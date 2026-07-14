@@ -14,97 +14,36 @@ namespace SharpProof.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class SymbolicRuntimeHazardQueryTests
 {
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ReturnsProvenDirectThrow()
+    public sealed record RuntimeHazardScenario(
+        string Name,
+        string Source,
+        string Marker,
+        bool IncludeUnprovenCandidates,
+        SymbolicRuntimeHazardKind[] Kinds,
+        SymbolicRuntimeHazardKind? Kind,
+        SymbolicRuntimeHazardStatus? Status,
+        string? ExceptionType,
+        string? Category,
+        string? Provenance,
+        SymbolicProofStatus? ProofStatus,
+        SymbolicProofBackend? Backend,
+        SymbolicUnknownReason? UnknownReason,
+        string? NodeKind,
+        string? OperationText);
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart1 =
     {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public void TestMethod()
-    {
-        throw new InvalidOperationException();
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "throw new InvalidOperationException();", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.Category, Is.EqualTo("direct_throw"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.direct-throw"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.direct-throw"));
-        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
-        Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
-        Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
-        Assert.That(hazard.InvariantInfo.MergedText, Is.EqualTo(hazard.MergedInvariantText));
-        Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
-        Assert.That(hazard.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesThrowNullAsNullReferenceException()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public void TestMethod()
-    {
-        Exception? error = null;
-        throw error;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "throw error;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.throw-null"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.throw-null"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesLiteralThrowNullAsNullReferenceException()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ClassifiesLiteralThrowNullAsNullReferenceException", @"
 public class TestClass
 {
     public void TestMethod()
     {
         throw null;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "throw null;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesPathProvenThrowMaybeNullAsNullReferenceException()
-    {
-        const string source = @"
+}", "throw null;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DirectThrow, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_throw_null", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ClassifiesPathProvenThrowMaybeNullAsNullReferenceException", @"
 using System;
 
 public class TestClass
@@ -116,22 +55,8 @@ public class TestClass
             throw error;
         }
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "throw error;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ReportsTypedCoalesceThrowExpression()
-    {
-        const string source = @"
+}", "throw error;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DirectThrow, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_throw_null", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ReportsTypedCoalesceThrowExpression", @"
 using System;
 
 public class TestClass
@@ -140,74 +65,9 @@ public class TestClass
     {
         return value ?? throw new InvalidOperationException();
     }
-}";
+}", "return value ?? throw new InvalidOperationException();", false, new[] { SymbolicRuntimeHazardKind.DirectThrow }, SymbolicRuntimeHazardKind.DirectThrow, SymbolicRuntimeHazardStatus.Proven, "System.InvalidOperationException", "direct_throw", null, null, null, null, SyntaxKind.ThrowExpression.ToString(), null),
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value ?? throw new InvalidOperationException();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DirectThrow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.Category, Is.EqualTo("direct_throw"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.ThrowExpression.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedDivideByZero()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int divisor)
-    {
-        if (divisor == 0)
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return 10 / divisor;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.divide-by-zero"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Has.Some.StartsWith("ir."));
-        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
-        Assert.That(hazard.Proof.Backend, Is.AnyOf(SymbolicProofBackend.Smt, SymbolicProofBackend.Syntactic));
-        if (hazard.Proof.Backend == SymbolicProofBackend.Smt)
-        {
-            Assert.That(hazard.Proof.Budget, Is.Not.Null);
-            Assert.That(hazard.Proof.Budget!.MaxPathConditions,
-                Is.EqualTo(SmtAnalysisOptions.Default.MaxPathConditions));
-        }
-        else
-        {
-            Assert.That(hazard.Proof.Budget, Is.Null);
-        }
-
-        Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
-        Assert.That(hazard.PathConditions, Does.Contain("divisor == 0"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_RemainderDivisorUsesIrPrecondition()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_RemainderDivisorUsesIrPrecondition", @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -219,22 +79,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return 10 / (value % 2);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.divide-by-zero");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_UnaryMinusDivisorUsesIrPrecondition()
-    {
-        const string source = @"
+}", "return 10 / (value % 2);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_UnaryMinusDivisorUsesIrPrecondition", @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -246,22 +92,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return 10 / -value;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.divide-by-zero");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ConditionalDivisorUsesIrPrecondition()
-    {
-        const string source = @"
+}", "return 10 / -value;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ConditionalDivisorUsesIrPrecondition", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -273,17 +105,86 @@ public class TestClass
 
         return 0;
     }
-}";
+}", "return 10 / (flag ? 0 : 1);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCompoundDivideByZero", @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor == 0)
+        {
+            value /= divisor;
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return 10 / (flag ? 0 : 1);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.divide-by-zero");
+        return value;
     }
+}", "value /= divisor;", false, new[] { SymbolicRuntimeHazardKind.DivideByZero }, SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", "definite_divide_by_zero", null, null, null, null, null, null),
+    };
+
+    private static IEnumerable<TestCaseData> RuntimeHazardScenarios()
+    {
+        var cases = RuntimeHazardScenariosPart1
+            .Concat(RuntimeHazardScenariosPart2)
+            .Concat(RuntimeHazardScenariosPart3)
+            .Concat(RuntimeHazardScenariosPart4)
+            .Concat(RuntimeHazardScenariosPart5)
+            .Concat(RuntimeHazardScenariosPart6)
+            .Concat(RuntimeHazardScenariosPart7)
+            .Concat(RuntimeHazardScenariosPart8)
+            .Concat(RuntimeHazardScenariosPart9)
+            .Concat(RuntimeHazardScenariosPart10)
+            .Concat(RuntimeHazardScenariosPart11)
+            .Concat(RuntimeHazardScenariosPart12)
+            .ToArray();
+
+        if (cases.Length != 99 ||
+            cases.Count(static testCase => testCase.Status == SymbolicRuntimeHazardStatus.Proven) != 71 ||
+            cases.Count(static testCase => testCase.Status == SymbolicRuntimeHazardStatus.Unreachable) != 24 ||
+            cases.Count(static testCase => testCase.Status == SymbolicRuntimeHazardStatus.Unknown) != 4 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 99)
+        {
+            throw new InvalidOperationException("Runtime hazard scenario invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(RuntimeHazardScenarios))]
+    public void QuerySourceRuntimeHazardsLine_Scenarios(RuntimeHazardScenario testCase)
+    {
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var options = testCase.IncludeUnprovenCandidates || testCase.Kinds.Length > 0
+            ? new SymbolicRuntimeHazardQueryOptions(testCase.IncludeUnprovenCandidates, testCase.Kinds)
+            : null;
+        var result = QueryLine(testCase.Source, testCase.Marker, smtAnalysis, options);
+        var hazard = AssertSingleHazard(result);
+        if (testCase.Kind is { } kind) Assert.That(hazard.Kind, Is.EqualTo(kind));
+        if (testCase.Status is { } status) Assert.That(hazard.Status, Is.EqualTo(status));
+        if (testCase.ExceptionType is { } exceptionType) Assert.That(hazard.ExceptionType, Is.EqualTo(exceptionType));
+        if (testCase.Category is { } category) Assert.That(hazard.Category, Is.EqualTo(category));
+        if (testCase.Provenance is { } provenance) AssertIrExceptionPrecondition(hazard, provenance);
+        if (testCase.ProofStatus is { } proofStatus) Assert.That(hazard.Proof.Status, Is.EqualTo(proofStatus));
+        if (testCase.Backend is { } backend) Assert.That(hazard.Proof.Backend, Is.EqualTo(backend));
+        if (testCase.UnknownReason is { } unknownReason) Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(unknownReason));
+        if (testCase.NodeKind is { } nodeKind) Assert.That(hazard.NodeKind, Is.EqualTo(nodeKind));
+        if (testCase.OperationText is { } operationText) Assert.That(hazard.OperationText, Is.EqualTo(operationText));
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [TestCase("/")]
     [TestCase("%")]
@@ -355,41 +256,11 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCompoundDivideByZero()
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart2 =
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (divisor == 0)
-        {
-            value /= divisor;
-        }
-
-        return value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value /= divisor;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_divide_by_zero"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedCompoundModuloByNonZeroIsPruned()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_GuardedCompoundModuloByNonZeroIsPruned", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -401,23 +272,142 @@ public class TestClass
 
         return value;
     }
-}";
+}", "value %= divisor;", true, new[] { SymbolicRuntimeHazardKind.DivideByZero }, SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Unreachable, "System.DivideByZeroException", "definite_modulo_by_zero", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedNullDereference", @"
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (value is null)
+        {
+            return value.Length;
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value %= divisor;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.DivideByZero }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_modulo_by_zero"));
+        return 0;
     }
+}", "return value.Length;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, null, null, null, null, null, null),
+
+        new("QuerySourceRuntimeHazardsLine_CoalescedReceiverNullDereferenceUsesIrPrecondition", @"
+public class TestClass
+{
+    public int TestMethod(string? left, string? right)
+    {
+        if (left is null && right is null)
+        {
+            return (left ?? right).Length;
+        }
+
+        return 0;
+    }
+}", "return (left ?? right).Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, "ir.runtime-hazard.null-dereference", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_StaticStringEqualsNullGuardUsesIrPrecondition", @"
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        string? other = null;
+        if (string.Equals(value, other))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}", "return value.Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, "ir.runtime-hazard.null-dereference", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ObjectReferenceEqualsNullGuardUsesIrPrecondition", @"
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (object.ReferenceEquals(value, null))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}", "return value.Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, "ir.runtime-hazard.null-dereference", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesWithExpressionNullReceiverDereference", @"
+public record Person(string Name);
+
+public class TestClass
+{
+    public Person TestMethod(Person? person)
+    {
+        if (person is null)
+        {
+            return person with { Name = ""fallback"" };
+        }
+
+        return person;
+    }
+}", "return person with { Name = \"fallback\" };", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_with_null", null, null, null, null, SyntaxKind.WithExpression.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_PrunesWithExpressionNullReceiverAfterNonNullGuard", @"
+public record Person(string Name);
+
+public class TestClass
+{
+    public Person TestMethod(Person? person)
+    {
+        if (person is not null)
+        {
+            return person with { Name = ""safe"" };
+        }
+
+        return new Person(""fallback"");
+    }
+}", "return person with { Name = \"safe\" };", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, "System.NullReferenceException", "definite_with_null", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesDeconstructionNullReceiverDereference", @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is null)
+        {
+            int left;
+            int right;
+            (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}", "(left, right) = pair;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_deconstruction_null", null, null, null, null, SyntaxKind.SimpleAssignmentExpression.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_PrunesDeconstructionNullReceiverAfterNonNullGuard", @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is not null)
+        {
+            int left;
+            int right;
+            (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}", "(left, right) = pair;", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, "System.NullReferenceException", "definite_deconstruction_null", null, null, null, null, null, null),
+    };
 
     [Test]
     public void QueryNodeRuntimeHazards_DefaultExcludesNestedCallableHazards()
@@ -478,31 +468,7 @@ public class TestClass
         }));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedNullDereference()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string? value)
-    {
-        if (value is null)
-        {
-            return value.Length;
-        }
 
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return value.Length;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_PrunesNotNullReturnContractReceiver()
@@ -566,301 +532,25 @@ public class TestClass
         Assert.That(result.Hazards[0].Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_MemberReceiverNullDereferenceUsesIrPrecondition()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart3 =
     {
-        const string source = @"
-public sealed class Holder
-{
-    public string? Value { get; set; }
-}
-
-public class TestClass
-{
-    public int TestMethod(Holder holder)
-    {
-        if (holder.Value is null)
-        {
-            return holder.Value.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return holder.Value.Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.null-dereference"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.null-dereference"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_CoalescedReceiverNullDereferenceUsesIrPrecondition()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string? left, string? right)
-    {
-        if (left is null && right is null)
-        {
-            return (left ?? right).Length;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (left ?? right).Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.null-dereference");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_StaticStringEqualsNullGuardUsesIrPrecondition()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string? value)
-    {
-        string? other = null;
-        if (string.Equals(value, other))
-        {
-            return value.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.null-dereference");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ObjectReferenceEqualsNullGuardUsesIrPrecondition()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string? value)
-    {
-        if (object.ReferenceEquals(value, null))
-        {
-            return value.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.null-dereference");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesWithExpressionNullReceiverDereference()
-    {
-        const string source = @"
-public record Person(string Name);
-
-public class TestClass
-{
-    public Person TestMethod(Person? person)
-    {
-        if (person is null)
-        {
-            return person with { Name = ""fallback"" };
-        }
-
-        return person;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return person with { Name = \"fallback\" };",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_with_null"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.WithExpression.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_PrunesWithExpressionNullReceiverAfterNonNullGuard()
-    {
-        const string source = @"
-public record Person(string Name);
-
-public class TestClass
-{
-    public Person TestMethod(Person? person)
-    {
-        if (person is not null)
-        {
-            return person with { Name = ""safe"" };
-        }
-
-        return new Person(""fallback"");
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return person with { Name = \"safe\" };",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_with_null"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDeconstructionNullReceiverDereference()
-    {
-        const string source = @"
-public sealed class Pair
-{
-    public void Deconstruct(out int left, out int right)
-    {
-        left = 1;
-        right = 2;
-    }
-}
-
-public class TestClass
-{
-    public int TestMethod(Pair? pair)
-    {
-        if (pair is null)
-        {
-            int left;
-            int right;
-            (left, right) = pair;
-            return left + right;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "(left, right) = pair;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.SimpleAssignmentExpression.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_PrunesDeconstructionNullReceiverAfterNonNullGuard()
-    {
-        const string source = @"
-public sealed class Pair
-{
-    public void Deconstruct(out int left, out int right)
-    {
-        left = 1;
-        right = 2;
-    }
-}
-
-public class TestClass
-{
-    public int TestMethod(Pair? pair)
-    {
-        if (pair is not null)
-        {
-            int left;
-            int right;
-            (left, right) = pair;
-            return left + right;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "(left, right) = pair;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDeconstructionDeclarationNullReceiverDereference()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesDeconstructionDeclarationNullReceiverDereference", @"
 public sealed class Pair
 {
     public void Deconstruct(out int left, out int right)
@@ -882,21 +572,109 @@ public class TestClass
 
         return 0;
     }
-}";
+}", "var (left, right) = pair;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_deconstruction_null", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesForeachNullSourceDereference", @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        if (values is null)
+        {
+            foreach (var value in values)
+            {
+                return value.Length;
+            }
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "var (left, right) = pair;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
+        return 0;
     }
+}", "foreach (var value in values)", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, null, null, null, null, SyntaxKind.ForEachStatement.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_ClassifiesForeachNullSourceAfterNonNullGuardAsUnreachableCandidate", @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        if (values is not null)
+        {
+            foreach (var value in values)
+            {
+                return value.Length;
+            }
+        }
+
+        return 0;
+    }
+}", "foreach (var value in values)", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, SyntaxKind.ForEachStatement.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_ProvesAwaitNullDereference", @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod()
+    {
+        Task<int> task = null!;
+        return await task;
+    }
+}", "return await task;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_await_null", null, null, null, null, SyntaxKind.AwaitExpression.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_ClassifiesAwaitNullDereferenceAfterNonNullGuardAsUnreachableCandidate", @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Task<int> task)
+    {
+        if (task is not null)
+        {
+            return await task;
+        }
+
+        return 0;
+    }
+}", "return await task;", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_await_null", null, null, null, null, SyntaxKind.AwaitExpression.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_ProvesLockNullSourceArgumentNull", @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate is null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}", "lock (gate)", false, new[] { SymbolicRuntimeHazardKind.ArgumentNull }, SymbolicRuntimeHazardKind.ArgumentNull, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentNullException", "definite_lock_null", null, null, null, null, SyntaxKind.LockStatement.ToString(), null),
+        new("QuerySourceRuntimeHazardsLine_ClassifiesLockNullSourceAfterNonNullGuardAsUnreachableCandidate", @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate is not null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}", "lock (gate)", true, new[] { SymbolicRuntimeHazardKind.ArgumentNull }, SymbolicRuntimeHazardKind.ArgumentNull, SymbolicRuntimeHazardStatus.Unreachable, "System.ArgumentNullException", null, null, null, null, null, SyntaxKind.LockStatement.ToString(), null),
+
+
+        new("QuerySourceRuntimeHazardsLine_ProvesDynamicInvocationNullBinding", @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing();
+    }
+}", "return value.Missing();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
+    };
 
     [Test]
     public void QuerySourceRuntimeHazards_DoesNotTreatExtensionDeconstructionNullSourceAsImplicitDereference()
@@ -943,39 +721,7 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesForeachNullSourceDereference()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string[] values)
-    {
-        if (values is null)
-        {
-            foreach (var value in values)
-            {
-                return value.Length;
-            }
-        }
 
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "foreach (var value in values)",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.ForEachStatement.ToString()));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_PrunesForeachNullSourceAfterNonNullGuard()
@@ -1007,70 +753,9 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesForeachNullSourceAfterNonNullGuardAsUnreachableCandidate()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string[] values)
-    {
-        if (values is not null)
-        {
-            foreach (var value in values)
-            {
-                return value.Length;
-            }
-        }
 
-        return 0;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "foreach (var value in values)",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NullDereference }));
 
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.ForEachStatement.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesAwaitNullDereference()
-    {
-        const string source = @"
-using System.Threading.Tasks;
-
-public class TestClass
-{
-    public async Task<int> TestMethod()
-    {
-        Task<int> task = null!;
-        return await task;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return await task;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_await_null"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.AwaitExpression.ToString()));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_PrunesAwaitNullDereferenceAfterNonNullGuard()
@@ -1101,75 +786,9 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesAwaitNullDereferenceAfterNonNullGuardAsUnreachableCandidate()
-    {
-        const string source = @"
-using System.Threading.Tasks;
 
-public class TestClass
-{
-    public async Task<int> TestMethod(Task<int> task)
-    {
-        if (task is not null)
-        {
-            return await task;
-        }
 
-        return 0;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return await task;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_await_null"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.AwaitExpression.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesLockNullSourceArgumentNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(object gate)
-    {
-        if (gate is null)
-        {
-            lock (gate)
-            {
-                return 1;
-            }
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "lock (gate)",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentNull }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_lock_null"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.LockStatement.ToString()));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_PrunesLockNullSourceAfterNonNullGuard()
@@ -1201,160 +820,25 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ClassifiesLockNullSourceAfterNonNullGuardAsUnreachableCandidate()
+
+
+
+
+
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart4 =
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(object gate)
-    {
-        if (gate is not null)
-        {
-            lock (gate)
-            {
-                return 1;
-            }
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "lock (gate)",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentNull }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.LockStatement.ToString()));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDynamicMemberNullBinding()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod()
-    {
-        dynamic value = null;
-        return value.Missing;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Missing;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.dynamic-null-binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicMemberNullBinding()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod()
-    {
-        return ((dynamic)null).Missing;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return ((dynamic)null).Missing;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDynamicInvocationNullBinding()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod()
-    {
-        dynamic value = null;
-        return value.Missing();
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Missing();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicInvocationNullBinding()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicInvocationNullBinding", @"
 public class TestClass
 {
     public object TestMethod()
     {
         return ((dynamic)null).Missing();
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return ((dynamic)null).Missing();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDynamicDirectInvocationNullBinding()
-    {
-        const string source = @"
+}", "return ((dynamic)null).Missing();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesDynamicDirectInvocationNullBinding", @"
 public class TestClass
 {
     public object TestMethod()
@@ -1362,52 +846,16 @@ public class TestClass
         dynamic value = null;
         return value();
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicDirectInvocationNullBinding()
-    {
-        const string source = @"
+}", "return value();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicDirectInvocationNullBinding", @"
 public class TestClass
 {
     public object TestMethod()
     {
         return ((dynamic)null)();
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return ((dynamic)null)();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesDynamicIndexerNullBinding()
-    {
-        const string source = @"
+}", "return ((dynamic)null)();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesDynamicIndexerNullBinding", @"
 public class TestClass
 {
     public object TestMethod()
@@ -1415,47 +863,44 @@ public class TestClass
         dynamic value = null;
         return value[0];
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value[0];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_index_null_binding"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicIndexerNullBinding()
-    {
-        const string source = @"
+}", "return value[0];", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_index_null_binding", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicIndexerNullBinding", @"
 public class TestClass
 {
     public object TestMethod()
     {
         return ((dynamic)null)[0];
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return ((dynamic)null)[0];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_index_null_binding"));
+}", "return ((dynamic)null)[0];", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_index_null_binding", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_NonNullDynamicReceiverPrunesNullBindingCandidate", @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = new object();
+        return value.ToString();
     }
+}", "return value.ToString();", true, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+
+
+
+        new("QuerySourceRuntimeHazardsLine_ProvesNullableExplicitCastWithoutValue", @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (!value.HasValue)
+        {
+            return (int)value;
+        }
+
+        return 0;
+    }
+}", "return (int)value;", false, new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }, SymbolicRuntimeHazardKind.NullableValueWithoutValue, SymbolicRuntimeHazardStatus.Proven, "System.InvalidOperationException", "definite_nullable_value_without_value", null, null, null, null, null, null),
+    };
+
+
+
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDynamicNullBindingCandidate()
@@ -1489,87 +934,8 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazards_NonNullDynamicReceiverPrunesNullBindingCandidate()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod()
-    {
-        dynamic value = new object();
-        return value.ToString();
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.ToString();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
 
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
-
-    [Test]
-    public void KnownLimitation_DynamicBinderMissingMemberOnNonNullReceiver_HasNoBinderHazard()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod()
-    {
-        dynamic value = new object();
-        return value.Missing;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Missing;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
-
-        var nullBindingCandidate = AssertSingleHazard(result);
-        Assert.That(nullBindingCandidate.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
-        Assert.That(nullBindingCandidate.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(result.Hazards, Has.None.Matches<SymbolicRuntimeHazard>(hazard =>
-            hazard.Status == SymbolicRuntimeHazardStatus.Proven));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesNullableValueWithoutValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        int? value = default;
-        return value.Value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return value.Value;", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance,
-            Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_SuppressesNullableValueAfterCoalesceFallbackAssignment()
@@ -1595,75 +961,7 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullableValueAfterConditionalAccessNullReceiverAssignment()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        int? value = text?.Length;
-        if (text is null)
-        {
-            return value.Value;
-        }
 
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance,
-            Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.nullable-value.without-value"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesNullableExplicitCastWithoutValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (!value.HasValue)
-        {
-            return (int)value;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (int)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_nullable_value_without_value"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_GuardedNullableExplicitCastIsPruned()
@@ -1706,10 +1004,9 @@ public class TestClass
         Assert.That(hazard.Category, Is.EqualTo("definite_nullable_value_without_value"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedTaskAwait()
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart5 =
     {
-        const string source = @"
+        new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedTaskAwait", @"
 using System.Threading.Tasks;
 
 public class TestClass
@@ -1719,26 +1016,8 @@ public class TestClass
         int? value = await Task.FromResult<int?>(null);
         return value.Value;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskResult()
-    {
-        const string source = @"
+}", "return value.Value;", false, new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }, SymbolicRuntimeHazardKind.NullableValueWithoutValue, SymbolicRuntimeHazardStatus.Proven, "System.InvalidOperationException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskResult", @"
 using System.Threading.Tasks;
 
 public class TestClass
@@ -1748,26 +1027,8 @@ public class TestClass
         int? value = new ValueTask<int?>((int?)null).Result;
         return value.Value;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskGetResult()
-    {
-        const string source = @"
+}", "return value.Value;", false, new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }, SymbolicRuntimeHazardKind.NullableValueWithoutValue, SymbolicRuntimeHazardStatus.Proven, "System.InvalidOperationException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskGetResult", @"
 using System.Threading.Tasks;
 
 public class TestClass
@@ -1777,25 +1038,8 @@ public class TestClass
         string? value = Task.FromResult<string?>(null).GetAwaiter().GetResult();
         return value.Length;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskResultProperty()
-    {
-        const string source = @"
+}", "return value.Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskResultProperty", @"
 using System.Threading.Tasks;
 
 public class TestClass
@@ -1805,24 +1049,8 @@ public class TestClass
         string? value = Task.FromResult<string?>(null).Result;
         return value.Length;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Length;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskAwait()
-    {
-        const string source = @"
+}", "return value.Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskAwait", @"
 using System.Threading.Tasks;
 
 public class TestClass
@@ -1832,25 +1060,8 @@ public class TestClass
         int? value = await ValueTask.FromResult<int?>(null);
         return value.Value;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
-    {
-        const string source = @"
+}", "return value.Value;", false, new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }, SymbolicRuntimeHazardKind.NullableValueWithoutValue, SymbolicRuntimeHazardStatus.Proven, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1858,21 +1069,50 @@ public class TestClass
         object value = null;
         return (int)value;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (int)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.UnboxNull }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.UnboxNull));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_unbox_null"));
+}", "return (int)value;", false, new[] { SymbolicRuntimeHazardKind.UnboxNull }, SymbolicRuntimeHazardKind.UnboxNull, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_unbox_null", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesInvalidReferenceCast", @"
+public class TestClass
+{
+    public string TestMethod()
+    {
+        object value = new object();
+        return (string)value;
     }
+}", "return (string)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
+
+        new("QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterAsCastNullAndSourceNonNull", @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        var text = value as string;
+        if (text == null && value != null)
+        {
+            return (string)value;
+        }
+
+        return string.Empty;
+    }
+}", "return (string)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterInlineAsAssignmentNullAndSourceNonNull", @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        string text;
+        if ((text = value as string) == null && value != null)
+        {
+            return (string)value;
+        }
+
+        return string.Empty;
+    }
+}", "return (string)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
+    };
+
+
+
+
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownUnboxNullCastCandidate()
@@ -1906,68 +1146,7 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidReferenceCast()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod()
-    {
-        object value = new object();
-        return (string)value;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (string)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterNegativeTypeAndNullTests()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(object value)
-    {
-        if (value is not string && value is not null)
-        {
-            return (string)value;
-        }
-
-        return string.Empty;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (string)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.invalid-cast.mismatch"));
-        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.invalid-cast.mismatch"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_SuppressesInvalidCastAfterAsCastNonNullGuard()
@@ -1997,37 +1176,6 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterAsCastNullAndSourceNonNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(object value)
-    {
-        var text = value as string;
-        if (text == null && value != null)
-        {
-            return (string)value;
-        }
-
-        return string.Empty;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (string)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_SuppressesInvalidCastAfterInlineAsAssignmentNonNullGuard()
@@ -2057,37 +1205,6 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterInlineAsAssignmentNullAndSourceNonNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(object value)
-    {
-        string text;
-        if ((text = value as string) == null && value != null)
-        {
-            return (string)value;
-        }
-
-        return string.Empty;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (string)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownInvalidCastAfterNegativeTypeTest()
@@ -2126,10 +1243,9 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidUnboxCast()
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart6 =
     {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesInvalidUnboxCast", @"
 public class TestClass
 {
     public long TestMethod()
@@ -2137,22 +1253,112 @@ public class TestClass
         object value = 1;
         return (long)value;
     }
-}";
+}", "return (long)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesBuiltInIndexOutOfRange", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values.Length == 0)
+        {
+            return values[0];
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return (long)value;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+        return 0;
     }
+}", "return values[0];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, "ir.runtime-hazard.index.out-of-range", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_NegativeFromEndIndexReportsConstructionFailure", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        return values[^-1];
+    }
+}", "return values[^-1];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_index_construction_argument_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesArrayGetValueIndexOutOfRange", @"
+public class TestClass
+{
+    public object TestMethod(int[] values)
+    {
+        return values.GetValue(values.Length);
+    }
+}", "return values.GetValue(values.Length);", false, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", "definite_array_get_value_index_out_of_range", "ir.runtime-hazard.array-get-value.index-out-of-range", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedMultidimensionalArrayGetValueIndexOutOfRangeIsPruned", @"
+public class TestClass
+{
+    public object TestMethod(int[,] values, int row, int column)
+    {
+        if (row >= 0 && row < values.GetLength(0) && column >= 0 && column < values.GetLength(1))
+        {
+            return values.GetValue(row, column);
+        }
 
+        return 0;
+    }
+}", "return values.GetValue(row, column);", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", "definite_array_get_value_index_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_AssignedModuloIndexUnderPositiveLengthGuardIsUnreachable", @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        if (values.Length > 0 && hash >= 0)
+        {
+            var index = hash % values.Length;
+            return values[index];
+        }
+
+        return 0;
+    }
+}", "return values[index];", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_AssignedAbsModuloIndexUnderPositiveLengthGuardIsUnreachable", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        if (values.Length > 0)
+        {
+            var index = Math.Abs(hash % values.Length);
+            return values[index];
+        }
+
+        return 0;
+    }
+}", "return values[index];", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_DirectAbsModuloIndexIsUnreachable", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        return values[Math.Abs(hash % values.Length)];
+    }
+}", "return values[Math.Abs(hash % values.Length)];", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesObjectErasedArrayCastAliasIndexOutOfRange", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[4];
+        object boxed = values;
+        var alias = (int[])boxed;
+        return alias[4];
+    }
+}", "return alias[4];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesAssignedSpanSliceIndexOutOfRange", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values)
+    {
+        var tail = values.Slice(values.Length);
+        return tail[0];
+    }
+}", "return tail[0];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+    };
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleCast()
     {
@@ -2176,264 +1382,18 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesBuiltInIndexOutOfRange()
+
+
+
+
+
+
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart7 =
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values.Length == 0)
-        {
-            return values[0];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return values[0];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.index.out-of-range");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_NegativeFromEndIndexReportsConstructionFailure()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        return values[^-1];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return values[^-1];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_index_construction_argument_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesArrayGetValueIndexOutOfRange()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod(int[] values)
-    {
-        return values.GetValue(values.Length);
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.GetValue(values.Length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_array_get_value_index_out_of_range"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.array-get-value.index-out-of-range");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedMultidimensionalArrayGetValueIndexOutOfRangeIsPruned()
-    {
-        const string source = @"
-public class TestClass
-{
-    public object TestMethod(int[,] values, int row, int column)
-    {
-        if (row >= 0 && row < values.GetLength(0) && column >= 0 && column < values.GetLength(1))
-        {
-            return values.GetValue(row, column);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.GetValue(row, column);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_array_get_value_index_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_AssignedModuloIndexUnderPositiveLengthGuardIsUnreachable()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values, int hash)
-    {
-        if (values.Length > 0 && hash >= 0)
-        {
-            var index = hash % values.Length;
-            return values[index];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[index];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_AssignedAbsModuloIndexUnderPositiveLengthGuardIsUnreachable()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, int hash)
-    {
-        if (values.Length > 0)
-        {
-            var index = Math.Abs(hash % values.Length);
-            return values[index];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[index];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_DirectAbsModuloIndexIsUnreachable()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, int hash)
-    {
-        return values[Math.Abs(hash % values.Length)];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[Math.Abs(hash % values.Length)];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesObjectErasedArrayCastAliasIndexOutOfRange()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var values = new int[4];
-        object boxed = values;
-        var alias = (int[])boxed;
-        return alias[4];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return alias[4];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesAssignedSpanSliceIndexOutOfRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(ReadOnlySpan<int> values)
-    {
-        var tail = values.Slice(values.Length);
-        return tail[0];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return tail[0];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesBuiltInRangeOutOfRange()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesBuiltInRangeOutOfRange", @"
 public class TestClass
 {
     public string TestMethod(string value)
@@ -2445,42 +1405,121 @@ public class TestClass
 
         return value;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return value[1..];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesStringSubstringArgumentOutOfRange()
-    {
-        const string source = @"
+}", "return value[1..];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesStringSubstringArgumentOutOfRange", @"
 public class TestClass
 {
     public string TestMethod(string value)
     {
         return value.Substring(value.Length + 1);
     }
-}";
+}", "return value.Substring(value.Length + 1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_string_substring_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_StringRemoveZeroCountAtLengthIsPruned", @"
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        if (value.Length >= 0)
+        {
+            return value.Remove(value.Length, 0);
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Substring(value.Length + 1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_string_substring_out_of_range"));
+        return value;
     }
+}", "return value.Remove(value.Length, 0);", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_string_remove_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesSpanSliceArgumentOutOfRange", @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
+    {
+        return values.Slice(values.Length + 1);
+    }
+}", "return values.Slice(values.Length + 1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_slice_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_OverflowProneSpanSliceGuardRemainsUnknown", @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length);
+        }
+
+        return values;
+    }
+}", "return values.Slice(start, length);", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Unknown, null, "definite_slice_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesSpanSliceUncheckedAddOverflowArgumentOutOfRange", @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
+    {
+        var start = int.MaxValue;
+        var length = 1;
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length);
+        }
+
+        return values;
+    }
+}", "return values.Slice(start, length);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_slice_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesArrayAsSpanArgumentOutOfRange", @"
+using System;
+
+public class TestClass
+{
+    public Span<int> TestMethod(int[] values)
+    {
+        return values.AsSpan(values.Length + 1);
+    }
+}", "return values.AsSpan(values.Length + 1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_memory_extensions_as_span_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_OverflowProneStringAsSpanGuardRemainsUnknown", @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<char> TestMethod(string value, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= value.Length)
+        {
+            return value.AsSpan(start, length);
+        }
+
+        return value.AsSpan();
+    }
+}", "return value.AsSpan(start, length);", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Unknown, null, "definite_memory_extensions_as_span_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesStringAsMemoryArgumentOutOfRange", @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlyMemory<char> TestMethod(string value)
+    {
+        return value.AsMemory(value.Length + 1);
+    }
+}", "return value.AsMemory(value.Length + 1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_memory_extensions_as_memory_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_OverflowProneArrayAsMemoryGuardRemainsUnknown", @"
+using System;
+
+public class TestClass
+{
+    public Memory<int> TestMethod(int[] values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.AsMemory(start, length);
+        }
+
+        return values.AsMemory();
+    }
+}", "return values.AsMemory(start, length);", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Unknown, null, "definite_memory_extensions_as_memory_out_of_range", null, null, null, null, null, null),
+    };
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_GuardedStringSubstringArgumentOutOfRangeIsPruned()
@@ -2557,263 +1596,17 @@ public class TestClass
         Assert.That(hazard.Category, Is.EqualTo("definite_string_remove_out_of_range"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_StringRemoveZeroCountAtLengthIsPruned()
+
+
+
+
+
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart8 =
     {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(string value)
-    {
-        if (value.Length >= 0)
-        {
-            return value.Remove(value.Length, 0);
-        }
-
-        return value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.Remove(value.Length, 0);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_string_remove_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesSpanSliceArgumentOutOfRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
-    {
-        return values.Slice(values.Length + 1);
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Slice(values.Length + 1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_OverflowProneSpanSliceGuardRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values, int start, int length)
-    {
-        if (start >= 0 && length >= 0 && start + length <= values.Length)
-        {
-            return values.Slice(start, length);
-        }
-
-        return values;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Slice(start, length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
-        Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesSpanSliceUncheckedAddOverflowArgumentOutOfRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
-    {
-        var start = int.MaxValue;
-        var length = 1;
-        if (start >= 0 && length >= 0 && start + length <= values.Length)
-        {
-            return values.Slice(start, length);
-        }
-
-        return values;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Slice(start, length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesArrayAsSpanArgumentOutOfRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public Span<int> TestMethod(int[] values)
-    {
-        return values.AsSpan(values.Length + 1);
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.AsSpan(values.Length + 1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_span_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_OverflowProneStringAsSpanGuardRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public ReadOnlySpan<char> TestMethod(string value, int start, int length)
-    {
-        if (start >= 0 && length >= 0 && start + length <= value.Length)
-        {
-            return value.AsSpan(start, length);
-        }
-
-        return value.AsSpan();
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.AsSpan(start, length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
-        Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_span_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesStringAsMemoryArgumentOutOfRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public ReadOnlyMemory<char> TestMethod(string value)
-    {
-        return value.AsMemory(value.Length + 1);
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value.AsMemory(value.Length + 1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_memory_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_OverflowProneArrayAsMemoryGuardRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public Memory<int> TestMethod(int[] values, int start, int length)
-    {
-        if (start >= 0 && length >= 0 && start + length <= values.Length)
-        {
-            return values.AsMemory(start, length);
-        }
-
-        return values.AsMemory();
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.AsMemory(start, length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
-        Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_memory_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesArrayAsMemoryUncheckedAddOverflowArgumentOutOfRange()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesArrayAsMemoryUncheckedAddOverflowArgumentOutOfRange", @"
 using System;
 
 public class TestClass
@@ -2829,26 +1622,8 @@ public class TestClass
 
         return values.AsMemory();
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.AsMemory(start, length);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_memory_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesMemorySliceNegativeLengthArgumentOutOfRange()
-    {
-        const string source = @"
+}", "return values.AsMemory(start, length);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_memory_extensions_as_memory_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesMemorySliceNegativeLengthArgumentOutOfRange", @"
 using System;
 
 public class TestClass
@@ -2857,21 +1632,112 @@ public class TestClass
     {
         return values.Slice(0, -1);
     }
-}";
+}", "return values.Slice(0, -1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_slice_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedRangeAccessArgumentOutOfRangeStillPruned", @"
+public class TestClass
+{
+    public string TestMethod(string value, int start, int end)
+    {
+        if (start >= 0 && start <= end && end <= value.Length)
+        {
+            return value[start..end];
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Slice(0, -1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
+        return value;
     }
+}", "return value[start..end];", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_range_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesListIndexerArgumentOutOfRange", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(List<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}", "return values[0];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_count_index_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesReadOnlyListIndexerArgumentOutOfRange", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyList<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}", "return values[0];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_count_index_out_of_range", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesListIndexFromEndArgumentOutOfRange", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(List<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[^1];
+        }
+
+        return 0;
+    }
+}", "return values[^1];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_count_index_out_of_range", null, null, null, null, null, null),
+
+        new("QuerySourceRuntimeHazardsLine_PrunesQueueDequeueAfterCountGuard", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Queue<int> values)
+    {
+        if (values.Count > 0)
+        {
+            return values.Dequeue();
+        }
+
+        return 0;
+    }
+}", "return values.Dequeue();", true, new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }, SymbolicRuntimeHazardKind.InvalidCollectionCardinality, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesStackPopOnEmptyCollection", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Stack<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values.Pop();
+        }
+
+        return 0;
+    }
+}", "return values.Pop();", false, new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }, SymbolicRuntimeHazardKind.InvalidCollectionCardinality, SymbolicRuntimeHazardStatus.Proven, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_PrunesPriorityQueuePeekAfterCountGuard", @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(PriorityQueue<int, int> values)
+    {
+        if (values.Count > 0)
+        {
+            return values.Peek();
+        }
+
+        return 0;
+    }
+}", "return values.Peek();", true, new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }, SymbolicRuntimeHazardKind.InvalidCollectionCardinality, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+    };
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownStringSubstringArgumentOutOfRangeCandidate()
@@ -2907,95 +1773,8 @@ public class TestClass
         Assert.That(hazard.Category, Is.EqualTo("definite_string_substring_out_of_range"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedRangeAccessArgumentOutOfRangeStillPruned()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(string value, int start, int end)
-    {
-        if (start >= 0 && start <= end && end <= value.Length)
-        {
-            return value[start..end];
-        }
 
-        return value;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value[start..end];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_range_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesListIndexerArgumentOutOfRange()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(List<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return values[0];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return values[0];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesReadOnlyListIndexerArgumentOutOfRange()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IReadOnlyList<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return values[0];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return values[0];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_GuardedReadOnlyListIndexerArgumentOutOfRangeIsPruned()
@@ -3036,34 +1815,6 @@ public class TestClass
         Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesListIndexFromEndArgumentOutOfRange()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(List<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return values[^1];
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return values[^1];", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazardsLine_GuardedListIndexFromEndArgumentOutOfRangeIsPruned()
@@ -3108,204 +1859,15 @@ public class TestClass
         Assert.That(listAccessHazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesQueuePeekOnEmptyCollection()
+
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart9 =
     {
-        const string source = @"
-using System.Collections.Generic;
 
-public class TestClass
-{
-    public int TestMethod(Queue<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return values.Peek();
-        }
 
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Peek();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_collection_cardinality"));
-        Assert.That(hazard.TriggerPrecondition?.Provenance,
-            Is.EqualTo("ir.runtime-hazard.collection-cardinality"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_PrunesQueueDequeueAfterCountGuard()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(Queue<int> values)
-    {
-        if (values.Count > 0)
-        {
-            return values.Dequeue();
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Dequeue();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesStackPopOnEmptyCollection()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(Stack<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return values.Pop();
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Pop();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
-                { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_PrunesPriorityQueuePeekAfterCountGuard()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(PriorityQueue<int, int> values)
-    {
-        if (values.Count > 0)
-        {
-            return values.Peek();
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values.Peek();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value == int.MaxValue)
-        {
-            return checked(value + 1);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return checked(value + 1);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance,
-            Is.EqualTo("ir.runtime-hazard.checked-integral.binary-overflow"));
-        Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
-        Assert.That(hazard.Proof.Budget, Is.Not.Null);
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesMathAbsMinimumOverflow()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod()
-    {
-        return Math.Abs(int.MinValue);
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return Math.Abs(int.MinValue);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Provenance,
-            Is.EqualTo("ir.runtime-hazard.math.abs-overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesInvalidMathClampBounds()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesInvalidMathClampBounds", @"
 using System;
 
 public class TestClass
@@ -3314,22 +1876,8 @@ public class TestClass
     {
         return Math.Clamp(value, 10, 0);
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return Math.Clamp(value, 10, 0);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_clamp_bounds"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesRegexNullInput()
-    {
-        const string source = @"
+}", "return Math.Clamp(value, 10, 0);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentException", "definite_invalid_clamp_bounds", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesRegexNullInput", @"
 using System.Text.RegularExpressions;
 
 public class TestClass
@@ -3339,22 +1887,8 @@ public class TestClass
         string input = null;
         return Regex.IsMatch(input, ""a"");
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return Regex.IsMatch(input, \"a\");", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_regex_null_input"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedMathAbsOverflowIsPruned()
-    {
-        const string source = @"
+}", "return Regex.IsMatch(input, \"a\");", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentNull, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentNullException", "definite_regex_null_input", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedMathAbsOverflowIsPruned", @"
 using System;
 
 public class TestClass
@@ -3368,27 +1902,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return Math.Abs(value);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesShortMathAbsMinimumOverflow()
-    {
-        const string source = @"
+}", "return Math.Abs(value);", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, "System.OverflowException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesShortMathAbsMinimumOverflow", @"
 using System;
 
 public class TestClass
@@ -3397,48 +1912,53 @@ public class TestClass
     {
         return Math.Abs(short.MinValue);
     }
-}";
+}", "return Math.Abs(short.MinValue);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", null, null, null, null, null, null, null),
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return Math.Abs(short.MinValue);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesConstantBoundMathClampIndexIsInRangeThroughIr()
-    {
-        const string source = @"
-using System;
-
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedDivisionOverflow", @"
 public class TestClass
 {
-    public int TestMethod(int index)
+    public int TestMethod(int value)
     {
-        var values = new int[11];
-        return values[Math.Clamp(index, 0, 10)];
-    }
-}";
+        if (value == int.MinValue)
+        {
+            return checked(value / -1);
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[Math.Clamp(index, 0, 10)];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Provenance,
-            Is.EqualTo("ir.runtime-hazard.index.out-of-range"));
+        return 0;
     }
+}", "return checked(value / -1);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.signed-division-overflow", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedCheckedDivisionOverflowIsPruned", @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value > int.MinValue && divisor == -1)
+        {
+            return checked(value / divisor);
+        }
+
+        return 0;
+    }
+}", "return checked(value / divisor);", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedDivisionOverflow", @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value == int.MinValue && divisor == -1)
+        {
+            return unchecked(value / divisor);
+        }
+
+        return 0;
+    }
+}", "return unchecked(value / divisor);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.signed-division-overflow", null, null, null, null, null),
+    };
+
+
+
+
+
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedIntegralOverflowCandidate()
@@ -3472,107 +1992,12 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedDivisionOverflow()
+
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart10 =
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value == int.MinValue)
-        {
-            return checked(value / -1);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return checked(value / -1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.signed-division-overflow");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedCheckedDivisionOverflowIsPruned()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (value > int.MinValue && divisor == -1)
-        {
-            return checked(value / divisor);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return checked(value / divisor);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedDivisionOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (value == int.MinValue && divisor == -1)
-        {
-            return unchecked(value / divisor);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return unchecked(value / divisor);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.signed-division-overflow");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedRemainderOverflow()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedRemainderOverflow", @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -3584,26 +2009,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return checked(value % -1);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedRemainderOverflow()
-    {
-        const string source = @"
+}", "return checked(value % -1);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedRemainderOverflow", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -3615,26 +2022,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return unchecked(value % divisor);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongRemainderOverflow()
-    {
-        const string source = @"
+}", "return unchecked(value % divisor);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongRemainderOverflow", @"
 public class TestClass
 {
     public long TestMethod(long value)
@@ -3646,26 +2035,8 @@ public class TestClass
 
         return 0;
     }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return checked(value % -1L);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedCheckedRemainderOverflowIsPruned()
-    {
-        const string source = @"
+}", "return checked(value % -1L);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedCheckedRemainderOverflowIsPruned", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -3677,23 +2048,103 @@ public class TestClass
 
         return 0;
     }
-}";
+}", "return checked(value % divisor);", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundAssignmentOverflow", @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            checked
+            {
+                value += 1;
+            }
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return checked(value % divisor);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        return value;
     }
+}", "value += 1;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundDivisionOverflow", @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value == int.MinValue && divisor == -1)
+        {
+            checked
+            {
+                value /= divisor;
+            }
+        }
+
+        return value;
+    }
+}", "value /= divisor;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundRemainderOverflow", @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value == int.MinValue && divisor == -1)
+        {
+            checked
+            {
+                value %= divisor;
+            }
+        }
+
+        return value;
+    }
+}", "value %= divisor;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardedCheckedCompoundAssignmentOverflowIsPruned", @"
+public class TestClass
+{
+    public int TestMethod(int value, int delta)
+    {
+        if (value >= int.MinValue && delta >= 0 && value <= int.MaxValue - delta)
+        {
+            checked
+            {
+                value += delta;
+            }
+        }
+
+        return value;
+    }
+}", "value += delta;", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_checked_integral_overflow", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeArrayLength", @"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        if (length < 0)
+        {
+            return new int[length];
+        }
+
+        return new int[0];
+    }
+}", "return new int[length];", false, new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }, SymbolicRuntimeHazardKind.NegativeArrayLength, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_negative_array_length", "ir.runtime-hazard.array.negative-length.aggregate", null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeStackAllocLength", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        if (length < 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}", "Span<int> span = stackalloc int[length];", false, new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }, SymbolicRuntimeHazardKind.NegativeStackAllocLength, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_negative_stackalloc_length", "ir.runtime-hazard.stackalloc.negative-length.aggregate", null, null, null, null, null),
+    };
+
+
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedDivisionOverflowCandidate()
@@ -3751,142 +2202,9 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundAssignmentOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value == int.MaxValue)
-        {
-            checked
-            {
-                value += 1;
-            }
-        }
 
-        return value;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value += 1;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
 
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundDivisionOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (value == int.MinValue && divisor == -1)
-        {
-            checked
-            {
-                value /= divisor;
-            }
-        }
-
-        return value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value /= divisor;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundRemainderOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (value == int.MinValue && divisor == -1)
-        {
-            checked
-            {
-                value %= divisor;
-            }
-        }
-
-        return value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value %= divisor;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedCheckedCompoundAssignmentOverflowIsPruned()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int delta)
-    {
-        if (value >= int.MinValue && delta >= 0 && value <= int.MaxValue - delta)
-        {
-            checked
-            {
-                value += delta;
-            }
-        }
-
-        return value;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "value += delta;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedCompoundAssignmentOverflowCandidate()
@@ -3926,37 +2244,6 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeArrayLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int[] TestMethod(int length)
-    {
-        if (length < 0)
-        {
-            return new int[length];
-        }
-
-        return new int[0];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return new int[length];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeArrayLength));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_negative_array_length"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.array.negative-length.aggregate");
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownNegativeArrayLengthCandidate()
@@ -3990,45 +2277,10 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeStackAllocLength()
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart11 =
     {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int length)
-    {
-        if (length < 0)
-        {
-            Span<int> span = stackalloc int[length];
-            return span.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "Span<int> span = stackalloc int[length];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeStackAllocLength));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.stackalloc.negative-length.aggregate");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedStackAllocLengthIsPruned()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_GuardedStackAllocLengthIsPruned", @"
 using System;
 
 public class TestClass
@@ -4043,23 +2295,121 @@ public class TestClass
 
         return 0;
     }
-}";
+}", "Span<int> span = stackalloc int[length];", true, new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }, SymbolicRuntimeHazardKind.NegativeStackAllocLength, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_negative_stackalloc_length", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_ArrayCreationNormalCompletionPrunesNegativeLengthBranch", @"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        var values = new int[length];
+        if (length < 0)
+        {
+            return new int[length + 0];
+        }
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "Span<int> span = stackalloc int[length];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeStackAllocLength));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
+        return values;
     }
+}", "return new int[length + 0];", true, new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }, SymbolicRuntimeHazardKind.NegativeArrayLength, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_MultidimensionalArrayNegativeLength_ProvesOverflow", @"
+public class TestClass
+{
+    public int[,] TestMethod()
+    {
+        var length = -1;
+        return new int[1, length];
+    }
+}", "return new int[1, length];", false, new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }, SymbolicRuntimeHazardKind.NegativeArrayLength, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazards_AssignedMultidimensionalArrayDimensionLengthProvesIndexOutOfRange", @"
+public class TestClass
+{
+    public int TestMethod(int rows, int columns)
+    {
+        var values = new int[rows, columns];
+        return values[rows, 0];
+    }
+}", "return values[rows, 0];", false, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedBytePreIncrementOverflow", @"
+public class TestClass
+{
+    public byte TestMethod(byte value)
+    {
+        if (value == byte.MaxValue)
+        {
+            return checked(++value);
+        }
 
+        return 0;
+    }
+}", "return checked(++value);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.increment-overflow", null, null, null, null, "++value"),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongPostDecrementOverflow", @"
+public class TestClass
+{
+    public long TestMethod(long value)
+    {
+        if (value == long.MinValue)
+        {
+            return checked(value--);
+        }
+
+        return 0L;
+    }
+}", "return checked(value--);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.decrement-overflow", null, null, null, null, "value--"),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedExplicitNumericConversionOverflow", @"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        if (value > int.MaxValue)
+        {
+            return checked((int)value);
+        }
+
+        return 0;
+    }
+}", "return checked((int)value);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_numeric_conversion_overflow", "ir.runtime-hazard.checked-conversion.overflow", null, null, null, null, "(int)value"),
+        new("QuerySourceRuntimeHazardsLine_ProvesArrayCovarianceStoreMismatch", @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        object[] values = new string[1];
+        values[0] = 42;
+    }
+}", "values[0] = 42;", false, new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }, SymbolicRuntimeHazardKind.ArrayTypeMismatch, SymbolicRuntimeHazardStatus.Proven, "System.ArrayTypeMismatchException", "definite_array_type_mismatch", null, null, null, null, null, null),
+        new("KnownLimitation_ArrayCovarianceStoreAcrossMergedIdentities_RemainsUnknown", @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(bool useStrings)
+    {
+        object[] values;
+        if (useStrings)
+            values = new string[1];
+        else
+            values = new Uri[1];
+
+        values[0] = new object();
+    }
+}", "values[0] = new object();", true, new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }, SymbolicRuntimeHazardKind.ArrayTypeMismatch, SymbolicRuntimeHazardStatus.Unknown, "System.ArrayTypeMismatchException", null, null, SymbolicProofStatus.Unknown, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ProvesGuardedSwitchExpressionNoMatch", @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0,
+            };
+        }
+
+        return 0;
+    }
+}", "return value switch", false, new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }, SymbolicRuntimeHazardKind.SwitchExpressionNoMatch, SymbolicRuntimeHazardStatus.Proven, "System.Runtime.CompilerServices.SwitchExpressionException", "definite_switch_expression_no_match", null, null, null, null, null, null),
+    };
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownNegativeStackAllocLengthCandidate()
     {
@@ -4096,147 +2446,10 @@ public class TestClass
         Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazards_ArrayCreationNormalCompletionPrunesNegativeLengthBranch()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int[] TestMethod(int length)
-    {
-        var values = new int[length];
-        if (length < 0)
-        {
-            return new int[length + 0];
-        }
 
-        return values;
-    }
-}";
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return new int[length + 0];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }));
 
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeArrayLength));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
 
-    [Test]
-    public void QuerySourceRuntimeHazards_MultidimensionalArrayNegativeLength_ProvesOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int[,] TestMethod()
-    {
-        var length = -1;
-        return new int[1, length];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return new int[1, length];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeArrayLength));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazards_AssignedMultidimensionalArrayDimensionLengthProvesIndexOutOfRange()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int rows, int columns)
-    {
-        var values = new int[rows, columns];
-        return values[rows, 0];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[rows, 0];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedBytePreIncrementOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public byte TestMethod(byte value)
-    {
-        if (value == byte.MaxValue)
-        {
-            return checked(++value);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return checked(++value);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(hazard.OperationText, Is.EqualTo("++value"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.increment-overflow");
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongPostDecrementOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public long TestMethod(long value)
-    {
-        if (value == long.MinValue)
-        {
-            return checked(value--);
-        }
-
-        return 0L;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return checked(value--);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(hazard.OperationText, Is.EqualTo("value--"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.decrement-overflow");
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedPostIncrementOverflowCandidate()
@@ -4314,34 +2527,6 @@ public class TestClass
         Assert.That(hazard.OperationText, Is.EqualTo("++value"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedExplicitNumericConversionOverflow()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(long value)
-    {
-        if (value > int.MaxValue)
-        {
-            return checked((int)value);
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(source, "return checked((int)value);", smtAnalysis);
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_checked_numeric_conversion_overflow"));
-        Assert.That(hazard.OperationText, Is.EqualTo("(int)value"));
-        AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-conversion.overflow");
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedExplicitNumericConversionOverflowCandidate()
@@ -4376,32 +2561,6 @@ public class TestClass
         Assert.That(hazard.OperationText, Is.EqualTo("(int)value"));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesArrayCovarianceStoreMismatch()
-    {
-        const string source = @"
-public class TestClass
-{
-    public void TestMethod()
-    {
-        object[] values = new string[1];
-        values[0] = 42;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "values[0] = 42;",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArrayTypeMismatch));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArrayTypeMismatchException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_array_type_mismatch"));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleArrayCovarianceStore()
@@ -4426,81 +2585,11 @@ public class TestClass
         Assert.That(result.Hazards, Is.Empty);
     }
 
-    [Test]
-    public void KnownLimitation_ArrayCovarianceStoreAcrossMergedIdentities_RemainsUnknown()
+
+
+    private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart12 =
     {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public void TestMethod(bool useStrings)
-    {
-        object[] values;
-        if (useStrings)
-            values = new string[1];
-        else
-            values = new Uri[1];
-
-        values[0] = new object();
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "values[0] = new object();",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArrayTypeMismatch));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArrayTypeMismatchException"));
-        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesGuardedSwitchExpressionNoMatch()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value > 0)
-        {
-            return value switch
-            {
-                < 0 => -1,
-                0 => 0,
-            };
-        }
-
-        return 0;
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value switch",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_switch_expression_no_match"));
-    }
-
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardedSwitchExpressionNoMatchIsPruned()
-    {
-        const string source = @"
+        new("QuerySourceRuntimeHazardsLine_GuardedSwitchExpressionNoMatchIsPruned", @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -4516,23 +2605,33 @@ public class TestClass
 
         return 1;
     }
-}";
+}", "return value switch", true, new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }, SymbolicRuntimeHazardKind.SwitchExpressionNoMatch, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_switch_expression_no_match", null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_GuardConditionMakesArgumentOutOfRangeGuardUnreachable", @"
+using System;
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return value switch",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.Category, Is.EqualTo("definite_switch_expression_no_match"));
+public class TestClass
+{
+    public void TestMethod(int value)
+    {
+        if (value >= 0)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+        }
     }
+}", "ArgumentOutOfRangeException.ThrowIfNegative(value);", true, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, null, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+        new("QuerySourceRuntimeHazardsLine_ArgumentOutOfRangeGuardsProveArrayIndexInRange", @"
+using System;
 
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, values.Length);
+        return values[index];
+    }
+}", "return values[index];", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, null, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
+    };
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownSwitchExpressionNoMatchCandidate()
     {
@@ -4790,35 +2889,6 @@ public class TestClass
             Does.StartWith("ir.runtime-hazard.argument-out-of-range.guard."));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_GuardConditionMakesArgumentOutOfRangeGuardUnreachable()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public void TestMethod(int value)
-    {
-        if (value >= 0)
-        {
-            ArgumentOutOfRangeException.ThrowIfNegative(value);
-        }
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "ArgumentOutOfRangeException.ThrowIfNegative(value);",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
 
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownArgumentOutOfRangeGuardCandidate()
@@ -4853,34 +2923,6 @@ public class TestClass
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
     }
 
-    [Test]
-    public void QuerySourceRuntimeHazardsLine_ArgumentOutOfRangeGuardsProveArrayIndexInRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, values.Length);
-        return values[index];
-    }
-}";
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = QueryLine(
-            source,
-            "return values[index];",
-            smtAnalysis,
-            new SymbolicRuntimeHazardQueryOptions(
-                true,
-                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
-
-        var hazard = AssertSingleHazard(result);
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-    }
 
     [Test]
     public void ClassifyTriggerCore_UsesTypedFactInsteadOfProvenanceAsControlFlow()
@@ -5107,6 +3149,503 @@ public class TestClass
         {
             File.Delete(sourcePath);
         }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ReturnsProvenDirectThrow()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new InvalidOperationException();
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "throw new InvalidOperationException();", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.Category, Is.EqualTo("direct_throw"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.direct-throw"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.direct-throw"));
+        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+        Assert.That(hazard.InvariantInfo.MergedText, Is.EqualTo(hazard.MergedInvariantText));
+        Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
+        Assert.That(hazard.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ClassifiesThrowNullAsNullReferenceException()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        Exception? error = null;
+        throw error;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "throw error;", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.throw-null"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.throw-null"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesGuardedDivideByZero()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return 10 / divisor;", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.divide-by-zero"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Has.Some.StartsWith("ir."));
+        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        Assert.That(hazard.Proof.Backend, Is.AnyOf(SymbolicProofBackend.Smt, SymbolicProofBackend.Syntactic));
+        if (hazard.Proof.Backend == SymbolicProofBackend.Smt)
+        {
+            Assert.That(hazard.Proof.Budget, Is.Not.Null);
+            Assert.That(hazard.Proof.Budget!.MaxPathConditions,
+                Is.EqualTo(SmtAnalysisOptions.Default.MaxPathConditions));
+        }
+        else
+        {
+            Assert.That(hazard.Proof.Budget, Is.Null);
+        }
+
+        Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
+        Assert.That(hazard.PathConditions, Does.Contain("divisor == 0"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_MemberReceiverNullDereferenceUsesIrPrecondition()
+    {
+        const string source = @"
+public sealed class Holder
+{
+    public string? Value { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Holder holder)
+    {
+        if (holder.Value is null)
+        {
+            return holder.Value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return holder.Value.Length;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.null-dereference"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.null-dereference"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesDynamicMemberNullBinding()
+    {
+        const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Missing;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.dynamic-null-binding"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicMemberNullBinding()
+    {
+        const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null).Missing;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return ((dynamic)null).Missing;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
+    }
+
+    [Test]
+    public void KnownLimitation_DynamicBinderMissingMemberOnNonNullReceiver_HasNoBinderHazard()
+    {
+        const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = new object();
+        return value.Missing;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Missing;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+        var nullBindingCandidate = AssertSingleHazard(result);
+        Assert.That(nullBindingCandidate.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+        Assert.That(nullBindingCandidate.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(result.Hazards, Has.None.Matches<SymbolicRuntimeHazard>(hazard =>
+            hazard.Status == SymbolicRuntimeHazardStatus.Proven));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesNullableValueWithoutValue()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = default;
+        return value.Value;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return value.Value;", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance,
+            Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullableValueAfterConditionalAccessNullReceiverAssignment()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        int? value = text?.Length;
+        if (text is null)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Value;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance,
+            Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.nullable-value.without-value"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterNegativeTypeAndNullTests()
+    {
+        const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        if (value is not string && value is not null)
+        {
+            return (string)value;
+        }
+
+        return string.Empty;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return (string)value;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.invalid-cast.mismatch"));
+        Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.runtime-hazard.invalid-cast.mismatch"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesQueuePeekOnEmptyCollection()
+    {
+        const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Queue<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values.Peek();
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values.Peek();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_collection_cardinality"));
+        Assert.That(hazard.TriggerPrecondition?.Provenance,
+            Is.EqualTo("ir.runtime-hazard.collection-cardinality"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return checked(value + 1);
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return checked(value + 1);", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance,
+            Is.EqualTo("ir.runtime-hazard.checked-integral.binary-overflow"));
+        Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        Assert.That(hazard.Proof.Budget, Is.Not.Null);
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesMathAbsMinimumOverflow()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return Math.Abs(int.MinValue);
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return Math.Abs(int.MinValue);", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Provenance,
+            Is.EqualTo("ir.runtime-hazard.math.abs-overflow"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesConstantBoundMathClampIndexIsInRangeThroughIr()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int index)
+    {
+        var values = new int[11];
+        return values[Math.Clamp(index, 0, 10)];
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values[Math.Clamp(index, 0, 10)];",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Provenance,
+            Is.EqualTo("ir.runtime-hazard.index.out-of-range"));
     }
 
     private static SymbolicRuntimeHazardQueryResult QueryLine(
