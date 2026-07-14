@@ -25,10 +25,33 @@ public static class SourcePredicates
 }
 ";
 
-    [Test]
-    public async Task Sp0010_AndConditionZeroDivisor_ReportsDivideByZeroException()
+    public enum DiagnosticSurface
     {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+        SummarySp0010,
+        SiteSp0011
+    }
+
+    public enum AssertionMode
+    {
+        ExactSingle,
+        Absent,
+        AnyContainsType,
+        ForbidType,
+        ForbidCategory
+    }
+
+    public sealed record ExceptionPathCase(
+        string Name,
+        string Source,
+        DiagnosticSurface Surface,
+        AssertionMode Mode,
+        string? ExceptionType,
+        string? ExceptionCategory,
+        string? ExceptionSource);
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart1 =
+    {
+        new("Sp0010_AndConditionZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor, bool enabled)
@@ -40,16 +63,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_AndConditionNullReceiver_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_AndConditionNullReceiver_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value, bool enabled)
@@ -61,16 +76,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public async Task Sp0010_GenericClassConstrainedNullReceiver_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", null, null),
+        new("Sp0010_GenericClassConstrainedNullReceiver_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod<T>(T value)
@@ -83,18 +90,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
-    }
-
-    [Test]
-    public async Task Sp0010_NotNullParameterGuardNormalCompletionSuppressesNullDereference()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", "definite_null_dereference", null),
+        new("Sp0010_NotNullParameterGuardNormalCompletionSuppressesNullDereference", @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -117,15 +114,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NotNullParameterGuardNormalCompletionDoesNotSurviveReassignment()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NotNullParameterGuardNormalCompletionDoesNotSurviveReassignment", @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -149,18 +139,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueNullLocal_ReportsInvalidOperationException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", "definite_null_dereference", null),
+        new("Sp0010_NullableValueNullLocal_ReportsInvalidOperationException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -168,20 +148,8 @@ public class TestClass
         int? value = null;
         return value.Value;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueDefaultLocal_ReportsInvalidOperationException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", "System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"),
+        new("Sp0010_NullableValueDefaultLocal_ReportsInvalidOperationException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -189,18 +157,8 @@ public class TestClass
         int? value = default;
         return value.Value;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueMutatedAfterLoopUse_RemainsConservative()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", null),
+        new("Sp0010_NullableValueMutatedAfterLoopUse_RemainsConservative", @"
 public class TestClass
 {
     public int TestMethod(bool repeat)
@@ -215,19 +173,8 @@ public class TestClass
 
         return result;
     }
-}");
-
-        Assert.That(diagnostics.Any(d =>
-                d.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                d.Properties[SharpProofDiagnostics.ExceptionTypesProperty]!
-                    .Contains("System.InvalidOperationException", StringComparison.Ordinal)),
-            Is.True);
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueReassignedPresentLocal_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.AnyContainsType, "System.InvalidOperationException", null, null),
+        new("Sp0010_NullableValueReassignedPresentLocal_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -236,15 +183,8 @@ public class TestClass
         value = 42;
         return value.Value;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueReassignedUnknownLocal_DoesNotReportDefiniteException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NullableValueReassignedUnknownLocal_DoesNotReportDefiniteException", @"
 public class TestClass
 {
     public int TestMethod(int? input)
@@ -253,15 +193,8 @@ public class TestClass
         value = input;
         return value.Value;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueFalseHasValueBranch_ReportsInvalidOperationException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NullableValueFalseHasValueBranch_ReportsInvalidOperationException", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -273,18 +206,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueTrueHasValueBranch_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", null),
+        new("Sp0010_NullableValueTrueHasValueBranch_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -296,15 +219,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NullableValueCaughtInvalidOperationException_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NullableValueCaughtInvalidOperationException_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -325,15 +241,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_OrFalseBranchZeroDivisor_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_OrFalseBranchZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor, bool enabled)
@@ -345,16 +254,8 @@ public class TestClass
 
         return value % divisor;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_IsNotNullElseBranch_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_IsNotNullElseBranch_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -368,16 +269,8 @@ public class TestClass
             return value.Length;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public async Task Sp0010_IsNotZeroElseBranch_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", null, null),
+        new("Sp0010_IsNotZeroElseBranch_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -391,16 +284,8 @@ public class TestClass
             return value / divisor;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_AndConditionZeroDivisor_ReassignedBeforeUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_AndConditionZeroDivisor_ReassignedBeforeUse_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor, bool enabled)
@@ -413,22 +298,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId),
-            Is.False,
-            string.Join(
-                "; ",
-                diagnostics
-                    .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                    .Select(d => d.Properties[SharpProofDiagnostics.ExceptionTypesProperty])));
-    }
-
-    [Test]
-    public async Task Sp0010_OrTrueBranchZeroDivisor_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_OrTrueBranchZeroDivisor_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor, bool enabled)
@@ -440,15 +311,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_OrTrueBranchNullReceiver_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_OrTrueBranchNullReceiver_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(string value, bool enabled)
@@ -460,15 +324,120 @@ public class TestClass
 
         return 0;
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    private static IEnumerable<TestCaseData> ExceptionPathCases()
+    {
+        var cases = ExceptionPathCasesPart1
+            .Concat(ExceptionPathCasesPart2)
+            .Concat(ExceptionPathCasesPart3)
+            .Concat(ExceptionPathCasesPart4)
+            .Concat(ExceptionPathCasesPart5)
+            .Concat(ExceptionPathCasesPart6)
+            .Concat(ExceptionPathCasesPart7)
+            .Concat(ExceptionPathCasesPart8)
+            .Concat(ExceptionPathCasesPart9)
+            .ToArray();
+
+        if (cases.Length != 163 ||
+            cases.Count(static testCase => testCase.Surface == DiagnosticSurface.SummarySp0010) != 139 ||
+            cases.Count(static testCase => testCase.Surface == DiagnosticSurface.SiteSp0011) != 24 ||
+            cases.Count(static testCase => testCase.Mode == AssertionMode.ExactSingle) != 88 ||
+            cases.Count(static testCase => testCase.Mode == AssertionMode.Absent) != 72 ||
+            cases.Count(static testCase => testCase.Mode == AssertionMode.AnyContainsType) != 1 ||
+            cases.Count(static testCase => testCase.Mode == AssertionMode.ForbidType) != 1 ||
+            cases.Count(static testCase => testCase.Mode == AssertionMode.ForbidCategory) != 1 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 163)
+        {
+            throw new InvalidOperationException("Exception path case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
     }
 
-    [Test]
-    public async Task Sp0010_NegatedNotEqualZero_ReportsDivideByZeroException()
+    [TestCaseSource(nameof(ExceptionPathCases))]
+    public async Task ExceptionFlowPathFactCases(ExceptionPathCase testCase)
     {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+        var isSummary = testCase.Surface == DiagnosticSurface.SummarySp0010;
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(testCase.Source, isSummary, !isSummary);
+        var diagnosticId = isSummary ? SharpProofDiagnostics.ExceptionSummaryId : SharpProofDiagnostics.UncaughtExceptionSiteId;
+        var matching = diagnostics.Where(diagnostic => diagnostic.Id == diagnosticId).ToArray();
+
+        switch (testCase.Mode)
+        {
+            case AssertionMode.ExactSingle:
+            {
+                var diagnostic = matching.Single();
+                if (testCase.ExceptionType is { } exceptionType)
+                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+                if (testCase.ExceptionCategory is { } exceptionCategory)
+                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(exceptionCategory));
+                if (testCase.ExceptionSource is { } exceptionSource)
+                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty], Is.EqualTo(exceptionSource));
+                break;
+            }
+            case AssertionMode.Absent:
+                Assert.That(matching, Is.Empty);
+                break;
+            case AssertionMode.AnyContainsType:
+                Assert.That(matching.Any(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty]!
+                    .Contains(testCase.ExceptionType!, StringComparison.Ordinal)), Is.True);
+                break;
+            case AssertionMode.ForbidType:
+                Assert.That(matching.Any(diagnostic => diagnostic.Properties.TryGetValue(
+                    SharpProofDiagnostics.ExceptionTypesProperty, out var types) && types != null &&
+                    types.Contains(testCase.ExceptionType!, StringComparison.Ordinal)), Is.False);
+                break;
+            case AssertionMode.ForbidCategory:
+                Assert.That(matching.Any(diagnostic => diagnostic.Properties.TryGetValue(
+                    SharpProofDiagnostics.ExceptionCategoriesProperty, out var categories) && categories != null &&
+                    categories.Contains(testCase.ExceptionCategory!, StringComparison.Ordinal)), Is.False);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart2 =
+    {
+        new("Sp0010_NegatedNotEqualZero_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -480,16 +449,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_NegatedEqualsZero_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_NegatedEqualsZero_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -501,15 +462,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NegatedIsNotNull_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NegatedIsNotNull_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -521,16 +475,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public async Task Sp0010_AndConditionNonZeroDivisor_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", null, null),
+        new("Sp0010_AndConditionNonZeroDivisor_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor, bool enabled)
@@ -542,15 +488,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ContradictoryShortCircuitDivideByZero_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ContradictoryShortCircuitDivideByZero_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -562,15 +501,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ContradictoryShortCircuitNullDereference_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ContradictoryShortCircuitNullDereference_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -582,15 +514,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_GuardFalsePathReassignedBeforeUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_GuardFalsePathReassignedBeforeUse_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -603,15 +528,8 @@ public class TestClass
         divisor = 1;
         return value / divisor;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_BranchFactDivideByZeroCaught_IsSuppressed()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_BranchFactDivideByZeroCaught_IsSuppressed", @"
 using System;
 
 public class TestClass
@@ -632,15 +550,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_WhileConditionZeroDivisor_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_WhileConditionZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -652,16 +563,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_WhileConditionNullReceiver_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_WhileConditionNullReceiver_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -673,34 +576,16 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public async Task Sp0010_NegativeArrayIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", null, null),
+        new("Sp0010_NegativeArrayIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
     {
         return values[-1];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_NegativeIndexGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_NegativeIndexGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -712,16 +597,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_UpperBoundIndexGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_UpperBoundIndexGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -733,16 +610,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_MultidimensionalArrayRowUpperBoundGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_MultidimensionalArrayRowUpperBoundGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[,] values, int row)
@@ -754,18 +623,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_MultidimensionalArrayGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_MultidimensionalArrayGuardedInRange_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[,] values, int row, int column)
@@ -780,33 +639,16 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_DirectMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_DirectMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
     {
         return (new int[1, 2])[0, 2];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_AssignedMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_AssignedMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int rows, int columns)
@@ -814,18 +656,8 @@ public class TestClass
         var values = new int[rows, columns];
         return values[rows, 0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_ReadOnlySpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -839,18 +671,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_ReadOnlySpanGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -864,15 +686,48 @@ public class TestClass
 
         return 0;
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
 
-    [Test]
-    public async Task Sp0010_SpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart3 =
     {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+        new("Sp0010_SpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -886,18 +741,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_SystemIndexVariableFromEndZeroGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_SystemIndexVariableFromEndZeroGuard_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -913,18 +758,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_SystemIndexVariableFromEndGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_SystemIndexVariableFromEndGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -939,15 +774,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SystemIndexFactoryFromEndZeroGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SystemIndexFactoryFromEndZeroGuard_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -961,18 +789,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_SystemIndexFactoriesGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_SystemIndexFactoriesGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -989,15 +807,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SystemIndexFactoryNegativeInput_DoesNotReportIndexOutOfRangeException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SystemIndexFactoryNegativeInput_DoesNotReportIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1011,42 +822,16 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(
-            diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .Any(d =>
-                    d.Properties.TryGetValue(SharpProofDiagnostics.ExceptionTypesProperty, out var exceptionTypes) &&
-                    exceptionTypes != null &&
-                    exceptionTypes.Contains("System.IndexOutOfRangeException")),
-            Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_DirectArrayRangeStartAfterEnd_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ForbidType, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_DirectArrayRangeStartAfterEnd_ReportsArgumentOutOfRangeException", @"
 public class TestClass
 {
     public int[] TestMethod(int[] values)
     {
         return values[2..1];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
-    }
-
-    [Test]
-    public async Task Sp0010_DirectReadOnlySpanRangeStartAfterEnd_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"),
+        new("Sp0010_DirectReadOnlySpanRangeStartAfterEnd_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1055,20 +840,8 @@ public class TestClass
     {
         return values[2..1];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanSliceStartGreaterThanLength_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"),
+        new("Sp0010_ReadOnlySpanSliceStartGreaterThanLength_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1077,20 +850,8 @@ public class TestClass
     {
         return values.Slice(values.Length + 1);
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
-    }
-
-    [Test]
-    public async Task Sp0010_SpanSliceNegativeLength_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"),
+        new("Sp0010_SpanSliceNegativeLength_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1099,20 +860,8 @@ public class TestClass
     {
         return values.Slice(0, -1);
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanSliceStartPlusLengthPastEnd_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"),
+        new("Sp0010_ReadOnlySpanSliceStartPlusLengthPastEnd_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1126,20 +875,8 @@ public class TestClass
 
         return values.Slice(0, 0);
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
-    }
-
-    [Test]
-    public async Task Sp0010_AssignedReadOnlySpanSliceIndexOutOfRange_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"),
+        new("Sp0010_AssignedReadOnlySpanSliceIndexOutOfRange_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1149,18 +886,8 @@ public class TestClass
         var tail = values.Slice(values.Length);
         return tail[0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_MemorySliceAliasLengthOutOfRange_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_MemorySliceAliasLengthOutOfRange_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1175,18 +902,8 @@ public class TestClass
 
         return values.Slice(0, 0);
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanSliceGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", null),
+        new("Sp0010_ReadOnlySpanSliceGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -1200,15 +917,8 @@ public class TestClass
 
         return values.Slice(0, 0);
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ReadOnlySpanSliceCaught_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ReadOnlySpanSliceCaught_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -1224,15 +934,8 @@ public class TestClass
             return values.Slice(0, 0);
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayRangeGuardedStartAfterEnd_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ArrayRangeGuardedStartAfterEnd_ReportsArgumentOutOfRangeException", @"
 public class TestClass
 {
     public int[] TestMethod(int[] values, int start, int end)
@@ -1244,18 +947,8 @@ public class TestClass
 
         return values[0..0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayRangeGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", null),
+        new("Sp0010_ArrayRangeGuardedInRange_DoesNotReport", @"
 public class TestClass
 {
     public int[] TestMethod(int[] values, int start, int end)
@@ -1267,15 +960,8 @@ public class TestClass
 
         return values[0..0];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SystemRangeVariableStartAfterEnd_ReportsArgumentOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SystemRangeVariableStartAfterEnd_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1290,18 +976,8 @@ public class TestClass
 
         return values[0..0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_SystemRangeVariableReassignedFromUnknown_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", null),
+        new("Sp0010_SystemRangeVariableReassignedFromUnknown_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -1317,15 +993,48 @@ public class TestClass
 
         return values[0..0];
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
 
-    [Test]
-    public async Task Sp0010_SystemRangeFactoryStartAfterEnd_ReportsArgumentOutOfRangeException()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart4 =
     {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+        new("Sp0010_SystemRangeFactoryStartAfterEnd_ReportsArgumentOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1334,18 +1043,8 @@ public class TestClass
     {
         return values[new Range(Index.FromStart(2), Index.FromStart(1))];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_SystemRangeFactoriesGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", null),
+        new("Sp0010_SystemRangeFactoriesGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -1363,15 +1062,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SystemRangeFactoryNegativeEndpoint_DoesNotReportRangeOutOfRangeException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SystemRangeFactoryNegativeEndpoint_DoesNotReportRangeOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1385,23 +1077,8 @@ public class TestClass
 
         return values[Range.All];
     }
-}");
-
-        Assert.That(
-            diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .Any(d =>
-                    d.Properties.TryGetValue(SharpProofDiagnostics.ExceptionCategoriesProperty,
-                        out var exceptionCategories) &&
-                    exceptionCategories != null &&
-                    exceptionCategories.Contains("definite_range_out_of_range")),
-            Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_InRangeArrayIndexGuard_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ForbidCategory, null, "definite_range_out_of_range", null),
+        new("Sp0010_InRangeArrayIndexGuard_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1413,15 +1090,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ContradictoryShortCircuitIndexOutOfRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ContradictoryShortCircuitIndexOutOfRange_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1433,15 +1103,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_UnsignedCastArrayIndexGuard_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_UnsignedCastArrayIndexGuard_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1453,15 +1116,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_UnsignedCastArrayIndexFalseBranch_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_UnsignedCastArrayIndexFalseBranch_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1473,16 +1129,8 @@ public class TestClass
 
         return values[index];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_UnsignedCastArrayUpperBoundGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_UnsignedCastArrayUpperBoundGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1494,16 +1142,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_WhileConditionUpperBoundIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_WhileConditionUpperBoundIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1515,16 +1155,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_ForConditionUpperBoundIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_ForConditionUpperBoundIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1536,16 +1168,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_ForLoopMonotonicIndexBounds_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_ForLoopMonotonicIndexBounds_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1558,15 +1182,8 @@ public class TestClass
 
         return sum;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ForLoopReverseIndexBounds_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ForLoopReverseIndexBounds_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1579,15 +1196,8 @@ public class TestClass
 
         return sum;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_WhileLoopMonotonicIndexBounds_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_WhileLoopMonotonicIndexBounds_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1602,15 +1212,8 @@ public class TestClass
 
         return sum;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_WhileLoopReverseIndexBounds_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_WhileLoopReverseIndexBounds_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1625,15 +1228,8 @@ public class TestClass
 
         return sum;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_LoopConditionIndexReassignedBeforeUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_LoopConditionIndexReassignedBeforeUse_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1646,15 +1242,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_WhileFalseBodyIndexOutOfRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_WhileFalseBodyIndexOutOfRange_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1666,15 +1255,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayLengthNegativeGuardedIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ArrayLengthNegativeGuardedIndex_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1686,15 +1268,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchExpressionArrayLengthNegativeArm_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SwitchExpressionArrayLengthNegativeArm_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -1705,15 +1280,8 @@ public class TestClass
             _ => 0
         };
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_OutOfRangeGuardReassignedBeforeUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_OutOfRangeGuardReassignedBeforeUse_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -1726,15 +1294,48 @@ public class TestClass
 
         return 0;
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
 
-    [Test]
-    public async Task Sp0010_BranchFactIndexOutOfRangeCaught_IsSuppressed()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart5 =
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+        new("Sp0010_BranchFactIndexOutOfRangeCaught_IsSuppressed", @"
 using System;
 
 public class TestClass
@@ -1755,15 +1356,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_LocalArrayCreationConstantUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_LocalArrayCreationConstantUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1771,36 +1365,16 @@ public class TestClass
         var values = new int[4];
         return values[4];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_DirectArrayCreationUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_DirectArrayCreationUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
     {
         return (new int[4])[4];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_LocalArrayCreationSymbolicUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_LocalArrayCreationSymbolicUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1809,18 +1383,8 @@ public class TestClass
         var values = new int[length];
         return values[length];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayEmptyIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_ArrayEmptyIndex_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -1830,16 +1394,8 @@ public class TestClass
         var values = Array.Empty<int>();
         return values[0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayCollectionExpressionIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_ArrayCollectionExpressionIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1847,18 +1403,8 @@ public class TestClass
         int[] values = [1, 2, 3];
         return values[3];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayAliasUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_ArrayAliasUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1867,18 +1413,8 @@ public class TestClass
         var alias = values;
         return alias[4];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_ObjectErasedArrayCastAliasUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_ObjectErasedArrayCastAliasUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -1888,18 +1424,8 @@ public class TestClass
         var alias = (int[])boxed;
         return alias[4];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_NegativeStringIndexGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_NegativeStringIndexGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod(string text, int index)
@@ -1911,16 +1437,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_StringUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_StringUpperBoundIndexGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod(string text, int index)
@@ -1932,16 +1450,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_UnsignedCastStringIndexGuard_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_UnsignedCastStringIndexGuard_DoesNotReport", @"
 public class TestClass
 {
     public char TestMethod(string text, int index)
@@ -1953,15 +1463,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_UnsignedCastStringUpperBoundGuard_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_UnsignedCastStringUpperBoundGuard_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod(string text, int index)
@@ -1973,16 +1476,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_StringLiteralUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_StringLiteralUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod()
@@ -1990,36 +1485,16 @@ public class TestClass
         var text = ""abc"";
         return text[3];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_DirectStringLiteralUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_DirectStringLiteralUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod()
     {
         return ""abc""[3];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_StringEmptyIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_StringEmptyIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod()
@@ -2027,33 +1502,16 @@ public class TestClass
         var text = string.Empty;
         return text[0];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_DirectStringLiteralInRangeIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_DirectStringLiteralInRangeIndex_DoesNotReport", @"
 public class TestClass
 {
     public char TestMethod()
     {
         return ""abc""[2];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_StringAliasUpperBound_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_StringAliasUpperBound_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public char TestMethod(string input)
@@ -2062,16 +1520,8 @@ public class TestClass
         var alias = text;
         return alias[input.Length];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_StringLiteralInRangeIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_StringLiteralInRangeIndex_DoesNotReport", @"
 public class TestClass
 {
     public char TestMethod()
@@ -2079,15 +1529,8 @@ public class TestClass
         var text = ""abc"";
         return text[2];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SourceNullOrEmptyPredicateNonNullIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(SourcePredicateSource + @"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SourceNullOrEmptyPredicateNonNullIndex_ReportsIndexOutOfRangeException", SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
@@ -2099,16 +1542,48 @@ public class TestClass
 
         return '\0';
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+    };
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
 
-    [Test]
-    public async Task Sp0010_SourceNullOrEmptyPredicateFalseBranchIndex_DoesNotReport()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart6 =
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(SourcePredicateSource + @"
+        new("Sp0010_SourceNullOrEmptyPredicateFalseBranchIndex_DoesNotReport", SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
@@ -2120,15 +1595,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SourceHasTextPredicateContradictoryIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(SourcePredicateSource + @"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SourceHasTextPredicateContradictoryIndex_DoesNotReport", SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
@@ -2140,15 +1608,8 @@ public class TestClass
 
         return '\0';
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayCollectionExpressionSpreadIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ArrayCollectionExpressionSpreadIndex_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] input)
@@ -2156,15 +1617,8 @@ public class TestClass
         int[] values = [.. input];
         return values[0];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayCollectionExpressionSpreadFixedElementsPruneZeroLengthBranch_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ArrayCollectionExpressionSpreadFixedElementsPruneZeroLengthBranch_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] input)
@@ -2177,15 +1631,8 @@ public class TestClass
 
         return values[0];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_IndexAssignedFromArrayLength_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_IndexAssignedFromArrayLength_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2194,16 +1641,8 @@ public class TestClass
         var index = values.Length;
         return values[index];
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_LocalArrayCreationInRangeIndex_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_LocalArrayCreationInRangeIndex_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2211,15 +1650,8 @@ public class TestClass
         var values = new int[4];
         return values[3];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ArrayLengthFactRemovedAfterReassignment_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ArrayLengthFactRemovedAfterReassignment_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] input)
@@ -2228,15 +1660,8 @@ public class TestClass
         values = input;
         return values[1];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ConditionalArrayReassignmentInvalidatesLength_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ConditionalArrayReassignmentInvalidatesLength_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -2249,15 +1674,8 @@ public class TestClass
 
         return values[1];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SelfReferentialIndexAssignment_DoesNotReportFromUnsatisfiableFacts()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SelfReferentialIndexAssignment_DoesNotReportFromUnsatisfiableFacts", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2265,15 +1683,8 @@ public class TestClass
         index = index + 1;
         return values[index];
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchStatementConstantZeroDivisor_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SwitchStatementConstantZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2286,16 +1697,8 @@ public class TestClass
                 return 0;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchStatementNonZeroCase_DoesNotReportDivideByZeroException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", null, null),
+        new("Sp0010_SwitchStatementNonZeroCase_DoesNotReportDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2308,15 +1711,8 @@ public class TestClass
                 return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchStatementReassignmentInvalidatesCaseFact_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SwitchStatementReassignmentInvalidatesCaseFact_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2330,15 +1726,8 @@ public class TestClass
                 return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchStatementNullCase_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_SwitchStatementNullCase_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2351,16 +1740,8 @@ public class TestClass
                 return 0;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchStatementRelationalPatternIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", null, null),
+        new("Sp0010_SwitchStatementRelationalPatternIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2373,16 +1754,8 @@ public class TestClass
                 return 0;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchExpressionRelationalPatternIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_SwitchExpressionRelationalPatternIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2393,16 +1766,8 @@ public class TestClass
             _ => 0
         };
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchExpressionWhenGuardIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_SwitchExpressionWhenGuardIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2413,16 +1778,8 @@ public class TestClass
             _ => 0
         };
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-    }
-
-    [Test]
-    public async Task Sp0010_SwitchExpressionWhenGuardInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", null, null),
+        new("Sp0010_SwitchExpressionWhenGuardInRange_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2433,15 +1790,8 @@ public class TestClass
             _ => 0
         };
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ForeachNewEmptyArrayConstantDivide_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ForeachNewEmptyArrayConstantDivide_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2453,15 +1803,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NullGuardedForeachBodyConstantDivide_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NullGuardedForeachBodyConstantDivide_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -2476,15 +1819,48 @@ public class TestClass
 
         return 0;
     }
-}");
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
 
-    [Test]
-    public async Task Sp0010_SingleElementForeachZeroDivisor_ReportsDivideByZeroException()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart7 =
     {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+        new("Sp0010_SingleElementForeachZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2496,18 +1872,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
-    }
-
-    [Test]
-    public async Task Sp0010_SingleElementForeachNonZeroDivisor_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", "definite_divide_by_zero", null),
+        new("Sp0010_SingleElementForeachNonZeroDivisor_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2519,15 +1885,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_FiniteForeachNonZeroContradictoryDivide_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_FiniteForeachNonZeroContradictoryDivide_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2542,15 +1901,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CoalesceAssignmentNonNullContradictoryNullDereference_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CoalesceAssignmentNonNullContradictoryNullDereference_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2563,15 +1915,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_PriorAssignedFiniteForeachContradictoryDivide_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_PriorAssignedFiniteForeachContradictoryDivide_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod()
@@ -2587,15 +1932,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterNonZeroDivisor_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CatchFilterNonZeroDivisor_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -2611,15 +1949,8 @@ public class TestClass
             return 10 / divisor;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterZeroDivisor_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CatchFilterZeroDivisor_ReportsDivideByZeroException", @"
 using System;
 
 public class TestClass
@@ -2635,18 +1966,8 @@ public class TestClass
             return 10 / divisor;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterNullReceiver_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", "definite_divide_by_zero", null),
+        new("Sp0010_CatchFilterNullReceiver_ReportsNullReferenceException", @"
 using System;
 
 public class TestClass
@@ -2662,18 +1983,8 @@ public class TestClass
             return value.Length;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterUpperBoundIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", "definite_null_dereference", null),
+        new("Sp0010_CatchFilterUpperBoundIndex_ReportsIndexOutOfRangeException", @"
 using System;
 
 public class TestClass
@@ -2689,18 +2000,8 @@ public class TestClass
             return values[index];
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterFactReassignedBeforeUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_CatchFilterFactReassignedBeforeUse_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -2717,15 +2018,8 @@ public class TestClass
             return 10 / divisor;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_ContinueGuardZeroDivisor_ReportsDivideByZeroException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_ContinueGuardZeroDivisor_ReportsDivideByZeroException", @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2742,18 +2036,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
-    }
-
-    [Test]
-    public async Task Sp0010_ContinueGuardUpperBoundIndex_ReportsIndexOutOfRangeException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.DivideByZeroException", "definite_divide_by_zero", null),
+        new("Sp0010_ContinueGuardUpperBoundIndex_ReportsIndexOutOfRangeException", @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2770,18 +2054,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0010_BreakGuardNullReceiver_ReportsNullReferenceException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0010_BreakGuardNullReceiver_ReportsNullReferenceException", @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2798,18 +2072,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
-    }
-
-    [Test]
-    public async Task Sp0010_PathSensitiveFinallyThrow_ShadowsGuardedDirectThrow()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.NullReferenceException", "definite_null_dereference", null),
+        new("Sp0010_PathSensitiveFinallyThrow_ShadowsGuardedDirectThrow", @"
 using System;
 
 public class TestClass
@@ -2831,18 +2095,8 @@ public class TestClass
             }
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_PathSensitiveFinallyThrow_ShadowsGuardedDivideByZero()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ApplicationException", "direct_throw", null),
+        new("Sp0010_PathSensitiveFinallyThrow_ShadowsGuardedDivideByZero", @"
 using System;
 
 public class TestClass
@@ -2866,18 +2120,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_PathSensitiveFinallyNestedBlockThrow_ShadowsGuardedDivideByZero()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ApplicationException", "direct_throw", null),
+        new("Sp0010_PathSensitiveFinallyNestedBlockThrow_ShadowsGuardedDivideByZero", @"
 using System;
 
 public class TestClass
@@ -2903,18 +2147,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_PathSensitiveFinallyNestedAliasThrow_ShadowsGuardedDivideByZero()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ApplicationException", "direct_throw", null),
+        new("Sp0010_PathSensitiveFinallyNestedAliasThrow_ShadowsGuardedDivideByZero", @"
 using System;
 
 public class TestClass
@@ -2941,18 +2175,8 @@ public class TestClass
 
         return 0;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_FinallyUnknownThrowCondition_DoesNotShadowTryThrow()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.ApplicationException", "direct_throw", null),
+        new("Sp0010_FinallyUnknownThrowCondition_DoesNotShadowTryThrow", @"
 using System;
 
 public class TestClass
@@ -2971,19 +2195,8 @@ public class TestClass
             }
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Does.Contain("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Does.Contain("System.InvalidOperationException"));
-    }
-
-    [Test]
-    public async Task Sp0011_PathSensitiveFinallyThrow_ShadowsCheckedDirectThrowSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, null, null, null),
+        new("Sp0011_PathSensitiveFinallyThrow_ShadowsCheckedDirectThrowSite", @"
 using System;
 
 public class TestClass
@@ -3005,21 +2218,48 @@ public class TestClass
             }
         }
     }
-}",
-            false,
-            true);
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.ApplicationException", "direct_throw", null),
+    };
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ApplicationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
 
-    [Test]
-    public async Task Sp0010_CatchFilterTrueFromThrowSiteBranch_SuppressesException()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart8 =
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+        new("Sp0010_CatchFilterTrueFromThrowSiteBranch_SuppressesException", @"
 using System;
 
 public class TestClass
@@ -3040,15 +2280,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterBooleanAliasFromThrowSiteBranch_SuppressesException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CatchFilterBooleanAliasFromThrowSiteBranch_SuppressesException", @"
 using System;
 
 public class TestClass
@@ -3070,15 +2303,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterAliasPrunesContradictoryIndexUse_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CatchFilterAliasPrunesContradictoryIndexUse_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3100,15 +2326,8 @@ public class TestClass
             return values[index];
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_CatchFilterUnknownAtThrowSite_DoesNotSuppressException()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_CatchFilterUnknownAtThrowSite_DoesNotSuppressException", @"
 using System;
 
 public class TestClass
@@ -3124,18 +2343,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesException()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.InvalidOperationException", "direct_throw", null),
+        new("Sp0010_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesException", @"
 using System;
 
 public class TestClass
@@ -3165,15 +2374,8 @@ public class TestClass
 
         return 2;
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0010_NestedCatchFilterFactReassignedBeforeThrow_RemainsConservativeReports()
-    {
-        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0010_NestedCatchFilterFactReassignedBeforeThrow_RemainsConservativeReports", @"
 using System;
 
 public class TestClass
@@ -3204,18 +2406,8 @@ public class TestClass
 
         return 2;
     }
-}");
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0010_FilteredCatchContradictoryGuardedThrow_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.ExactSingle, "System.InvalidOperationException", "direct_throw", null),
+        new("Sp0010_FilteredCatchContradictoryGuardedThrow_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3241,16 +2433,8 @@ public class TestClass
             return 0;
         }
     }
-}");
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_CatchFilterTrueFromThrowSiteBranch_SuppressesExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SummarySp0010, AssertionMode.Absent, null, null, null),
+        new("Sp0011_CatchFilterTrueFromThrowSiteBranch_SuppressesExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3271,18 +2455,8 @@ public class TestClass
             return 0;
         }
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3312,18 +2486,8 @@ public class TestClass
 
         return 2;
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_FilteredCatchContradictoryGuardedThrow_DoesNotReportExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_FilteredCatchContradictoryGuardedThrow_DoesNotReportExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3349,18 +2513,8 @@ public class TestClass
             return 0;
         }
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_CatchFilterUnknownAtThrowSite_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_CatchFilterUnknownAtThrowSite_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3376,22 +2530,8 @@ public class TestClass
             return 0;
         }
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-    }
-
-    [Test]
-    public async Task Sp0011_NullableValueFalseHasValueBranch_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidOperationException", "direct_throw", null),
+        new("Sp0011_NullableValueFalseHasValueBranch_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -3403,24 +2543,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
-    }
-
-    [Test]
-    public async Task Sp0011_ConditionalAccessNullReceiverNullableValue_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", "System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"),
+        new("Sp0011_ConditionalAccessNullReceiverNullableValue_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -3433,24 +2557,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
-    }
-
-    [Test]
-    public async Task Sp0011_NullableCoalesceMissingFallback_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", "System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"),
+        new("Sp0011_NullableCoalesceMissingFallback_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod(int? left)
@@ -3463,24 +2571,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
-    }
-
-    [Test]
-    public async Task Sp0011_ConditionalNullableMissingBranch_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", "System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"),
+        new("Sp0011_ConditionalNullableMissingBranch_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -3493,24 +2585,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_nullable_value_without_value"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
-    }
-
-    [Test]
-    public async Task Sp0011_NullableValueTrueHasValueBranch_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidOperationException", "definite_nullable_value_without_value", "System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"),
+        new("Sp0011_NullableValueTrueHasValueBranch_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -3522,18 +2598,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_UnboxNullCast_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_UnboxNullCast_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3541,24 +2607,8 @@ public class TestClass
         object value = null;
         return (int)value;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_unbox_null"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.NullReferenceException=definite_unbox_null:cast"));
-    }
-
-    [Test]
-    public async Task Sp0011_InvalidReferenceCast_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.NullReferenceException", "definite_unbox_null", "System.NullReferenceException=definite_unbox_null:cast"),
+        new("Sp0011_InvalidReferenceCast_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3566,24 +2616,8 @@ public class TestClass
         object value = 42;
         return ((string)value).Length;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidCastException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_invalid_cast"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidCastException=definite_invalid_cast:cast"));
-    }
-
-    [Test]
-    public async Task Sp0011_SystemIndexVariableFromEndZeroGuard_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.InvalidCastException", "definite_invalid_cast", "System.InvalidCastException=definite_invalid_cast:cast"),
+        new("Sp0011_SystemIndexVariableFromEndZeroGuard_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3598,22 +2632,48 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+    };
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
 
-    [Test]
-    public async Task Sp0011_SystemIndexVariableFromEndGuardedInRange_DoesNotReport()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ExceptionPathCase[] ExceptionPathCasesPart9 =
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+        new("Sp0011_SystemIndexVariableFromEndGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3628,18 +2688,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_SystemIndexFactoryFromEndZeroGuard_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_SystemIndexFactoryFromEndZeroGuard_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3653,22 +2703,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0011_ReadOnlySpanUpperBoundIndex_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0011_ReadOnlySpanUpperBoundIndex_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3682,22 +2718,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0011_ReadOnlySpanGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0011_ReadOnlySpanGuardedInRange_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3711,18 +2733,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_MultidimensionalArrayRowUpperBoundGuard_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_MultidimensionalArrayRowUpperBoundGuard_ReportsExceptionSite", @"
 public class TestClass
 {
     public int TestMethod(int[,] values, int row)
@@ -3734,22 +2746,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
-    }
-
-    [Test]
-    public async Task Sp0011_MultidimensionalArrayGuardedInRange_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.IndexOutOfRangeException", "definite_index_out_of_range", null),
+        new("Sp0011_MultidimensionalArrayGuardedInRange_DoesNotReport", @"
 public class TestClass
 {
     public int TestMethod(int[,] values, int row, int column)
@@ -3764,18 +2762,8 @@ public class TestClass
 
         return 0;
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_DirectReadOnlySpanRangeStartAfterEnd_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_DirectReadOnlySpanRangeStartAfterEnd_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3784,24 +2772,8 @@ public class TestClass
     {
         return values[2..1];
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
-    }
-
-    [Test]
-    public async Task Sp0011_DirectReadOnlySpanRangeStartAfterEndCaught_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"),
+        new("Sp0011_DirectReadOnlySpanRangeStartAfterEndCaught_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3818,42 +2790,16 @@ public class TestClass
             return 0;
         }
     }
-}",
-            false,
-            true);
-
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
-
-    [Test]
-    public async Task Sp0011_DirectArrayRangeStartAfterEnd_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+        new("Sp0011_DirectArrayRangeStartAfterEnd_ReportsExceptionSite", @"
 public class TestClass
 {
     public int[] TestMethod(int[] values)
     {
         return values[2..1];
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
-    }
-
-    [Test]
-    public async Task Sp0011_SystemRangeFactoryStartAfterEnd_ReportsExceptionSite()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"),
+        new("Sp0011_SystemRangeFactoryStartAfterEnd_ReportsExceptionSite", @"
 using System;
 
 public class TestClass
@@ -3862,24 +2808,8 @@ public class TestClass
     {
         return values[new Range(Index.FromStart(2), Index.FromStart(1))];
     }
-}",
-            false,
-            true);
-
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
-    }
-
-    [Test]
-    public async Task Sp0011_DirectArrayRangeStartAfterEndCaught_DoesNotReport()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            @"
+}", DiagnosticSurface.SiteSp0011, AssertionMode.ExactSingle, "System.ArgumentOutOfRangeException", "definite_range_out_of_range", "System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"),
+        new("Sp0011_DirectArrayRangeStartAfterEndCaught_DoesNotReport", @"
 using System;
 
 public class TestClass
@@ -3896,12 +2826,28 @@ public class TestClass
             return 0;
         }
     }
-}",
-            false,
-            true);
+}", DiagnosticSurface.SiteSp0011, AssertionMode.Absent, null, null, null),
+    };
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source)
     {
