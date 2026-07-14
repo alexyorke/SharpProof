@@ -11,6 +11,7 @@ using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Attributes;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.TestReflectionFacts;
 
 namespace SharpProof.Test;
 
@@ -444,11 +445,6 @@ public class AnalyzerHostConcurrencyStressTests
         Assert.That(
             diagnostics.Where(diagnostic => diagnostic.Id.StartsWith("AD", StringComparison.Ordinal)),
             Is.Empty);
-    }
-
-    private static int GetCount(object instance)
-    {
-        return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;
     }
 
     private const string IsolationSource = """

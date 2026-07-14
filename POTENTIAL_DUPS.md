@@ -140,12 +140,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## SharpProof.Test - A-D
 
-### Duplicated `GetCount` reflection helper
-Identical body `return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;` in
-`CachingTests.cs:444`, `AnalyzerHostConcurrencyStressTests.cs:449` (and `ExceptionSummaryCatalogValidationTests.Helpers.cs:601`).
-
-**Recommendation:** Move to a shared internal test-utility class.
-
 ---
 
 ## SharpProof.Test - E-G

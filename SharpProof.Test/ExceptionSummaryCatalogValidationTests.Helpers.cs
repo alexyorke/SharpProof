@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Identity;
+using static SharpProof.Test.TestReflectionFacts;
 
 namespace SharpProof.Test;
 
@@ -579,11 +580,6 @@ public partial class ExceptionSummaryCatalogValidationTests
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-    }
-
-    private static int GetCount(object instance)
-    {
-        return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;
     }
 
     private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>

@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using static SharpProof.Test.TestReflectionFacts;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
@@ -441,8 +442,4 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    private static int GetCount(object instance)
-    {
-        return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;
-    }
 }
