@@ -91,6 +91,33 @@ internal static class SymbolicOperatorLowerer
         }
     }
 
+    internal static bool TryGetRelationalPatternOperator(
+        SyntaxKind tokenKind,
+        bool negate,
+        out SymbolicRelationOperator op)
+    {
+        op = tokenKind switch
+        {
+            SyntaxKind.GreaterThanToken => negate
+                ? SymbolicRelationOperator.LessThanOrEqual
+                : SymbolicRelationOperator.GreaterThan,
+            SyntaxKind.GreaterThanEqualsToken => negate
+                ? SymbolicRelationOperator.LessThan
+                : SymbolicRelationOperator.GreaterThanOrEqual,
+            SyntaxKind.LessThanToken => negate
+                ? SymbolicRelationOperator.GreaterThanOrEqual
+                : SymbolicRelationOperator.LessThan,
+            SyntaxKind.LessThanEqualsToken => negate
+                ? SymbolicRelationOperator.GreaterThan
+                : SymbolicRelationOperator.LessThanOrEqual,
+            _ => default
+        };
+        return tokenKind is SyntaxKind.GreaterThanToken or
+            SyntaxKind.GreaterThanEqualsToken or
+            SyntaxKind.LessThanToken or
+            SyntaxKind.LessThanEqualsToken;
+    }
+
     internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op)
     {
         switch (kind)

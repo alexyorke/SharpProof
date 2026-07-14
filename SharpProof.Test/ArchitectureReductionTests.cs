@@ -1915,6 +1915,15 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicOperatorLowerer.cs"));
+        var patternSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicPatternLowerer.cs"));
+        var programPointSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
 
         Assert.That(coreSource, Does.Contain(
             "SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind()"));
@@ -1930,7 +1939,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(operatorSource, Does.Contain("internal static bool CanCompareTerms"));
         Assert.That(operatorSource, Does.Contain("internal static bool IsEqualityExpression"));
         Assert.That(operatorSource, Does.Contain("internal static bool TryGetRelationOperator"));
+        Assert.That(operatorSource, Does.Contain("internal static bool TryGetRelationalPatternOperator"));
         Assert.That(operatorSource, Does.Contain("internal static bool TryGetBinaryTermOperator"));
+        Assert.That(patternSource, Does.Contain("SymbolicOperatorLowerer.TryGetRelationalPatternOperator("));
+        Assert.That(programPointSource, Does.Contain("SymbolicOperatorLowerer.TryGetRelationOperator("));
+        Assert.That(programPointSource, Does.Contain("SymbolicOperatorLowerer.TryGetRelationalPatternOperator("));
+        Assert.That(programPointSource, Does.Not.Contain("TryGetInlineAssignmentComparisonRelationOperator"));
+        Assert.That(programPointSource, Does.Not.Contain("TryGetIrRelationalPatternOperator"));
         Assert.That(operatorSource, Does.Not.Contain("partial class SymbolicOperatorLowerer"));
         Assert.That(operatorSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }

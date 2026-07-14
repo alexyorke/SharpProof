@@ -535,7 +535,7 @@ internal static class SymbolicProgramPointFacts
                 out branchState);
 
         if (condition is not BinaryExpressionSyntax comparison ||
-            !TryGetInlineAssignmentComparisonRelationOperator(
+            !SymbolicOperatorLowerer.TryGetRelationOperator(
                 comparison.Kind(),
                 out var relationOperator))
             return false;
@@ -652,36 +652,6 @@ internal static class SymbolicProgramPointFacts
         }
 
         return false;
-    }
-
-    private static bool TryGetInlineAssignmentComparisonRelationOperator(
-        SyntaxKind syntaxKind,
-        out SymbolicRelationOperator relationOperator)
-    {
-        switch (syntaxKind)
-        {
-            case SyntaxKind.EqualsExpression:
-                relationOperator = SymbolicRelationOperator.Equal;
-                return true;
-            case SyntaxKind.NotEqualsExpression:
-                relationOperator = SymbolicRelationOperator.NotEqual;
-                return true;
-            case SyntaxKind.GreaterThanExpression:
-                relationOperator = SymbolicRelationOperator.GreaterThan;
-                return true;
-            case SyntaxKind.GreaterThanOrEqualExpression:
-                relationOperator = SymbolicRelationOperator.GreaterThanOrEqual;
-                return true;
-            case SyntaxKind.LessThanExpression:
-                relationOperator = SymbolicRelationOperator.LessThan;
-                return true;
-            case SyntaxKind.LessThanOrEqualExpression:
-                relationOperator = SymbolicRelationOperator.LessThanOrEqual;
-                return true;
-            default:
-                relationOperator = default;
-                return false;
-        }
     }
 
     internal static void AddReferenceNullCondition(
@@ -1115,7 +1085,10 @@ internal static class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         if (matchedTerm.Kind != SmtValueKind.Int ||
-            !TryGetIrRelationalPatternOperator(relationalPattern.OperatorToken.Kind(), out var relationOperator))
+            !SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
+                relationalPattern.OperatorToken.Kind(),
+                false,
+                out var relationOperator))
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -1132,26 +1105,6 @@ internal static class SymbolicProgramPointFacts
             relationalPattern,
             "ir.path.switch-pattern-binding.relational");
         return true;
-    }
-
-    private static bool TryGetIrRelationalPatternOperator(
-        SyntaxKind operatorKind,
-        out SymbolicRelationOperator relationOperator)
-    {
-        relationOperator = operatorKind switch
-        {
-            SyntaxKind.GreaterThanToken => SymbolicRelationOperator.GreaterThan,
-            SyntaxKind.GreaterThanEqualsToken => SymbolicRelationOperator.GreaterThanOrEqual,
-            SyntaxKind.LessThanToken => SymbolicRelationOperator.LessThan,
-            SyntaxKind.LessThanEqualsToken => SymbolicRelationOperator.LessThanOrEqual,
-            _ => default
-        };
-
-        return operatorKind is
-            SyntaxKind.GreaterThanToken or
-            SyntaxKind.GreaterThanEqualsToken or
-            SyntaxKind.LessThanToken or
-            SyntaxKind.LessThanEqualsToken;
     }
 
     private static bool TryAddIrDesignationBindingStateFacts(

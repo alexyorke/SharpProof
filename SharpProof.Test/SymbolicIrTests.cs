@@ -466,6 +466,26 @@ public sealed class SymbolicIrTests
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
+    [TestCase(SyntaxKind.GreaterThanToken, false, "GreaterThan")]
+    [TestCase(SyntaxKind.GreaterThanEqualsToken, false, "GreaterThanOrEqual")]
+    [TestCase(SyntaxKind.LessThanToken, false, "LessThan")]
+    [TestCase(SyntaxKind.LessThanEqualsToken, false, "LessThanOrEqual")]
+    [TestCase(SyntaxKind.GreaterThanToken, true, "LessThanOrEqual")]
+    [TestCase(SyntaxKind.GreaterThanEqualsToken, true, "LessThan")]
+    [TestCase(SyntaxKind.LessThanToken, true, "GreaterThanOrEqual")]
+    [TestCase(SyntaxKind.LessThanEqualsToken, true, "GreaterThan")]
+    public void RelationalPatternOperatorMapping_IsCanonical(
+        SyntaxKind tokenKind,
+        bool negate,
+        string expected)
+    {
+        Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
+            tokenKind,
+            negate,
+            out var relationOperator), Is.True);
+        Assert.That(relationOperator.ToString(), Is.EqualTo(expected));
+    }
+
     [Test]
     public void LowerCondition_EmptyRecursivePatternUsesSharedNullRelation()
     {

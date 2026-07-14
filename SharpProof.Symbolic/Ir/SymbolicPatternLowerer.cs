@@ -907,7 +907,10 @@ internal static class SymbolicPatternLowerer
     {
         condition = null!;
         if (!TryLowerRelationalPattern(pattern, out var operatorKind, out var relationalExpression, out var negate) ||
-            !TryGetRelationalPatternOperator(operatorKind, negate, out var relationOperator) ||
+            !SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
+                operatorKind,
+                negate,
+                out var relationOperator) ||
             value.Kind != SmtValueKind.Int ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(relationalExpression, context), out var relationalValue) ||
             relationalValue.Kind != SmtValueKind.Int)
@@ -950,34 +953,6 @@ internal static class SymbolicPatternLowerer
         operatorKind = default;
         relationalExpression = null!;
         return false;
-    }
-
-    private static bool TryGetRelationalPatternOperator(
-        SyntaxKind operatorKind,
-        bool negate,
-        out SymbolicRelationOperator relationOperator)
-    {
-        relationOperator = operatorKind switch
-        {
-            SyntaxKind.GreaterThanToken => negate
-                ? SymbolicRelationOperator.LessThanOrEqual
-                : SymbolicRelationOperator.GreaterThan,
-            SyntaxKind.GreaterThanEqualsToken => negate
-                ? SymbolicRelationOperator.LessThan
-                : SymbolicRelationOperator.GreaterThanOrEqual,
-            SyntaxKind.LessThanToken => negate
-                ? SymbolicRelationOperator.GreaterThanOrEqual
-                : SymbolicRelationOperator.LessThan,
-            SyntaxKind.LessThanEqualsToken => negate
-                ? SymbolicRelationOperator.GreaterThan
-                : SymbolicRelationOperator.LessThanOrEqual,
-            _ => default
-        };
-        return operatorKind is
-            SyntaxKind.GreaterThanToken or
-            SyntaxKind.GreaterThanEqualsToken or
-            SyntaxKind.LessThanToken or
-            SyntaxKind.LessThanEqualsToken;
     }
 
     internal static bool TryLowerEmptyRecursivePatternCondition(
