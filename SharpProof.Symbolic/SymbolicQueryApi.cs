@@ -71,41 +71,24 @@ public sealed class SymbolicQueryService
 
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         var source = context.Source;
-        switch (source.Kind)
-        {
-            case SymbolicSourceInputKind.File:
-                return _sourceQueryService.ProveConditionAtFile(
-                    source.FilePath!,
-                    pointTarget.LineNumber!.Value,
-                    pointTarget.ColumnNumber ?? 1,
-                    conditionText,
-                    options.SmtAnalysis,
-                    options.References,
-                    cancellationToken,
-                    source.CompilationProfile);
-            case SymbolicSourceInputKind.Text:
-                return _sourceQueryService.ProveConditionAtSource(
-                    source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath,
-                    pointTarget.LineNumber!.Value,
-                    pointTarget.ColumnNumber ?? 1,
-                    conditionText,
-                    options.SmtAnalysis,
-                    options.References,
-                    cancellationToken,
-                    source.CompilationProfile);
-            case SymbolicSourceInputKind.SyntaxTree:
-                return _sourceQueryService.ProveConditionAtSyntaxTree(
-                    source.SyntaxTree!,
-                    source.Compilation!,
-                    pointTarget.LineNumber!.Value,
-                    pointTarget.ColumnNumber ?? 1,
-                    conditionText,
-                    options.SmtAnalysis,
-                    cancellationToken);
-            default:
-                throw new NotSupportedException("Condition proof source kind is not supported.");
-        }
+        return SymbolicSourceInputDispatcher.Execute(
+            source,
+            pointTarget,
+            options,
+            "SharpProof.Symbolic.Query.cs",
+            "SharpProof.Symbolic.Query",
+            "Condition proof source kind is not supported.",
+            (syntaxTree, compilation, target, token) => _sourceQueryService.ProveConditionAtSyntaxTree(
+                syntaxTree,
+                compilation,
+                target.LineNumber!.Value,
+                target.ColumnNumber ?? 1,
+                conditionText,
+                options.SmtAnalysis,
+                token),
+            static (_, _, _, _) =>
+                throw new NotSupportedException("Condition proof source kind is not supported."),
+            cancellationToken);
     }
 
     public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(

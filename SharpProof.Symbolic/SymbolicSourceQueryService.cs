@@ -489,28 +489,6 @@ internal sealed class SymbolicSourceQueryService
             SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
     }
 
-    public SymbolicConditionProofResult ProveConditionAtFile(
-        string filePath,
-        int line,
-        int column,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => ProveConditionAtSource(
-            sourceText,
-            sourcePath,
-            line,
-            column,
-            conditionText,
-            smtAnalysis,
-            references,
-            cancellationToken,
-            compilationProfile));
-    }
-
     public SymbolicConditionProofResult ProveConditionAtSource(
         string sourceText,
         string filePath,

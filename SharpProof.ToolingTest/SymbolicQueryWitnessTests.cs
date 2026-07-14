@@ -85,6 +85,22 @@ public sealed class SymbolicQueryWitnessTests
             proof.CounterexampleWitness.Assignments.Single(assignment => assignment.SourceName == "value")
                 .IntegerValue,
             Is.LessThanOrEqualTo(5));
+
+        var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.ProofQuery." + Guid.NewGuid() + ".cs");
+        try
+        {
+            File.WriteAllText(sourcePath, source);
+            var fileProof = service.Prove(new SymbolicQueryContext(
+                SymbolicSourceInput.FromFile(sourcePath),
+                SymbolicQueryTarget.Point(line, FindColumn(source, position)),
+                options), "value > 5");
+            Assert.That(fileProof.TruthValue, Is.EqualTo(proof.TruthValue));
+            Assert.That(fileProof.CounterexampleWitness.IsAvailable, Is.True);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
     }
 
     [Test]
