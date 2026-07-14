@@ -89,36 +89,13 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
     public bool ContainsApproximateRegex(SmtFormula formula)
     {
-        return formula switch
-        {
-            SmtRegexMatchFormula regexMatch => GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
-                                               RegexTranslationPrecision.Approximate ||
-                                               ContainsApproximateRegex(regexMatch.Value),
-            SmtRuntimeTypeTestFormula runtimeTypeTestFormula => ContainsApproximateRegex(runtimeTypeTestFormula.Value),
-            SmtUnaryFormula unaryFormula => ContainsApproximateRegex(unaryFormula.Operand),
-            SmtBinaryFormula binaryFormula => ContainsApproximateRegex(binaryFormula.Left) ||
-                                              ContainsApproximateRegex(binaryFormula.Right),
-            SmtIntegerUnaryTerm integerUnaryTerm => ContainsApproximateRegex(integerUnaryTerm.Operand),
-            SmtIntegerBinaryTerm integerBinaryTerm => ContainsApproximateRegex(integerBinaryTerm.Left) ||
-                                                      ContainsApproximateRegex(integerBinaryTerm.Right),
-            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm => ContainsApproximateRegex(opaqueIntegerTerm.Left) ||
-                                                             ContainsApproximateRegex(opaqueIntegerTerm.Right),
-            SmtStringLengthTerm stringLengthTerm => ContainsApproximateRegex(stringLengthTerm.Value),
-            SmtStringConcatTerm stringConcatTerm => ContainsApproximateRegex(stringConcatTerm.Left) ||
-                                                    ContainsApproximateRegex(stringConcatTerm.Right),
-            SmtStringContainsFormula stringContainsFormula => ContainsApproximateRegex(stringContainsFormula.Value) ||
-                                                              ContainsApproximateRegex(stringContainsFormula.Search),
-            SmtStringStartsWithFormula stringStartsWithFormula => ContainsApproximateRegex(
-                                                                      stringStartsWithFormula.Value) ||
-                                                                  ContainsApproximateRegex(stringStartsWithFormula
-                                                                      .Prefix),
-            SmtStringEndsWithFormula stringEndsWithFormula => ContainsApproximateRegex(stringEndsWithFormula.Value) ||
-                                                              ContainsApproximateRegex(stringEndsWithFormula.Suffix),
-            SmtConditionalFormula conditionalFormula => ContainsApproximateRegex(conditionalFormula.Condition) ||
-                                                        ContainsApproximateRegex(conditionalFormula.WhenTrue) ||
-                                                        ContainsApproximateRegex(conditionalFormula.WhenFalse),
-            _ => false
-        };
+        foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
+            if (candidate is SmtRegexMatchFormula regexMatch &&
+                GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
+                RegexTranslationPrecision.Approximate)
+                return true;
+
+        return false;
     }
 
     private Expr Encode(SmtFormula formula)

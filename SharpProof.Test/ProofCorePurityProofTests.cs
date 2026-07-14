@@ -99,7 +99,10 @@ internal class ProofCorePurityProofTests
         var result = search.Classify(
             new SmtFormula[]
             {
-                new SmtRegexMatchFormula(text, @"\A\bA\z"),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    new SmtBooleanConstant(true),
+                    new SmtRegexMatchFormula(text, @"\A\bA\z")),
                 new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
             },
             new SmtBooleanConstant(true),
