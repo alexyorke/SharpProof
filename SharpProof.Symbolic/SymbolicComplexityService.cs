@@ -484,9 +484,7 @@ internal sealed class SymbolicComplexityService
                     return AnalyzeForEachLoop(forEachLoopOperation, semanticModel, currentMethod);
 
                 case IWhileLoopOperation whileLoopOperation:
-                    return whileLoopOperation.ConditionIsTop
-                        ? AnalyzeWhileLoop(whileLoopOperation, semanticModel, currentMethod)
-                        : AnalyzeDoLoop(whileLoopOperation, semanticModel, currentMethod);
+                    return AnalyzeWhileLikeLoop(whileLoopOperation, semanticModel, currentMethod);
 
                 case IInvocationOperation invocationOperation:
                     return AnalyzeInvocation(invocationOperation, semanticModel, currentMethod);
@@ -621,68 +619,44 @@ internal sealed class SymbolicComplexityService
             return CombineSequence(collectionCost, multiplied);
         }
 
-        private ComplexityArtifacts AnalyzeWhileLoop(
-            IWhileLoopOperation whileLoopOperation,
+        private ComplexityArtifacts AnalyzeWhileLikeLoop(
+            IWhileLoopOperation loopOperation,
             SemanticModel semanticModel,
             IMethodSymbol currentMethod)
         {
-            var conditionCost = AnalyzeOperation(whileLoopOperation.Condition, semanticModel, currentMethod);
-            var bodyCost = AnalyzeOperation(whileLoopOperation.Body, semanticModel, currentMethod);
+            var conditionCost = AnalyzeOperation(loopOperation.Condition, semanticModel, currentMethod);
+            var bodyCost = AnalyzeOperation(loopOperation.Body, semanticModel, currentMethod);
+            var (condition, body, driverKind, description) = loopOperation.Syntax switch
+            {
+                WhileStatementSyntax statement =>
+                    (statement.Condition, statement.Statement, "WhileLoop", "while-loop"),
+                DoStatementSyntax statement =>
+                    (statement.Condition, statement.Statement, "DoLoop", "do-loop"),
+                _ => (null, null, string.Empty, string.Empty)
+            };
 
-            if (whileLoopOperation.Syntax is not WhileStatementSyntax whileStatement ||
+            if (condition == null ||
+                body == null ||
                 !TryGetWhileLikeBound(
-                    whileStatement.Condition,
-                    whileStatement.Statement,
+                    condition,
+                    body,
                     semanticModel,
                     currentMethod,
                     out var bound))
                 return ComplexityArtifacts.Unknown(
                     SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
-                    whileLoopOperation.Syntax,
-                    whileLoopOperation.Syntax.SyntaxTree,
+                    loopOperation.Syntax,
+                    loopOperation.Syntax.SyntaxTree,
                     _cancellationToken,
                     conditionCost,
                     bodyCost);
 
             var multiplied = Multiply(bound.Cost, CombineSequence(conditionCost, bodyCost));
             multiplied = multiplied.WithDriver(CreateDriver(
-                "WhileLoop",
-                "while-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-                whileStatement,
-                whileStatement.SyntaxTree,
-                _cancellationToken));
-            return multiplied;
-        }
-
-        private ComplexityArtifacts AnalyzeDoLoop(
-            IWhileLoopOperation doLoopOperation,
-            SemanticModel semanticModel,
-            IMethodSymbol currentMethod)
-        {
-            var conditionCost = AnalyzeOperation(doLoopOperation.Condition, semanticModel, currentMethod);
-            var bodyCost = AnalyzeOperation(doLoopOperation.Body, semanticModel, currentMethod);
-
-            if (doLoopOperation.Syntax is not DoStatementSyntax doStatement ||
-                !TryGetWhileLikeBound(
-                    doStatement.Condition,
-                    doStatement.Statement,
-                    semanticModel,
-                    currentMethod,
-                    out var bound))
-                return ComplexityArtifacts.Unknown(
-                    SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
-                    doLoopOperation.Syntax,
-                    doLoopOperation.Syntax.SyntaxTree,
-                    _cancellationToken,
-                    conditionCost,
-                    bodyCost);
-
-            var multiplied = Multiply(bound.Cost, CombineSequence(conditionCost, bodyCost));
-            multiplied = multiplied.WithDriver(CreateDriver(
-                "DoLoop",
-                "do-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-                doStatement,
-                doStatement.SyntaxTree,
+                driverKind,
+                description + " bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
+                loopOperation.Syntax,
+                loopOperation.Syntax.SyntaxTree,
                 _cancellationToken));
             return multiplied;
         }
