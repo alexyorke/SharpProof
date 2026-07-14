@@ -25,38 +25,16 @@ internal static class SymbolicSourceCompilation
                     .ToImmutableArray<MetadataReference>());
     }
 
-    public static (SyntaxTree SyntaxTree, Compilation Compilation) CreateQuery(
+    public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
         string sourceText,
         string filePath,
+        SymbolicSourceCompilationKind kind,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
         SymbolicSourceCompilationProfile? profile = null)
     {
-        return Create(
-            sourceText,
-            filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
-            references,
-            cancellationToken,
-            profile);
-    }
-
-    public static (SyntaxTree SyntaxTree, Compilation Compilation) CreateRuntimeHazards(
-        string sourceText,
-        string filePath,
-        IEnumerable<MetadataReference>? references,
-        CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? profile = null)
-    {
-        return Create(
-            sourceText,
-            filePath,
-            "SharpProof.Symbolic.RuntimeHazards.cs",
-            "SharpProof.Symbolic.RuntimeHazards",
-            references,
-            cancellationToken,
-            profile);
+        var assemblyName = "SharpProof.Symbolic." + kind;
+        return Create(sourceText, filePath, assemblyName + ".cs", assemblyName, references, cancellationToken, profile);
     }
 
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
@@ -99,4 +77,12 @@ internal static class SymbolicSourceCompilation
             compilationOptions);
         return (syntaxTree, compilation);
     }
+}
+
+internal enum SymbolicSourceCompilationKind
+{
+    Query,
+    RuntimeHazards,
+    Complexity,
+    Capabilities
 }

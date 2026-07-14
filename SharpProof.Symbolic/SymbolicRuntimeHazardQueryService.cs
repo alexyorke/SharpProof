@@ -218,8 +218,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileRuntimeHazardSource(
         string sourceText, string filePath, IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
-        SymbolicSourceCompilation.CreateRuntimeHazards(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        SymbolicSourceCompilation.Create(
+            sourceText, filePath, SymbolicSourceCompilationKind.RuntimeHazards, references, cancellationToken,
+            compilationProfile);
 
     private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsCore(
         SyntaxTree syntaxTree,

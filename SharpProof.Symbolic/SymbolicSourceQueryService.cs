@@ -644,8 +644,9 @@ internal sealed class SymbolicSourceQueryService
     private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
         string sourceText, string filePath, IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
-        SymbolicSourceCompilation.CreateQuery(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        SymbolicSourceCompilation.Create(
+            sourceText, filePath, SymbolicSourceCompilationKind.Query, references, cancellationToken,
+            compilationProfile);
 
     private static void ValidateSyntaxTreeQuery(SyntaxTree syntaxTree, Compilation compilation)
     {

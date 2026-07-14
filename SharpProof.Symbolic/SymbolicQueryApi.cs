@@ -75,8 +75,7 @@ public sealed class SymbolicQueryService
             source,
             pointTarget,
             options,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
+            SymbolicSourceCompilationKind.Query,
             "Condition proof source kind is not supported.",
             (syntaxTree, compilation, target, token) => _sourceQueryService.ProveConditionAtSyntaxTree(
                 syntaxTree,
@@ -197,8 +196,7 @@ public sealed class SymbolicQueryService
             source,
             target,
             options,
-            "SharpProof.Symbolic.RuntimeHazards.cs",
-            "SharpProof.Symbolic.RuntimeHazards",
+            SymbolicSourceCompilationKind.RuntimeHazards,
             "Runtime hazard source kind is not supported.",
             (syntaxTree, compilation, queryTarget, token) => QuerySyntaxTreeRuntimeHazards(
                 syntaxTree, compilation, queryTarget, options, hazardOptions, token),
@@ -293,8 +291,7 @@ public sealed class SymbolicQueryService
             source,
             target,
             options,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
+            SymbolicSourceCompilationKind.Query,
             "Source kind is not supported.",
             (syntaxTree, compilation, queryTarget, token) =>
                 QuerySyntaxTree(syntaxTree, compilation, queryTarget, options, token),

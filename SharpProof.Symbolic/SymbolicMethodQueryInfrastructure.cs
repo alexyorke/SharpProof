@@ -9,8 +9,7 @@ internal static class SymbolicSourceInputDispatcher
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions? options,
-        string generatedFileName,
-        string assemblyName,
+        SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
         Func<SyntaxTree, Compilation, SymbolicQueryTarget, CancellationToken, TResult> querySyntaxTree,
         Func<SyntaxNode, SemanticModel, SymbolicQueryTarget, CancellationToken, TResult> queryNode,
@@ -29,8 +28,7 @@ internal static class SymbolicSourceInputDispatcher
                     target,
                     options,
                     source.CompilationProfile,
-                    generatedFileName,
-                    assemblyName,
+                    compilationKind,
                     querySyntaxTree,
                     cancellationToken));
             case SymbolicSourceInputKind.Text:
@@ -40,8 +38,7 @@ internal static class SymbolicSourceInputDispatcher
                     target,
                     options,
                     source.CompilationProfile,
-                    generatedFileName,
-                    assemblyName,
+                    compilationKind,
                     querySyntaxTree,
                     cancellationToken);
             case SymbolicSourceInputKind.SyntaxTree:
@@ -63,16 +60,14 @@ internal static class SymbolicSourceInputDispatcher
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         SymbolicSourceCompilationProfile? compilationProfile,
-        string generatedFileName,
-        string assemblyName,
+        SymbolicSourceCompilationKind compilationKind,
         Func<SyntaxTree, Compilation, SymbolicQueryTarget, CancellationToken, TResult> querySyntaxTree,
         CancellationToken cancellationToken)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,
             filePath,
-            generatedFileName,
-            assemblyName,
+            compilationKind,
             options.References,
             cancellationToken,
             compilationProfile);
