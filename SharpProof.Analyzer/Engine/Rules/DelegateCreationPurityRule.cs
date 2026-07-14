@@ -343,31 +343,9 @@ internal class DelegateCreationPurityRule : IPurityRule
         out SyntaxNode captureSyntax,
         out ILocalSymbol capturedLocal)
     {
-        var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
-        foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (TryGetCapturedOwnedLocalArray(operation, lambdaSpan, currentState, cancellationToken,
-                    out capturedLocal))
-            {
-                captureSyntax = operation.Syntax;
-                return true;
-            }
-        }
-
-        if (TryFindCapturedOwnedLocalArrayBySyntax(
-                anonymousFunctionOperation.Syntax,
-                lambdaSpan,
-                currentState,
-                semanticModel,
-                cancellationToken,
-                out captureSyntax,
-                out capturedLocal))
-            return true;
-
-        captureSyntax = null!;
-        capturedLocal = null!;
-        return false;
+        return TryFindCapturedOwnedLocal(
+            anonymousFunctionOperation, currentState, null, semanticModel, cancellationToken,
+            freshMutableObject: false, out captureSyntax, out capturedLocal);
     }
 
     internal static bool TryFindLocalFunctionCapturedOwnedLocalArray(
@@ -453,37 +431,40 @@ internal class DelegateCreationPurityRule : IPurityRule
         out SyntaxNode captureSyntax,
         out ILocalSymbol capturedLocal)
     {
+        return TryFindCapturedOwnedLocal(
+            anonymousFunctionOperation, currentState, delegateCreationSyntax, semanticModel, cancellationToken,
+            freshMutableObject: true, out captureSyntax, out capturedLocal);
+    }
+
+    private static bool TryFindCapturedOwnedLocal(
+        IOperation anonymousFunctionOperation, PurityAnalysisEngine.PurityAnalysisState currentState,
+        SyntaxNode? delegateCreationSyntax, SemanticModel semanticModel, CancellationToken cancellationToken,
+        bool freshMutableObject, out SyntaxNode captureSyntax, out ILocalSymbol capturedLocal)
+    {
         var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
         foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (TryGetCapturedFreshMutableObject(
-                    operation,
-                    lambdaSpan,
-                    currentState,
-                    delegateCreationSyntax,
-                    semanticModel,
-                    cancellationToken,
-                    out capturedLocal))
+            var captured = freshMutableObject
+                ? TryGetCapturedFreshMutableObject(
+                    operation, lambdaSpan, currentState, delegateCreationSyntax!, semanticModel, cancellationToken,
+                    out capturedLocal)
+                : TryGetCapturedOwnedLocalArray(
+                    operation, lambdaSpan, currentState, cancellationToken, out capturedLocal);
+            if (captured)
             {
                 captureSyntax = operation.Syntax;
                 return true;
             }
         }
 
-        if (TryFindCapturedFreshMutableObjectBySyntax(
-                anonymousFunctionOperation.Syntax,
-                lambdaSpan,
-                currentState,
-                semanticModel,
-                cancellationToken,
-                out captureSyntax,
-                out capturedLocal))
-            return true;
-
-        captureSyntax = null!;
-        capturedLocal = null!;
-        return false;
+        return freshMutableObject
+            ? TryFindCapturedFreshMutableObjectBySyntax(
+                anonymousFunctionOperation.Syntax, lambdaSpan, currentState, semanticModel, cancellationToken,
+                out captureSyntax, out capturedLocal)
+            : TryFindCapturedOwnedLocalArrayBySyntax(
+                anonymousFunctionOperation.Syntax, lambdaSpan, currentState, semanticModel, cancellationToken,
+                out captureSyntax, out capturedLocal);
     }
 
     internal static bool TryFindLocalFunctionCapturedFreshMutableObject(
