@@ -131,8 +131,7 @@ internal static class AnalyzerFeaturePipeline
         out MethodBodyAnalysisContext methodContext)
     {
         methodContext = null!;
-        if (context.OwningSymbol is not IMethodSymbol methodSymbol ||
-            methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true)
+        if (context.OwningSymbol is not IMethodSymbol methodSymbol || PurityAnalysisEngine.IsMetadataSymbol(methodSymbol))
             return false;
 
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
@@ -168,7 +167,7 @@ internal static class AnalyzerFeaturePipeline
                 IndexerDeclarationSyntax { ExpressionBody: not null })
             methodSymbol = propertySymbol.GetMethod;
 
-        if (methodSymbol == null || methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return false;
+        if (methodSymbol == null || PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return false;
 
         var state = session.GetOrCreateMethodBodyAnalysis(
             methodSymbol,

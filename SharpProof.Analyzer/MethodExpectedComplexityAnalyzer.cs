@@ -17,7 +17,7 @@ internal static class MethodExpectedComplexityAnalyzer
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
-        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
+        if (Engine.PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
         if (!TryGetExpectedComplexity(
                 methodSymbol,

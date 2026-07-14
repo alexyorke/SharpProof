@@ -20,7 +20,7 @@ internal static class MethodRequiresAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
+        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
         var contracts =
             RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);

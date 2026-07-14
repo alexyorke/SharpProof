@@ -21,7 +21,7 @@ internal static class MethodAllocationAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
+        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
         var hasZeroAllocationsAttribute = MethodContractHierarchy
             .EnumerateSources(methodSymbol, context.CancellationToken)

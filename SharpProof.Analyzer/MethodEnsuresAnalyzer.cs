@@ -23,7 +23,7 @@ internal static class MethodEnsuresAnalyzer
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
-        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
+        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
         var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
         if (contracts.Length == 0) return;

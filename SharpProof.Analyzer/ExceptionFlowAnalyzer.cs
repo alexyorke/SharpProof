@@ -52,7 +52,7 @@ internal static partial class ExceptionFlowAnalyzer
 
         var methodSymbol = context.MethodSymbol;
 
-        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
+        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
         var exceptionContracts = CollectExceptionContracts(methodSymbol, context.SemanticModel, attributePolicy,
             context.CancellationToken);
