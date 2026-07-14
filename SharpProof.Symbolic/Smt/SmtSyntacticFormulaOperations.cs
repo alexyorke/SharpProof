@@ -116,80 +116,9 @@ internal static class SmtSyntacticFormulaOperations
 
     internal static IEnumerable<SmtFormula> EnumerateConditionalConditions(SmtFormula formula)
     {
-        switch (formula)
-        {
-            case SmtUnaryFormula unary:
-                foreach (var condition in EnumerateConditionalConditions(unary.Operand)) yield return condition;
-
-                break;
-            case SmtBinaryFormula binary:
-                foreach (var condition in EnumerateConditionalConditions(binary.Left)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(binary.Right)) yield return condition;
-
-                break;
-            case SmtIntegerUnaryTerm unary:
-                foreach (var condition in EnumerateConditionalConditions(unary.Operand)) yield return condition;
-
-                break;
-            case SmtIntegerBinaryTerm binary:
-                foreach (var condition in EnumerateConditionalConditions(binary.Left)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(binary.Right)) yield return condition;
-
-                break;
-            case SmtOpaqueIntegerBinaryTerm binary:
-                foreach (var condition in EnumerateConditionalConditions(binary.Left)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(binary.Right)) yield return condition;
-
-                break;
-            case SmtStringLengthTerm stringLength:
-                foreach (var condition in EnumerateConditionalConditions(stringLength.Value)) yield return condition;
-
-                break;
-            case SmtStringConcatTerm stringConcat:
-                foreach (var condition in EnumerateConditionalConditions(stringConcat.Left)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(stringConcat.Right)) yield return condition;
-
-                break;
-            case SmtStringContainsFormula contains:
-                foreach (var condition in EnumerateConditionalConditions(contains.Value)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(contains.Search)) yield return condition;
-
-                break;
-            case SmtStringStartsWithFormula startsWith:
-                foreach (var condition in EnumerateConditionalConditions(startsWith.Value)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(startsWith.Prefix)) yield return condition;
-
-                break;
-            case SmtStringEndsWithFormula endsWith:
-                foreach (var condition in EnumerateConditionalConditions(endsWith.Value)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(endsWith.Suffix)) yield return condition;
-
-                break;
-            case SmtRegexMatchFormula regexMatch:
-                foreach (var condition in EnumerateConditionalConditions(regexMatch.Value)) yield return condition;
-
-                break;
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                foreach (var condition in EnumerateConditionalConditions(runtimeTypeTest.Value)) yield return condition;
-
-                break;
-            case SmtConditionalFormula conditional:
-                yield return conditional.Condition;
-                foreach (var condition in EnumerateConditionalConditions(conditional.Condition)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(conditional.WhenTrue)) yield return condition;
-
-                foreach (var condition in EnumerateConditionalConditions(conditional.WhenFalse)) yield return condition;
-
-                break;
-        }
+        return SmtFormulaTraversal.Enumerate(formula)
+            .OfType<SmtConditionalFormula>()
+            .Select(static conditional => conditional.Condition);
     }
 
     internal static bool TryGetIntegerComparison(
