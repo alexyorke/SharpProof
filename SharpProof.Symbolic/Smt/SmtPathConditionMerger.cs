@@ -38,6 +38,9 @@ internal static class SmtPathConditionMerger
 
     private static bool TryGetMergeTargetKey(SmtFormula formula, out string targetKey)
     {
+        if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not, Operand: { } operand })
+            formula = operand;
+
         switch (formula)
         {
             case SmtBinaryFormula
@@ -71,30 +74,6 @@ internal static class SmtPathConditionMerger
                 return true;
             case SmtVariable { Kind: SmtValueKind.Bool } target:
                 targetKey = GetKey(target);
-                return true;
-            case SmtUnaryFormula
-            {
-                Operator: SmtUnaryOperator.Not,
-                Operand: SmtVariable { Kind: SmtValueKind.Bool } target
-            }:
-                targetKey = GetKey(target);
-                return true;
-            case SmtUnaryFormula
-            {
-                Operator: SmtUnaryOperator.Not,
-                Operand: SmtBinaryFormula
-                {
-                    Operator: SmtBinaryOperator.Equal or
-                        SmtBinaryOperator.NotEqual or
-                        SmtBinaryOperator.GreaterThan or
-                        SmtBinaryOperator.GreaterThanOrEqual or
-                        SmtBinaryOperator.LessThan or
-                        SmtBinaryOperator.LessThanOrEqual,
-                    Left: { } left,
-                    Right: { } right
-                }
-            } when TryGetMergeTargetTermKey(left, out targetKey) ||
-                   TryGetMergeTargetTermKey(right, out targetKey):
                 return true;
             default:
                 targetKey = string.Empty;

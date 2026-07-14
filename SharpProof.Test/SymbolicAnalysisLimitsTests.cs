@@ -190,6 +190,37 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
+    public void PathConditionMerger_GroupsNegatedBooleanAndComparisonTargets()
+    {
+        var flag = new SmtVariable("flag", SmtValueKind.Bool);
+        var value = new SmtVariable("value", SmtValueKind.Int);
+        var first = ImmutableArray.Create<SmtFormula>(
+            flag,
+            new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThan,
+                    value,
+                    new SmtIntegerConstant(0))));
+        var second = ImmutableArray.Create<SmtFormula>(
+            new SmtUnaryFormula(SmtUnaryOperator.Not, flag),
+            new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThan,
+                    value,
+                    new SmtIntegerConstant(1))));
+
+        var merged = SmtPathConditionMerger.MergeAcrossAll(
+            new[] { first, second },
+            new SmtPathConditionMergeOptions(8, 8, 8, 8));
+
+        Assert.That(merged, Has.Length.EqualTo(2));
+        Assert.That(merged, Has.All.Matches<SmtFormula>(
+            static formula => formula is SmtBinaryFormula { Operator: SmtBinaryOperator.Or }));
+    }
+
+    [Test]
     public void QueryOptions_ExposeProgramPointTruncationInFullAndCompactResults()
     {
         const string source = """
