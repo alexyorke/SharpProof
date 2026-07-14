@@ -665,102 +665,97 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 out var targetType))
             return false;
 
-        if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
-        {
-            if (TryCreateReferenceNullCondition(
-                    castExpression.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.invalid-cast.null-operand",
-                    out var nullCondition) &&
-                nullCondition is SymbolicConstantCondition { Value: true })
-                return false;
-
-            if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                    castExpression.Expression,
-                    castExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var exactRuntimeType))
-            {
-                if (SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
-                    return false;
-
-                if (TryCreateExactRuntimeInvalidCastTrigger(
-                        castExpression.Expression,
-                        semanticModel,
-                        cancellationToken,
-                        out var exactInvalidCastTrigger))
-                {
-                    candidate = CreateInvalidCastCandidate(castExpression, exactInvalidCastTrigger);
-                    return true;
-                }
-            }
-
-        }
-        else
+        var isUnboxing = IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken);
+        if (!isUnboxing)
         {
             var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
             if (!IsReferenceType(targetType) ||
                 !IsReferenceType(operandType))
                 return false;
-
-            if (TryCreateReferenceNullCondition(
-                    castExpression.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.invalid-cast.null-operand",
-                    out var nullCondition) &&
-                nullCondition is SymbolicConstantCondition { Value: true })
-                return false;
-
-            if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                    castExpression.Expression,
-                    castExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var exactRuntimeType) &&
-                TryCreateRuntimeReferenceInvalidCastTrigger(
-                    castExpression.Expression,
-                    targetType,
-                    semanticModel,
-                    cancellationToken,
-                    out var irInvalidCastTrigger))
-            {
-                candidate = CreateInvalidCastCandidate(castExpression, irInvalidCastTrigger);
-                return true;
-            }
-
-            if (exactRuntimeType != null)
-            {
-                if (SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
-                        exactRuntimeType,
-                        targetType,
-                        semanticModel.Compilation))
-                    return false;
-
-                if (TryCreateExactRuntimeInvalidCastTrigger(
-                        castExpression.Expression,
-                        semanticModel,
-                        cancellationToken,
-                        out var exactInvalidCastTrigger))
-                {
-                    candidate = CreateInvalidCastCandidate(castExpression, exactInvalidCastTrigger);
-                    return true;
-                }
-            }
-
         }
 
-        var unsupportedTrigger = CreateUnsupportedExceptionPreconditionTrigger(
+        if (IsDefinitelyNullInvalidCastOperand(castExpression, semanticModel, cancellationToken))
+            return false;
+
+        if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                castExpression.Expression,
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out var exactRuntimeType))
+        {
+            var conversionIsValid = isUnboxing
+                ? SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType)
+                : SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
+                        exactRuntimeType,
+                        targetType,
+                        semanticModel.Compilation);
+            return TryCreateExactRuntimeInvalidCastCandidate(
+                castExpression,
+                conversionIsValid,
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        if (!isUnboxing &&
+            TryCreateRuntimeReferenceInvalidCastTrigger(
+                castExpression.Expression,
+                targetType,
+                semanticModel,
+                cancellationToken,
+                out var irInvalidCastTrigger))
+        {
+            candidate = CreateInvalidCastCandidate(castExpression, irInvalidCastTrigger);
+            return true;
+        }
+
+        candidate = CreateInvalidCastCandidate(
+            castExpression,
+            CreateUnsupportedInvalidCastTrigger(castExpression));
+        return true;
+    }
+
+    private static bool IsDefinitelyNullInvalidCastOperand(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
+        TryCreateReferenceNullCondition(
+            castExpression.Expression,
+            semanticModel,
+            cancellationToken,
+            "ir.runtime-hazard.invalid-cast.null-operand",
+            out var nullCondition) &&
+        nullCondition is SymbolicConstantCondition { Value: true };
+
+    private static bool TryCreateExactRuntimeInvalidCastCandidate(
+        CastExpressionSyntax castExpression,
+        bool conversionIsValid,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (conversionIsValid) return false;
+
+        var trigger = TryCreateExactRuntimeInvalidCastTrigger(
+            castExpression.Expression,
+            semanticModel,
+            cancellationToken,
+            out var exactTrigger)
+            ? exactTrigger
+            : CreateUnsupportedInvalidCastTrigger(castExpression);
+
+        candidate = CreateInvalidCastCandidate(castExpression, trigger);
+        return true;
+    }
+
+    private static RuntimeHazardTrigger CreateUnsupportedInvalidCastTrigger(CastExpressionSyntax castExpression) =>
+        CreateUnsupportedExceptionPreconditionTrigger(
             castExpression.Expression,
             SymbolicExceptionPreconditionKind.InvalidCast,
             null,
             "ir.runtime-hazard.invalid-cast.unsupported");
-
-        candidate = CreateInvalidCastCandidate(castExpression, unsupportedTrigger);
-        return true;
-    }
 
     private static RuntimeHazardCandidate CreateInvalidCastCandidate(
         CastExpressionSyntax castExpression,
