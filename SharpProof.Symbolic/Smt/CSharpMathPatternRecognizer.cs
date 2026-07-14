@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic.Smt;
 
@@ -18,9 +19,8 @@ internal static class CSharpMathPatternRecognizer
         divisorExpression = null!;
         if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation
                 invocationOperation ||
-            invocationOperation.TargetMethod.Name != "Abs" ||
+            !SymbolicKnownApiLowerer.IsMathAbs(invocationOperation.TargetMethod) ||
             !invocationOperation.TargetMethod.IsStatic ||
-            invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
             invocationOperation.TargetMethod.Parameters.Length != 1 ||
             !SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var argumentExpression))

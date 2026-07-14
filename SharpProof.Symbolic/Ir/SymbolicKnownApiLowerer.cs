@@ -8,6 +8,15 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicKnownApiLowerer
 {
+    private static readonly KnownApiLoweringDescriptor<SymbolicTerm> MathAbsLowering = new(
+        "System.Math",
+        nameof(Math.Abs),
+        SymbolicNumericLowerer.TryLowerIntegralMathAbsInvocation);
+    private static readonly KnownApiLoweringDescriptor<SymbolicTerm> MathClampLowering = new(
+        "System.Math",
+        "Clamp",
+        SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation);
+
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         ImmutableArray.Create(
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), SymbolicObjectLowerer.TryLowerObjectReferenceEqualsInvocation),
@@ -52,14 +61,12 @@ internal static class SymbolicKnownApiLowerer
                 "System.Math",
                 nameof(Math.Max),
                 SymbolicNumericLowerer.TryLowerIntegralMathMinMaxInvocation),
-            new KnownApiLoweringDescriptor<SymbolicTerm>(
-                "System.Math",
-                nameof(Math.Abs),
-                SymbolicNumericLowerer.TryLowerIntegralMathAbsInvocation),
-            new KnownApiLoweringDescriptor<SymbolicTerm>(
-                "System.Math",
-                "Clamp",
-                SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation));
+            MathAbsLowering,
+            MathClampLowering);
+
+    internal static bool IsMathAbs(IMethodSymbol method) => MathAbsLowering.Matches(method);
+
+    internal static bool IsMathClamp(IMethodSymbol method) => MathClampLowering.Matches(method);
 
     internal static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,

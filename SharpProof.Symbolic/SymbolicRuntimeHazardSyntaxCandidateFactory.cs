@@ -55,11 +55,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         candidate = default;
         if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
             !operation.TargetMethod.IsStatic ||
-            !string.Equals(operation.TargetMethod.Name, nameof(Math.Abs), StringComparison.Ordinal) ||
-            !string.Equals(
-                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
-                "System.Math",
-                StringComparison.Ordinal) ||
+            !SymbolicKnownApiLowerer.IsMathAbs(operation.TargetMethod) ||
             operation.TargetMethod.Parameters.Length != 1 ||
             !TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
             minValue >= 0 ||
@@ -92,11 +88,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         candidate = default;
         if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
             !operation.TargetMethod.IsStatic ||
-            !string.Equals(operation.TargetMethod.Name, "Clamp", StringComparison.Ordinal) ||
-            !string.Equals(
-                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
-                "System.Math",
-                StringComparison.Ordinal) ||
+            !SymbolicKnownApiLowerer.IsMathClamp(operation.TargetMethod) ||
             operation.TargetMethod.Parameters.Length != 3 ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var minExpression) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 2, out var maxExpression))
