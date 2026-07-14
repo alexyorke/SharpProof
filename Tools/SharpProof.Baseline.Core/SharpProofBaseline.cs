@@ -81,21 +81,10 @@ public static class SharpProofBaseline
 
         var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
         using var document = JsonDocument.Parse(sarifJson, JsonOptions);
-        if (!document.RootElement.TryGetProperty("runs", out var runs) ||
-            runs.ValueKind != JsonValueKind.Array)
-            return new BaselineDocument(ImmutableArray<BaselineEntry>.Empty);
-
-        foreach (var run in runs.EnumerateArray())
+        foreach (var result in EnumerateResults(document.RootElement))
         {
-            if (!run.TryGetProperty("results", out var results) ||
-                results.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var result in results.EnumerateArray())
-            {
-                var entry = TryCreateEntry(result);
-                if (entry != null) entries.Add(entry);
-            }
+            var entry = TryCreateEntry(result);
+            if (entry != null) entries.Add(entry);
         }
 
         return new BaselineDocument(Deduplicate(entries));
@@ -342,10 +331,11 @@ public static class SharpProofBaseline
             EvidenceSchemaCompatibilityProperty,
             "SARIF diagnostic");
 
-        var symbol = GetEvidenceProperty(properties, BaselineSymbolProperty);
+        var symbol = GetEvidenceProperty(properties, BaselineSymbolProperty, includeCustomProperties: true);
         if (string.IsNullOrWhiteSpace(symbol)) return null;
 
-        var path = GetEvidenceProperty(properties, BaselinePathProperty) ?? GetResultPath(result);
+        var path = GetEvidenceProperty(properties, BaselinePathProperty, includeCustomProperties: true) ??
+                   GetResultPath(result);
         if (string.IsNullOrWhiteSpace(path)) return null;
 
         var (line, column) = GetResultLocation(result);
@@ -356,9 +346,9 @@ public static class SharpProofBaseline
             GetMessageText(result),
             line,
             column,
-            GetEvidenceProperty(properties, BaselineContractProperty),
-            GetEvidenceProperty(properties, BaselineOperationKindProperty),
-            GetEvidenceProperty(properties, BaselineEvidenceKeyProperty));
+            GetEvidenceProperty(properties, BaselineContractProperty, includeCustomProperties: true),
+            GetEvidenceProperty(properties, BaselineOperationKindProperty, includeCustomProperties: true),
+            GetEvidenceProperty(properties, BaselineEvidenceKeyProperty, includeCustomProperties: true));
     }
 
     private static void AddBaselineEntries(
@@ -535,21 +525,6 @@ public static class SharpProofBaseline
 
         version = default;
         return false;
-    }
-
-    private static string? GetEvidenceProperty(JsonElement properties, string propertyName)
-    {
-        var value = GetStringProperty(properties, propertyName);
-        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
-
-        if (properties.TryGetProperty("customProperties", out var customProperties) &&
-            customProperties.ValueKind == JsonValueKind.Object)
-        {
-            value = GetStringProperty(customProperties, propertyName);
-            if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
-        }
-
-        return null;
     }
 
     private static string? GetResultPath(JsonElement result)

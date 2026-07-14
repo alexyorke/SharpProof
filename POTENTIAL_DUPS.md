@@ -394,12 +394,6 @@ Four private methods pure boilerplate over `FuzzExpectation.Create`. **Recommend
 
 ## Tools - Baseline / Corpus / Vsix
 
-### `GetEvidenceProperty` near-duplicated SARIF property reader - `SharpProof.Baseline.Core/SharpProofBaseline.cs:540` vs `SharpProof.CorpusReport.Core/SarifCorpusReport.cs:195`
-**Recommendation:** Single `GetEvidenceProperty` (with optional `customProperties` fallback) on `SarifJsonFacts`.
-
-### SARIF `runs`->`results`->`result` traversal duplicated - `SharpProofBaseline.cs:84-99` vs `SarifCorpusReport.cs:79-91`
-**Recommendation:** `SarifJsonFacts.ForEachResult(sarifJson, action)` iterator.
-
 ### Input-to-SARIF resolution + temp-file cleanup duplicated - `SharpProof.Baseline/Program.cs:87-111` vs `SharpProof.CorpusReport/Program.cs:27-56`
 **Recommendation:** `ResolveSarifInputsAsync(IEnumerable<string>, List<string> tempFiles)` in `SharpProof.Tools.Shared`.
 

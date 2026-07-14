@@ -77,18 +77,7 @@ public static class SarifCorpusReport
         {
             _inputs.Add(inputName);
             using var document = JsonDocument.Parse(sarifJson);
-            if (!document.RootElement.TryGetProperty("runs", out var runs) ||
-                runs.ValueKind != JsonValueKind.Array)
-                return;
-
-            foreach (var run in runs.EnumerateArray())
-            {
-                if (!run.TryGetProperty("results", out var results) ||
-                    results.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                foreach (var result in results.EnumerateArray()) AddResult(inputName, result);
-            }
+            foreach (var result in EnumerateResults(document.RootElement)) AddResult(inputName, result);
         }
 
         public CorpusReportSummary Build()
@@ -190,12 +179,6 @@ public static class SarifCorpusReport
 
             if (category != null && symbol != null && FalsePositiveCandidateCategories.Contains(category))
                 IncrementCategorized(_falsePositiveCandidates, category, symbol);
-        }
-
-        private static string? GetEvidenceProperty(JsonElement element, string propertyName)
-        {
-            var value = GetStringProperty(element, propertyName);
-            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
         private static void IncrementIfPresent(Dictionary<string, int> values, string? key)
