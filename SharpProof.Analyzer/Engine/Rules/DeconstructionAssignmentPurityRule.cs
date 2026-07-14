@@ -69,9 +69,12 @@ internal sealed class DeconstructionAssignmentPurityRule : IPurityRule
     {
         if (deconstructionInfo.Method is IMethodSymbol deconstructMethod)
         {
-            var calleeResult = PurityCalleeResolver.GetCalleePurity(deconstructMethod.OriginalDefinition, context);
+            var calleeResult = PurityCalleeResolver.GetCalleePurityAtUse(
+                deconstructMethod,
+                operation.Syntax,
+                context);
             if (!calleeResult.IsPure)
-                return calleeResult.WithCallee(deconstructMethod.OriginalDefinition, operation.Syntax);
+                return calleeResult;
         }
 
         foreach (var nestedInfo in deconstructionInfo.Nested)

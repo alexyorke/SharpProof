@@ -28,10 +28,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         if (IsPotentiallyDispatchedSetter(setter))
             return CheckDispatchedSetterPurity(propertyReference, context, currentState);
 
-        var setterResult = PurityCalleeResolver.GetCalleePurity(setter.OriginalDefinition, context);
-        return setterResult.IsPure
-            ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-            : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
+        return PurityCalleeResolver.GetCalleePurityAtUse(setter, targetOperation.Syntax, context);
     }
 
     private static bool IsPotentiallyDispatchedSetter(IMethodSymbol setterSymbol)
