@@ -140,12 +140,8 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyList<string> exactSymbols,
         IReadOnlyList<string> canonicalKeys)
     {
-        var exactSymbolSet = exactSymbols.Count == 0
-            ? null
-            : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
-        var displayNameSet = canonicalKeys.Count == 0
-            ? null
-            : new HashSet<string>(canonicalKeys, StringComparer.Ordinal);
+        var exactSymbolSet = CreateOptionalOrdinalSet(exactSymbols);
+        var displayNameSet = CreateOptionalOrdinalSet(canonicalKeys);
         var rootHandles = new HashSet<MethodDefinitionHandle>();
         foreach (var handle in reader.MethodDefinitions)
         {
@@ -282,17 +278,16 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyList<string> exactSymbols,
         IReadOnlyList<string> canonicalKeys)
     {
-        var exactSymbolSet = exactSymbols.Count == 0
-            ? null
-            : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
-        var displayNameSet = canonicalKeys.Count == 0
-            ? null
-            : new HashSet<string>(canonicalKeys, StringComparer.Ordinal);
+        var exactSymbolSet = CreateOptionalOrdinalSet(exactSymbols);
+        var displayNameSet = CreateOptionalOrdinalSet(canonicalKeys);
 
         return allSummaries.Where(summary =>
             (exactSymbolSet != null && exactSymbolSet.Contains(summary.Symbol)) ||
             (displayNameSet != null && displayNameSet.Contains(summary.CanonicalKey)));
     }
+
+    private static HashSet<string>? CreateOptionalOrdinalSet(IReadOnlyList<string> values) =>
+        values.Count == 0 ? null : new HashSet<string>(values, StringComparer.Ordinal);
 
     private static IEnumerable<MethodEffectSummary> UnionByIdentity(
         IEnumerable<MethodEffectSummary> first,
