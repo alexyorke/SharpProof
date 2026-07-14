@@ -351,33 +351,14 @@ internal static class SymbolicControlFlowCompletionStateTransfer
 
         if (guards.Count <= 1 || !IsTopLevelLoopBodyStatement(currentStatement, loopBody)) return false;
 
-        SymbolicCondition? combinedCondition = null;
-        for (var index = guards.Count - 1; index >= 0; index--)
-        {
-            var guard = guards[index];
-            if (AnyConditionSymbolInvalidatedBeforeStatement(
-                    guard.IfStatement.Condition,
-                    loopBody,
-                    guard.IfStatement.SpanStart,
-                    semanticModel,
-                    cancellationToken) ||
-                !SymbolicBranchCompletionStateTransfer.TryCreateBranchSymbolicCondition(
-                    guard.IfStatement.Condition,
-                    guard.BranchWhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    out var guardCondition))
-                return false;
-
-            combinedCondition = combinedCondition == null
-                ? guardCondition
-                : new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.And,
-                    combinedCondition,
-                    guardCondition);
-        }
-
-        if (combinedCondition == null) return false;
+        if (!TryCreateCombinedNestedGuardCondition(
+                guards,
+                loopBody,
+                invalidationSpanStart: null,
+                semanticModel,
+                cancellationToken,
+                out var combinedCondition))
+            return false;
 
         if (TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
                 loopStatement,
@@ -547,14 +528,32 @@ internal static class SymbolicControlFlowCompletionStateTransfer
 
         if (guards.Count <= 1 || !ReferenceEquals(currentStatement, ifStatement)) return false;
 
-        SymbolicCondition? combinedCondition = null;
+        return TryCreateCombinedNestedGuardCondition(
+            guards,
+            loopBody,
+            targetStatement.SpanStart,
+            semanticModel,
+            cancellationToken,
+            out continueCondition);
+    }
+
+    private static bool TryCreateCombinedNestedGuardCondition(
+        IReadOnlyList<(IfStatementSyntax IfStatement, bool BranchWhenTrue)> guards,
+        StatementSyntax loopBody,
+        int? invalidationSpanStart,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition combinedCondition)
+    {
+        combinedCondition = null!;
+        SymbolicCondition? aggregate = null;
         for (var index = guards.Count - 1; index >= 0; index--)
         {
             var guard = guards[index];
             if (AnyConditionSymbolInvalidatedBeforeStatement(
                     guard.IfStatement.Condition,
                     loopBody,
-                    targetStatement.SpanStart,
+                    invalidationSpanStart ?? guard.IfStatement.SpanStart,
                     semanticModel,
                     cancellationToken) ||
                 !SymbolicBranchCompletionStateTransfer.TryCreateBranchSymbolicCondition(
@@ -565,17 +564,14 @@ internal static class SymbolicControlFlowCompletionStateTransfer
                     out var guardCondition))
                 return false;
 
-            combinedCondition = combinedCondition == null
+            aggregate = aggregate == null
                 ? guardCondition
-                : new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.And,
-                    combinedCondition,
-                    guardCondition);
+                : new SymbolicBinaryCondition(SymbolicConditionOperator.And, aggregate, guardCondition);
         }
 
-        if (combinedCondition == null) return false;
+        if (aggregate == null) return false;
 
-        continueCondition = combinedCondition;
+        combinedCondition = aggregate;
         return true;
     }
 
