@@ -282,26 +282,88 @@ public sealed class SymbolicInvariantQueryFocus
     }
 }
 
+internal sealed record SymbolicCompactQueryScope(
+    string Kind,
+    string FilePath,
+    int? Line = null,
+    int? Column = null,
+    int? Position = null,
+    string? NodeKind = null,
+    string? MethodName = null,
+    string? ProgramPointKind = null,
+    int? NodeSpanStart = null,
+    int? NodeSpanEnd = null,
+    int? NodeSpanLength = null,
+    int? NodeStartLine = null,
+    int? NodeStartColumn = null,
+    int? NodeEndLine = null,
+    int? NodeEndColumn = null,
+    string? PointReachability = null,
+    string? ReachabilityReason = null,
+    int? RequestedLine = null,
+    int? RequestedColumn = null,
+    int? RequestedPosition = null,
+    int? RequestedPositionDistance = null,
+    bool? ContainsRequestedPosition = null)
+{
+    internal static SymbolicCompactQueryScope FromPoint(SymbolicProgramPointResult result)
+    {
+        return new SymbolicCompactQueryScope(
+            "point",
+            result.FilePath,
+            Line: result.Line,
+            Column: result.Column,
+            Position: result.Position,
+            NodeKind: result.NodeKind,
+            MethodName: result.MethodName,
+            ProgramPointKind: result.ProgramPointKind,
+            NodeSpanStart: result.NodeSpanStart,
+            NodeSpanEnd: result.NodeSpanEnd,
+            NodeSpanLength: result.NodeSpanLength,
+            NodeStartLine: result.NodeStartLine,
+            NodeStartColumn: result.NodeStartColumn,
+            NodeEndLine: result.NodeEndLine,
+            NodeEndColumn: result.NodeEndColumn,
+            PointReachability: result.Reachability.ToString(),
+            ReachabilityReason: result.ReachabilityReason,
+            RequestedLine: result.RequestedLine,
+            RequestedColumn: result.RequestedColumn,
+            RequestedPosition: result.RequestedPosition,
+            RequestedPositionDistance: result.RequestedPositionDistance,
+            ContainsRequestedPosition: result.ContainsRequestedPosition);
+    }
+
+    internal static SymbolicCompactQueryScope FromLine(SymbolicLineQueryResult result)
+    {
+        return new SymbolicCompactQueryScope("line", result.FilePath, Line: result.Line);
+    }
+
+    internal static SymbolicCompactQueryScope FromSpan(SymbolicSpanQueryResult result)
+    {
+        return new SymbolicCompactQueryScope(
+            "span",
+            result.FilePath,
+            NodeSpanStart: result.SpanStart,
+            NodeSpanEnd: result.SpanEnd,
+            NodeSpanLength: result.SpanLength,
+            NodeStartLine: result.StartLine,
+            NodeStartColumn: result.StartColumn,
+            NodeEndLine: result.EndLine,
+            NodeEndColumn: result.EndColumn);
+    }
+
+    internal static SymbolicCompactQueryScope FromFile(SymbolicFileQueryResult result)
+    {
+        return new SymbolicCompactQueryScope("file", result.FilePath);
+    }
+}
+
 public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 {
+    private readonly SymbolicCompactQueryScope _scope;
+
     private SymbolicCompactQueryResult(
-        string kind,
-        string filePath,
-        int? line,
-        int? column,
-        int? position,
-        string? nodeKind,
-        string? methodName,
-        string? programPointKind,
-        int? nodeSpanStart,
-        int? nodeSpanEnd,
-        int? nodeSpanLength,
-        int? nodeStartLine,
-        int? nodeStartColumn,
-        int? nodeEndLine,
-        int? nodeEndColumn,
-        string? pointReachability,
-        string? reachabilityReason,
+        SymbolicCompactQueryScope scope,
         int? lineCount,
         int linesWithProgramPoints,
         int programPointCount,
@@ -315,35 +377,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         SymbolicAnalysisTruncationInfo analysisTruncation,
-        SymbolicCompactOutputTruncation truncation,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
+        SymbolicCompactOutputTruncation truncation)
     {
-        Kind = kind ?? throw new ArgumentNullException(nameof(kind));
-        FilePath = filePath ?? string.Empty;
-        Line = line;
-        Column = column;
-        Position = position;
-        RequestedLine = requestedLine;
-        RequestedColumn = requestedColumn;
-        RequestedPosition = requestedPosition;
-        RequestedPositionDistance = requestedPositionDistance;
-        ContainsRequestedPosition = containsRequestedPosition;
-        NodeKind = nodeKind;
-        MethodName = methodName;
-        ProgramPointKind = programPointKind;
-        NodeSpanStart = nodeSpanStart;
-        NodeSpanEnd = nodeSpanEnd;
-        NodeSpanLength = nodeSpanLength;
-        NodeStartLine = nodeStartLine;
-        NodeStartColumn = nodeStartColumn;
-        NodeEndLine = nodeEndLine;
-        NodeEndColumn = nodeEndColumn;
-        PointReachability = pointReachability;
-        ReachabilityReason = reachabilityReason;
+        _scope = scope ?? throw new ArgumentNullException(nameof(scope));
         LineCount = lineCount;
         LinesWithProgramPoints = linesWithProgramPoints;
         ProgramPointCount = programPointCount;
@@ -368,7 +404,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
 
-    public string Kind { get; }
+    public string Kind => _scope.Kind;
 
     public int SchemaVersion => 1;
 
@@ -376,45 +412,45 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
     public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
-    public string FilePath { get; }
+    public string FilePath => _scope.FilePath;
 
     public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
 
-    public int? Line { get; }
+    public int? Line => _scope.Line;
 
-    public int? Column { get; }
+    public int? Column => _scope.Column;
 
-    public int? Position { get; }
+    public int? Position => _scope.Position;
 
-    public int? RequestedLine { get; }
+    public int? RequestedLine => _scope.RequestedLine;
 
-    public int? RequestedColumn { get; }
+    public int? RequestedColumn => _scope.RequestedColumn;
 
-    public int? RequestedPosition { get; }
+    public int? RequestedPosition => _scope.RequestedPosition;
 
-    public int? RequestedPositionDistance { get; }
+    public int? RequestedPositionDistance => _scope.RequestedPositionDistance;
 
-    public bool? ContainsRequestedPosition { get; }
+    public bool? ContainsRequestedPosition => _scope.ContainsRequestedPosition;
 
-    public string? NodeKind { get; }
+    public string? NodeKind => _scope.NodeKind;
 
-    public string? MethodName { get; }
+    public string? MethodName => _scope.MethodName;
 
-    public string? ProgramPointKind { get; }
+    public string? ProgramPointKind => _scope.ProgramPointKind;
 
-    public int? NodeSpanStart { get; }
+    public int? NodeSpanStart => _scope.NodeSpanStart;
 
-    public int? NodeSpanEnd { get; }
+    public int? NodeSpanEnd => _scope.NodeSpanEnd;
 
-    public int? NodeSpanLength { get; }
+    public int? NodeSpanLength => _scope.NodeSpanLength;
 
-    public int? NodeStartLine { get; }
+    public int? NodeStartLine => _scope.NodeStartLine;
 
-    public int? NodeStartColumn { get; }
+    public int? NodeStartColumn => _scope.NodeStartColumn;
 
-    public int? NodeEndLine { get; }
+    public int? NodeEndLine => _scope.NodeEndLine;
 
-    public int? NodeEndColumn { get; }
+    public int? NodeEndColumn => _scope.NodeEndColumn;
 
     public int? QuerySpanStart => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanStart : null;
 
@@ -430,9 +466,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
     public int? QueryEndColumn => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeEndColumn : null;
 
-    public string? PointReachability { get; }
+    public string? PointReachability => _scope.PointReachability;
 
-    public string? ReachabilityReason { get; }
+    public string? ReachabilityReason => _scope.ReachabilityReason;
 
     public int? LineCount { get; }
 
@@ -491,23 +527,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             normalizedOptions.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
-            "point",
-            result.FilePath,
-            result.Line,
-            result.Column,
-            result.Position,
-            result.NodeKind,
-            result.MethodName,
-            result.ProgramPointKind,
-            result.NodeSpanStart,
-            result.NodeSpanEnd,
-            result.NodeSpanLength,
-            result.NodeStartLine,
-            result.NodeStartColumn,
-            result.NodeEndLine,
-            result.NodeEndColumn,
-            result.Reachability.ToString(),
-            result.ReachabilityReason,
+            SymbolicCompactQueryScope.FromPoint(result),
             null,
             1,
             1,
@@ -521,12 +541,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             projection.ProgramPoints,
             projection.SmtDiagnostics,
             result.AnalysisTruncation,
-            projection.Truncation,
-            result.RequestedLine,
-            result.RequestedColumn,
-            result.RequestedPosition,
-            result.RequestedPositionDistance,
-            result.ContainsRequestedPosition);
+            projection.Truncation);
     }
 
     internal static SymbolicCompactQueryResult FromLine(
@@ -542,23 +557,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             normalizedOptions.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
-            "line",
-            result.FilePath,
-            result.Line,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
+            SymbolicCompactQueryScope.FromLine(result),
             null,
             result.ProgramPoints.Count == 0 ? 0 : 1,
             result.ProgramPoints.Count,
@@ -597,23 +596,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             normalizedOptions.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
-            "span",
-            result.FilePath,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            result.SpanStart,
-            result.SpanEnd,
-            result.SpanLength,
-            result.StartLine,
-            result.StartColumn,
-            result.EndLine,
-            result.EndColumn,
-            null,
-            null,
+            SymbolicCompactQueryScope.FromSpan(result),
             null,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,
@@ -673,23 +656,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)));
 
         return new SymbolicCompactQueryResult(
-            "file",
-            result.FilePath,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
+            SymbolicCompactQueryScope.FromFile(result),
             result.LineCount,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,

@@ -12,14 +12,6 @@
     },
     {
       "paths": [
-        "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
-      ],
-      "category": "cli-schema-projection",
-      "reason": "The top-level compact query preserves flat point coordinates for the existing JSON schema; nested compact program points now compose the canonical result."
-    },
-    {
-      "paths": [
         "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
         "SharpProof.Analyzer/GeneratedPurityCatalog.cs"
       ],
