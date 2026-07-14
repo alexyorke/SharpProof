@@ -68,13 +68,11 @@ internal partial class PropertyReferencePurityRule
                 propertyReferenceOperation.Property,
                 knownReceiverType,
                 context.SemanticModel.Compilation))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    symbol: propertyReferenceOperation.Property.GetMethod));
+            return PurityAnalysisEngine.ImpureResult(
+                propertyReferenceOperation,
+                "dynamic_dispatch",
+                nameof(PropertyReferencePurityRule),
+                propertyReferenceOperation.Property.GetMethod);
 
         return PropertyAccessorDispatchTargetResolver.CheckPotentialTargetPurity(
             propertyReferenceOperation,

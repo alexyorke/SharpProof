@@ -83,7 +83,12 @@ internal static class DispatchedMemberResolution
             receiverType,
             hasStableConcreteReceiver,
             context.SemanticModel.Compilation);
-        if (getter == null) return DynamicDispatch(operation, ruleName, propertySymbol.GetMethod);
+        if (getter == null)
+            return PurityAnalysisEngine.ImpureResult(
+                operation,
+                "dynamic_dispatch",
+                ruleName,
+                propertySymbol.GetMethod);
 
         return PurityCalleeResolver.GetCalleePurityAtUse(getter, operation.Syntax, context);
     }
@@ -103,24 +108,14 @@ internal static class DispatchedMemberResolution
             receiverType,
             hasStableConcreteReceiver,
             context.SemanticModel.Compilation);
-        if (targetMethod == null) return DynamicDispatch(operation, ruleName, methodSymbol);
-
-        return PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, operation.Syntax, context);
-    }
-
-    private static PurityAnalysisEngine.PurityAnalysisResult DynamicDispatch(
-        IOperation operation,
-        string ruleName,
-        ISymbol? symbol)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            operation.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
+        if (targetMethod == null)
+            return PurityAnalysisEngine.ImpureResult(
+                operation,
                 "dynamic_dispatch",
                 ruleName,
-                operation,
-                operation.Syntax,
-                symbol));
+                methodSymbol);
+
+        return PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, operation.Syntax, context);
     }
 
     internal static INamedTypeSymbol? GetKnownReceiverType(

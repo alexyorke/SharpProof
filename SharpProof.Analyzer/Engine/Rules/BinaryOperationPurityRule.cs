@@ -74,26 +74,21 @@ internal class BinaryOperationPurityRule : IPurityRule
         if (binaryOperation.LeftOperand.Type?.TypeKind == TypeKind.Dynamic ||
             binaryOperation.RightOperand.Type?.TypeKind == TypeKind.Dynamic ||
             binaryOperation.Type?.TypeKind == TypeKind.Dynamic)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                binaryOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(BinaryOperationPurityRule),
-                    binaryOperation,
-                    binaryOperation.Syntax));
+            return PurityAnalysisEngine.ImpureResult(
+                binaryOperation,
+                "dynamic_dispatch",
+                nameof(BinaryOperationPurityRule));
 
 
         if (binaryOperation.OperatorMethod != null)
         {
             var operatorMethod = binaryOperation.OperatorMethod;
             if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.UserDefinedOperator))
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    binaryOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(BinaryOperationPurityRule),
-                        binaryOperation,
-                        symbol: operatorMethod));
+                return PurityAnalysisEngine.ImpureResult(
+                    binaryOperation,
+                    "unknown_external_call",
+                    nameof(BinaryOperationPurityRule),
+                    operatorMethod);
 
             var operatorPurity = PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, binaryOperation.Syntax, context);
             if (!operatorPurity.IsPure) return operatorPurity;

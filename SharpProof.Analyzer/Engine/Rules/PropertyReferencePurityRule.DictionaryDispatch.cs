@@ -159,12 +159,10 @@ internal partial class PropertyReferencePurityRule
         IPropertyReferenceOperation propertyReferenceOperation,
         ISymbol? symbol = null)
     {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            propertyReferenceOperation.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "unknown_external_call",
-                nameof(PropertyReferencePurityRule),
-                propertyReferenceOperation,
-                symbol: symbol ?? propertyReferenceOperation.Property.GetMethod));
+        return PurityAnalysisEngine.ImpureResult(
+            propertyReferenceOperation,
+            "unknown_external_call",
+            nameof(PropertyReferencePurityRule),
+            symbol ?? propertyReferenceOperation.Property.GetMethod);
     }
 }

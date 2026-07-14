@@ -24,12 +24,10 @@ internal class ConversionPurityRule : IPurityRule
 
         if (conversionOperation.Operand.Type?.TypeKind == TypeKind.Dynamic ||
             conversionOperation.Type?.TypeKind == TypeKind.Dynamic)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                conversionOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(ConversionPurityRule),
-                    conversionOperation));
+            return PurityAnalysisEngine.ImpureResult(
+                conversionOperation,
+                "dynamic_dispatch",
+                nameof(ConversionPurityRule));
 
 
         if (conversionOperation.Conversion.IsUserDefined && conversionOperation.Conversion.MethodSymbol != null)
@@ -41,13 +39,11 @@ internal class ConversionPurityRule : IPurityRule
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.Conversion))
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    conversionOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(ConversionPurityRule),
-                        conversionOperation,
-                        symbol: operatorMethod));
+                return PurityAnalysisEngine.ImpureResult(
+                    conversionOperation,
+                    "unknown_external_call",
+                    nameof(ConversionPurityRule),
+                    operatorMethod);
 
             var operatorResult = PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, conversionOperation.Syntax, context);
             if (!operatorResult.IsPure) return operatorResult;

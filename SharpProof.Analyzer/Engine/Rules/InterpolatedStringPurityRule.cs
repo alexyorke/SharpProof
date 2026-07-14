@@ -108,40 +108,31 @@ internal class InterpolatedStringPurityRule : IPurityRule
         if (expressionType.TypeKind == TypeKind.Dynamic ||
             expressionType.TypeKind == TypeKind.TypeParameter ||
             expressionType.SpecialType == SpecialType.System_Object)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    PurityAnalysisEngine.TryResolveSymbol(expression)));
+            return PurityAnalysisEngine.ImpureResult(
+                interpolation,
+                "dynamic_dispatch",
+                nameof(InterpolatedStringPurityRule),
+                PurityAnalysisEngine.TryResolveSymbol(expression));
 
         if (expressionType is not INamedTypeSymbol namedType) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var toStringMethod = FindParameterlessToString(namedType);
         if (toStringMethod == null)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "unknown_external_call",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    expressionType));
+            return PurityAnalysisEngine.ImpureResult(
+                interpolation,
+                "unknown_external_call",
+                nameof(InterpolatedStringPurityRule),
+                expressionType);
 
         if (namedType.TypeKind == TypeKind.Class &&
             !namedType.IsSealed &&
             toStringMethod.IsVirtual &&
             !toStringMethod.IsSealed)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    toStringMethod));
+            return PurityAnalysisEngine.ImpureResult(
+                interpolation,
+                "dynamic_dispatch",
+                nameof(InterpolatedStringPurityRule),
+                toStringMethod);
 
         var originalDefinition = toStringMethod.OriginalDefinition;
         if (IsPrimitiveOrEnumInterpolationValue(expressionType)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;

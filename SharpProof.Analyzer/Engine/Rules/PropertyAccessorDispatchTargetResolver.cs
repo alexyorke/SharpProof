@@ -24,13 +24,11 @@ internal static class PropertyAccessorDispatchTargetResolver
             useSetter,
             context.CancellationToken);
         if (candidates.IsDefaultOrEmpty)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReference.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    ruleName,
-                    propertyReference,
-                    symbol: accessor));
+            return PurityAnalysisEngine.ImpureResult(
+                propertyReference,
+                "dynamic_dispatch",
+                ruleName,
+                accessor);
 
         foreach (var candidate in candidates)
         {
