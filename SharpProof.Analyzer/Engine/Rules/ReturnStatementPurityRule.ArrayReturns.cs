@@ -57,45 +57,33 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 out methodSymbol))
             return true;
 
-        if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
         {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-                return IsAllowedTrustedArrayReturn(
-                    conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                    semanticModel,
-                    visitedLocals,
-                    cancellationToken,
-                    out methodSymbol);
+            var firstAlternative = true;
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
+                         unwrappedReturnedValue,
+                         cancellationToken))
+            {
+                var branchVisited = firstAlternative
+                    ? visitedLocals
+                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default);
+                if (!IsAllowedTrustedArrayReturn(
+                        alternative,
+                        semanticModel,
+                        branchVisited,
+                        cancellationToken,
+                        out var branchMethod))
+                {
+                    methodSymbol = null!;
+                    return false;
+                }
 
-            if (IsAllowedTrustedArrayReturn(
-                    conditionalOperation.WhenTrue,
-                    semanticModel,
-                    visitedLocals,
-                    cancellationToken,
-                    out methodSymbol) &&
-                IsAllowedTrustedArrayReturn(
-                    conditionalOperation.WhenFalse,
-                    semanticModel,
-                    new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                    cancellationToken,
-                    out _))
-                return true;
+                if (firstAlternative) methodSymbol = branchMethod;
+                firstAlternative = false;
+            }
+
+            if (!firstAlternative) return true;
         }
-
-        if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            if (IsAllowedTrustedArrayReturn(
-                    coalesceOperation.Value,
-                    semanticModel,
-                    visitedLocals,
-                    cancellationToken,
-                    out methodSymbol) &&
-                IsAllowedTrustedArrayReturn(
-                    coalesceOperation.WhenNull,
-                    semanticModel,
-                    new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                    cancellationToken,
-                    out _))
-                return true;
 
         methodSymbol = null!;
         return false;
@@ -234,58 +222,29 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 out sourceOperation,
                 out methodSymbol);
 
-        if (unwrappedOperation is IConditionalOperation conditionalOperation)
+        if (unwrappedOperation is IConditionalOperation or ICoalesceOperation)
         {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-                return TryResolveReturnedArrayViewSource(
-                    conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                    returnedValue,
-                    semanticModel,
-                    expectedKind,
-                    visitedLocals,
-                    cancellationToken,
-                    out sourceOperation,
-                    out methodSymbol);
-
-            return TryResolveReturnedArrayViewSource(
-                       conditionalOperation.WhenTrue,
-                       returnedValue,
-                       semanticModel,
-                       expectedKind,
-                       visitedLocals,
-                       cancellationToken,
-                       out sourceOperation,
-                       out methodSymbol) ||
-                   TryResolveReturnedArrayViewSource(
-                       conditionalOperation.WhenFalse,
-                       returnedValue,
-                       semanticModel,
-                       expectedKind,
-                       new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                       cancellationToken,
-                       out sourceOperation,
-                       out methodSymbol);
+            var firstAlternative = true;
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
+                         unwrappedOperation,
+                         cancellationToken))
+            {
+                var branchVisited = firstAlternative
+                    ? visitedLocals
+                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default);
+                firstAlternative = false;
+                if (TryResolveReturnedArrayViewSource(
+                        alternative,
+                        returnedValue,
+                        semanticModel,
+                        expectedKind,
+                        branchVisited,
+                        cancellationToken,
+                        out sourceOperation,
+                        out methodSymbol))
+                    return true;
+            }
         }
-
-        if (unwrappedOperation is ICoalesceOperation coalesceOperation)
-            return TryResolveReturnedArrayViewSource(
-                       coalesceOperation.Value,
-                       returnedValue,
-                       semanticModel,
-                       expectedKind,
-                       visitedLocals,
-                       cancellationToken,
-                       out sourceOperation,
-                       out methodSymbol) ||
-                   TryResolveReturnedArrayViewSource(
-                       coalesceOperation.WhenNull,
-                       returnedValue,
-                       semanticModel,
-                       expectedKind,
-                       new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                       cancellationToken,
-                       out sourceOperation,
-                       out methodSymbol);
 
         sourceOperation = null!;
         methodSymbol = null!;

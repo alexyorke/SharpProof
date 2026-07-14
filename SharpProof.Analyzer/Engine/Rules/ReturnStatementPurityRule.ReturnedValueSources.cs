@@ -119,38 +119,10 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         var normalizedReturnedValue = normalize(returnedValue);
         if (match(normalizedReturnedValue, out result)) return true;
 
-        if (normalizedReturnedValue is IConditionalOperation conditionalOperation)
-        {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-                return TryMatchReturnedValueAlternative(
-                    conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                    normalize,
-                    match,
-                    out result);
-
-            return TryMatchReturnedValueAlternative(
-                       conditionalOperation.WhenTrue,
-                       normalize,
-                       match,
-                       out result) ||
-                   TryMatchReturnedValueAlternative(
-                       conditionalOperation.WhenFalse,
-                       normalize,
-                       match,
-                       out result);
-        }
-
-        if (normalizedReturnedValue is ICoalesceOperation coalesceOperation)
-            return TryMatchReturnedValueAlternative(
-                       coalesceOperation.Value,
-                       normalize,
-                       match,
-                       out result) ||
-                   TryMatchReturnedValueAlternative(
-                       coalesceOperation.WhenNull,
-                       normalize,
-                       match,
-                       out result);
+        if (normalizedReturnedValue is IConditionalOperation or ICoalesceOperation)
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(normalizedReturnedValue))
+                if (TryMatchReturnedValueAlternative(alternative, normalize, match, out result))
+                    return true;
 
         result = default!;
         return false;

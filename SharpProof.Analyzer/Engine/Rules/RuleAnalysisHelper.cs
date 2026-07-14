@@ -6,6 +6,44 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class RuleAnalysisHelper
 {
+    internal static IEnumerable<IOperation> EnumerateReachableAlternatives(
+        IOperation operation,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        switch (operation)
+        {
+            case IConditionalOperation conditional
+                when TryGetConstantCondition(conditional, out var conditionValue):
+                var selected = conditionValue ? conditional.WhenTrue : conditional.WhenFalse;
+                if (selected != null)
+                    foreach (var alternative in EnumerateReachableAlternatives(selected, cancellationToken))
+                        yield return alternative;
+                yield break;
+            case IConditionalOperation conditional:
+                if (conditional.WhenTrue != null)
+                    foreach (var alternative in EnumerateReachableAlternatives(
+                                 conditional.WhenTrue,
+                                 cancellationToken))
+                        yield return alternative;
+                if (conditional.WhenFalse != null)
+                    foreach (var alternative in EnumerateReachableAlternatives(
+                                 conditional.WhenFalse,
+                                 cancellationToken))
+                        yield return alternative;
+                yield break;
+            case ICoalesceOperation coalesce:
+                foreach (var alternative in EnumerateReachableAlternatives(coalesce.Value, cancellationToken))
+                    yield return alternative;
+                foreach (var alternative in EnumerateReachableAlternatives(coalesce.WhenNull, cancellationToken))
+                    yield return alternative;
+                yield break;
+            default:
+                yield return operation;
+                yield break;
+        }
+    }
+
     internal static IEnumerable<IOperation> EnumerateRefLocalInitializerOperations(
         ILocalSymbol localSymbol,
         SemanticModel semanticModel,

@@ -449,12 +449,6 @@ interface-impl/virtual-override algorithm twice.
 
 ## Analyzer Engine - Q-Z
 
-### Repeated conditional/coalesce branch-walking logic (high impact)
-`ReturnStatementPurityRule.ReturnedValueSources.cs:113-157`, `ArrayReturns.cs:60-98`, `:237-288`,
-`MutableEscapes.cs:241-260` each re-derive "unwrap `IConditionalOperation`/`ICoalesceOperation`, recurse both branches".
-
-**Recommendation:** `RuleAnalysisHelper.EnumerateReachableAlternatives(IOperation, CancellationToken)` shared helper.
-
 ### Duplicated local declarator-syntax lookup
 `UsingStatementPurityRule.cs:279-287`, `RuleAnalysisHelper.cs:50-53`, `ReturnStatementPurityRule.MutableEscapes.cs:365-368`.
 **Recommendation:** `RuleAnalysisHelper.GetVariableDeclaratorSyntax(ILocalSymbol, CancellationToken)`.

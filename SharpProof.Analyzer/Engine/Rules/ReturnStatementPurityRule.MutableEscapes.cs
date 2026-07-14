@@ -72,7 +72,9 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
         {
-            foreach (var alternative in EnumerateReachableReturnAlternatives(unwrappedReturnedValue))
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
+                         unwrappedReturnedValue,
+                         cancellationToken))
                 if (TryFindMutableCollectionReturnEscape(
                         alternative,
                         semanticModel,
@@ -221,7 +223,9 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
         {
-            foreach (var alternative in EnumerateReachableReturnAlternatives(unwrappedReturnedValue))
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
+                         unwrappedReturnedValue,
+                         cancellationToken))
                 if (TryFindFreshMutableObjectReturnEscape(
                         alternative,
                         semanticModel,
@@ -236,27 +240,6 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         }
 
         return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
-    }
-
-    private static IEnumerable<IOperation> EnumerateReachableReturnAlternatives(IOperation operation)
-    {
-        if (operation is ICoalesceOperation coalesceOperation)
-        {
-            yield return coalesceOperation.Value;
-            yield return coalesceOperation.WhenNull;
-            yield break;
-        }
-
-        var conditionalOperation = (IConditionalOperation)operation;
-        if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-        {
-            var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
-            if (selectedBranch != null) yield return selectedBranch;
-            yield break;
-        }
-
-        yield return conditionalOperation.WhenTrue!;
-        if (conditionalOperation.WhenFalse != null) yield return conditionalOperation.WhenFalse;
     }
 
     private static bool TryFindNestedCallableFreshMutableObjectReturnEscape(
