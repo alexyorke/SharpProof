@@ -24,13 +24,7 @@ internal static partial class ComparerInvocationPurity
         if (ComparerDispatchHelper.IsBuiltinValueComparerKey(elementType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
-                out var getHashCodeOverride)) return CreateUnknownExternalCallImpurity(invocationOperation);
-
-        return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
-            getHashCodeOverride,
-            invocationOperation.Syntax,
-            context);
+        return CheckDefaultGetHashCodeDispatchPurity(elementType, invocationOperation, context);
     }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultEqualityDispatchPurity(
@@ -44,13 +38,7 @@ internal static partial class ComparerInvocationPurity
 
         if (requiresHashCode)
         {
-            if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
-                    out var getHashCodeOverride)) return CreateUnknownExternalCallImpurity(invocationOperation);
-
-            var hashPurity = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
-                getHashCodeOverride,
-                invocationOperation.Syntax,
-                context);
+            var hashPurity = CheckDefaultGetHashCodeDispatchPurity(elementType, invocationOperation, context);
             if (!hashPurity.IsPure) return hashPurity;
         }
 
@@ -71,6 +59,16 @@ internal static partial class ComparerInvocationPurity
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         return CreateUnknownExternalCallImpurity(invocationOperation);
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultGetHashCodeDispatchPurity(
+        ITypeSymbol elementType, IInvocationOperation invocationOperation, PurityAnalysisContext context)
+    {
+        return DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
+            out var getHashCodeOverride)
+            ? PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
+                getHashCodeOverride, invocationOperation.Syntax, context)
+            : CreateUnknownExternalCallImpurity(invocationOperation);
     }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultComparisonDispatchPurity(

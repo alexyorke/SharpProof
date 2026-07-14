@@ -256,10 +256,6 @@ Three captured-escape checks inlined instead of reusing `CheckEscapingAnonymousF
 ### 5. Repeated base-type instance-method enumeration - `DisposalMemberClassifier.cs:25-31`, `EnumeratorRuntimeMemberClassifier.cs:133-138`, `DispatchedMemberResolution.cs:35-42,61-68`
 Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Recommendation:** Sibling helper `EnumerateBaseTypeInstanceMethods`.
 
-### 6. Duplicated GetHashCode-override resolution - `ComparerInvocationPurity.DefaultDispatch.cs:19-34` vs `:45-55`
-Same `TryGetObjectOverride(nameof(GetHashCode),0)` -> `GetCanonicalCalleePurityAtUse` -> `CreateUnknownExternalCallImpurity`.
-**Recommendation:** `CheckDefaultGetHashCodeDispatchPurity(...)`.
-
 ### 7. Repeated `dynamic_dispatch`/`unknown_external_call` result creation
 `BinaryOperationPurityRule.cs:77-83`, `ConversionPurityRule.cs:27-32`, `DynamicOperationPurityRule.cs:19-22`,
 `ComparerDispatchHelper.cs:160-165`, `ComparerInvocationPurity.DefaultDispatch.cs:12-17`.
