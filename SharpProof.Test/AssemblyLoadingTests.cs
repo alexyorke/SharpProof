@@ -6,10 +6,11 @@ namespace SharpProof.Test;
 [TestFixture]
 public class AssemblyLoadingTests
 {
-    [Test]
-    public async Task Assembly_GetExecutingAssembly_Diagnostic()
-    {
-        var test = @"
+    private const int ExpectedScenarioCount = 70;
+
+    private static readonly (string Name, string Source)[] AssemblyLoadingScenarioData =
+    [
+        ("Assembly_GetExecutingAssembly_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -24,15 +25,8 @@ namespace TestNamespace
             return Assembly.GetExecutingAssembly();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetCallingAssembly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetCallingAssembly_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -46,15 +40,8 @@ namespace TestNamespace
             return Assembly.GetCallingAssembly();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetEntryAssembly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetEntryAssembly_Diagnostic", @"
 #nullable enable
 using System.Reflection;
 using SharpProof.Attributes;
@@ -69,15 +56,8 @@ namespace TestNamespace
             return Assembly.GetEntryAssembly();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_Load_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_Load_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -91,15 +71,8 @@ namespace TestNamespace
             return Assembly.Load(assemblyString);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_LoadFrom_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_LoadFrom_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -113,16 +86,8 @@ namespace TestNamespace
             return Assembly.LoadFrom(assemblyFile);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-
-    [Test]
-    public async Task Assembly_GetTypes_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetTypes_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -138,14 +103,8 @@ namespace TestNamespace
             return assembly.GetTypes();
         }
     }
-            }";
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetExportedTypes_Diagnostic()
-    {
-        var test = @"
+            }"),
+        ("Assembly_GetExportedTypes_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -160,15 +119,8 @@ namespace TestNamespace
             return assembly.GetExportedTypes();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetReferencedAssemblies_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetReferencedAssemblies_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -182,15 +134,8 @@ namespace TestNamespace
             return assembly.GetReferencedAssemblies();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyName_Constructor_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyName_Constructor_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -204,15 +149,8 @@ namespace TestNamespace
             return new AssemblyName(""SharpProof"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DynamicMethod_Constructor_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DynamicMethod_Constructor_Diagnostic", @"
 using System;
 using System.Reflection.Emit;
 using SharpProof.Attributes;
@@ -227,15 +165,8 @@ namespace TestNamespace
             return new DynamicMethod(""SharpProof"", typeof(void), Type.EmptyTypes);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyName_GetAssemblyName_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyName_GetAssemblyName_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -249,15 +180,8 @@ namespace TestNamespace
             return AssemblyName.GetAssemblyName(path);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyBuilder_DefineDynamicModule_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyBuilder_DefineDynamicModule_Diagnostic", @"
 using System.Reflection.Emit;
 using SharpProof.Attributes;
 
@@ -271,15 +195,8 @@ namespace TestNamespace
             return builder.DefineDynamicModule(""DynamicModule"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ILGenerator_Emit_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("ILGenerator_Emit_Diagnostic", @"
 using System.Reflection.Emit;
 using SharpProof.Attributes;
 
@@ -293,15 +210,8 @@ namespace TestNamespace
             il.Emit(OpCodes.Ret);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_Default_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_Default_Diagnostic", @"
 using System.Runtime.Loader;
 using SharpProof.Attributes;
 
@@ -315,15 +225,8 @@ namespace TestNamespace
             return AssemblyLoadContext.Default;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_DerivedConstructor_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_DerivedConstructor_Diagnostic", @"
 using System.Runtime.Loader;
 using SharpProof.Attributes;
 
@@ -344,15 +247,8 @@ namespace TestNamespace
             return new DerivedLoadContext();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_All_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_All_Diagnostic", @"
 using System.Collections.Generic;
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -367,15 +263,8 @@ namespace TestNamespace
             return AssemblyLoadContext.All;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_LoadFromAssemblyPath_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_LoadFromAssemblyPath_Diagnostic", @"
 using System.Reflection;
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -390,15 +279,8 @@ namespace TestNamespace
             return context.LoadFromAssemblyPath(path);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_LoadFromStream_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_LoadFromStream_Diagnostic", @"
 using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -414,15 +296,8 @@ namespace TestNamespace
             return context.LoadFromStream(stream);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_LoadFromStreamWithSymbols_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_LoadFromStreamWithSymbols_Diagnostic", @"
 using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -438,15 +313,8 @@ namespace TestNamespace
             return context.LoadFromStream(assemblyStream, symbolsStream);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_LoadFromAssemblyName_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_LoadFromAssemblyName_Diagnostic", @"
 using System.Reflection;
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -461,15 +329,8 @@ namespace TestNamespace
             return context.LoadFromAssemblyName(assemblyName);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_LoadFromNativeImagePath_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_LoadFromNativeImagePath_Diagnostic", @"
 using System.Reflection;
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -484,15 +345,8 @@ namespace TestNamespace
             return context.LoadFromNativeImagePath(nativeImagePath, assemblyPath);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_GetLoadContext_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_GetLoadContext_Diagnostic", @"
 #nullable enable
 using System.Reflection;
 using System.Runtime.Loader;
@@ -508,15 +362,8 @@ namespace TestNamespace
             return AssemblyLoadContext.GetLoadContext(assembly);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_CurrentContextualReflectionContext_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_CurrentContextualReflectionContext_Diagnostic", @"
 #nullable enable
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -531,15 +378,8 @@ namespace TestNamespace
             return AssemblyLoadContext.CurrentContextualReflectionContext;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_EnterContextualReflection_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_EnterContextualReflection_Diagnostic", @"
 using System.Runtime.Loader;
 using SharpProof.Attributes;
 
@@ -553,15 +393,8 @@ namespace TestNamespace
             return context.EnterContextualReflection();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AssemblyLoadContext_EnterContextualReflectionForAssembly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("AssemblyLoadContext_EnterContextualReflectionForAssembly_Diagnostic", @"
 using System.Reflection;
 using System.Runtime.Loader;
 using SharpProof.Attributes;
@@ -576,15 +409,8 @@ namespace TestNamespace
             return AssemblyLoadContext.EnterContextualReflection(assembly);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetManifestResourceNames_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetManifestResourceNames_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -598,15 +424,8 @@ namespace TestNamespace
             return assembly.GetManifestResourceNames();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetLoadedModules_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetLoadedModules_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -620,15 +439,8 @@ namespace TestNamespace
             return assembly.GetLoadedModules();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetModules_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetModules_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -642,15 +454,8 @@ namespace TestNamespace
             return assembly.GetModules();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_DefinedTypes_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_DefinedTypes_Diagnostic", @"
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -666,15 +471,8 @@ namespace TestNamespace
             return assembly.DefinedTypes;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_ExportedTypes_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_ExportedTypes_Diagnostic", @"
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -690,15 +488,8 @@ namespace TestNamespace
             return assembly.ExportedTypes;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_Modules_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_Modules_Diagnostic", @"
 using System.Collections.Generic;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -713,15 +504,8 @@ namespace TestNamespace
             return assembly.Modules;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_ManifestModule_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_ManifestModule_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -735,15 +519,8 @@ namespace TestNamespace
             return assembly.ManifestModule;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_EntryPoint_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_EntryPoint_Diagnostic", @"
 #nullable enable
 using System.Reflection;
 using SharpProof.Attributes;
@@ -758,15 +535,8 @@ namespace TestNamespace
             return assembly.EntryPoint;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_CustomAttributes_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_CustomAttributes_Diagnostic", @"
 using System.Collections.Generic;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -781,15 +551,8 @@ namespace TestNamespace
             return assembly.CustomAttributes;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_Location_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_Location_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -803,15 +566,8 @@ namespace TestNamespace
             return assembly.Location;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_IsDynamic_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_IsDynamic_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -825,15 +581,8 @@ namespace TestNamespace
             return assembly.IsDynamic;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_IsFullyTrusted_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_IsFullyTrusted_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -847,15 +596,8 @@ namespace TestNamespace
             return assembly.IsFullyTrusted;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_HostContext_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_HostContext_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -869,15 +611,8 @@ namespace TestNamespace
             return assembly.HostContext;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GlobalAssemblyCache_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GlobalAssemblyCache_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -891,15 +626,8 @@ namespace TestNamespace
             return assembly.GlobalAssemblyCache;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_ReflectionOnly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_ReflectionOnly_Diagnostic", @"
 using System.Reflection;
 using System.Security;
 using SharpProof.Attributes;
@@ -914,15 +642,8 @@ namespace TestNamespace
             return assembly.ReflectionOnly;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_SecurityRuleSet_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_SecurityRuleSet_Diagnostic", @"
 using System.Reflection;
 using System.Security;
 using SharpProof.Attributes;
@@ -937,15 +658,8 @@ namespace TestNamespace
             return assembly.SecurityRuleSet;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_CodeBase_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_CodeBase_Diagnostic", @"
 #pragma warning disable SYSLIB0012
 using System.Reflection;
 using SharpProof.Attributes;
@@ -960,15 +674,8 @@ namespace TestNamespace
             return assembly.CodeBase;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_EscapedCodeBase_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_EscapedCodeBase_Diagnostic", @"
 #pragma warning disable SYSLIB0012
 using System.Reflection;
 using SharpProof.Attributes;
@@ -983,15 +690,8 @@ namespace TestNamespace
             return assembly.EscapedCodeBase;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetName_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetName_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1005,15 +705,8 @@ namespace TestNamespace
             return assembly.GetName();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetFiles_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetFiles_Diagnostic", @"
 using System.IO;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1028,15 +721,8 @@ namespace TestNamespace
             return assembly.GetFiles();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetModule_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetModule_Diagnostic", @"
 #nullable enable
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1051,15 +737,8 @@ namespace TestNamespace
             return assembly.GetModule(""MainModule"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetFile_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetFile_Diagnostic", @"
 #nullable enable
 using System.IO;
 using System.Reflection;
@@ -1075,15 +754,8 @@ namespace TestNamespace
             return assembly.GetFile(""data.bin"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetManifestResourceInfo_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetManifestResourceInfo_Diagnostic", @"
 #nullable enable
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1098,15 +770,8 @@ namespace TestNamespace
             return assembly.GetManifestResourceInfo(""asset.txt"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetManifestResourceStream_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetManifestResourceStream_Diagnostic", @"
 #nullable enable
 using System.IO;
 using System.Reflection;
@@ -1122,15 +787,8 @@ namespace TestNamespace
             return assembly.GetManifestResourceStream(""asset.txt"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetModules_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetModules_Overload_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1144,15 +802,8 @@ namespace TestNamespace
             return assembly.GetModules(true);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetLoadedModules_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetLoadedModules_Overload_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1166,15 +817,8 @@ namespace TestNamespace
             return assembly.GetLoadedModules(true);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetSatelliteAssembly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetSatelliteAssembly_Diagnostic", @"
 using System.Globalization;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1189,15 +833,8 @@ namespace TestNamespace
             return assembly.GetSatelliteAssembly(CultureInfo.InvariantCulture);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Assembly_GetSatelliteAssembly_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Assembly_GetSatelliteAssembly_Overload_Diagnostic", @"
 using System;
 using System.Globalization;
 using System.Reflection;
@@ -1213,15 +850,8 @@ namespace TestNamespace
             return assembly.GetSatelliteAssembly(CultureInfo.InvariantCulture, new Version(1, 0));
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_Assembly_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_Assembly_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1235,15 +865,8 @@ namespace TestNamespace
             return module.Assembly;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_FullyQualifiedName_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_FullyQualifiedName_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1257,15 +880,8 @@ namespace TestNamespace
             return module.FullyQualifiedName;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_Name_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_Name_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1279,15 +895,8 @@ namespace TestNamespace
             return module.Name;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ScopeName_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ScopeName_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1301,15 +910,8 @@ namespace TestNamespace
             return module.ScopeName;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ModuleVersionId_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ModuleVersionId_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1324,15 +926,8 @@ namespace TestNamespace
             return module.ModuleVersionId;
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_GetTypes_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_GetTypes_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1347,15 +942,8 @@ namespace TestNamespace
             return module.GetTypes();
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_GetType_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_GetType_Diagnostic", @"
 #nullable enable
 using System;
 using System.Reflection;
@@ -1371,15 +959,8 @@ namespace TestNamespace
             return module.GetType(""TestNamespace.TestClass"");
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveMethod_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveMethod_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1393,15 +974,8 @@ namespace TestNamespace
             return module.ResolveMethod(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveType_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveType_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1416,15 +990,8 @@ namespace TestNamespace
             return module.ResolveType(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveField_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveField_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1438,15 +1005,8 @@ namespace TestNamespace
             return module.ResolveField(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveMember_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveMember_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1460,15 +1020,8 @@ namespace TestNamespace
             return module.ResolveMember(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveString_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveString_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1482,15 +1035,8 @@ namespace TestNamespace
             return module.ResolveString(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveSignature_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveSignature_Diagnostic", @"
 using System.Reflection;
 using SharpProof.Attributes;
 
@@ -1504,15 +1050,8 @@ namespace TestNamespace
             return module.ResolveSignature(0);
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveMethod_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveMethod_Overload_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1527,15 +1066,8 @@ namespace TestNamespace
             return module.ResolveMethod(0, Array.Empty<Type>(), Array.Empty<Type>());
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveType_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveType_Overload_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1550,15 +1082,8 @@ namespace TestNamespace
             return module.ResolveType(0, Array.Empty<Type>(), Array.Empty<Type>());
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveField_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveField_Overload_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1573,15 +1098,8 @@ namespace TestNamespace
             return module.ResolveField(0, Array.Empty<Type>(), Array.Empty<Type>());
         }
     }
-}";
-
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task Module_ResolveMember_Overload_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("Module_ResolveMember_Overload_Diagnostic", @"
 using System;
 using System.Reflection;
 using SharpProof.Attributes;
@@ -1596,10 +1114,105 @@ namespace TestNamespace
             return module.ResolveMember(0, Array.Empty<Type>(), Array.Empty<Type>());
         }
     }
-}";
+}"),
+    ];
 
-        await AssertAssemblyLoadingDiagnosticsAsync(test);
+    private static IEnumerable<TestCaseData> AssemblyLoadingScenarios
+    {
+        get
+        {
+            if (AssemblyLoadingScenarioData.Length != ExpectedScenarioCount)
+            {
+                throw new InvalidOperationException(
+                    $"Expected {ExpectedScenarioCount} assembly loading scenarios, but found {AssemblyLoadingScenarioData.Length}.");
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var scenario in AssemblyLoadingScenarioData)
+            {
+                if (!names.Add(scenario.Name))
+                {
+                    throw new InvalidOperationException($"Duplicate assembly loading scenario name: {scenario.Name}");
+                }
+
+                yield return new TestCaseData(scenario.Source).SetName(scenario.Name);
+            }
+        }
     }
+
+    [TestCaseSource(nameof(AssemblyLoadingScenarios))]
+    public Task AssemblyLoadingScenario(string markedSource) =>
+        AssertAssemblyLoadingDiagnosticsAsync(markedSource);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public async Task Assembly_LoadFile_Diagnostic()
