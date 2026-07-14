@@ -11,7 +11,7 @@ internal static class AssemblyEffectSummarizer
         bool includeTransitiveRoots,
         int maxExceptionEdges)
     {
-        var assemblySha256 = ComputeFileSha256(assemblyPath);
+        var assemblySha256 = EffectSummaryHash.FileSha256(assemblyPath);
         using var stream = File.OpenRead(assemblyPath);
         using var peReader = new PEReader(stream);
         if (!peReader.HasMetadata)
@@ -382,7 +382,7 @@ internal static class AssemblyEffectSummarizer
             var il = body.GetILBytes();
             if (il is not null)
             {
-                methodBodySha256 = ComputeSha256(il);
+                methodBodySha256 = EffectSummaryHash.Sha256(il);
                 AnalyzeIl(
                     context,
                     il,
@@ -601,19 +601,6 @@ internal static class AssemblyEffectSummarizer
         {
             return (null, Array.Empty<string>());
         }
-    }
-
-    private static string ComputeFileSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        using var sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
-    }
-
-    private static string ComputeSha256(byte[] bytes)
-    {
-        using var sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(bytes)).ToLowerInvariant();
     }
 
     private static IEnumerable<string> GetRootCandidates(

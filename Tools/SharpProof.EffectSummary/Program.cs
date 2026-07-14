@@ -135,7 +135,7 @@ internal static class EffectSummaryCli
         var normalizedProgressPath = string.IsNullOrWhiteSpace(progressPath)
             ? null
             : Path.GetFullPath(progressPath);
-        var artifactSpecSha256 = ComputeFileSha256(artifactSpecPath);
+        var artifactSpecSha256 = EffectSummaryHash.FileSha256(artifactSpecPath);
         var completedOutputPaths = normalizedProgressPath == null || !resume || !File.Exists(normalizedProgressPath)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : LoadCompletedArtifactOutputs(normalizedProgressPath, artifactSpecSha256);
@@ -287,9 +287,7 @@ internal static class EffectSummaryCli
             assemblyName
                 .Select(character => invalidFileNameCharacters.Contains(character) ? '_' : character)
                 .ToArray());
-        var pathHash = Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(assemblyPath))))
-            .ToLowerInvariant()[..12];
+        var pathHash = EffectSummaryHash.Sha256(Path.GetFullPath(assemblyPath))[..12];
         return Path.Combine(
             outputDirectory,
             $"{safeAssemblyName}.{pathHash}.SharpProof.EffectSummary.json");
@@ -303,7 +301,7 @@ internal static class EffectSummaryCli
             Assemblies = assemblyPaths.Select(path => new
             {
                 Path = Path.GetFullPath(path),
-                Sha256 = ComputeFileSha256(path)
+                Sha256 = EffectSummaryHash.FileSha256(path)
             }),
             options.Limit,
             options.SymbolPrefixes,
@@ -318,7 +316,7 @@ internal static class EffectSummaryCli
             options.CompareManualCatalogs,
             options.IncludeBclFallbackInventory
         });
-        return ComputeSha256(payload);
+        return EffectSummaryHash.Sha256(payload);
     }
 
     private static HashSet<string> LoadShardedProgress(string progressPath, string inputFingerprint)
@@ -425,19 +423,6 @@ internal static class EffectSummaryCli
         {
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
-    }
-
-    private static string ComputeFileSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        using var sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
-    }
-
-    private static string ComputeSha256(string value)
-    {
-        using var sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
     }
 
     private static string GetToolModuleVersionId()
