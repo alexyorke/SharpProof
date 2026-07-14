@@ -692,12 +692,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                         cancellationToken,
                         out var exactInvalidCastTrigger))
                 {
-                    candidate = new RuntimeHazardCandidate(
-                        castExpression,
-                        SymbolicRuntimeHazardKind.InvalidCast,
-                        exactInvalidCastTrigger,
-                        ExceptionTypes.InvalidCastException,
-                        ExceptionCategories.DefiniteInvalidCast);
+                    candidate = CreateInvalidCastCandidate(castExpression, exactInvalidCastTrigger);
                     return true;
                 }
             }
@@ -732,12 +727,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                     cancellationToken,
                     out var irInvalidCastTrigger))
             {
-                candidate = new RuntimeHazardCandidate(
-                    castExpression,
-                    SymbolicRuntimeHazardKind.InvalidCast,
-                    irInvalidCastTrigger,
-                    ExceptionTypes.InvalidCastException,
-                    ExceptionCategories.DefiniteInvalidCast);
+                candidate = CreateInvalidCastCandidate(castExpression, irInvalidCastTrigger);
                 return true;
             }
 
@@ -755,12 +745,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                         cancellationToken,
                         out var exactInvalidCastTrigger))
                 {
-                    candidate = new RuntimeHazardCandidate(
-                        castExpression,
-                        SymbolicRuntimeHazardKind.InvalidCast,
-                        exactInvalidCastTrigger,
-                        ExceptionTypes.InvalidCastException,
-                        ExceptionCategories.DefiniteInvalidCast);
+                    candidate = CreateInvalidCastCandidate(castExpression, exactInvalidCastTrigger);
                     return true;
                 }
             }
@@ -773,14 +758,19 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             null,
             "ir.runtime-hazard.invalid-cast.unsupported");
 
-        candidate = new RuntimeHazardCandidate(
-            castExpression,
-            SymbolicRuntimeHazardKind.InvalidCast,
-            unsupportedTrigger,
-            ExceptionTypes.InvalidCastException,
-            ExceptionCategories.DefiniteInvalidCast);
+        candidate = CreateInvalidCastCandidate(castExpression, unsupportedTrigger);
         return true;
     }
+
+    private static RuntimeHazardCandidate CreateInvalidCastCandidate(
+        CastExpressionSyntax castExpression,
+        RuntimeHazardTrigger trigger) =>
+        new(
+            castExpression,
+            SymbolicRuntimeHazardKind.InvalidCast,
+            trigger,
+            ExceptionTypes.InvalidCastException,
+            ExceptionCategories.DefiniteInvalidCast);
 
     internal static bool TryCreateNullDereferenceCandidate(
         SyntaxNode site,
