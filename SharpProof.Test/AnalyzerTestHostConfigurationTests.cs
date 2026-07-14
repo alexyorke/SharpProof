@@ -519,6 +519,25 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task NestedBaselineDocumentWithoutEvidenceSchema_ReportsSp0032()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "SharpProof.Baseline.json",
+                    "{\"evidenceSchemaVersion\":2,\"evidenceSchemaCompatibility\":\"exact-v2\"," +
+                    "\"groups\":[{\"diagnostics\":[{\"id\":\"SP0002\"," +
+                    "\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"," +
+                    "\"evidenceSchemaVersion\":2,\"evidenceSchemaCompatibility\":\"exact-v2\"}]}]}")));
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("baseline entry is missing required evidenceSchemaVersion"));
+    }
+
+    [Test]
     public async Task LegacyBaselineEvidenceSchema_IsRejectedByAnalyzer()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

@@ -12,22 +12,29 @@ internal static class BaselineJsonCompatibility
         CommentHandling = JsonCommentHandling.Skip
     };
 
-    internal static bool TryValidateEvidenceSchemaTree(
+    internal static bool TryValidateBaselineEvidenceSchemaTree(
         JsonElement element,
-        string versionPropertyName,
-        string compatibilityPropertyName,
         bool requireRootSchema,
-        Func<JsonElement, bool> requiresNestedSchema,
         out EvidenceSchemaValidationFailure failure)
     {
         return TryValidateEvidenceSchemaTree(
             element,
-            versionPropertyName,
-            compatibilityPropertyName,
+            "evidenceSchemaVersion",
+            "evidenceSchemaCompatibility",
             requireRootSchema,
-            requiresNestedSchema,
-            isRoot: true,
+            static candidate =>
+                HasPropertyIgnoreCase(candidate, "diagnostics") ||
+                (HasPropertyIgnoreCase(candidate, "id") &&
+                 HasPropertyIgnoreCase(candidate, "symbol") &&
+                 HasPropertyIgnoreCase(candidate, "path")),
             out failure);
+    }
+
+    internal static bool VisitJsonTree(
+        JsonElement element,
+        Func<JsonElement, bool, bool> visit)
+    {
+        return VisitJsonTree(element, isRoot: true, visit);
     }
 
     internal static bool TryValidateEvidenceSchema(
@@ -155,65 +162,60 @@ internal static class BaselineJsonCompatibility
         string compatibilityPropertyName,
         bool requireRootSchema,
         Func<JsonElement, bool> requiresNestedSchema,
-        bool isRoot,
         out EvidenceSchemaValidationFailure failure)
     {
-        if (element.ValueKind == JsonValueKind.Array)
+        var validationFailure = default(EvidenceSchemaValidationFailure);
+        var valid = VisitJsonTree(element, (candidate, isRoot) =>
         {
-            if (isRoot && requireRootSchema)
+            if (candidate.ValueKind == JsonValueKind.Array)
             {
-                failure = new EvidenceSchemaValidationFailure(
+                if (!isRoot || !requireRootSchema) return true;
+
+                validationFailure = new EvidenceSchemaValidationFailure(
                     EvidenceSchemaValidationFailureKind.Missing,
                     IsRoot: true);
                 return false;
             }
 
-            foreach (var item in element.EnumerateArray())
-                if (!TryValidateEvidenceSchemaTree(
-                        item,
-                        versionPropertyName,
-                        compatibilityPropertyName,
-                        requireRootSchema: false,
-                        requiresNestedSchema,
-                        isRoot: false,
-                        out failure))
-                    return false;
+            if (candidate.ValueKind != JsonValueKind.Object) return true;
 
-            failure = default;
-            return true;
-        }
-
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            failure = default;
-            return true;
-        }
-
-        var required = isRoot ? requireRootSchema : requiresNestedSchema(element);
-        if (!TryValidateEvidenceSchema(
-                element,
-                versionPropertyName,
-                compatibilityPropertyName,
-                required,
-                out failure))
-        {
-            failure = failure.WithRoot(isRoot);
-            return false;
-        }
-
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object &&
-                !TryValidateEvidenceSchemaTree(
-                    property.Value,
+            var required = isRoot ? requireRootSchema : requiresNestedSchema(candidate);
+            if (TryValidateEvidenceSchema(
+                    candidate,
                     versionPropertyName,
                     compatibilityPropertyName,
-                    requireRootSchema: false,
-                    requiresNestedSchema,
-                    isRoot: false,
-                    out failure))
-                return false;
+                    required,
+                    out validationFailure))
+                return true;
 
-        failure = default;
+            validationFailure = validationFailure.WithRoot(isRoot);
+            return false;
+        });
+
+        failure = validationFailure;
+        return valid;
+    }
+
+    private static bool VisitJsonTree(
+        JsonElement element,
+        bool isRoot,
+        Func<JsonElement, bool, bool> visit)
+    {
+        if (!visit(element, isRoot)) return false;
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                if (!VisitJsonTree(item, isRoot: false, visit))
+                    return false;
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+                if (!VisitJsonTree(property.Value, isRoot: false, visit))
+                    return false;
+        }
+
         return true;
     }
 

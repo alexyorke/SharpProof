@@ -115,7 +115,10 @@ internal sealed class DiagnosticBaseline
         try
         {
             using var document = JsonDocument.Parse(json, BaselineJsonCompatibility.DocumentOptions);
-            if (!HasReadCompatibleEvidenceSchema(document.RootElement, requireDocumentSchema: true))
+            if (!BaselineJsonCompatibility.TryValidateBaselineEvidenceSchemaTree(
+                    document.RootElement,
+                    requireRootSchema: true,
+                    out _))
                 return builder.ToImmutable();
             AddEntries(document.RootElement, baseDirectory, builder);
         }
@@ -126,42 +129,17 @@ internal sealed class DiagnosticBaseline
         return builder.ToImmutable();
     }
 
-    private static bool HasReadCompatibleEvidenceSchema(
-        JsonElement element,
-        bool requireDocumentSchema = false)
-    {
-        return BaselineJsonCompatibility.TryValidateEvidenceSchemaTree(
-            element,
-            "evidenceSchemaVersion",
-            "evidenceSchemaCompatibility",
-            requireDocumentSchema,
-            static candidate =>
-                BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "diagnostics") ||
-                (BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "id") &&
-                 BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "symbol") &&
-                 BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "path")),
-            out _);
-    }
-
     private static void AddEntries(
         JsonElement element,
         string baseDirectory,
         ImmutableArray<BaselineEntry>.Builder builder)
     {
-        if (element.ValueKind == JsonValueKind.Array)
+        BaselineJsonCompatibility.VisitJsonTree(element, (candidate, _) =>
         {
-            foreach (var item in element.EnumerateArray()) AddEntries(item, baseDirectory, builder);
-
-            return;
-        }
-
-        if (element.ValueKind != JsonValueKind.Object) return;
-
-        TryAddEntry(element, baseDirectory, builder);
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind == JsonValueKind.Array ||
-                property.Value.ValueKind == JsonValueKind.Object)
-                AddEntries(property.Value, baseDirectory, builder);
+            if (candidate.ValueKind == JsonValueKind.Object)
+                TryAddEntry(candidate, baseDirectory, builder);
+            return true;
+        });
     }
 
     private static void TryAddEntry(

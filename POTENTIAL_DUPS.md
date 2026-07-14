@@ -384,16 +384,6 @@ repeats the `[Impure][ZeroAllocations]` scaffold ~15x.
 
 **Recommendation:** Generic `T ParseEnumFallback<T>(string?, IReadOnlyDictionary<string,T>, T fallback)`.
 
-### 4. Recursive JSON tree-walk duplicated - `DiagnosticBaseline.cs:146-165`, `:295-319`; `BaselineJsonCompatibility.cs:152-218`
-`AddEntries`, `CountBaselineEntries`, `TryValidateEvidenceSchemaTree` share the identical descent rule.
-
-**Recommendation:** Shared `VisitJsonTree(JsonElement, Action<JsonElement>)`.
-
-### 5. Duplicated baseline evidence-schema tree validation - `DiagnosticBaseline.cs:129-144` vs `AnalyzerAdditionalFileValidator.cs:183-208`
-Both call `TryValidateEvidenceSchemaTree` with the same property names + candidate predicate.
-
-**Recommendation:** One shared `TryValidateBaselineEvidenceSchema(JsonElement, bool requireDocumentSchema, out failure)`.
-
 ### 6. Repeated pluralization - `AnalyzerAdditionalFileValidator.cs:56-59,149-152,281-285`
 `$"...partially ignored {count} malformed entr{(count==1?"y":"ies")}"` three times.
 

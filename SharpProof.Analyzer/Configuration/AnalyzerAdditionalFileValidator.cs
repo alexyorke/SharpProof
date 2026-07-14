@@ -185,15 +185,9 @@ internal static class AnalyzerAdditionalFileValidator
         JsonElement element,
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
     {
-        if (BaselineJsonCompatibility.TryValidateEvidenceSchemaTree(
+        if (BaselineJsonCompatibility.TryValidateBaselineEvidenceSchemaTree(
                 element,
-                "evidenceSchemaVersion",
-                "evidenceSchemaCompatibility",
                 requireRootSchema: true,
-                static candidate =>
-                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "id") &&
-                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "symbol") &&
-                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "path"),
                 out var failure))
             return true;
 
@@ -288,15 +282,11 @@ internal static class AnalyzerAdditionalFileValidator
     private static BaselineEntryCounts CountBaselineEntries(JsonElement element)
     {
         var counts = new BaselineEntryCounts();
-        CountBaselineEntries(element, ref counts);
-        return counts;
-    }
-
-    private static void CountBaselineEntries(JsonElement element, ref BaselineEntryCounts counts)
-    {
-        if (element.ValueKind == JsonValueKind.Object)
+        BaselineJsonCompatibility.VisitJsonTree(element, (candidate, _) =>
         {
-            var fields = BaselineJsonCompatibility.ReadEntryFields(element);
+            if (candidate.ValueKind != JsonValueKind.Object) return true;
+
+            var fields = BaselineJsonCompatibility.ReadEntryFields(candidate);
             if (fields.HasCandidateProperty)
             {
                 counts.CandidateCount++;
@@ -306,16 +296,9 @@ internal static class AnalyzerAdditionalFileValidator
                     counts.InvalidCount++;
             }
 
-            foreach (var property in element.EnumerateObject())
-                if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
-                    CountBaselineEntries(property.Value, ref counts);
-
-            return;
-        }
-
-        if (element.ValueKind == JsonValueKind.Array)
-            foreach (var item in element.EnumerateArray())
-                CountBaselineEntries(item, ref counts);
+            return true;
+        });
+        return counts;
     }
 
     private static bool TryGetText(
