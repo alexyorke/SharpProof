@@ -337,20 +337,11 @@ Physically in `Shared` but `namespace SharpProof.Analyzer.Engine`. **Recommendat
 
 ## Tools - EffectSummary
 
-### Duplicated dominance-resolution blocks - `EffectSummaryCatalogReporting.cs:134-138,155-159`
-Both implement identical "pick more-dominant of two entries" pattern. **Recommendation:** `TryResolveDominant(ref best, candidate)`.
-
 ### Repeated call-chain key construction & ordering - `EffectSummaryExceptionPropagation.cs:424-429,431-442,444-451,453-464`
 `string.Join(">", chain.Select(identity => identity.ToCanonicalKey()))` written inline 4x. **Recommendation:** `CanonicalCallChain(...)` shared helper.
 
 ### Hardcoded `StringComparer` value set duplicated - `EffectSummarySemanticWrapperRules.cs:923-928` vs `EffectSummaryIlAnalyzer.cs:591-635`
 Four deterministic comparer symbols defined twice. **Recommendation:** `KnownStringComparers` helper.
-
-### Duplicated accessor-suffix (`.get`/`.set`) detection & member-splitting - `EffectSummaryCatalogReporting.cs:303-326,328-372`
-Same suffix-detect + `FindLastTopLevelDot` + slice. **Recommendation:** `TryGetPropertyAccessorParts(...)`.
-
-### Depth-aware top-level scanning duplicated - `EffectSummaryCatalogReporting.cs:560-582,713-732`
-`SplitTopLevelArguments` and `FindLastTopLevelDot` share the same `<`/`>` depth-counter state machine. **Recommendation:** Shared `ScanTopLevel(...)` enumerator.
 
 ---
 

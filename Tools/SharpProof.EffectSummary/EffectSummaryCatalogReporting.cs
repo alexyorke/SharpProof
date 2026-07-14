@@ -123,19 +123,10 @@ internal static class EffectSummaryCatalogReporting
                 implementationGroup.ToArray());
             if (resolvedEntry == null) continue;
 
-            if (bestEntry == null)
-            {
-                bestEntry = resolvedEntry;
-                continue;
-            }
-
-            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, resolvedEntry)) continue;
-
-            var bestDominatesResolved = GeneratedPurityCatalogEntryRelations.DoesDominate(bestEntry, resolvedEntry);
-            var resolvedDominatesBest = GeneratedPurityCatalogEntryRelations.DoesDominate(resolvedEntry, bestEntry);
-            if (bestDominatesResolved == resolvedDominatesBest) return null;
-
-            if (resolvedDominatesBest) bestEntry = resolvedEntry;
+            bestEntry = bestEntry == null
+                ? resolvedEntry
+                : ResolveDominantGeneratedPurityEntry(bestEntry, resolvedEntry);
+            if (bestEntry == null) return null;
         }
 
         return bestEntry;
@@ -146,20 +137,25 @@ internal static class EffectSummaryCatalogReporting
     {
         if (candidates.Count == 0) return null;
 
-        var bestEntry = candidates[0];
+        GeneratedPurityCatalogEntry? bestEntry = candidates[0];
         for (var i = 1; i < candidates.Count; i++)
         {
-            var candidate = candidates[i];
-            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, candidate)) continue;
-
-            var bestDominatesCandidate = GeneratedPurityCatalogEntryRelations.DoesDominate(bestEntry, candidate);
-            var candidateDominatesBest = GeneratedPurityCatalogEntryRelations.DoesDominate(candidate, bestEntry);
-            if (bestDominatesCandidate == candidateDominatesBest) return null;
-
-            if (candidateDominatesBest) bestEntry = candidate;
+            bestEntry = ResolveDominantGeneratedPurityEntry(bestEntry, candidates[i]);
+            if (bestEntry == null) return null;
         }
 
         return bestEntry;
+    }
+
+    private static GeneratedPurityCatalogEntry? ResolveDominantGeneratedPurityEntry(
+        GeneratedPurityCatalogEntry left,
+        GeneratedPurityCatalogEntry right)
+    {
+        if (GeneratedPurityCatalogEntryRelations.AreEquivalent(left, right)) return left;
+
+        var leftDominates = GeneratedPurityCatalogEntryRelations.DoesDominate(left, right);
+        var rightDominates = GeneratedPurityCatalogEntryRelations.DoesDominate(right, left);
+        return leftDominates == rightDominates ? null : rightDominates ? right : left;
     }
 
     internal static bool HaveSameGeneratedPurityEntryMap(
@@ -302,54 +298,16 @@ internal static class EffectSummaryCatalogReporting
 
     internal static string NormalizePropertyAccessorSymbol(string symbol)
     {
-        var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
-            ? ".get"
-            : symbol.EndsWith(".set", StringComparison.Ordinal)
-                ? ".set"
-                : null;
-        if (suffix == null) return symbol;
-
-        var memberSeparator = FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
-        if (memberSeparator < 0) return symbol;
-
-        var containingType = symbol.Substring(0, memberSeparator);
-        var propertyName = symbol.Substring(
-            memberSeparator + 1,
-            symbol.Length - memberSeparator - suffix.Length - 1);
-        if (string.IsNullOrWhiteSpace(propertyName)) return symbol;
+        if (!TryGetCatalogAccessorParts(symbol, out var containingType, out var accessorKind, out var propertyName))
+            return symbol;
 
         var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out _);
-        var accessorPrefix = string.Equals(suffix, ".get", StringComparison.Ordinal)
-            ? "get_"
-            : "set_";
-        return normalizedContainingType + "." + accessorPrefix + propertyName + "()";
+        return normalizedContainingType + "." + accessorKind + "_" + propertyName + "()";
     }
 
     internal static bool TryNormalizeCatalogAccessorComparisonKey(string symbol, out string comparisonKey)
     {
-        var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
-            ? ".get"
-            : symbol.EndsWith(".set", StringComparison.Ordinal)
-                ? ".set"
-                : null;
-        if (suffix == null)
-        {
-            comparisonKey = string.Empty;
-            return false;
-        }
-
-        var memberSeparator = FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
-        if (memberSeparator < 0)
-        {
-            comparisonKey = string.Empty;
-            return false;
-        }
-
-        var containingType = symbol.Substring(0, memberSeparator);
-        var propertyName = symbol.Substring(
-            memberSeparator + 1,
-            symbol.Length - memberSeparator - suffix.Length - 1);
-        if (string.IsNullOrWhiteSpace(propertyName))
+        if (!TryGetCatalogAccessorParts(symbol, out var containingType, out var accessorKind, out var propertyName))
         {
             comparisonKey = string.Empty;
             return false;
@@ -364,11 +322,37 @@ internal static class EffectSummaryCatalogReporting
 
         comparisonKey = BuildNormalizedAccessorComparisonKey(
             containingType,
-            string.Equals(suffix, ".get", StringComparison.Ordinal) ? "get" : "set",
+            accessorKind,
             normalizedPropertyName,
             indexParameterList,
             false);
         return true;
+    }
+
+    private static bool TryGetCatalogAccessorParts(
+        string symbol,
+        out string containingType,
+        out string accessorKind,
+        out string propertyName)
+    {
+        var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
+            ? ".get"
+            : symbol.EndsWith(".set", StringComparison.Ordinal)
+                ? ".set"
+                : null;
+        var memberSeparator = suffix == null ? -1 : FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
+        if (memberSeparator < 0)
+        {
+            containingType = accessorKind = propertyName = string.Empty;
+            return false;
+        }
+
+        containingType = symbol.Substring(0, memberSeparator);
+        accessorKind = suffix![1..];
+        propertyName = symbol.Substring(
+            memberSeparator + 1,
+            symbol.Length - memberSeparator - suffix.Length - 1);
+        return !string.IsNullOrWhiteSpace(propertyName);
     }
 
     internal static bool TryNormalizeRuntimeAccessorComparisonKey(string symbol, out string comparisonKey)
@@ -559,21 +543,11 @@ internal static class EffectSummaryCatalogReporting
     {
         var arguments = new List<string>();
         var start = 0;
-        var depth = 0;
-        for (var i = 0; i < text.Length; i++)
-            switch (text[i])
-            {
-                case '<':
-                    depth++;
-                    break;
-                case '>':
-                    depth = Math.Max(0, depth - 1);
-                    break;
-                case ',' when depth == 0:
-                    arguments.Add(text.Substring(start, i - start).Trim());
-                    start = i + 1;
-                    break;
-            }
+        foreach (var separator in EnumerateTopLevelSeparators(text, text.Length, ','))
+        {
+            arguments.Add(text.Substring(start, separator - start).Trim());
+            start = separator + 1;
+        }
 
         arguments.Add(text.Substring(start).Trim());
         return arguments
@@ -712,8 +686,17 @@ internal static class EffectSummaryCatalogReporting
 
     internal static int FindLastTopLevelDot(string text, int exclusiveUpperBound)
     {
-        var depth = 0;
         var lastDot = -1;
+        foreach (var separator in EnumerateTopLevelSeparators(text, exclusiveUpperBound, '.')) lastDot = separator;
+        return lastDot;
+    }
+
+    private static IEnumerable<int> EnumerateTopLevelSeparators(
+        string text,
+        int exclusiveUpperBound,
+        char separator)
+    {
+        var depth = 0;
         for (var i = 0; i < exclusiveUpperBound; i++)
             switch (text[i])
             {
@@ -723,12 +706,10 @@ internal static class EffectSummaryCatalogReporting
                 case '>':
                     depth = Math.Max(0, depth - 1);
                     break;
-                case '.' when depth == 0:
-                    lastDot = i;
+                default:
+                    if (text[i] == separator && depth == 0) yield return i;
                     break;
             }
-
-        return lastDot;
     }
 
     internal static string GetSimpleTypeName(string containingType)
