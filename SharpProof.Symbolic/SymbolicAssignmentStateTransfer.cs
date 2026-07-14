@@ -101,11 +101,8 @@ internal static class SymbolicAssignmentStateTransfer
             AddThrowGuardedAssignmentCompletionStateFacts(
                 ref state,
                 assignedSymbol,
-                effectiveValueExpression,
+                throwGuardedValue,
                 effectiveValueIsAssignedSymbol,
-                throwGuardedValue.GuardExpression,
-                throwGuardedValue.GuardBranchWhenTrue,
-                throwGuardedValue.RequiresNonNullValue,
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
@@ -283,11 +280,8 @@ internal static class SymbolicAssignmentStateTransfer
             AddThrowGuardedAssignmentCompletionStateFacts(
                 ref state,
                 assignedSymbol,
-                effectiveValueExpression,
+                throwGuardedValue,
                 effectiveValueIsAssignedSymbol,
-                throwGuardedValue.GuardExpression,
-                throwGuardedValue.GuardBranchWhenTrue,
-                throwGuardedValue.RequiresNonNullValue,
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
@@ -296,16 +290,13 @@ internal static class SymbolicAssignmentStateTransfer
     private static void AddThrowGuardedAssignmentCompletionStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
-        ExpressionSyntax effectiveValueExpression,
+        SymbolicThrowGuardedValue throwGuardedValue,
         bool effectiveValueIsAssignedSymbol,
-        ExpressionSyntax? guardExpression,
-        bool guardBranchWhenTrue,
-        bool requiresNonNullValue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string provenanceRoot)
     {
-        if (guardExpression != null)
+        if (throwGuardedValue.GuardExpression is { } guardExpression)
         {
             if (!SymbolMutationFacts.ExpressionReferencesSymbol(
                     guardExpression,
@@ -316,18 +307,18 @@ internal static class SymbolicAssignmentStateTransfer
                 SymbolicProgramPointFacts.AddReachabilityCondition(
                     ref state,
                     guardExpression,
-                    guardBranchWhenTrue,
+                    throwGuardedValue.GuardBranchWhenTrue,
                     semanticModel,
                     cancellationToken);
 
             return;
         }
 
-        if (!requiresNonNullValue) return;
+        if (!throwGuardedValue.RequiresNonNullValue) return;
 
         SymbolicProgramPointFacts.AddReferenceNullCondition(
             ref state,
-            effectiveValueExpression,
+            throwGuardedValue.EffectiveValueExpression,
             false,
             semanticModel,
             cancellationToken,
