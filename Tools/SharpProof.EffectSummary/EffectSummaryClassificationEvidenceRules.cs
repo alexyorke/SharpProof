@@ -441,138 +441,62 @@ internal static class EffectSummaryClassificationEvidenceRules
         string symbol,
         PurityClassificationContext context)
     {
-        var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
-        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
-
-        var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var compatible = IsFreshOwnedObjectInitializationCompatibleCore(
+        return IsClassificationCompatible(
             symbol,
             context,
-            compatibilityVisiting);
-        freshOwnedInitializationMemo[symbol] = compatible;
-        return compatible;
-    }
-
-    internal static bool IsFreshOwnedObjectInitializationCompatibleCore(
-        string symbol,
-        PurityClassificationContext context,
-        HashSet<string> compatibilityVisiting)
-    {
-        var bySymbol = context.BySymbol;
-        var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
-        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
-
-        if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
-
-        if (!compatibilityVisiting.Add(symbol)) return false;
-
-        foreach (var root in summary.RootCandidates)
-        {
-            if (InternalOnlyRoots.Contains(root) ||
-                string.Equals(root, "object_state_write", StringComparison.Ordinal))
-                continue;
-
-            compatibilityVisiting.Remove(symbol);
-            return false;
-        }
-
-        foreach (var effect in summary.Effects)
-        {
-            if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
-                SafeEffects.Contains(effect))
-                continue;
-
-            compatibilityVisiting.Remove(symbol);
-            return false;
-        }
-
-        foreach (var callSite in EnumerateCallSites(summary))
-        {
-            var call = callSite.DisplayName;
-            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
-
-            if (IsValidationThrowHelperSupportCall(call)) continue;
-
-            if (callSite.CanonicalKey == null ||
-                !TryResolveCallSummary(callSite.CanonicalKey, bySymbol, out var resolvedCallKey,
-                    out var resolvedCallSummary))
-            {
-                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _))
-                {
-                    compatibilityVisiting.Remove(symbol);
-                    return false;
-                }
-
-                continue;
-            }
-
-            var calleeClassification = ClassifyMethod(resolvedCallKey, context);
-            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
-
-            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
-                continue;
-
-            if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
-                IsFreshOwnedObjectInitializationCompatibleCore(
-                    resolvedCallKey,
-                    context,
-                    compatibilityVisiting))
-                continue;
-
-            compatibilityVisiting.Remove(symbol);
-            return false;
-        }
-
-        compatibilityVisiting.Remove(symbol);
-        freshOwnedInitializationMemo[symbol] = true;
-        return true;
+            context.FreshOwnedInitializationMemo,
+            IsFreshOwnedInitializationRoot,
+            IsFreshOwnedInitializationEffect);
     }
 
     internal static bool IsValidationThrowHelperCompatible(
         string symbol,
         PurityClassificationContext context)
     {
-        var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
-        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
-
-        var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var compatible = IsValidationThrowHelperCompatibleCore(
+        return IsClassificationCompatible(
             symbol,
             context,
-            compatibilityVisiting);
-        validationThrowHelperMemo[symbol] = compatible;
+            context.ValidationThrowHelperMemo,
+            IsValidationThrowHelperRoot,
+            IsValidationThrowHelperEffect);
+    }
+
+    private static bool IsClassificationCompatible(
+        string symbol,
+        PurityClassificationContext context,
+        Dictionary<string, bool> memo,
+        Func<string, bool> isAllowedRoot,
+        Func<string, bool> isAllowedEffect)
+    {
+        if (memo.TryGetValue(symbol, out var cached)) return cached;
+
+        var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
+        var compatible = IsClassificationCompatibleCore(
+            symbol,
+            context,
+            memo,
+            compatibilityVisiting,
+            isAllowedRoot,
+            isAllowedEffect);
+        memo[symbol] = compatible;
         return compatible;
     }
 
-    internal static bool IsValidationThrowHelperCompatibleCore(
+    private static bool IsClassificationCompatibleCore(
         string symbol,
         PurityClassificationContext context,
-        HashSet<string> compatibilityVisiting)
+        Dictionary<string, bool> memo,
+        HashSet<string> compatibilityVisiting,
+        Func<string, bool> isAllowedRoot,
+        Func<string, bool> isAllowedEffect)
     {
-        var bySymbol = context.BySymbol;
-        var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
-        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
-
-        if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
-
+        if (memo.TryGetValue(symbol, out var cached)) return cached;
+        if (!context.BySymbol.TryGetValue(symbol, out var summary)) return false;
         if (!compatibilityVisiting.Add(symbol)) return false;
 
-        foreach (var root in summary.RootCandidates)
+        if (summary.RootCandidates.Any(root => !isAllowedRoot(root)) ||
+            summary.Effects.Any(effect => !isAllowedEffect(effect)))
         {
-            if (string.Equals(root, "throw", StringComparison.Ordinal) ||
-                InternalOnlyRoots.Contains(root))
-                continue;
-
-            compatibilityVisiting.Remove(symbol);
-            return false;
-        }
-
-        foreach (var effect in summary.Effects)
-        {
-            if (string.Equals(effect, "throws", StringComparison.Ordinal) ||
-                SafeEffects.Contains(effect))
-                continue;
-
             compatibilityVisiting.Remove(symbol);
             return false;
         }
@@ -580,12 +504,15 @@ internal static class EffectSummaryClassificationEvidenceRules
         foreach (var callSite in EnumerateCallSites(summary))
         {
             var call = callSite.DisplayName;
-            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
-
-            if (IsValidationThrowHelperSupportCall(call)) continue;
+            if (IsPurityNeutralIntrinsicHelperCall(call) ||
+                IsValidationThrowHelperSupportCall(call))
+                continue;
 
             if (callSite.CanonicalKey == null ||
-                !TryResolveCallSummary(callSite.CanonicalKey, bySymbol, out var resolvedCallKey,
+                !TryResolveCallSummary(
+                    callSite.CanonicalKey,
+                    context.BySymbol,
+                    out var resolvedCallKey,
                     out var resolvedCallSummary))
             {
                 if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _))
@@ -598,16 +525,18 @@ internal static class EffectSummaryClassificationEvidenceRules
             }
 
             var calleeClassification = ClassifyMethod(resolvedCallKey, context);
-            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
-
-            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
+            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) ||
+                ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
                 continue;
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
-                IsValidationThrowHelperCompatibleCore(
+                IsClassificationCompatibleCore(
                     resolvedCallKey,
                     context,
-                    compatibilityVisiting))
+                    memo,
+                    compatibilityVisiting,
+                    isAllowedRoot,
+                    isAllowedEffect))
                 continue;
 
             compatibilityVisiting.Remove(symbol);
@@ -615,10 +544,33 @@ internal static class EffectSummaryClassificationEvidenceRules
         }
 
         compatibilityVisiting.Remove(symbol);
-        validationThrowHelperMemo[symbol] = true;
+        memo[symbol] = true;
         return true;
     }
 
+    private static bool IsFreshOwnedInitializationRoot(string root)
+    {
+        return InternalOnlyRoots.Contains(root) ||
+               string.Equals(root, "object_state_write", StringComparison.Ordinal);
+    }
+
+    private static bool IsFreshOwnedInitializationEffect(string effect)
+    {
+        return SafeEffects.Contains(effect) ||
+               string.Equals(effect, "writes_instance_field", StringComparison.Ordinal);
+    }
+
+    private static bool IsValidationThrowHelperRoot(string root)
+    {
+        return InternalOnlyRoots.Contains(root) ||
+               string.Equals(root, "throw", StringComparison.Ordinal);
+    }
+
+    private static bool IsValidationThrowHelperEffect(string effect)
+    {
+        return SafeEffects.Contains(effect) ||
+               string.Equals(effect, "throws", StringComparison.Ordinal);
+    }
     internal static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary)
     {
         if (string.IsNullOrWhiteSpace(summary.Symbol) ||
