@@ -70,8 +70,8 @@ internal static class MethodCapabilityAnalyzer
             }
 
             var disallowedCapabilities =
-                SymbolicCapabilityFacts.Normalize(site.Capabilities) & ~allowedCapabilities;
-            if (disallowedCapabilities == SymbolicCapability.None) continue;
+                SymbolicCapabilityFacts.NormalizeMask(SymbolicCapabilityFacts.GetMask(site)) & ~allowedCapabilities;
+            if (disallowedCapabilities == SymbolicCapabilityFacts.NoneMask) continue;
 
             var diagnostic =
                 CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree);
@@ -145,10 +145,10 @@ internal static class MethodCapabilityAnalyzer
     private static Diagnostic CreateViolationDiagnostic(
         IMethodSymbol methodSymbol,
         SymbolicCapabilitySite site,
-        SymbolicCapability disallowedCapabilities,
+        int disallowedCapabilities,
         SyntaxTree syntaxTree)
     {
-        var formattedCapabilities = SymbolicCapabilityFacts.Format(disallowedCapabilities);
+        var formattedCapabilities = SymbolicCapabilityFacts.FormatMask(disallowedCapabilities);
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.CapabilityProperty, formattedCapabilities);
         properties = AddCapabilitySiteDiagnosticProperties(
@@ -244,10 +244,10 @@ internal static class MethodCapabilityAnalyzer
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
-        out SymbolicCapability capabilities,
+        out int capabilities,
         out InvalidContractArgument? invalidContract)
     {
-        capabilities = SymbolicCapability.None;
+        capabilities = SymbolicCapabilityFacts.NoneMask;
         invalidContract = null;
         var found = false;
 
@@ -269,7 +269,8 @@ internal static class MethodCapabilityAnalyzer
             }
 
             if (rawValue < 0 ||
-                ((SymbolicCapability)rawValue & ~SymbolicCapabilityFacts.AllKnown) != 0)
+                rawValue > int.MaxValue ||
+                ((int)rawValue & ~SymbolicCapabilityFacts.AllKnownMask) != 0)
             {
                 invalidContract = new InvalidContractArgument(
                     rawValue.ToString(CultureInfo.InvariantCulture),
@@ -278,7 +279,7 @@ internal static class MethodCapabilityAnalyzer
                 return true;
             }
 
-            var declaredCapabilities = SymbolicCapabilityFacts.ExpandAllowed((SymbolicCapability)rawValue);
+            var declaredCapabilities = SymbolicCapabilityFacts.ExpandAllowedMask((int)rawValue);
             capabilities = found ? capabilities & declaredCapabilities : declaredCapabilities;
             found = true;
         }

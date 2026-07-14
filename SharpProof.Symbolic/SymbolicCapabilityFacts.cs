@@ -34,6 +34,14 @@ internal static class SymbolicCapabilityFacts
         SymbolicCapability.Synchronization,
         SymbolicCapability.NativeInterop);
 
+    internal const int NoneMask = (int)SymbolicCapability.None;
+
+    internal const int AllKnownMask = (int)AllKnown;
+
+    internal static readonly ImmutableArray<int> OrderedMasks = Ordered
+        .Select(static capability => (int)capability)
+        .ToImmutableArray();
+
     internal static SymbolicCapability Normalize(SymbolicCapability capabilities)
     {
         if ((capabilities & (SymbolicCapability.FileRead |
@@ -68,5 +76,30 @@ internal static class SymbolicCapabilityFacts
             .Select(static value => value.ToString())
             .ToArray();
         return values.Length == 0 ? "None" : string.Join(", ", values);
+    }
+
+    internal static int GetMask(SymbolicCapabilityResult result)
+    {
+        return (int)result.Capabilities;
+    }
+
+    internal static int GetMask(SymbolicCapabilitySite site)
+    {
+        return (int)site.Capabilities;
+    }
+
+    internal static int NormalizeMask(int capabilities)
+    {
+        return (int)Normalize((SymbolicCapability)capabilities);
+    }
+
+    internal static int ExpandAllowedMask(int capabilities)
+    {
+        return (int)ExpandAllowed((SymbolicCapability)capabilities);
+    }
+
+    internal static string FormatMask(int capabilities)
+    {
+        return Format((SymbolicCapability)capabilities);
     }
 }

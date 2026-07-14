@@ -146,28 +146,31 @@ internal static class InferredContractSuggestionAnalyzer
         }
 
         var result = outcome.Value!;
-        var capabilities = SymbolicCapabilityFacts.Normalize(result.Capabilities);
-        if (result.HasUnknowns || (capabilities & ~SymbolicCapabilityFacts.AllKnown) != 0) return;
+        var capabilities = SymbolicCapabilityFacts.NormalizeMask(SymbolicCapabilityFacts.GetMask(result));
+        if (result.HasUnknowns || (capabilities & ~SymbolicCapabilityFacts.AllKnownMask) != 0) return;
 
-        var flagExpressions = SymbolicCapabilityFacts.Ordered
-            .Where(capability => capability != SymbolicCapability.None && capabilities.HasFlag(capability))
-            .Select(capability => AttributeNamespace + "SharpProofCapability." + capability)
+        var flagExpressions = SymbolicCapabilityFacts.OrderedMasks
+            .Where(capability => capability != SymbolicCapabilityFacts.NoneMask && (capabilities & capability) != 0)
+            .Select(capability => AttributeNamespace + "SharpProofCapability." +
+                                  SymbolicCapabilityFacts.FormatMask(capability))
             .ToArray();
         var argument = flagExpressions.Length == 0
             ? AttributeNamespace + "SharpProofCapability.None"
             : string.Join(" | ", flagExpressions);
-        var displayArgument = capabilities == SymbolicCapability.None
+        var displayArgument = capabilities == SymbolicCapabilityFacts.NoneMask
             ? "SharpProofCapability.None"
             : string.Join(
                 " | ",
-                SymbolicCapabilityFacts.Ordered
-                    .Where(capability => capabilities.HasFlag(capability))
-                    .Select(capability => "SharpProofCapability." + capability));
-        var displaySet = capabilities == SymbolicCapability.None
+                SymbolicCapabilityFacts.OrderedMasks
+                    .Where(capability => (capabilities & capability) != 0)
+                    .Select(capability => "SharpProofCapability." + SymbolicCapabilityFacts.FormatMask(capability)));
+        var displaySet = capabilities == SymbolicCapabilityFacts.NoneMask
             ? "no capabilities"
             : "the exact capability set " + string.Join(
                 ", ",
-                SymbolicCapabilityFacts.Ordered.Where(capability => capabilities.HasFlag(capability)));
+                SymbolicCapabilityFacts.OrderedMasks
+                    .Where(capability => (capabilities & capability) != 0)
+                    .Select(SymbolicCapabilityFacts.FormatMask));
 
         Report(
             context,

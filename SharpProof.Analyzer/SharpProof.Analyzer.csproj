@@ -44,7 +44,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
     <Compile Include="..\Shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />

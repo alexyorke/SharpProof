@@ -709,6 +709,7 @@ namespace TestNamespace {
         var repositoryRoot = FindRepositoryRoot();
         var packageProjectPath = Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj");
         var project = XDocument.Load(packageProjectPath);
+        var propertyResolver = new MsBuildPropertyTestResolver(project);
         var analyzerPackagePath = project
             .Descendants()
             .Where(element => string.Equals(
@@ -724,7 +725,7 @@ namespace TestNamespace {
             .Where(element => string.Equals(element.Name.LocalName, "TfmSpecificPackageFile", StringComparison.Ordinal))
             .Select(element => element.Attribute("Include")?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .SelectMany(value => value!.Split(
+            .SelectMany(value => propertyResolver.Expand(value!).Split(
                 ';',
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(Path.GetFileName)
