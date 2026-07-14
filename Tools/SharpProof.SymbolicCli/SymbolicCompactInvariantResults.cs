@@ -245,91 +245,68 @@ public sealed class SymbolicCompactSmtDiagnostics
 
 public sealed class SymbolicCompactAnalysisSummary
 {
+    private readonly SymbolicAnalysisTruncationInfo _analysisTruncation;
+    private readonly SymbolicCompactInvariantQueryView _invariantQuery;
+    private readonly SymbolicProgramPointSummary _programPointSummary;
     private readonly SymbolicCompactSmtDiagnostics _smtDiagnostics;
 
     private SymbolicCompactAnalysisSummary(
-        int programPointCount,
-        int invariantConditionCount,
-        int conservativeUnknownCount,
-        int mustFactCount,
-        int maybeFactCount,
-        int unknownFactCount,
-        string invariantStatus,
-        string invariantStatusReason,
-        string invariantSummary,
-        int invariantDiagnosticCount,
-        int totalPathConditionCount,
-        int maxPathConditionCount,
-        int reachabilityCheckedCount,
-        int reachabilityKnownCount,
-        int reachabilityUnknownCount,
-        int reachabilityNotCheckedCount,
-        int proofTotalCount,
-        int proofResolvedCount,
-        int proofUnknownCount,
+        SymbolicCompactInvariantQueryView invariantQuery,
+        SymbolicProgramPointSummary programPointSummary,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
-        bool analysisTruncated)
+        SymbolicAnalysisTruncationInfo analysisTruncation)
     {
-        ProgramPointCount = programPointCount;
-        InvariantConditionCount = invariantConditionCount;
-        ConservativeUnknownCount = conservativeUnknownCount;
-        MustFactCount = mustFactCount;
-        MaybeFactCount = maybeFactCount;
-        UnknownFactCount = unknownFactCount;
-        InvariantStatus = invariantStatus ?? string.Empty;
-        InvariantStatusReason = invariantStatusReason ?? string.Empty;
-        InvariantSummary = invariantSummary ?? string.Empty;
-        InvariantDiagnosticCount = invariantDiagnosticCount;
-        TotalPathConditionCount = totalPathConditionCount;
-        MaxPathConditionCount = maxPathConditionCount;
-        ReachabilityCheckedCount = reachabilityCheckedCount;
-        ReachabilityKnownCount = reachabilityKnownCount;
-        ReachabilityUnknownCount = reachabilityUnknownCount;
-        ReachabilityNotCheckedCount = reachabilityNotCheckedCount;
-        ProofTotalCount = proofTotalCount;
-        ProofResolvedCount = proofResolvedCount;
-        ProofUnknownCount = proofUnknownCount;
+        _invariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
+        _programPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
         _smtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
-        AnalysisTruncated = analysisTruncated;
+        _analysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
     }
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _programPointSummary.ProgramPointCount;
 
-    public int InvariantConditionCount { get; }
+    public int InvariantConditionCount => MustFactCount + UnknownFactCount;
 
-    public int ConservativeUnknownCount { get; }
+    public int ConservativeUnknownCount => UnknownFactCount;
 
-    public int MustFactCount { get; }
+    public int MustFactCount => _invariantQuery.MustFactCount;
 
-    public int MaybeFactCount { get; }
+    public int MaybeFactCount => _invariantQuery.MaybeFactCount;
 
-    public int UnknownFactCount { get; }
+    public int UnknownFactCount => _invariantQuery.UnknownFactCount;
 
-    public string InvariantStatus { get; }
+    public string InvariantStatus => _invariantQuery.Status;
 
-    public string InvariantStatusReason { get; }
+    public string InvariantStatusReason => _invariantQuery.StatusReason;
 
-    public string InvariantSummary { get; }
+    public string InvariantSummary => _invariantQuery.Summary;
 
-    public int InvariantDiagnosticCount { get; }
+    public int InvariantDiagnosticCount => _invariantQuery.DiagnosticCount;
 
-    public int TotalPathConditionCount { get; }
+    public int TotalPathConditionCount => _programPointSummary.TotalPathConditionCount;
 
-    public int MaxPathConditionCount { get; }
+    public int MaxPathConditionCount => _programPointSummary.MaxPathConditionCount;
 
-    public int ReachabilityCheckedCount { get; }
+    public int ReachabilityCheckedCount =>
+        _programPointSummary.Reachability.ReachableCount +
+        _programPointSummary.Reachability.UnreachableCount +
+        _programPointSummary.Reachability.UnknownCount;
 
-    public int ReachabilityKnownCount { get; }
+    public int ReachabilityKnownCount =>
+        _programPointSummary.Reachability.ReachableCount +
+        _programPointSummary.Reachability.UnreachableCount;
 
-    public int ReachabilityUnknownCount { get; }
+    public int ReachabilityUnknownCount => _programPointSummary.Reachability.UnknownCount;
 
-    public int ReachabilityNotCheckedCount { get; }
+    public int ReachabilityNotCheckedCount => _programPointSummary.Reachability.NotCheckedCount;
 
-    public int ProofTotalCount { get; }
+    public int ProofTotalCount => _programPointSummary.ProofOutcomes.TotalCount;
 
-    public int ProofResolvedCount { get; }
+    public int ProofResolvedCount =>
+        _programPointSummary.ProofOutcomes.ProvenTrueCount +
+        _programPointSummary.ProofOutcomes.ProvenFalseCount +
+        _programPointSummary.ProofOutcomes.UnreachableCount;
 
-    public int ProofUnknownCount { get; }
+    public int ProofUnknownCount => _programPointSummary.ProofOutcomes.UnknownCount;
 
     public bool SmtConfigured => _smtDiagnostics.IsConfigured;
 
@@ -347,7 +324,7 @@ public sealed class SymbolicCompactAnalysisSummary
 
     public int SmtMaxExpressionNodes => _smtDiagnostics.MaxExpressionNodes;
 
-    public bool AnalysisTruncated { get; }
+    public bool AnalysisTruncated => _analysisTruncation.IsTruncated;
 
     public bool HasUnresolvedAnalysis =>
         ConservativeUnknownCount != 0 ||
@@ -370,42 +347,11 @@ public sealed class SymbolicCompactAnalysisSummary
 
         if (analysisTruncation == null) throw new ArgumentNullException(nameof(analysisTruncation));
 
-        var reachability = programPointSummary.Reachability;
-        var proofOutcomes = programPointSummary.ProofOutcomes;
-        var reachabilityCheckedCount =
-            reachability.ReachableCount +
-            reachability.UnreachableCount +
-            reachability.UnknownCount;
-        var reachabilityKnownCount =
-            reachability.ReachableCount +
-            reachability.UnreachableCount;
-        var proofResolvedCount =
-            proofOutcomes.ProvenTrueCount +
-            proofOutcomes.ProvenFalseCount +
-            proofOutcomes.UnreachableCount;
-
         return new SymbolicCompactAnalysisSummary(
-            programPointSummary.ProgramPointCount,
-            invariantQuery.MustFactCount + invariantQuery.UnknownFactCount,
-            invariantQuery.UnknownFactCount,
-            invariantQuery.MustFactCount,
-            invariantQuery.MaybeFactCount,
-            invariantQuery.UnknownFactCount,
-            invariantQuery.Status,
-            invariantQuery.StatusReason,
-            invariantQuery.Summary,
-            invariantQuery.DiagnosticCount,
-            programPointSummary.TotalPathConditionCount,
-            programPointSummary.MaxPathConditionCount,
-            reachabilityCheckedCount,
-            reachabilityKnownCount,
-            reachability.UnknownCount,
-            reachability.NotCheckedCount,
-            proofOutcomes.TotalCount,
-            proofResolvedCount,
-            proofOutcomes.UnknownCount,
+            invariantQuery,
+            programPointSummary,
             smtDiagnostics,
-            analysisTruncation.IsTruncated);
+            analysisTruncation);
     }
 }
 
