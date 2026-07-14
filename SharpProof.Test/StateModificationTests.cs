@@ -80,10 +80,11 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task CompoundAssignmentWithImpureRhs_Diagnostic()
+    public sealed record StateModificationCase(string Name, string Source);
+
+    private static readonly StateModificationCase[] StateModificationCasesPart1 =
     {
-        var test = @"
+        new("CompoundAssignmentWithImpureRhs_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -102,15 +103,8 @@ public class TestClass
         Console.WriteLine(""impure"");
         return 1;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MethodWithMutableStructFieldAssignment_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("MethodWithMutableStructFieldAssignment_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -126,10 +120,175 @@ public class TestClass
     {
         str.Value = 42;
     }
-}";
+}"),
+        new("LinkedListAddFirst_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(LinkedList<int> list, int value)
+    {
+        list.AddFirst(value);
     }
+}"),
+        new("LinkedListNodeValueSetter_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(LinkedListNode<int> node, int value)
+    {
+        node.Value = value;
+    }
+}"),
+        new("PriorityQueueEnqueue_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(PriorityQueue<int, int> queue, int value, int priority)
+    {
+        queue.Enqueue(value, priority);
+    }
+}"),
+        new("PriorityQueueDequeue_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(PriorityQueue<int, int> queue)
+    {
+        return queue.Dequeue();
+    }
+}"),
+        new("ConcurrentQueueEnqueue_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(ConcurrentQueue<int> queue, int value)
+    {
+        queue.Enqueue(value);
+    }
+}"),
+        new("ConcurrentQueueTryDequeue_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|SP0002:TestMethod|}(ConcurrentQueue<int> queue)
+    {
+        return queue.TryDequeue(out _);
+    }
+}"),
+        new("SortedDictionaryAdd_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(SortedDictionary<int, string> values)
+    {
+        values.Add(1, ""one"");
+    }
+}"),
+        new("SortedSetAdd_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(SortedSet<int> values)
+    {
+        values.Add(1);
+    }
+}"),
+        new("BitArraySet_Diagnostic", @"
+using SharpProof.Attributes;
+using System.Collections;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(BitArray bits)
+    {
+        bits.Set(0, true);
+    }
+}"),
+        new("MethodWithInterfaceCollectionAdd_Diagnostic", @"
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(ICollection<int> collection, int value)
+    {
+        collection.Add(value);
+    }
+}"),
+        new("MethodWithInterfaceCollectionClear_Diagnostic", @"
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(ICollection<int> collection)
+    {
+        collection.Clear();
+    }
+}"),
+        new("MethodWithInterfaceCollectionRemove_Diagnostic", @"
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|SP0002:TestMethod|}(ICollection<int> collection, int value)
+    {
+        return collection.Remove(value);
+    }
+}"),
+    };
+
+    private static IEnumerable<TestCaseData> StateModificationCaseData()
+    {
+        var cases = StateModificationCasesPart1
+            .Concat(StateModificationCasesPart2)
+            .ToArray();
+
+        if (cases.Length != 28 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 28)
+        {
+            throw new InvalidOperationException("StateModification case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(StateModificationCaseData))]
+    public async Task StateModificationCases(StateModificationCase testCase)
+    {
+        await VerifyCS.VerifyAnalyzerAsync(testCase.Source);
+    }
+
+
 
     [Test]
     public async Task MethodWithRefParameter_Diagnostic()
@@ -199,176 +358,23 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task LinkedListAddFirst_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(LinkedList<int> list, int value)
-    {
-        list.AddFirst(value);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task LinkedListNodeValueSetter_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(LinkedListNode<int> node, int value)
-    {
-        node.Value = value;
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PriorityQueueEnqueue_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(PriorityQueue<int, int> queue, int value, int priority)
-    {
-        queue.Enqueue(value, priority);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PriorityQueueDequeue_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(PriorityQueue<int, int> queue)
-    {
-        return queue.Dequeue();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task ConcurrentQueueEnqueue_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Concurrent;
 
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(ConcurrentQueue<int> queue, int value)
-    {
-        queue.Enqueue(value);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task ConcurrentQueueTryDequeue_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Concurrent;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool {|SP0002:TestMethod|}(ConcurrentQueue<int> queue)
-    {
-        return queue.TryDequeue(out _);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task SortedDictionaryAdd_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(SortedDictionary<int, string> values)
-    {
-        values.Add(1, ""one"");
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task SortedSetAdd_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(SortedSet<int> values)
-    {
-        values.Add(1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitArraySet_Diagnostic()
-    {
-        var test = @"
-using SharpProof.Attributes;
-using System.Collections;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(BitArray bits)
-    {
-        bits.Set(0, true);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task MethodWithListClear_Diagnostic()
@@ -440,67 +446,15 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task MethodWithInterfaceCollectionAdd_Diagnostic()
+
+
+
+
+
+
+    private static readonly StateModificationCase[] StateModificationCasesPart2 =
     {
-        var test = @"
-using System.Collections.Generic;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(ICollection<int> collection, int value)
-    {
-        collection.Add(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MethodWithInterfaceCollectionClear_Diagnostic()
-    {
-        var test = @"
-using System.Collections.Generic;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(ICollection<int> collection)
-    {
-        collection.Clear();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MethodWithInterfaceCollectionRemove_Diagnostic()
-    {
-        var test = @"
-using System.Collections.Generic;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool {|SP0002:TestMethod|}(ICollection<int> collection, int value)
-    {
-        return collection.Remove(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MethodWithInterfaceListInsert_Diagnostic()
-    {
-        var test = @"
+        new("MethodWithInterfaceListInsert_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -511,15 +465,8 @@ public class TestClass
     {
         list.Insert(0, value);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MethodWithInterfaceListRemoveAt_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("MethodWithInterfaceListRemoveAt_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -530,15 +477,8 @@ public class TestClass
     {
         list.RemoveAt(0);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task PureMethodWithListCount_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("PureMethodWithListCount_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -550,10 +490,155 @@ public class TestClass
     {
         return list.Count; // Reading Count property should be pure
     }
-}";
+}"),
+        new("PureMethodWithListGetterIndexer_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(List<int> list)
+    {
+        return list.Count > 0 ? list[0] : 0; // Reading via indexer should be pure
     }
+}"),
+        new("MethodWithListCapacitySetter_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(List<int> list)
+    {
+        list.Capacity = 1;
+    }
+}"),
+        new("PureMethodWithListContains_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(List<int> list, int item)
+    {
+        return list.Contains(item); // Calling Contains should be pure
+    }
+}"),
+        new("PureMethodWithDictionaryContainsKey_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Dictionary<string, int> dict, string key)
+    {
+        return dict.ContainsKey(key); // Calling ContainsKey should be pure
+    }
+}"),
+        new("PureMethodWithDictionaryGetterIndexer_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Dictionary<string, int> dict, string key)
+    {
+        return dict.ContainsKey(key) ? dict[key] : 0; // Reading via indexer should be pure
+    }
+}"),
+        new("PureMethodWithQueuePeek_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Queue<int> values)
+    {
+        return values.Peek();
+    }
+}"),
+        new("PureMethodWithQueueContains_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Queue<int> values, int value)
+    {
+        return values.Contains(value);
+    }
+}"),
+        new("MethodWithQueueDequeue_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(Queue<int> values)
+    {
+        return values.Dequeue();
+    }
+}"),
+        new("PureMethodWithStackPeek_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Stack<int> values)
+    {
+        return values.Peek();
+    }
+}"),
+        new("PureMethodWithStackContains_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Stack<int> values, int value)
+    {
+        return values.Contains(value);
+    }
+}"),
+        new("MethodWithStackPop_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(Stack<int> values)
+    {
+        return values.Pop();
+    }
+}"),
+    };
+
+
+
+
 
     [Test]
     public async Task MethodWithListReverse_Diagnostic()
@@ -578,65 +663,11 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task PureMethodWithListGetterIndexer_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(List<int> list)
-    {
-        return list.Count > 0 ? list[0] : 0; // Reading via indexer should be pure
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task MethodWithListCapacitySetter_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(List<int> list)
-    {
-        list.Capacity = 1;
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task PureMethodWithListContains_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(List<int> list, int item)
-    {
-        return list.Contains(item); // Calling Contains should be pure
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
 
     [Test]
@@ -864,45 +895,9 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task PureMethodWithDictionaryContainsKey_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(Dictionary<string, int> dict, string key)
-    {
-        return dict.ContainsKey(key); // Calling ContainsKey should be pure
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PureMethodWithDictionaryGetterIndexer_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(Dictionary<string, int> dict, string key)
-    {
-        return dict.ContainsKey(key) ? dict[key] : 0; // Reading via indexer should be pure
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task MethodWithHashSetAdd_Diagnostic()
@@ -996,45 +991,9 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task PureMethodWithQueuePeek_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(Queue<int> values)
-    {
-        return values.Peek();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PureMethodWithQueueContains_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(Queue<int> values, int value)
-    {
-        return values.Contains(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task MethodWithQueueEnqueue_Diagnostic()
@@ -1059,65 +1018,11 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task MethodWithQueueDequeue_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(Queue<int> values)
-    {
-        return values.Dequeue();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PureMethodWithStackPeek_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(Stack<int> values)
-    {
-        return values.Peek();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task PureMethodWithStackContains_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(Stack<int> values, int value)
-    {
-        return values.Contains(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task MethodWithStackPush_Diagnostic()
@@ -1142,25 +1047,7 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task MethodWithStackPop_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Collections.Generic;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(Stack<int> values)
-    {
-        return values.Pop();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task StaticReadonlyFieldModification_Diagnostic()

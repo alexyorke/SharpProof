@@ -7,10 +7,11 @@ namespace SharpProof.Test;
 [Parallelizable(ParallelScope.Children)]
 public class IOOperationsTests
 {
-    [Test]
-    public async Task StringReaderConstructor_Diagnostic()
+    public sealed record IoOperationCase(string Name, string Source);
+
+    private static readonly IoOperationCase[] IoOperationCasesPart1 =
     {
-        var test = @"
+        new("StringReaderConstructor_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -21,15 +22,8 @@ public class TestClass
     {
         return new StringReader(""text"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringWriterConstructor_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringWriterConstructor_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -40,15 +34,8 @@ public class TestClass
     {
         return new StringWriter();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MemoryStreamToArray_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("MemoryStreamToArray_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -59,15 +46,8 @@ public class TestClass
     {
         return stream.ToArray();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MemoryStreamConstructor_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("MemoryStreamConstructor_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -78,15 +58,8 @@ public class TestClass
     {
         return new MemoryStream();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DirectoryGetFilesLength_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("DirectoryGetFilesLength_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -97,15 +70,8 @@ public class TestClass
     {
         return Directory.GetFiles(path).Length;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StreamFlush_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StreamFlush_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -116,15 +82,8 @@ public class TestClass
     {
         stream.Flush();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task TextReaderReadToEnd_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("TextReaderReadToEnd_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -135,15 +94,8 @@ public class TestClass
     {
         return reader.ReadToEnd();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StreamReaderReadLine_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StreamReaderReadLine_Diagnostic", @"
 #nullable enable
 using System.IO;
 using SharpProof.Attributes;
@@ -155,15 +107,8 @@ public class TestClass
     {
         return reader.ReadLine();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StreamWriterWriteLine_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StreamWriterWriteLine_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -174,15 +119,8 @@ public class TestClass
     {
         writer.WriteLine(""line"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringWriterWrite_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringWriterWrite_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -193,15 +131,8 @@ public class TestClass
     {
         writer.Write(""text"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task AsyncAwait_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("AsyncAwait_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -216,10 +147,106 @@ public class TestClass
         // Task.FromResult now follows reviewed runtime evidence.
         return await Task.FromResult(42);
     }
-}";
+}"),
+        new("ConstantFalseBranch_IgnoresDeadIo", @"
+using System;
+using SharpProof.Attributes;
+using System.IO;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input)
+    {
+        if (false) // Never executed branch
+        {
+            // Impure operation but in a branch that can never be executed
+            File.WriteAllText(""log.txt"", input);
+        }
+
+        return input.ToUpperInvariant();
     }
+}"),
+        new("ConstantFalseConditionalExpression_IgnoresDeadImpureInvocation", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return false ? Console.Read() : 42;
+    }
+}"),
+        new("DirectoryGetCurrentDirectory_Diagnostic", @"
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}()
+    {
+        return Directory.GetCurrentDirectory();
+    }
+}"),
+        new("DirectorySetCurrentDirectory_Diagnostic", @"
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(string path)
+    {
+        Directory.SetCurrentDirectory(path);
+    }
+}"),
+    };
+
+    private static IEnumerable<TestCaseData> IoOperationCaseData()
+    {
+        var cases = IoOperationCasesPart1
+            .Concat(IoOperationCasesPart2)
+            .ToArray();
+
+        if (cases.Length != 29 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 29)
+        {
+            throw new InvalidOperationException("IoOperation case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(IoOperationCaseData))]
+    public async Task IoOperationCases(IoOperationCase testCase)
+    {
+        await VerifyCS.VerifyAnalyzerAsync(testCase.Source);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public async Task ClosureOverFieldImpurity_Diagnostic()
@@ -326,53 +353,9 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expectedDiagnostic);
     }
 
-    [Test]
-    public async Task ConstantFalseBranch_IgnoresDeadIo()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.IO;
 
 
 
-public class TestClass
-{
-    [EnforcePure]
-    public string TestMethod(string input)
-    {
-        if (false) // Never executed branch
-        {
-            // Impure operation but in a branch that can never be executed
-            File.WriteAllText(""log.txt"", input);
-        }
-        
-        return input.ToUpperInvariant();
-    }
-}";
-
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ConstantFalseConditionalExpression_IgnoresDeadImpureInvocation()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        return false ? Console.Read() : 42;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task EnvironmentPathLookup_ReportsSP0002()
@@ -404,48 +387,13 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task DirectoryGetCurrentDirectory_Diagnostic()
+
+
+
+
+    private static readonly IoOperationCase[] IoOperationCasesPart2 =
     {
-        var test = @"
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}()
-    {
-        return Directory.GetCurrentDirectory();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DirectorySetCurrentDirectory_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(string path)
-    {
-        Directory.SetCurrentDirectory(path);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task PathGetRandomFileName_Diagnostic()
-    {
-        var test = @"
+        new("PathGetRandomFileName_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -456,15 +404,8 @@ public class TestClass
     {
         return Path.GetRandomFileName();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task PathGetTempFileName_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("PathGetTempFileName_Diagnostic", @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -475,10 +416,197 @@ public class TestClass
     {
         return Path.GetTempFileName();
     }
-}";
+}"),
+        new("ContextStaticFieldImpurity_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [ContextStatic]
+    private static int _contextCounter;
+
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}()
+    {
+        return _contextCounter;
     }
+}"),
+        new("PathGetExtension_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod(string path)
+    {
+        return Path.GetExtension(path);
+    }
+}"),
+        new("PathGetFileNameWithoutExtension_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod(string path)
+    {
+        return Path.GetFileNameWithoutExtension(path);
+    }
+}"),
+        new("PathHasExtension_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string path)
+    {
+        return Path.HasExtension(path);
+    }
+}"),
+        new("PathHelpers_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? DirectoryNameMethod(string path)
+    {
+        return Path.GetDirectoryName(path);
+    }
+
+    [EnforcePure]
+    public string? FileNameMethod(string path)
+    {
+        return Path.GetFileName(path);
+    }
+
+    [EnforcePure]
+    public string? ChangeExtensionMethod(string path)
+    {
+        return Path.ChangeExtension(path, "".txt"");
+    }
+}"),
+        new("DirectoryInfoParent_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DirectoryInfo? TestMethod(DirectoryInfo info)
+    {
+        return info.Parent;
+    }
+}"),
+        new("FileInfoDirectoryName_NoDiagnostic", @"
+#nullable enable
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod(FileInfo info)
+    {
+        return info.DirectoryName;
+    }
+}"),
+        new("DirectoryInfoName_Diagnostic", @"
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DirectoryInfo info)
+    {
+        return info.Name;
+    }
+}"),
+        new("FileInfoName_Diagnostic", @"
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(FileInfo info)
+    {
+        return info.Name;
+    }
+}"),
+        new("FileInfoExtension_Diagnostic", @"
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(FileInfo info)
+    {
+        return info.Extension;
+    }
+}"),
+        new("IoClassInheritanceButPureMethods_ShouldBePure", @"
+using System;
+using SharpProof.Attributes;
+using System.IO;
+
+
+
+public class PureStreamInfo : FileSystemInfo
+{
+    public override string Name => ""PureStream"";
+    public override bool Exists => false;
+
+    public override void Delete()
+    {
+        // Impure but never called
+        throw new NotImplementedException();
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        // Create an object of IO-derived class but only use pure properties
+        var info = new PureStreamInfo();
+        return info.Name;
+    }
+}"),
+        new("UnusedIoFieldReference_ShouldBePure", @"
+using System;
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    private StreamReader _reader = null; // Impure type field
+
+    [EnforcePure]
+    public int TestMethod(int x)
+    {
+        var y = _reader; // Read the field, but don't use it in a way that causes impurity
+        return x * 2; // Pure operation
+    }
+}
+"),
+    };
+
+
 
     [Test]
     public async Task DynamicDispatchImpurity_Diagnostic()
@@ -856,27 +984,7 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected15);
     }
 
-    [Test]
-    public async Task ContextStaticFieldImpurity_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [ContextStatic]
-    private static int _contextCounter;
-
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}()
-    {
-        return _contextCounter;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task LazyInitializationImpurity_Diagnostic()
@@ -950,194 +1058,23 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCombine);
     }
 
-    [Test]
-    public async Task PathGetExtension_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string? TestMethod(string path)
-    {
-        return Path.GetExtension(path);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PathGetFileNameWithoutExtension_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string? TestMethod(string path)
-    {
-        return Path.GetFileNameWithoutExtension(path);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PathHasExtension_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(string path)
-    {
-        return Path.HasExtension(path);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PathHelpers_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string? DirectoryNameMethod(string path)
-    {
-        return Path.GetDirectoryName(path);
-    }
 
-    [EnforcePure]
-    public string? FileNameMethod(string path)
-    {
-        return Path.GetFileName(path);
-    }
 
-    [EnforcePure]
-    public string? ChangeExtensionMethod(string path)
-    {
-        return Path.ChangeExtension(path, "".txt"");
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DirectoryInfoParent_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public DirectoryInfo? TestMethod(DirectoryInfo info)
-    {
-        return info.Parent;
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task FileInfoDirectoryName_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string? TestMethod(FileInfo info)
-    {
-        return info.DirectoryName;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DirectoryInfoName_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DirectoryInfo info)
-    {
-        return info.Name;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FileInfoName_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(FileInfo info)
-    {
-        return info.Name;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FileInfoExtension_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(FileInfo info)
-    {
-        return info.Extension;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task UnusedMemoryStreamCreation_ReportsSP0002()
@@ -1167,41 +1104,7 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task IoClassInheritanceButPureMethods_ShouldBePure()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.IO;
 
-
-
-public class PureStreamInfo : FileSystemInfo
-{
-    public override string Name => ""PureStream"";
-    public override bool Exists => false;
-    
-    public override void Delete() 
-    { 
-        // Impure but never called
-        throw new NotImplementedException();
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public string TestMethod()
-    {
-        // Create an object of IO-derived class but only use pure properties
-        var info = new PureStreamInfo();
-        return info.Name;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task MockIoInterface_PureMembersReportSP0004()
@@ -1250,30 +1153,7 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCtor);
     }
 
-    [Test]
-    public async Task UnusedIoFieldReference_ShouldBePure()
-    {
-        var test = @"
-using System;
-using System.IO;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    private StreamReader _reader = null; // Impure type field
-
-    [EnforcePure]
-    public int TestMethod(int x)
-    {
-        var y = _reader; // Read the field, but don't use it in a way that causes impurity
-        return x * 2; // Pure operation
-    }
-}
-";
-
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     public async Task DirectConsoleWriteLineCall_Diagnostic()

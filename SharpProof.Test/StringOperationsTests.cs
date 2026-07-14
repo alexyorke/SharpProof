@@ -7,10 +7,11 @@ namespace SharpProof.Test;
 [Parallelizable(ParallelScope.Children)]
 public class StringOperationsTests
 {
-    [Test]
-    public async Task ComplexStringOperations_WithSplit_NoDiagnostic()
+    public sealed record StringOperationCase(string Name, string Source);
+
+    private static readonly StringOperationCase[] StringOperationCasesPart1 =
     {
-        var test = @"
+        new("ComplexStringOperations_WithSplit_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -29,14 +30,8 @@ public class TestClass
 
         return string.Join("" "", words);
     }
-}";
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringSplitReturnedArray_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringSplitReturnedArray_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -47,15 +42,8 @@ public class TestClass
     {
         return input.Split(' ');
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringStartsWithChar_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringStartsWithChar_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -66,15 +54,8 @@ public class TestClass
     {
         return input.StartsWith('a') && input.EndsWith('z');
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringStartsWithString_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringStartsWithString_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -85,15 +66,8 @@ public class TestClass
     {
         return input.StartsWith(""abc"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringIsNullOrWhiteSpace_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringIsNullOrWhiteSpace_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -104,15 +78,8 @@ public class TestClass
     {
         return string.IsNullOrWhiteSpace(input);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task CharConvertFromUtf32_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("CharConvertFromUtf32_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -123,15 +90,8 @@ public class TestClass
     {
         return char.ConvertFromUtf32(codePoint);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task CharConvertToUtf32_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("CharConvertToUtf32_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,15 +102,8 @@ public class TestClass
     {
         return char.ConvertToUtf32(highSurrogate, lowSurrogate);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringLengthAndTrimHelpers_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringLengthAndTrimHelpers_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -161,15 +114,8 @@ public class TestClass
     {
         return input.Length + input.Trim().Length + input.TrimStart().Length + input.TrimEnd().Length;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringEqualsStringComparisonOrdinal_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringEqualsStringComparisonOrdinal_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -180,15 +126,8 @@ public class TestClass
     {
         return input.Equals(""abc"", StringComparison.Ordinal);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringEqualsStringComparisonCurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringEqualsStringComparisonCurrentCulture_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -199,15 +138,8 @@ public class TestClass
     {
         return input.Equals(""abc"", StringComparison.CurrentCulture);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringStaticEqualsStringComparisonOrdinal_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringStaticEqualsStringComparisonOrdinal_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -218,15 +150,8 @@ public class TestClass
     {
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringInvariantCasingAndHashCode_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringInvariantCasingAndHashCode_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -239,15 +164,8 @@ public class TestClass
         var upper = input.ToUpperInvariant();
         return lower.GetHashCode() + upper.Length;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringConcatReplaceSubstring_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringConcatReplaceSubstring_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -262,15 +180,8 @@ public class TestClass
         var tail = replaced.Substring(1);
         return tail.Substring(0, 1);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringCloneCompareToAndIndexOfChar_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringCloneCompareToAndIndexOfChar_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -284,15 +195,60 @@ public class TestClass
         var comparison = normalized.CompareTo(other);
         return normalized.IndexOf('a') + comparison;
     }
-}";
+}"),
+    };
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+    private static IEnumerable<TestCaseData> StringOperationCaseData()
+    {
+        var cases = StringOperationCasesPart1
+            .Concat(StringOperationCasesPart2)
+            .Concat(StringOperationCasesPart3)
+            .ToArray();
+
+        if (cases.Length != 41 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 41)
+        {
+            throw new InvalidOperationException("StringOperation case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
     }
 
-    [Test]
-    public async Task StringIndexOfString_Diagnostic()
+    [TestCaseSource(nameof(StringOperationCaseData))]
+    public async Task StringOperationCases(StringOperationCase testCase)
     {
-        var test = @"
+        await VerifyCS.VerifyAnalyzerAsync(testCase.Source);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly StringOperationCase[] StringOperationCasesPart2 =
+    {
+        new("StringIndexOfString_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -303,15 +259,8 @@ public class TestClass
     {
         return input.IndexOf(""abc"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringIndexOfStringComparisonOrdinal_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringIndexOfStringComparisonOrdinal_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -322,15 +271,8 @@ public class TestClass
     {
         return input.IndexOf(""abc"", StringComparison.OrdinalIgnoreCase);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringIndexOfStringComparisonCurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringIndexOfStringComparisonCurrentCulture_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -341,15 +283,8 @@ public class TestClass
     {
         return input.IndexOf(""abc"", StringComparison.CurrentCulture);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringInsertPadLeftAndRemoveRange_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringInsertPadLeftAndRemoveRange_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -362,15 +297,8 @@ public class TestClass
         var inserted = padded.Insert(1, ""-"");
         return inserted.Remove(0, 1);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringRemoveSingleIndex_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringRemoveSingleIndex_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -381,15 +309,8 @@ public class TestClass
     {
         return input.Remove(1);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringStartsWithStringComparisonOrdinal_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -400,15 +321,8 @@ public class TestClass
     {
         return input.StartsWith(""abc"", StringComparison.Ordinal);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringStartsWithStringComparisonCurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringStartsWithStringComparisonCurrentCulture_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -419,15 +333,8 @@ public class TestClass
     {
         return input.StartsWith(""abc"", StringComparison.CurrentCulture);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringToCharArray_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringToCharArray_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -438,15 +345,8 @@ public class TestClass
     {
         return input.ToCharArray();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringToCharArray_LocalNonEscapingUse_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringToCharArray_LocalNonEscapingUse_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -458,15 +358,8 @@ public class TestClass
         var chars = input.ToCharArray();
         return chars.Length;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringToCharArray_LocalReturned_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringToCharArray_LocalReturned_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -478,15 +371,8 @@ public class TestClass
         var chars = input.ToCharArray();
         return chars;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringCtorFromReadOnlySpan_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringCtorFromReadOnlySpan_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -498,15 +384,8 @@ public class TestClass
         ReadOnlySpan<char> chars = input.AsSpan();
         return new string(chars);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringCtorFromReadOnlySpan_LocalNonEscapingUse_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringCtorFromReadOnlySpan_LocalNonEscapingUse_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -519,15 +398,8 @@ public class TestClass
         var copy = new string(chars);
         return copy.Length;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringCtorFromReadOnlySpan_LocalReturned_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringCtorFromReadOnlySpan_LocalReturned_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -540,15 +412,8 @@ public class TestClass
         var copy = new string(chars);
         return copy;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringInterpolation_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("StringInterpolation_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -559,15 +424,38 @@ public class TestClass
     {
         return $""Value: {x}, Text: {y.ToUpperInvariant()}"";
     }
-}";
+}"),
+    };
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task StringInterpolation_WithFormatSpecifier_Diagnostic()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly StringOperationCase[] StringOperationCasesPart3 =
     {
-        var test = @"
+        new("StringInterpolation_WithFormatSpecifier_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -578,15 +466,8 @@ public class TestClass
     {
         return $""Amount: {value:C2}"";
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringInterpolation_WithAlignment_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("StringInterpolation_WithAlignment_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -597,15 +478,8 @@ public class TestClass
     {
         return $""Value: {value,10}"";
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FormattableStringInvariant_WithFormatSpecifier_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("FormattableStringInvariant_WithFormatSpecifier_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -616,15 +490,8 @@ public class TestClass
     {
         return FormattableString.Invariant($""{value,10:N2}"");
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FormattableStringToString_WithInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("FormattableStringToString_WithInvariantCulture_NoDiagnostic", @"
 using System;
 using System.Globalization;
 using SharpProof.Attributes;
@@ -636,15 +503,8 @@ public class TestClass
     {
         return FormattableString.Invariant($""{value,10:N2}"").ToString(CultureInfo.InvariantCulture);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FormattableStringFormatProperty_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("FormattableStringFormatProperty_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -655,15 +515,8 @@ public class TestClass
     {
         return formatted.Format;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task FormattableStringInvariant_WithImpureInterpolationExpression_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("FormattableStringInvariant_WithImpureInterpolationExpression_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -674,10 +527,126 @@ public class TestClass
     {
         return FormattableString.Invariant($""{Console.Read():N2}"");
     }
-}";
+}"),
+        new("PureMethodWithStringBuilderToString_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Text;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(StringBuilder sb)
+    {
+        return sb.ToString();
     }
+}"),
+        new("PureMethodWithStringBuilderLength_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Text;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(StringBuilder sb)
+    {
+        return sb.Length;
+    }
+}"),
+        new("PureMethodWithLocalStringBuilderToString_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+using System.Text;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}()
+    {
+        StringBuilder sb = new StringBuilder(""initial"");
+        return sb.ToString();
+    }
+}"),
+        new("StringContains_Overloads_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool ContainsChar(string value, char needle)
+    {
+        return value.Contains(needle);
+    }
+
+    [EnforcePure]
+    public bool ContainsStringWithComparison(string value, string search)
+    {
+        return value.Contains(search, StringComparison.Ordinal);
+    }
+}"
+            ),
+        new("StringContains_String_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string value, string search)
+    {
+        return value.Contains(search);
+    }
+}"),
+        new("StringContains_StringComparisonCurrentCulture_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|SP0002:TestMethod|}(string value, string search)
+    {
+        return value.Contains(search, StringComparison.CurrentCulture);
+    }
+}"),
+        new("StringJoinWithImpureEnumerable_Diagnostic", @"
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public sealed class ImpureEnumerable : IEnumerable<string>
+{
+    public IEnumerator<string> GetEnumerator()
+    {
+        _ = DateTime.Now;
+        return ((IEnumerable<string>)Array.Empty<string>()).GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(ImpureEnumerable values)
+    {
+        return string.Join("" "", values);
+    }
+}"),
+    };
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public async Task StringBuilderOperations_Diagnostic()
@@ -846,160 +815,17 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 
-    [Test]
-    public async Task PureMethodWithStringBuilderToString_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Text;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(StringBuilder sb)
-    {
-        return sb.ToString();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PureMethodWithStringBuilderLength_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Text;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(StringBuilder sb)
-    {
-        return sb.Length;
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task PureMethodWithLocalStringBuilderToString_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Text;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}()
-    {
-        StringBuilder sb = new StringBuilder(""initial"");
-        return sb.ToString();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task StringContains_Overloads_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool ContainsChar(string value, char needle)
-    {
-        return value.Contains(needle);
-    }
 
-    [EnforcePure]
-    public bool ContainsStringWithComparison(string value, string search)
-    {
-        return value.Contains(search, StringComparison.Ordinal);
-    }
-}"
-            ;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task StringContains_String_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(string value, string search)
-    {
-        return value.Contains(search);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringContains_StringComparisonCurrentCulture_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool {|SP0002:TestMethod|}(string value, string search)
-    {
-        return value.Contains(search, StringComparison.CurrentCulture);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task StringJoinWithImpureEnumerable_Diagnostic()
-    {
-        var test = @"
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using SharpProof.Attributes;
-
-public sealed class ImpureEnumerable : IEnumerable<string>
-{
-    public IEnumerator<string> GetEnumerator()
-    {
-        _ = DateTime.Now;
-        return ((IEnumerable<string>)Array.Empty<string>()).GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(ImpureEnumerable values)
-    {
-        return string.Join("" "", values);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 }
