@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 
@@ -71,6 +72,55 @@ internal static class SymbolicStateFactBuilder
             new SymbolicNullTerm(),
             source,
             provenance);
+    }
+
+    internal static bool TryCreateReferenceNullCondition(
+        ExpressionSyntax expression,
+        bool isNull,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance,
+        out SymbolicCondition condition,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
+            expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
+        if (lowering is not { IsExact: true, Value: { } reference })
+        {
+            condition = null!;
+            return false;
+        }
+
+        condition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                reference,
+                new SymbolicNullTerm()),
+            expression,
+            provenance));
+        return true;
+    }
+
+    internal static SymbolicState AddReferenceNullCondition(
+        SymbolicState state,
+        ExpressionSyntax expression,
+        bool isNull,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        return TryCreateReferenceNullCondition(
+            expression,
+            isNull,
+            semanticModel,
+            cancellationToken,
+            provenance,
+            out var condition,
+            getSymbolVersion)
+            ? state.AddPathCondition(condition)
+            : state;
     }
 
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)

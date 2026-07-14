@@ -38,22 +38,24 @@ internal static partial class ExecutionVisibility
         if (ancestor is BinaryExpressionSyntax binaryExpression &&
             binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
             binaryExpression.IsKind(SyntaxKind.CoalesceExpression))
-            return AddReferenceNullStateCondition(
+            return SymbolicStateFactBuilder.AddReferenceNullCondition(
                 pathState,
                 binaryExpression.Left,
                 true,
                 semanticModel,
                 cancellationToken,
+                "analyzer.evaluation.null",
                 getSymbolVersion);
 
         if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression &&
             conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
-            return AddReferenceNullStateCondition(
+            return SymbolicStateFactBuilder.AddReferenceNullCondition(
                 pathState,
                 conditionalAccessExpression.Expression,
                 false,
                 semanticModel,
                 cancellationToken,
+                "analyzer.evaluation.non-null",
                 getSymbolVersion);
 
         if (ancestor is SwitchStatementSyntax switchStatement)
@@ -216,29 +218,6 @@ internal static partial class ExecutionVisibility
             .Any(expression =>
                 semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is { } symbol &&
                 dependencies.Contains(symbol.OriginalDefinition));
-    }
-
-    private static SymbolicState AddReferenceNullStateCondition(
-        SymbolicState pathState,
-        ExpressionSyntax expression,
-        bool equalToNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion)
-    {
-        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } reference }) return pathState;
-
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                reference,
-                new SymbolicNullTerm()),
-            expression,
-            equalToNull ? "analyzer.evaluation.null" : "analyzer.evaluation.non-null");
-        return pathState.AddPathCondition(new SymbolicFactCondition(fact));
     }
 
     private static SymbolicState AddSwitchEvaluationState(

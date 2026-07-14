@@ -69,12 +69,13 @@ internal static partial class ExceptionPathStateService
         var pathState = CollectPathStateForUse(candidate.CallSite, semanticModel, cancellationToken);
 
         if (candidate.UsingDisposeGuard?.ResourceExpression is { } disposeReceiver)
-            TryAddReferenceNullCondition(
-                ref pathState,
+            pathState = SymbolicStateFactBuilder.AddReferenceNullCondition(
+                pathState,
                 disposeReceiver,
                 false,
                 semanticModel,
-                cancellationToken);
+                cancellationToken,
+                "analyzer.exception-flow.non-null");
 
         return IsPathStateReachable(pathState, smtAnalysis);
     }
@@ -117,44 +118,12 @@ internal static partial class ExceptionPathStateService
             return false;
         }
 
-        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } term })
-        {
-            condition = null!;
-            return false;
-        }
-
-        condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                term,
-                new SymbolicNullTerm()),
+        return SymbolicStateFactBuilder.TryCreateReferenceNullCondition(
             expression,
-            "analyzer.exception-flow.null"));
-        return true;
-    }
-
-    private static void TryAddReferenceNullCondition(
-        ref SymbolicState pathState,
-        ExpressionSyntax expression,
-        bool equalToNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } reference }) return;
-
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                reference,
-                new SymbolicNullTerm()),
-            expression,
-            equalToNull
-                ? "analyzer.exception-flow.null"
-                : "analyzer.exception-flow.non-null");
-        pathState = pathState.AddPathCondition(new SymbolicFactCondition(fact));
+            true,
+            semanticModel,
+            cancellationToken,
+            "analyzer.exception-flow.null",
+            out condition);
     }
 }
