@@ -245,6 +245,8 @@ public sealed class SymbolicCompactSmtDiagnostics
 
 public sealed class SymbolicCompactAnalysisSummary
 {
+    private readonly SymbolicCompactSmtDiagnostics _smtDiagnostics;
+
     private SymbolicCompactAnalysisSummary(
         int programPointCount,
         int invariantConditionCount,
@@ -265,14 +267,7 @@ public sealed class SymbolicCompactAnalysisSummary
         int proofTotalCount,
         int proofResolvedCount,
         int proofUnknownCount,
-        bool smtConfigured,
-        bool smtEnabled,
-        int smtExecutedQueryCount,
-        int smtCacheEntryCount,
-        int smtQueryTimeoutMs,
-        int smtMethodBudgetMs,
-        int smtMaxPathConditions,
-        int smtMaxExpressionNodes,
+        SymbolicCompactSmtDiagnostics smtDiagnostics,
         bool analysisTruncated)
     {
         ProgramPointCount = programPointCount;
@@ -294,14 +289,7 @@ public sealed class SymbolicCompactAnalysisSummary
         ProofTotalCount = proofTotalCount;
         ProofResolvedCount = proofResolvedCount;
         ProofUnknownCount = proofUnknownCount;
-        SmtConfigured = smtConfigured;
-        SmtEnabled = smtEnabled;
-        SmtExecutedQueryCount = smtExecutedQueryCount;
-        SmtCacheEntryCount = smtCacheEntryCount;
-        SmtQueryTimeoutMs = smtQueryTimeoutMs;
-        SmtMethodBudgetMs = smtMethodBudgetMs;
-        SmtMaxPathConditions = smtMaxPathConditions;
-        SmtMaxExpressionNodes = smtMaxExpressionNodes;
+        _smtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         AnalysisTruncated = analysisTruncated;
     }
 
@@ -343,21 +331,21 @@ public sealed class SymbolicCompactAnalysisSummary
 
     public int ProofUnknownCount { get; }
 
-    public bool SmtConfigured { get; }
+    public bool SmtConfigured => _smtDiagnostics.IsConfigured;
 
-    public bool SmtEnabled { get; }
+    public bool SmtEnabled => _smtDiagnostics.IsEnabled;
 
-    public int SmtExecutedQueryCount { get; }
+    public int SmtExecutedQueryCount => _smtDiagnostics.ExecutedQueryCount;
 
-    public int SmtCacheEntryCount { get; }
+    public int SmtCacheEntryCount => _smtDiagnostics.CacheEntryCount;
 
-    public int SmtQueryTimeoutMs { get; }
+    public int SmtQueryTimeoutMs => _smtDiagnostics.QueryTimeoutMs;
 
-    public int SmtMethodBudgetMs { get; }
+    public int SmtMethodBudgetMs => _smtDiagnostics.MethodBudgetMs;
 
-    public int SmtMaxPathConditions { get; }
+    public int SmtMaxPathConditions => _smtDiagnostics.MaxPathConditions;
 
-    public int SmtMaxExpressionNodes { get; }
+    public int SmtMaxExpressionNodes => _smtDiagnostics.MaxExpressionNodes;
 
     public bool AnalysisTruncated { get; }
 
@@ -416,14 +404,7 @@ public sealed class SymbolicCompactAnalysisSummary
             proofOutcomes.TotalCount,
             proofResolvedCount,
             proofOutcomes.UnknownCount,
-            smtDiagnostics.IsConfigured,
-            smtDiagnostics.IsEnabled,
-            smtDiagnostics.ExecutedQueryCount,
-            smtDiagnostics.CacheEntryCount,
-            smtDiagnostics.QueryTimeoutMs,
-            smtDiagnostics.MethodBudgetMs,
-            smtDiagnostics.MaxPathConditions,
-            smtDiagnostics.MaxExpressionNodes,
+            smtDiagnostics,
             analysisTruncation.IsTruncated);
     }
 }

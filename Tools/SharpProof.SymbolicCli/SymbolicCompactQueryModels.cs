@@ -793,6 +793,7 @@ public sealed class SymbolicInvariantQuerySummary
 {
     private const int MaxSummaryReasons = 16;
     private const int MaxSummaryTargets = 32;
+    private readonly SymbolicCompactSmtDiagnostics _smtDiagnostics;
 
     private SymbolicInvariantQuerySummary(
         int outputMaxFacts,
@@ -815,14 +816,7 @@ public sealed class SymbolicInvariantQuerySummary
         int reasonCount,
         IReadOnlyList<string> reasons,
         bool reasonsTruncated,
-        bool smtConfigured,
-        bool smtEnabled,
-        int smtExecutedQueryCount,
-        int smtCacheEntryCount,
-        int smtQueryTimeoutMs,
-        int smtMethodBudgetMs,
-        int smtMaxPathConditions,
-        int smtMaxExpressionNodes,
+        SymbolicCompactSmtDiagnostics smtDiagnostics,
         bool pathConditionBudgetExceeded)
     {
         OutputMaxFacts = outputMaxFacts;
@@ -845,14 +839,7 @@ public sealed class SymbolicInvariantQuerySummary
         ReasonCount = reasonCount;
         Reasons = reasons ?? throw new ArgumentNullException(nameof(reasons));
         ReasonsTruncated = reasonsTruncated;
-        SmtConfigured = smtConfigured;
-        SmtEnabled = smtEnabled;
-        SmtExecutedQueryCount = smtExecutedQueryCount;
-        SmtCacheEntryCount = smtCacheEntryCount;
-        SmtQueryTimeoutMs = smtQueryTimeoutMs;
-        SmtMethodBudgetMs = smtMethodBudgetMs;
-        SmtMaxPathConditions = smtMaxPathConditions;
-        SmtMaxExpressionNodes = smtMaxExpressionNodes;
+        _smtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         PathConditionBudgetExceeded = pathConditionBudgetExceeded;
     }
 
@@ -896,21 +883,21 @@ public sealed class SymbolicInvariantQuerySummary
 
     public bool ReasonsTruncated { get; }
 
-    public bool SmtConfigured { get; }
+    public bool SmtConfigured => _smtDiagnostics.IsConfigured;
 
-    public bool SmtEnabled { get; }
+    public bool SmtEnabled => _smtDiagnostics.IsEnabled;
 
-    public int SmtExecutedQueryCount { get; }
+    public int SmtExecutedQueryCount => _smtDiagnostics.ExecutedQueryCount;
 
-    public int SmtCacheEntryCount { get; }
+    public int SmtCacheEntryCount => _smtDiagnostics.CacheEntryCount;
 
-    public int SmtQueryTimeoutMs { get; }
+    public int SmtQueryTimeoutMs => _smtDiagnostics.QueryTimeoutMs;
 
-    public int SmtMethodBudgetMs { get; }
+    public int SmtMethodBudgetMs => _smtDiagnostics.MethodBudgetMs;
 
-    public int SmtMaxPathConditions { get; }
+    public int SmtMaxPathConditions => _smtDiagnostics.MaxPathConditions;
 
-    public int SmtMaxExpressionNodes { get; }
+    public int SmtMaxExpressionNodes => _smtDiagnostics.MaxExpressionNodes;
 
     public bool PathConditionBudgetExceeded { get; }
 
@@ -971,14 +958,7 @@ public sealed class SymbolicInvariantQuerySummary
             reasons.Length,
             reasonView,
             reasons.Length > reasonView.Count,
-            smtDiagnostics.IsConfigured,
-            smtDiagnostics.IsEnabled,
-            smtDiagnostics.ExecutedQueryCount,
-            smtDiagnostics.CacheEntryCount,
-            smtDiagnostics.QueryTimeoutMs,
-            smtDiagnostics.MethodBudgetMs,
-            smtDiagnostics.MaxPathConditions,
-            smtDiagnostics.MaxExpressionNodes,
+            smtDiagnostics,
             smtDiagnostics.MaxPathConditions > 0 &&
             analysisSummary.MaxPathConditionCount > smtDiagnostics.MaxPathConditions);
     }
