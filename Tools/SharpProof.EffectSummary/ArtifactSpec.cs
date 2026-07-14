@@ -47,7 +47,7 @@ internal sealed class ShardedEffectSummaryProgressDocument
     public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
 }
 
-internal sealed class ArtifactSpecDefaults
+internal class ArtifactSpecDefaults
 {
     public string? Framework { get; set; }
 
@@ -74,15 +74,11 @@ internal sealed class ArtifactSpecDefaults
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
-internal sealed class ArtifactSpecEntry
+internal sealed class ArtifactSpecEntry : ArtifactSpecDefaults
 {
     public string? OutputPath { get; set; }
 
     public string? SourceSummaryPath { get; set; }
-
-    public string? Framework { get; set; }
-
-    public string? RuntimeAssemblyName { get; set; }
 
     public string[]? AssemblyPaths { get; set; }
 
@@ -93,26 +89,6 @@ internal sealed class ArtifactSpecEntry
     public string? PackageAssemblyRelativePath { get; set; }
 
     public string[]? SymbolPrefixes { get; set; }
-
-    public int? Limit { get; set; }
-
-    public bool? IncludeCallees { get; set; }
-
-    public int? MaxDepth { get; set; }
-
-    public int? MaxExceptionEdges { get; set; }
-
-    public bool? IncludeTransitiveRoots { get; set; }
-
-    public bool? IncludePurityClassification { get; set; }
-
-    public bool? CompareManualCatalogs { get; set; }
-
-    public bool? IncludeBclFallbackInventory { get; set; }
-
-    public bool? AllRuntimeAssemblies { get; set; }
-
-    public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
 internal static class ArtifactSpecSymbolSource
