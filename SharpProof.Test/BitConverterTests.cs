@@ -7,600 +7,101 @@ namespace SharpProof.Test;
 [TestFixture]
 public class BitConverterTests
 {
-    [Test]
-    public async Task BitConverterGetBytesInt_ReturnedArray_NoDiagnostic()
+    private static readonly GetBytesType[] GetBytesTypes =
+    [
+        new("Int", "int", "value + 1"),
+        new("Long", "long", "value + 1"),
+        new("Float", "float", "value + 1"),
+        new("UInt", "uint", "value + 1"),
+        new("ULong", "ulong", "value + 1"),
+        new("Half", "Half", null, false),
+        new("Short", "short", "(short)(value + 1)"),
+        new("UShort", "ushort", "(ushort)(value + 1)"),
+        new("Bool", "bool", "!value"),
+        new("Char", "char", "(char)(value + 1)")
+    ];
+
+    private static IEnumerable<TestCaseData> GetBytesCases()
     {
-        var test = @"
+        foreach (var type in GetBytesTypes)
+        foreach (var scenario in Enum.GetValues<GetBytesScenario>())
+        {
+            if (!type.SupportsLocal && scenario != GetBytesScenario.ReturnedArray) continue;
+
+            yield return new TestCaseData(type.TypeName, type.AlternateExpression, scenario.ToString())
+                .SetName($"BitConverterGetBytes{type.Name}_{scenario}_NoDiagnostic");
+        }
+    }
+
+    private static IEnumerable<TestCaseData> SpanCases()
+    {
+        yield return new TestCaseData("int", "ToInt32").SetName("BitConverterToInt32Span_NoDiagnostic");
+        yield return new TestCaseData("double", "ToDouble").SetName("BitConverterToDoubleSpan_NoDiagnostic");
+    }
+
+    [TestCaseSource(nameof(GetBytesCases))]
+    public async Task BitConverterGetBytes_NoDiagnostic(
+        string typeName,
+        string? alternateExpression,
+        string scenarioName)
+    {
+        var scenario = Enum.Parse<GetBytesScenario>(scenarioName);
+        var parameters = scenario == GetBytesScenario.ConditionalReturnedArray
+            ? $"bool useLeft, {typeName} value"
+            : $"{typeName} value";
+        var body = scenario switch
+        {
+            GetBytesScenario.ReturnedArray => "return BitConverter.GetBytes(value);",
+            GetBytesScenario.LocalReturnedArray => "var bytes = BitConverter.GetBytes(value);\n        return bytes;",
+            GetBytesScenario.ConditionalReturnedArray =>
+                $"return useLeft\n            ? BitConverter.GetBytes(value)\n            : BitConverter.GetBytes({alternateExpression});",
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var test = $@"
 using System;
 using SharpProof.Attributes;
 
 public class TestClass
-{
+{{
     [EnforcePure]
-    public byte[] TestMethod(int value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
+    public byte[] TestMethod({parameters})
+    {{
+        {body}
+    }}
+}}";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task BitConverterGetBytesInt_LocalReturnedArray_NoDiagnostic()
+    [TestCaseSource(nameof(SpanCases))]
+    public async Task BitConverterSpan_NoDiagnostic(string returnType, string methodName)
     {
-        var test = @"
+        var test = $@"
 using System;
 using SharpProof.Attributes;
 
 public class TestClass
-{
+{{
     [EnforcePure]
-    public byte[] TestMethod(int value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
+    public {returnType} TestMethod(ReadOnlySpan<byte> bytes)
+    {{
+        return BitConverter.{methodName}(bytes);
+    }}
+}}";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task BitConverterGetBytesInt_ConditionalReturnedArray_NoDiagnostic()
+    private enum GetBytesScenario
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, int value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(value + 1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        ReturnedArray,
+        LocalReturnedArray,
+        ConditionalReturnedArray
     }
 
-    [Test]
-    public async Task BitConverterGetBytesLong_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(long value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesLong_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(long value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesLong_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, long value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(value + 1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesFloat_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(float value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesFloat_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(float value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesFloat_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, float value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(value + 1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUInt_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(uint value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUInt_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(uint value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUInt_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, uint value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(value + 1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesULong_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(ulong value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesULong_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(ulong value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesULong_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, ulong value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(value + 1);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesHalf_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(Half value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesShort_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(short value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesShort_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(short value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesShort_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, short value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes((short)(value + 1));
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUShort_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(ushort value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUShort_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(ushort value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesUShort_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, ushort value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes((ushort)(value + 1));
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesBool_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesBool_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesBool_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, bool value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes(!value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesChar_ReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(char value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesChar_LocalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(char value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        return bytes;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterGetBytesChar_ConditionalReturnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] TestMethod(bool useLeft, char value)
-    {
-        return useLeft
-            ? BitConverter.GetBytes(value)
-            : BitConverter.GetBytes((char)(value + 1));
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterToInt32Span_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(ReadOnlySpan<byte> bytes)
-    {
-        return BitConverter.ToInt32(bytes);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task BitConverterToDoubleSpan_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(ReadOnlySpan<byte> bytes)
-    {
-        return BitConverter.ToDouble(bytes);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
+    private sealed record GetBytesType(
+        string Name,
+        string TypeName,
+        string? AlternateExpression,
+        bool SupportsLocal = true);
 }

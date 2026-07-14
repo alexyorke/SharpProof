@@ -78,7 +78,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Lower-priority follow-ups
 
-- `SharpProof.Test/BitConverterTests.cs:10-568+` has repeated typed `GetBytes` source-string test templates; a data-driven source builder could reduce size while retaining case names.
 - `SharpProof.ToolingTest/EffectSummarySchemaV5Tests.cs:104-142` locally rebuilds trusted platform references even though `AnalyzerTestHost.GetTrustedPlatformReferences` already exists.
 - `SharpProof.Symbolic/MethodBodyOperationResolver.cs:14-45` repeats body/expression operation lookup across method-like syntax types; a shared body-node adapter may simplify it.
 - `SharpProof.Package/tools/install.ps1:1-58` and `uninstall.ps1:1-65` repeat analyzer-root/language traversal and DLL loops; use a common operation helper if packaging permits it.
