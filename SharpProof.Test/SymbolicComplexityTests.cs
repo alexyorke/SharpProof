@@ -277,6 +277,33 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
+    public void MonotoneDoLoop_IsLinear()
+    {
+        const string source = """
+                              public static class C
+                              {
+                                  public static int Work(int n)
+                                  {
+                                      var i = 0;
+                                      do
+                                      {
+                                          i++;
+                                      }
+                                      while (i < n);
+
+                                      return i;
+                                  }
+                              }
+                              """;
+
+        var result = QueryComplexityAtMarker(source, "return i;");
+
+        Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+        Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+        Assert.That(result.Drivers.Any(driver => driver.Kind == "DoLoop"), Is.True);
+    }
+
+    [Test]
     public void UnsupportedWhileLoop_IsUnknown()
     {
         const string source = """
@@ -551,6 +578,82 @@ public sealed class SymbolicComplexityTests
 
         Assert.That(result.MethodName, Is.EqualTo("Local"));
         Assert.That(result.Complexity.Text, Is.EqualTo("O(m)"));
+    }
+
+    [Test]
+    public void NodeTarget_ResolvesPropertyGetter()
+    {
+        const string source = """
+                              public sealed class C
+                              {
+                                  public int Count
+                                  {
+                                      get
+                                      {
+                                          var sum = 0;
+                                          for (var i = 0; i < 10; i++) sum += i;
+                                          return sum;
+                                      }
+                                  }
+                              }
+                              """;
+
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+            source,
+            "SymbolicComplexityTests.cs",
+            "SymbolicComplexityTests.cs",
+            "SharpProof.Test.SymbolicComplexity",
+            null,
+            default);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var property = syntaxTree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();
+
+        var result = new SymbolicQueryService().QueryComplexity(
+            new SymbolicQueryContext(
+                SymbolicSourceInput.FromNode(property, semanticModel),
+                SymbolicQueryTarget.Node()));
+
+        Assert.That(result.MethodName, Is.EqualTo("get_Count"));
+        Assert.That(result.DeclarationKind, Is.EqualTo("property_getter"));
+        Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Constant));
+    }
+
+    [Test]
+    public void NodeTarget_ResolvesIndexerGetter()
+    {
+        const string source = """
+                              public sealed class C
+                              {
+                                  public int this[int n]
+                                  {
+                                      get
+                                      {
+                                          var sum = 0;
+                                          for (var i = 0; i < n; i++) sum += i;
+                                          return sum;
+                                      }
+                                  }
+                              }
+                              """;
+
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+            source,
+            "SymbolicComplexityTests.cs",
+            "SymbolicComplexityTests.cs",
+            "SharpProof.Test.SymbolicComplexity",
+            null,
+            default);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var indexer = syntaxTree.GetRoot().DescendantNodes().OfType<IndexerDeclarationSyntax>().Single();
+
+        var result = new SymbolicQueryService().QueryComplexity(
+            new SymbolicQueryContext(
+                SymbolicSourceInput.FromNode(indexer, semanticModel),
+                SymbolicQueryTarget.Node()));
+
+        Assert.That(result.MethodName, Is.EqualTo("get_Item"));
+        Assert.That(result.DeclarationKind, Is.EqualTo("indexer_getter"));
+        Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
     }
 
     [Test]

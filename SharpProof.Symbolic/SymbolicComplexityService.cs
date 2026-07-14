@@ -208,34 +208,18 @@ internal sealed class SymbolicComplexityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        switch (declaration)
+        if (declaration is AnonymousFunctionExpressionSyntax anonymousFunction)
+            return semanticModel.GetOperation(anonymousFunction, cancellationToken) is IAnonymousFunctionOperation
+                lambda
+                ? lambda.Symbol
+                : null;
+
+        return semanticModel.GetDeclaredSymbol(declaration, cancellationToken) switch
         {
-            case MethodDeclarationSyntax method:
-                return semanticModel.GetDeclaredSymbol(method, cancellationToken);
-            case ConstructorDeclarationSyntax constructor:
-                return semanticModel.GetDeclaredSymbol(constructor, cancellationToken);
-            case DestructorDeclarationSyntax destructor:
-                return semanticModel.GetDeclaredSymbol(destructor, cancellationToken);
-            case OperatorDeclarationSyntax operatorDeclaration:
-                return semanticModel.GetDeclaredSymbol(operatorDeclaration, cancellationToken);
-            case ConversionOperatorDeclarationSyntax conversionOperator:
-                return semanticModel.GetDeclaredSymbol(conversionOperator, cancellationToken);
-            case AccessorDeclarationSyntax accessor:
-                return semanticModel.GetDeclaredSymbol(accessor, cancellationToken);
-            case PropertyDeclarationSyntax property:
-                return semanticModel.GetDeclaredSymbol(property, cancellationToken)?.GetMethod;
-            case IndexerDeclarationSyntax indexer:
-                return semanticModel.GetDeclaredSymbol(indexer, cancellationToken)?.GetMethod;
-            case LocalFunctionStatementSyntax localFunction:
-                return semanticModel.GetDeclaredSymbol(localFunction, cancellationToken);
-            case AnonymousFunctionExpressionSyntax anonymousFunction:
-                return semanticModel.GetOperation(anonymousFunction, cancellationToken) is IAnonymousFunctionOperation
-                    lambda
-                    ? lambda.Symbol
-                    : null;
-            default:
-                return null;
-        }
+            IMethodSymbol method => method,
+            IPropertySymbol property => property.GetMethod,
+            _ => null
+        };
     }
 
     private static string GetDeclarationKind(SyntaxNode declaration)

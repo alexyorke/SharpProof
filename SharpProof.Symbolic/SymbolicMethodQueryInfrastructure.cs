@@ -266,12 +266,20 @@ internal static class SymbolicMethodSourceResolver
         {
             BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
             AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            PropertyDeclarationSyntax property => property.ExpressionBody?.Expression,
-            IndexerDeclarationSyntax indexer => indexer.ExpressionBody?.Expression,
+            PropertyDeclarationSyntax property => GetGetterBody(property.ExpressionBody, property.AccessorList),
+            IndexerDeclarationSyntax indexer => GetGetterBody(indexer.ExpressionBody, indexer.AccessorList),
             LocalFunctionStatementSyntax localFunction =>
                 (SyntaxNode?)localFunction.Body ?? localFunction.ExpressionBody?.Expression,
             AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.Body,
             _ => null
         };
+    }
+
+    private static SyntaxNode? GetGetterBody(
+        ArrowExpressionClauseSyntax? expressionBody,
+        AccessorListSyntax? accessorList)
+    {
+        var getter = accessorList?.Accessors.FirstOrDefault(static accessor => accessor.Keyword.ValueText == "get");
+        return expressionBody?.Expression ?? (SyntaxNode?)getter?.Body ?? getter?.ExpressionBody?.Expression;
     }
 }
