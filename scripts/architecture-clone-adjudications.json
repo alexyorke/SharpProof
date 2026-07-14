@@ -4,14 +4,6 @@
   "adjudications": [
     {
       "paths": [
-        "SharpProof.Symbolic/SymbolicScopedQueryResults.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs"
-      ],
-      "category": "cli-schema-projection",
-      "reason": "The CLI adapter deliberately mirrors stable invariant JSON fields from the typed query result; projection behavior is centralized in the adapter conversion path."
-    },
-    {
-      "paths": [
         "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
         "SharpProof.Analyzer/GeneratedPurityCatalog.cs"
       ],

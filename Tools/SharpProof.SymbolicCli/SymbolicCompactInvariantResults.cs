@@ -99,73 +99,49 @@ public sealed class SymbolicCompactInvariantTargetSummary
 
 public sealed class SymbolicCompactInvariantTargetPathSummary
 {
+    private readonly SymbolicInvariantTargetPathSummary _summary;
+
     private SymbolicCompactInvariantTargetPathSummary(
-        string target,
-        int pathConditionCount,
-        int smtConditionCount,
-        int conservativeUnknownCount,
-        int programPointCount,
-        int reachableProgramPointCount,
-        int proofTotalCount,
-        int proofUnknownCount,
-        int proofProvenTrueCount,
-        int proofProvenFalseCount,
-        int proofUnreachableCount,
+        SymbolicInvariantTargetPathSummary summary,
         IReadOnlyList<string> conditions,
-        bool conditionsTruncated,
-        string statusReason,
-        string reasonCode,
-        string summary)
+        bool conditionsTruncated)
     {
-        Target = target ?? string.Empty;
-        PathConditionCount = pathConditionCount;
-        SmtConditionCount = smtConditionCount;
-        ConservativeUnknownCount = conservativeUnknownCount;
-        ProgramPointCount = programPointCount;
-        ReachableProgramPointCount = reachableProgramPointCount;
-        ProofTotalCount = proofTotalCount;
-        ProofUnknownCount = proofUnknownCount;
-        ProofProvenTrueCount = proofProvenTrueCount;
-        ProofProvenFalseCount = proofProvenFalseCount;
-        ProofUnreachableCount = proofUnreachableCount;
+        _summary = summary ?? throw new ArgumentNullException(nameof(summary));
         Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
         ConditionsTruncated = conditionsTruncated;
-        StatusReason = statusReason ?? string.Empty;
-        ReasonCode = reasonCode ?? string.Empty;
-        Summary = summary ?? string.Empty;
     }
 
-    public string Target { get; }
+    public string Target => _summary.Target;
 
-    public int PathConditionCount { get; }
+    public int PathConditionCount => _summary.PathConditionCount;
 
-    public int SmtConditionCount { get; }
+    public int SmtConditionCount => _summary.SmtConditionCount;
 
-    public int ConservativeUnknownCount { get; }
+    public int ConservativeUnknownCount => _summary.ConservativeUnknownCount;
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _summary.ProgramPointCount;
 
-    public int ReachableProgramPointCount { get; }
+    public int ReachableProgramPointCount => _summary.ReachableProgramPointCount;
 
-    public int ProofTotalCount { get; }
+    public int ProofTotalCount => _summary.ProofTotalCount;
 
-    public int ProofUnknownCount { get; }
+    public int ProofUnknownCount => _summary.ProofUnknownCount;
 
-    public int ProofProvenTrueCount { get; }
+    public int ProofProvenTrueCount => _summary.ProofProvenTrueCount;
 
-    public int ProofProvenFalseCount { get; }
+    public int ProofProvenFalseCount => _summary.ProofProvenFalseCount;
 
-    public int ProofUnreachableCount { get; }
+    public int ProofUnreachableCount => _summary.ProofUnreachableCount;
 
     public IReadOnlyList<string> Conditions { get; }
 
     public bool ConditionsTruncated { get; }
 
-    public string StatusReason { get; }
+    public string StatusReason => _summary.StatusReason;
 
-    public string ReasonCode { get; }
+    public string ReasonCode => _summary.ReasonCode;
 
-    public string Summary { get; }
+    public string Summary => _summary.Summary;
 
     internal static SymbolicCompactInvariantTargetPathSummary FromSummary(
         SymbolicInvariantTargetPathSummary summary,
@@ -173,22 +149,9 @@ public sealed class SymbolicCompactInvariantTargetPathSummary
     {
         var conditions = SymbolicCompactProjection.Take(summary.Conditions, options.MaxConditions);
         return new SymbolicCompactInvariantTargetPathSummary(
-            summary.Target,
-            summary.PathConditionCount,
-            summary.SmtConditionCount,
-            summary.ConservativeUnknownCount,
-            summary.ProgramPointCount,
-            summary.ReachableProgramPointCount,
-            summary.ProofTotalCount,
-            summary.ProofUnknownCount,
-            summary.ProofProvenTrueCount,
-            summary.ProofProvenFalseCount,
-            summary.ProofUnreachableCount,
+            summary,
             conditions,
-            summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count,
-            summary.StatusReason,
-            summary.ReasonCode,
-            summary.Summary);
+            summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count);
     }
 }
 
