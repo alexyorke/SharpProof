@@ -432,23 +432,11 @@ public static class SharpProofDiagnostics
         SuggestRequiresId,
         "Inferred [Requires] Contract");
 
-    private static readonly LocalizableString MisplacedZeroAllocationsAttributeTitle =
-        "Misplaced [ZeroAllocations] Attribute";
-
-    private static readonly LocalizableString MisplacedZeroAllocationsAttributeMessageFormat =
-        "The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedZeroAllocationsAttributeDescription =
-        "[ZeroAllocations] configures allocation analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
-
-    public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule = CreateDescriptor(
+    public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule =
+        CreateMisplacedGetterAliasingAttributeDescriptor(
         MisplacedZeroAllocationsAttributeId,
-        MisplacedZeroAllocationsAttributeTitle,
-        MisplacedZeroAllocationsAttributeMessageFormat,
-        "Usage",
-        DiagnosticSeverity.Error,
-        true,
-        MisplacedZeroAllocationsAttributeDescription);
+        "ZeroAllocations",
+        "allocation");
 
     private static readonly LocalizableString CapabilityViolationTitle = "Disallowed Capability Use";
 
@@ -484,23 +472,11 @@ public static class SharpProofDiagnostics
         true,
         CapabilityUnknownDescription);
 
-    private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeTitle =
-        "Misplaced [AllowedCapabilities] Attribute";
-
-    private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeMessageFormat =
-        "The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeDescription =
-        "[AllowedCapabilities] configures capability analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
-
-    public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule = CreateDescriptor(
+    public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule =
+        CreateMisplacedGetterAliasingAttributeDescriptor(
         MisplacedAllowedCapabilitiesAttributeId,
-        MisplacedAllowedCapabilitiesAttributeTitle,
-        MisplacedAllowedCapabilitiesAttributeMessageFormat,
-        "Usage",
-        DiagnosticSeverity.Error,
-        true,
-        MisplacedAllowedCapabilitiesAttributeDescription);
+        "AllowedCapabilities",
+        "capability");
 
     private static readonly LocalizableString EnsuresNotProvenTitle = "Postcondition Not Proven";
 
@@ -536,22 +512,11 @@ public static class SharpProofDiagnostics
         true,
         EnsuresUnsupportedDescription);
 
-    private static readonly LocalizableString MisplacedEnsuresAttributeTitle = "Misplaced [Ensures] Attribute";
-
-    private static readonly LocalizableString MisplacedEnsuresAttributeMessageFormat =
-        "The [Ensures] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedEnsuresAttributeDescription =
-        "[Ensures] configures symbolic postcondition analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
-
-    public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule = CreateDescriptor(
+    public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule =
+        CreateMisplacedGetterAliasingAttributeDescriptor(
         MisplacedEnsuresAttributeId,
-        MisplacedEnsuresAttributeTitle,
-        MisplacedEnsuresAttributeMessageFormat,
-        "Usage",
-        DiagnosticSeverity.Error,
-        true,
-        MisplacedEnsuresAttributeDescription);
+        "Ensures",
+        "symbolic postcondition");
 
     private static readonly LocalizableString ComplexityExceededTitle = "Declared Complexity Exceeded";
 
@@ -588,23 +553,11 @@ public static class SharpProofDiagnostics
         true,
         ComplexityCouldNotBeVerifiedDescription);
 
-    private static readonly LocalizableString MisplacedExpectedComplexityAttributeTitle =
-        "Misplaced [ExpectedComplexity] Attribute";
-
-    private static readonly LocalizableString MisplacedExpectedComplexityAttributeMessageFormat =
-        "The [ExpectedComplexity] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedExpectedComplexityAttributeDescription =
-        "[ExpectedComplexity] configures complexity analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
-
-    public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule = CreateDescriptor(
+    public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule =
+        CreateMisplacedGetterAliasingAttributeDescriptor(
         MisplacedExpectedComplexityAttributeId,
-        MisplacedExpectedComplexityAttributeTitle,
-        MisplacedExpectedComplexityAttributeMessageFormat,
-        "Usage",
-        DiagnosticSeverity.Error,
-        true,
-        MisplacedExpectedComplexityAttributeDescription);
+        "ExpectedComplexity",
+        "complexity");
 
     private static readonly LocalizableString InvalidContractArgumentTitle = "Invalid SharpProof Contract Argument";
 
@@ -1146,6 +1099,21 @@ public static class SharpProofDiagnostics
         LocalizableString description)
     {
         return CreateDescriptor(id, title, messageFormat, category, defaultSeverity, false, description);
+    }
+
+    private static DiagnosticDescriptor CreateMisplacedGetterAliasingAttributeDescriptor(
+        string id,
+        string attributeName,
+        string analysisKind)
+    {
+        return CreateDescriptor(
+            id,
+            $"Misplaced [{attributeName}] Attribute",
+            $"The [{attributeName}] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
+            "Usage",
+            DiagnosticSeverity.Error,
+            true,
+            $"[{attributeName}] configures {analysisKind} analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.");
     }
 
     private static DiagnosticDescriptor CreateInferredContractDescriptor(string id, string title)
