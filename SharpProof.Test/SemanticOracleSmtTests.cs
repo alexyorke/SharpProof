@@ -874,14 +874,7 @@ public class TestClass
     {
         Assert.That(
             IsStatementUnreachable(
-                @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
+                SemanticOracleTestSources.ModeEnum + @"public class TestClass
 {
     public int TestMethod()
     {
@@ -4310,14 +4303,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesEnumImplication()
     {
-        const string source = @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
+        const string source = SemanticOracleTestSources.ModeEnum + @"public class TestClass
 {
     public int TestMethod(Mode state)
     {
@@ -5063,16 +5049,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsCompoundAssignmentUpdateFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        divisor += 1;
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.CompoundAssignedNonZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -5085,16 +5062,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsIncrementUpdateFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        divisor++;
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.IncrementedNonZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -5107,17 +5075,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsTupleAssignmentFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        var other = 0;
-        (divisor, other) = (1, 2);
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.TupleAssignedNonZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -5130,15 +5088,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsTupleDeconstructionDeclarationFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var (divisor, other) = (1, 2);
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.TupleDeconstructionDeclaredNonZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -5150,15 +5100,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = (new[] { 1, 2 })[0];
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "InlineFiniteArrayElementAssignedNonZeroValue.cs",
@@ -5174,16 +5116,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var values = new[] { 1, 2 };
-        var divisor = values[0];
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "PriorFiniteArrayElementAssignedNonZeroValue.cs",
@@ -5200,15 +5133,7 @@ public class TestClass
     public void
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayFromEndElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = (new[] { 1, 2 })[^1];
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.InlineFiniteArrayFromEndElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "InlineFiniteArrayFromEndElementAssignedNonZeroValue.cs",
@@ -5225,16 +5150,7 @@ public class TestClass
     public void
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayFromEndElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var values = new[] { 1, 2 };
-        var divisor = values[^1];
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.PriorFiniteArrayFromEndElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "PriorFiniteArrayFromEndElementAssignedNonZeroValue.cs",
@@ -5251,16 +5167,7 @@ public class TestClass
     public void
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFiniteArrayElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var values = new[] { 1, 2 };
-        var divisor = flag ? values[0] : values[1];
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.ConditionalFiniteArrayElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "ConditionalFiniteArrayElementAssignedNonZeroValue.cs",
@@ -5330,16 +5237,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var divisor = pair.Item1;
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.TupleElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "TupleElementAssignedNonZeroValue.cs",
@@ -5385,16 +5283,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (divisor: 1, other: 2);
-        var divisor = pair.divisor;
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.NamedTupleElementNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "NamedTupleElementAssignedNonZeroValue.cs",
@@ -5410,18 +5299,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var divisor = 0;
-        var other = 0;
-        (divisor, other) = pair;
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "TupleLocalDeconstructionAssignedNonZeroValue.cs",
@@ -5437,16 +5315,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var (divisor, other) = pair;
-        return 10 / divisor;
-    }
-}";
+        const string source = SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor;
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "TupleLocalDeconstructionDeclaredNonZeroValue.cs",

@@ -261,14 +261,7 @@ public class TestClass
     [Test]
     public async Task Sp0010_EnumGuardImpliesZeroDivisor_ReportsDivideByZero()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
+        var diagnostics = await GetExceptionDiagnosticsAsync(SemanticOracleTestSources.ModeEnum + @"public class TestClass
 {
     public int TestMethod(int value, Mode state)
     {
@@ -870,16 +863,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_CompoundAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        divisor += 1;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.CompoundAssignedNonZeroDivisor);
 
         Assert.That(
             diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
@@ -890,16 +875,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_IncrementedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        divisor++;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.IncrementedNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -907,17 +884,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TupleAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = 0;
-        var other = 0;
-        (divisor, other) = (1, 2);
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.TupleAssignedNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -925,15 +893,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TupleDeconstructionDeclaredNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var (divisor, other) = (1, 2);
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.TupleDeconstructionDeclaredNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -941,15 +902,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_InlineFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = (new[] { 1, 2 })[0];
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -957,16 +911,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_PriorFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var values = new[] { 1, 2 };
-        var divisor = values[0];
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -974,15 +920,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_InlineFiniteArrayFromEndElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var divisor = (new[] { 1, 2 })[^1];
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.InlineFiniteArrayFromEndElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -990,16 +929,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_PriorFiniteArrayFromEndElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var values = new[] { 1, 2 };
-        var divisor = values[^1];
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.PriorFiniteArrayFromEndElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1007,16 +938,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_ConditionalFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var values = new[] { 1, 2 };
-        var divisor = flag ? values[0] : values[1];
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.ConditionalFiniteArrayElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1024,16 +947,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TupleElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var divisor = pair.Item1;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.TupleElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1041,16 +956,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_NamedTupleElementAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (divisor: 1, other: 2);
-        var divisor = pair.divisor;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.NamedTupleElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1058,18 +965,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TupleLocalDeconstructionAssignedNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var divisor = 0;
-        var other = 0;
-        (divisor, other) = pair;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1077,16 +974,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TupleLocalDeconstructionDeclaredNonZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (1, 2);
-        var (divisor, other) = pair;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
