@@ -890,54 +890,36 @@ internal sealed class SymbolicState
 
     private static bool ContainsFalseConstant(SymbolicCondition condition)
     {
-        if (string.Equals(
-                CreateConditionKey(condition),
-                "const:false",
-                StringComparison.Ordinal))
-            return true;
-
-        switch (condition)
-        {
-            case SymbolicConstantCondition { Value: false }:
-                return true;
-            case SymbolicNotCondition { Operand: SymbolicConstantCondition { Value: true } }:
-                return true;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
-                return ContainsFalseConstant(binary.Left) || ContainsFalseConstant(binary.Right);
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
-                return ContainsFalseConstant(binary.Left) && ContainsFalseConstant(binary.Right);
-            case SymbolicNotCondition { Operand: var operand }:
-                return ContainsTrueConstant(operand);
-            default:
-                return false;
-        }
+        return ContainsConstant(condition, false);
     }
 
     private static bool ContainsTrueConstant(SymbolicCondition condition)
     {
+        return ContainsConstant(condition, true);
+    }
+
+    private static bool ContainsConstant(SymbolicCondition condition, bool expected)
+    {
         if (string.Equals(
                 CreateConditionKey(condition),
-                "const:true",
+                expected ? "const:true" : "const:false",
                 StringComparison.Ordinal))
             return true;
 
-        switch (condition)
+        return condition switch
         {
-            case SymbolicConstantCondition { Value: true }:
-                return true;
-            case SymbolicNotCondition { Operand: SymbolicConstantCondition { Value: false } }:
-                return true;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
-                return ContainsTrueConstant(binary.Left) && ContainsTrueConstant(binary.Right);
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
-                return ContainsTrueConstant(binary.Left) ||
-                       ContainsTrueConstant(binary.Right) ||
-                       ContainsDisjunctionTautology(condition);
-            case SymbolicNotCondition { Operand: var operand }:
-                return ContainsFalseConstant(operand);
-            default:
-                return false;
-        }
+            SymbolicConstantCondition constant => constant.Value == expected,
+            SymbolicNotCondition { Operand: var operand } => ContainsConstant(operand, !expected),
+            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary => expected
+                ? ContainsConstant(binary.Left, true) && ContainsConstant(binary.Right, true)
+                : ContainsConstant(binary.Left, false) || ContainsConstant(binary.Right, false),
+            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary => expected
+                ? ContainsConstant(binary.Left, true) ||
+                  ContainsConstant(binary.Right, true) ||
+                  ContainsDisjunctionTautology(condition)
+                : ContainsConstant(binary.Left, false) && ContainsConstant(binary.Right, false),
+            _ => false
+        };
     }
 
     private static IEnumerable<SymbolicFact> EnumerateConditionFacts(SymbolicCondition condition)
