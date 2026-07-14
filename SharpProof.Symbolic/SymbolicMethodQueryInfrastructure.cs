@@ -75,6 +75,74 @@ internal static class SymbolicSourceInputDispatcher
     }
 }
 
+internal static class SymbolicMethodLikeQueryDispatcher
+{
+    internal static TResult Execute<TResult, TTarget>(
+        SymbolicSourceInput source,
+        SymbolicQueryTarget target,
+        SymbolicQueryOptions options,
+        SymbolicSourceCompilationKind compilationKind,
+        string unsupportedSourceMessage,
+        string unsupportedTargetMessage,
+        string nodeTargetMessage,
+        Func<SyntaxNode, bool> isMethodLikeDeclaration,
+        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
+        Func<TTarget, Compilation, CancellationToken, TResult> executeAnalysis,
+        CancellationToken cancellationToken)
+    {
+        return SymbolicSourceInputDispatcher.Execute(
+            source,
+            target,
+            options,
+            compilationKind,
+            unsupportedSourceMessage,
+            QuerySyntaxTree,
+            QueryNode,
+            cancellationToken);
+
+        TResult QuerySyntaxTree(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            SymbolicQueryTarget queryTarget,
+            CancellationToken queryCancellationToken)
+        {
+            if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
+            if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
+                syntaxTree,
+                semanticModel,
+                queryTarget,
+                unsupportedTargetMessage,
+                isMethodLikeDeclaration,
+                createTarget,
+                queryCancellationToken);
+            return executeAnalysis(resolvedTarget, compilation, queryCancellationToken);
+        }
+
+        TResult QueryNode(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            SymbolicQueryTarget queryTarget,
+            CancellationToken queryCancellationToken)
+        {
+            if (node == null) throw new ArgumentNullException(nameof(node));
+            if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+            if (queryTarget.Kind != SymbolicQueryTargetKind.Node)
+                throw new NotSupportedException(nodeTargetMessage);
+
+            var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
+                node,
+                semanticModel,
+                isMethodLikeDeclaration,
+                createTarget,
+                queryCancellationToken);
+            return executeAnalysis(resolvedTarget, semanticModel.Compilation, queryCancellationToken);
+        }
+    }
+}
+
 internal static class SymbolicMethodLikeTargetResolver
 {
     internal static TTarget Resolve<TTarget>(

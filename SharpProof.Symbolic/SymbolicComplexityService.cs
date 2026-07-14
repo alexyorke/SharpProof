@@ -16,59 +16,18 @@ internal sealed class SymbolicComplexityService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        return SymbolicSourceInputDispatcher.Execute(
+        return SymbolicMethodLikeQueryDispatcher.Execute(
             source,
             target,
             options,
             SymbolicSourceCompilationKind.Complexity,
             "Complexity source kind is not supported.",
-            QuerySyntaxTree,
-            QueryNode,
-            cancellationToken);
-    }
-
-    private SymbolicComplexityResult QuerySyntaxTree(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
-
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var resolved = SymbolicMethodLikeTargetResolver.Resolve(
-            syntaxTree,
-            semanticModel,
-            target,
             "Complexity queries support point, position, line, or node targets only.",
+            "Node complexity queries require a node target.",
             IsMethodLikeDeclaration,
             ResolveMethodLikeDeclaration,
+            ExecuteAnalysis,
             cancellationToken);
-        return ExecuteAnalysis(resolved, compilation, cancellationToken);
-    }
-
-    private SymbolicComplexityResult QueryNode(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (target.Kind != SymbolicQueryTargetKind.Node)
-            throw new NotSupportedException("Node complexity queries require a node target.");
-
-        var resolved = SymbolicMethodLikeTargetResolver.ResolveNode(
-            node,
-            semanticModel,
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
-        return ExecuteAnalysis(resolved, semanticModel.Compilation, cancellationToken);
     }
 
     private static SymbolicComplexityResult ExecuteAnalysis(

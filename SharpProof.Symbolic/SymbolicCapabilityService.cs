@@ -25,51 +25,18 @@ internal sealed class SymbolicCapabilityService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        return SymbolicSourceInputDispatcher.Execute(
+        return SymbolicMethodLikeQueryDispatcher.Execute(
             source,
             target,
             options,
             SymbolicSourceCompilationKind.Capabilities,
             "Capability source kind is not supported.",
-            QuerySyntaxTree,
-            QueryNode,
-            cancellationToken);
-    }
-
-    private SymbolicCapabilityResult QuerySyntaxTree(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
-            syntaxTree,
-            semanticModel,
-            target,
             "Capability queries support point, position, line, or node targets only.",
+            "Capability node queries require a node target.",
             IsMethodLikeDeclaration,
             ResolveMethodLikeDeclaration,
+            ExecuteAnalysis,
             cancellationToken);
-        return ExecuteAnalysis(resolvedTarget, compilation, cancellationToken);
-    }
-
-    private SymbolicCapabilityResult QueryNode(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        if (target.Kind != SymbolicQueryTargetKind.Node)
-            throw new NotSupportedException("Capability node queries require a node target.");
-
-        var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
-            node,
-            semanticModel,
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
-        return ExecuteAnalysis(resolvedTarget, semanticModel.Compilation, cancellationToken);
     }
 
     private static SymbolicCapabilityResult ExecuteAnalysis(
