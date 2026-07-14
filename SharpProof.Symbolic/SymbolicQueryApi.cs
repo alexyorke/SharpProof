@@ -309,67 +309,24 @@ public sealed class SymbolicQueryService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        switch (source.Kind)
-        {
-            case SymbolicSourceInputKind.File:
-                return QueryFile(
-                    source.FilePath!,
-                    source.CompilationProfile,
-                    target,
-                    options,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Text:
-                return QuerySource(source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, source.CompilationProfile, target, options,
-                    cancellationToken);
-            case SymbolicSourceInputKind.SyntaxTree:
-                return QuerySyntaxTree(source.SyntaxTree!, source.Compilation!, target,
-                    options, cancellationToken);
-            case SymbolicSourceInputKind.Node:
-                return QueryNode(source.Node!, source.SemanticModel!, target, options,
-                    cancellationToken);
-            default:
-                throw new NotSupportedException("Source kind is not supported.");
-        }
-    }
+        if (!SupportsScopedQueryTarget(target.Kind) &&
+            source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
+            throw new NotSupportedException(source.Kind == SymbolicSourceInputKind.File
+                ? "Target kind is not supported for file queries."
+                : "Target kind is not supported for source queries.");
 
-    private SymbolicQueryResult QueryFile(
-        string filePath,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
-        if (!SupportsScopedQueryTarget(target.Kind))
-            throw new NotSupportedException("Target kind is not supported for file queries.");
-
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySource(
-            sourceText,
-            sourcePath,
-            compilationProfile,
+        return SymbolicSourceInputDispatcher.Execute(
+            source,
             target,
             options,
-            cancellationToken));
-    }
-
-    private SymbolicQueryResult QuerySource(
-        string sourceText,
-        string filePath,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
-        if (!SupportsScopedQueryTarget(target.Kind))
-            throw new NotSupportedException("Target kind is not supported for source queries.");
-
-        var (syntaxTree, compilation) = SymbolicSourceQueryService.CompileQuerySource(
-            sourceText,
-            filePath,
-            options.References,
-            cancellationToken,
-            compilationProfile);
-        return QuerySyntaxTree(syntaxTree, compilation, target, options, cancellationToken);
+            "SharpProof.Symbolic.Query.cs",
+            "SharpProof.Symbolic.Query",
+            "Source kind is not supported.",
+            (syntaxTree, compilation, queryTarget, token) =>
+                QuerySyntaxTree(syntaxTree, compilation, queryTarget, options, token),
+            (node, semanticModel, queryTarget, token) =>
+                QueryNode(node, semanticModel, queryTarget, options, token),
+            cancellationToken);
     }
 
     private static bool SupportsScopedQueryTarget(SymbolicQueryTargetKind kind)

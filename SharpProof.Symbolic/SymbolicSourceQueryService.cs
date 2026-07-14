@@ -663,7 +663,7 @@ internal sealed class SymbolicSourceQueryService
         if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
     }
 
-    internal static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
+    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
         string sourceText, string filePath, IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
         SymbolicSourceCompilation.CreateQuery(
