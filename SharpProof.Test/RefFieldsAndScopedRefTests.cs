@@ -8,14 +8,6 @@ namespace SharpProof.Test;
 [TestFixture]
 public class RefFieldsAndScopedRefTests
 {
-    private const string MinimalEnforcePureAttributeSource = @"
-namespace SharpProof.Attributes
-{
-    [System.AttributeUsage(System.AttributeTargets.All)]
-    public sealed class EnforcePureAttribute : System.Attribute { }
-}
-";
-
     [Test]
     public async Task ScopedRef_PureMethod_NoDiagnostic()
     {
@@ -37,7 +29,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -63,7 +55,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
 
         var expected = new[]
@@ -100,7 +92,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -126,7 +118,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
 
         var expected = new[]
@@ -160,7 +152,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
 
         var expected = new[]

@@ -9,14 +9,6 @@ namespace SharpProof.Test;
 [TestFixture]
 public class RecordTests
 {
-    private const string MinimalEnforcePureAttributeSource = """
-        namespace SharpProof.Attributes
-        {
-            [System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Constructor | System.AttributeTargets.Property | System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface)]
-            public sealed class EnforcePureAttribute : System.Attribute { }
-        }
-        """;
-
     [Test]
     public async Task ImmutableRecord_NoDiagnostic()
     {
@@ -49,7 +41,7 @@ public class RecordTests
         {
             TestState =
             {
-                Sources = { testCode, isExternalInit, MinimalEnforcePureAttributeSource }
+                Sources = { testCode, isExternalInit, MathAndAttributeTestSources.MemberEnforcePureAttribute }
             }
         };
 
@@ -66,7 +58,7 @@ public class RecordTests
                    using SharpProof.Attributes;
                    using System.Runtime.CompilerServices;
 
-                   """ + MinimalEnforcePureAttributeSource + """
+                   """ + MathAndAttributeTestSources.MemberEnforcePureAttribute + """
                                                              public record Calculator
                                                              {
                                                                  [EnforcePure]

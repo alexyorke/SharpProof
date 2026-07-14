@@ -8,14 +8,6 @@ namespace SharpProof.Test;
 [TestFixture]
 public class WhileLoopTests
 {
-    private const string MinimalEnforcePureAttributeSource = @"
-namespace SharpProof.Attributes
-{
-    [System.AttributeUsage(System.AttributeTargets.All)]
-    public sealed class EnforcePureAttribute : System.Attribute { }
-}
-";
-
     [Test]
     public async Task PureWhileLoop_NoDiagnostic()
     {
@@ -41,7 +33,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -79,7 +71,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
 
         await VerifyCS.VerifyAnalyzerAsync(test);
@@ -111,7 +103,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
 
         var expected = new[]
@@ -146,7 +138,7 @@ namespace TestNamespace
         }
     }
 }
-" + MinimalEnforcePureAttributeSource;
+" + MathAndAttributeTestSources.MinimalEnforcePureAttribute;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }

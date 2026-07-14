@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
@@ -10,16 +11,6 @@ namespace SharpProof.Test;
 [TestFixture]
 public class UnsafeCodeTests
 {
-    private const string MinimalEnforcePureAttributeSource = @"
-using System;
-
-namespace SharpProof.Attributes
-{
-    [AttributeUsage(AttributeTargets.All)] // Use permissive usage for testing
-    public sealed class EnforcePureAttribute : Attribute { }
-}
-";
-
     [Test]
     public async Task MethodWithUnsafeCode_Diagnostic()
     {
@@ -40,44 +31,11 @@ public class TestClass
 ";
 
 
-        var expected = new[]
-        {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        await VerifyUnsafeAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
                 .WithSpan("/0/Test1.cs", 8, 24, 8, 34)
-                .WithArguments("TestMethod")
-        };
-
-        var verifierTest = new VerifyCS.Test
-        {
-            TestState =
-            {
-                Sources = { MinimalEnforcePureAttributeSource, test },
-                ExpectedDiagnostics = { expected[0] }
-            }
-        };
-
-
-        verifierTest.SolutionTransforms.Add((solution, projectId) =>
-        {
-            var project = solution.GetProject(projectId);
-            if (project == null) return solution;
-
-            var parseOptions = (project.ParseOptions as CSharpParseOptions)?
-                .WithLanguageVersion(LanguageVersion.Latest);
-
-            solution = solution.WithProjectParseOptions(projectId,
-                parseOptions ?? project.ParseOptions ?? new CSharpParseOptions());
-
-            var compilationOptions = (project.CompilationOptions as CSharpCompilationOptions)?
-                .WithAllowUnsafe(true);
-
-            solution = solution.WithProjectCompilationOptions(projectId,
-                compilationOptions ?? project.CompilationOptions ??
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-            return solution;
-        });
-        await verifierTest.RunAsync();
+                .WithArguments("TestMethod"));
     }
 
     [Test]
@@ -102,44 +60,43 @@ public class TestClass
 ";
 
 
-        var expected = new[]
-        {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        await VerifyUnsafeAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
                 .WithSpan("/0/Test1.cs", 8, 31, 8, 41)
-                .WithArguments("TestMethod")
-        };
+                .WithArguments("TestMethod"));
+    }
 
-        var verifierTest = new VerifyCS.Test
+    private static Task VerifyUnsafeAsync(string source, DiagnosticResult expected)
+    {
+        var test = new VerifyCS.Test
         {
             TestState =
             {
-                Sources = { MinimalEnforcePureAttributeSource, test },
-                ExpectedDiagnostics = { expected[0] }
+                Sources = { MathAndAttributeTestSources.MinimalEnforcePureAttribute, source },
+                ExpectedDiagnostics = { expected }
             }
         };
+        test.SolutionTransforms.Add(EnableUnsafe);
+        return test.RunAsync();
+    }
 
+    private static Solution EnableUnsafe(Solution solution, ProjectId projectId)
+    {
+        var project = solution.GetProject(projectId);
+        if (project == null) return solution;
 
-        verifierTest.SolutionTransforms.Add((solution, projectId) =>
-        {
-            var project = solution.GetProject(projectId);
-            if (project == null) return solution;
+        var parseOptions = (project.ParseOptions as CSharpParseOptions)?
+            .WithLanguageVersion(LanguageVersion.Latest);
+        solution = solution.WithProjectParseOptions(
+            projectId,
+            parseOptions ?? project.ParseOptions ?? new CSharpParseOptions());
 
-            var parseOptions = (project.ParseOptions as CSharpParseOptions)?
-                .WithLanguageVersion(LanguageVersion.Latest);
-
-            solution = solution.WithProjectParseOptions(projectId,
-                parseOptions ?? project.ParseOptions ?? new CSharpParseOptions());
-
-            var compilationOptions = (project.CompilationOptions as CSharpCompilationOptions)?
-                .WithAllowUnsafe(true);
-
-            solution = solution.WithProjectCompilationOptions(projectId,
-                compilationOptions ?? project.CompilationOptions ??
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-            return solution;
-        });
-
-        await verifierTest.RunAsync();
+        var compilationOptions = (project.CompilationOptions as CSharpCompilationOptions)?
+            .WithAllowUnsafe(true);
+        return solution.WithProjectCompilationOptions(
+            projectId,
+            compilationOptions ?? project.CompilationOptions ??
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }

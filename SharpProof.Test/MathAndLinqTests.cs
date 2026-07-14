@@ -39,89 +39,25 @@ public class TestClass
     [Test]
     public async Task ComplexNestedExpressions_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(double x, double y, double z)
-    {
-        var a = Math.Sin(x) * Math.Cos(y); // Pure
-        var b = Math.Pow(Math.E, z) / Math.PI; // Pure: Math.E and Math.PI reads are now allowed
-        var c = Math.Sqrt(Math.Abs(a * b)); // Pure
-        return Math.Max(a, Math.Min(b, c)); // Pure
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(MathAndAttributeTestSources.ComplexNestedExpressions);
     }
 
     [Test]
     public async Task SimpleMathMethod_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(double x)
-    {
-        // Math.Sin is pure
-        return Math.Sin(x);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(MathAndAttributeTestSources.SimpleMathMethod);
     }
 
     [Test]
     public async Task MathConstant_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod()
-    {
-        // Pure: Math.PI read is now allowed
-        return Math.PI;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(MathAndAttributeTestSources.MathConstant);
     }
 
     [Test]
     public async Task MathMethodChain_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(double x)
-    {
-        return Math.Sin(Math.Cos(x));
-    }
-}";
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(MathAndAttributeTestSources.MathMethodChain);
     }
 
     [Test]
