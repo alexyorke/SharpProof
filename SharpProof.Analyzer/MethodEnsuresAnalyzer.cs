@@ -666,12 +666,7 @@ internal static class MethodEnsuresAnalyzer
             if (!string.Equals(node.Identifier.ValueText, "result", StringComparison.Ordinal))
                 return base.VisitIdentifierName(node);
 
-            if (node.Parent is MemberAccessExpressionSyntax memberAccess &&
-                ReferenceEquals(memberAccess.Name, node))
-                return base.VisitIdentifierName(node);
-
-            if (node.Parent is QualifiedNameSyntax qualifiedName &&
-                ReferenceEquals(qualifiedName.Right, node))
+            if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);
 
             return _replacement.WithTriviaFrom(node);

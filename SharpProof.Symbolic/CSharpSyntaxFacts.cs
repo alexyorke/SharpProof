@@ -92,6 +92,14 @@ internal static class CSharpSyntaxFacts
         return expression;
     }
 
+    internal static bool IsMemberOrQualifiedNameRightSide(IdentifierNameSyntax identifier)
+    {
+        return identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
+               ReferenceEquals(memberAccess.Name, identifier) ||
+               identifier.Parent is QualifiedNameSyntax qualifiedName &&
+               ReferenceEquals(qualifiedName.Right, identifier);
+    }
+
     public static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression)
     {
         expression = node switch
