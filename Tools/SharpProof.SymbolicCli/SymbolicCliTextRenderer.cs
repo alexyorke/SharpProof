@@ -40,39 +40,30 @@ internal static class SymbolicCliTextRenderer
     internal static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");
-    Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
-    PrintAnalysisTruncation(result.AnalysisTruncation);
-    PrintProgramPointSummary(result.ProgramPointSummary, options);
-    Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
-    Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
-    Console.WriteLine($"Line invariant merge: {result.InvariantInfo.MergeKind}");
-    Console.WriteLine($"Line invariant conditions: {result.InvariantInfo.ConditionCount}");
-    PrintInvariantQuery("Line invariant query", result.InvariantQuery, options);
-    PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
-    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
-    foreach (var point in result.ProgramPoints)
-    {
-        Console.WriteLine();
-        PrintPointResult(point, options, true);
-    }
-
-    if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
-        PrintSmtDiagnostics(result.SmtDiagnostics);
+    PrintScopedResult(result, "Line", options);
 }
 
     internal static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.SpanStart}-{result.SpanEnd}");
     Console.WriteLine($"Span lines: {result.StartLine}:{result.StartColumn}-{result.EndLine}:{result.EndColumn}");
+    PrintScopedResult(result, "Span", options);
+}
+
+    private static void PrintScopedResult(
+        SymbolicScopedQueryAggregate result,
+        string scopeLabel,
+        SymbolicCliOptions options)
+{
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
     PrintAnalysisTruncation(result.AnalysisTruncation);
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
-    Console.WriteLine($"Span merged invariant: {result.MergedInvariantText}");
-    Console.WriteLine($"Span invariant merge: {result.InvariantInfo.MergeKind}");
-    Console.WriteLine($"Span invariant conditions: {result.InvariantInfo.ConditionCount}");
-    PrintInvariantQuery("Span invariant query", result.InvariantQuery, options);
-    PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
+    Console.WriteLine($"{scopeLabel} merged invariant: {result.MergedInvariantText}");
+    Console.WriteLine($"{scopeLabel} invariant merge: {result.InvariantInfo.MergeKind}");
+    Console.WriteLine($"{scopeLabel} invariant conditions: {result.InvariantInfo.ConditionCount}");
+    PrintInvariantQuery(scopeLabel + " invariant query", result.InvariantQuery, options);
+    PrintMergedPathFacts(scopeLabel + " merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
     foreach (var point in result.ProgramPoints)
     {

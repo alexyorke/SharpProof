@@ -1935,7 +1935,8 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("Capabilities:"));
         Assert.That(source, Does.Contain("SharpProof explanation"));
         Assert.That(source, Does.Contain("Merged invariant"));
-        Assert.That(source, Does.Contain("Line merged invariant"));
+        Assert.That(source, Does.Contain("PrintScopedResult(result, \"Line\", options)"));
+        Assert.That(source, Does.Contain("scopeLabel} merged invariant"));
         Assert.That(source, Does.Contain("Invariant merge"));
         Assert.That(source, Does.Contain("Path conditions"));
         Assert.That(source, Does.Contain("Program point kind"));
