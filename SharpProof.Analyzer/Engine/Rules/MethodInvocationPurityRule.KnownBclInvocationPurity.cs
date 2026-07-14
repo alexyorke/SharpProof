@@ -170,35 +170,13 @@ internal partial class MethodInvocationPurityRule
     {
         return TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
                TryGetDefaultEqualityCollectionElementType(methodSymbol, out _, out _) ||
-               IsLinqDefaultEqualityDispatchMethod(methodSymbol) ||
-               IsLinqDefaultComparisonDispatchMethod(methodSymbol) ||
-               IsNullableDefaultDispatchMethod(methodSymbol) ||
+               TryGetLinqDefaultEqualityDispatchType(methodSymbol, out _) ||
+               TryGetLinqDefaultComparisonDispatchType(methodSymbol, out _) ||
+               TryGetNullableDefaultDispatchType(methodSymbol, out _, out _) ||
                IsMemoryExtensionsDefaultEqualityDispatchMethod(methodSymbol) ||
                IsHashCodeCombineMethod(methodSymbol) ||
                TryGetEqualityComparerElementType(methodSymbol, out _) ||
                TryGetComparerElementType(methodSymbol, out _);
-    }
-
-    private static bool IsLinqDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol)
-    {
-        var definition = GetExtensionDefinition(methodSymbol);
-        return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
-               definition.Name is "Contains" or "SequenceEqual" or "Distinct" or "Except" or "Intersect" or "Union" or
-                   "GroupBy" or "ToLookup" or "Join" or "GroupJoin";
-    }
-
-    private static bool IsLinqDefaultComparisonDispatchMethod(IMethodSymbol methodSymbol)
-    {
-        var definition = GetExtensionDefinition(methodSymbol);
-        return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
-               definition.Name is "OrderBy" or "OrderByDescending" or "ThenBy" or "ThenByDescending" or "Min" or "Max";
-    }
-
-    private static bool IsNullableDefaultDispatchMethod(IMethodSymbol methodSymbol)
-    {
-        var definition = methodSymbol.OriginalDefinition;
-        return definition.ContainingType?.ToDisplayString() == "System.Nullable" &&
-               definition.Name is "Compare" or "Equals";
     }
 
     private static bool IsMemoryExtensionsDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol)

@@ -16,6 +16,12 @@ internal static partial class ComparerInvocationPurity
         bool IncludesHashSetRelations,
         params string[] MethodNames);
 
+    private sealed record GenericDispatchRule(
+        int TypeArgumentIndex,
+        int RequiredTypeArgumentCount,
+        bool RequiresExactTypeArgumentCount,
+        params string[] MethodNames);
+
     private static readonly CollectionDispatchRule[] EqualityCollectionDispatchRules =
     [
         new("System.Collections.Generic.Dictionary<TKey, TValue>", 0, true, null, false, "ContainsKey", "TryGetValue"),
@@ -38,6 +44,19 @@ internal static partial class ComparerInvocationPurity
         new("System.Collections.Generic.SortedSet<T>", 0, false, null, false, "Contains", "TryGetValue"),
         new("System.Collections.Immutable.ImmutableSortedSet<T>", 0, false, null, false, "Contains", "TryGetValue", "Add", "Remove"),
         new("System.Collections.Generic.List<T>", 0, false, 1, false, "BinarySearch")
+    ];
+
+    private static readonly GenericDispatchRule[] LinqEqualityDispatchRules =
+    [
+        new(0, 1, true, "Contains", "SequenceEqual", "Distinct", "Except", "Intersect", "Union"),
+        new(1, 2, false, "GroupBy", "ToLookup"),
+        new(2, 3, false, "Join", "GroupJoin")
+    ];
+
+    private static readonly GenericDispatchRule[] LinqComparisonDispatchRules =
+    [
+        new(0, 1, true, "Min", "Max"),
+        new(1, 2, false, "OrderBy", "OrderByDescending", "ThenBy", "ThenByDescending")
     ];
 
     internal static bool TryCheckEqualityComparerDispatchPurity(
@@ -116,27 +135,33 @@ internal static partial class ComparerInvocationPurity
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var methodSymbol = invocationOperation.TargetMethod;
+        if (!TryGetNullableDefaultDispatchType(
+                invocationOperation.TargetMethod,
+                out var valueType,
+                out var isComparison))
+            return false;
+
+        result = isComparison
+            ? CheckDefaultComparisonDispatchPurity(valueType, invocationOperation, context)
+            : CheckDefaultEqualityDispatchPurity(valueType, invocationOperation, context);
+        return true;
+    }
+
+    internal static bool TryGetNullableDefaultDispatchType(
+        IMethodSymbol methodSymbol,
+        out ITypeSymbol valueType,
+        out bool isComparison)
+    {
+        valueType = null!;
         var definition = methodSymbol.OriginalDefinition;
+        isComparison = definition.Name == "Compare";
         if (definition.ContainingType?.ToDisplayString() != "System.Nullable" ||
-            definition.Name is not ("Compare" or "Equals") ||
+            !isComparison && definition.Name != "Equals" ||
             methodSymbol.TypeArguments.Length != 1)
             return false;
 
-        var valueType = methodSymbol.TypeArguments[0];
-        if (definition.Name == "Compare")
-        {
-            result = CheckDefaultComparisonDispatchPurity(valueType, invocationOperation, context);
-            return true;
-        }
-
-        if (definition.Name == "Equals")
-        {
-            result = CheckDefaultEqualityDispatchPurity(valueType, invocationOperation, context);
-            return true;
-        }
-
-        return false;
+        valueType = methodSymbol.TypeArguments[0];
+        return true;
     }
 
     internal static bool TryCheckCollectionEqualityDispatchPurity(
@@ -307,30 +332,11 @@ internal static partial class ComparerInvocationPurity
         return true;
     }
 
-    private static bool TryGetLinqDefaultComparisonDispatchType(
+    internal static bool TryGetLinqDefaultComparisonDispatchType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol comparisonType)
     {
-        comparisonType = null!;
-
-        var definition = GetExtensionDefinition(methodSymbol);
-        if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable" ||
-            definition.Name is not ("OrderBy" or "OrderByDescending" or "ThenBy" or "ThenByDescending" or "Min"
-                or "Max"))
-            return false;
-
-        if (definition.Name is "Min" or "Max")
-        {
-            if (methodSymbol.TypeArguments.Length != 1) return false;
-
-            comparisonType = methodSymbol.TypeArguments[0];
-            return true;
-        }
-
-        if (methodSymbol.TypeArguments.Length < 2) return false;
-
-        comparisonType = methodSymbol.TypeArguments[1];
-        return true;
+        return TryGetLinqDispatchType(methodSymbol, LinqComparisonDispatchRules, out comparisonType);
     }
 
     private static bool IsLinqDefaultComparisonOverload(IInvocationOperation invocationOperation)
@@ -341,38 +347,35 @@ internal static partial class ComparerInvocationPurity
         return true;
     }
 
-    private static bool TryGetLinqDefaultEqualityDispatchType(
+    internal static bool TryGetLinqDefaultEqualityDispatchType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol equalityType)
     {
-        equalityType = null!;
+        return TryGetLinqDispatchType(methodSymbol, LinqEqualityDispatchRules, out equalityType);
+    }
 
+    private static bool TryGetLinqDispatchType(
+        IMethodSymbol methodSymbol,
+        IReadOnlyList<GenericDispatchRule> rules,
+        out ITypeSymbol dispatchType)
+    {
+        dispatchType = null!;
         var definition = GetExtensionDefinition(methodSymbol);
         if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable") return false;
 
-        if (definition.Name is "GroupBy" or "ToLookup")
+        foreach (var rule in rules)
         {
-            if (methodSymbol.TypeArguments.Length < 2) return false;
+            var typeArgumentCount = methodSymbol.TypeArguments.Length;
+            if (!rule.MethodNames.Contains(definition.Name, StringComparer.Ordinal) ||
+                typeArgumentCount < rule.RequiredTypeArgumentCount ||
+                rule.RequiresExactTypeArgumentCount && typeArgumentCount != rule.RequiredTypeArgumentCount)
+                continue;
 
-            equalityType = methodSymbol.TypeArguments[1];
+            dispatchType = methodSymbol.TypeArguments[rule.TypeArgumentIndex];
             return true;
         }
 
-        if (definition.Name is "Join" or "GroupJoin")
-        {
-            if (methodSymbol.TypeArguments.Length < 3) return false;
-
-            equalityType = methodSymbol.TypeArguments[2];
-            return true;
-        }
-
-        if (definition.Name is not ("Contains" or "SequenceEqual" or "Distinct" or "Except" or "Intersect"
-                or "Union") ||
-            methodSymbol.TypeArguments.Length != 1)
-            return false;
-
-        equalityType = methodSymbol.TypeArguments[0];
-        return true;
+        return false;
     }
 
     private static bool IsLinqDefaultEqualityOverload(IInvocationOperation invocationOperation)
