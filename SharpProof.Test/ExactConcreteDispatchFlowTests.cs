@@ -7,629 +7,107 @@ namespace SharpProof.Test;
 [Parallelizable(ParallelScope.Children)]
 public class ExactConcreteDispatchFlowTests
 {
-    [Test]
-    public async Task InterfaceMethodDispatch_AliasedExactConcreteLocal_NoDiagnostic()
+    private static IEnumerable<TestCaseData> Scenarios()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public interface IWorker
+        yield return Scenario("InterfaceMethodDispatch_AliasedExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.InterfaceMethodHierarchy, "Process(int value)",
+            "IWorker worker = new ExactWorker();\nIWorker alias = worker;\nreturn alias.Compute(value);");
+        yield return Scenario("VirtualMethodDispatch_CastExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(int value)",
+            "Worker worker = (Worker)new ExactWorker();\nreturn worker.Compute(value);");
+        yield return Scenario("VirtualMethodDispatch_SameConcreteConditionalMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(bool chooseLeft, int value)",
+            "Worker worker = chooseLeft ? new ExactWorker() : new ExactWorker();\nreturn worker.Compute(value);");
+        yield return Scenario("VirtualPropertyDispatch_SameConcreteConditionalMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy, "ReadValue(bool chooseLeft)",
+            "BaseValue value = chooseLeft ? new ExactValue() : new ExactValue();\nreturn value.Value;");
+        yield return Scenario("VirtualMethodDispatch_SameConcreteIfElseMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(bool chooseLeft, int value)", """
+Worker worker;
+if (chooseLeft)
 {
-    [EnforcePure]
-    int Compute(int value);
+    worker = new ExactWorker();
+}
+else
+{
+    worker = new ExactWorker();
 }
 
-public class ExactWorker : IWorker
+return worker.Compute(value);
+""");
+        yield return Scenario("VirtualPropertyDispatch_SameConcreteIfElseMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy, "ReadValue(bool chooseLeft)", """
+BaseValue value;
+if (chooseLeft)
 {
-    [EnforcePure]
-    public virtual int Compute(int value) => value + 1;
+    value = new ExactValue();
+}
+else
+{
+    value = new ExactValue();
 }
 
-public class ImpureWorker : ExactWorker
+return value.Value;
+""");
+        yield return Scenario("VirtualMethodDispatch_SameConcreteCoalesceMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(int value)",
+            "ExactWorker primary = new ExactWorker();\nExactWorker fallback = new ExactWorker();\nWorker worker = primary ?? fallback;\nreturn worker.Compute(value);");
+        yield return Scenario("VirtualPropertyDispatch_SameConcreteCoalesceMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy, "ReadValue()",
+            "ExactValue primary = new ExactValue();\nExactValue fallback = new ExactValue();\nBaseValue value = primary ?? fallback;\nreturn value.Value;");
+        yield return Scenario("VirtualMethodDispatch_SameConcreteSwitchExpressionMerge_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(bool chooseLeft, int value)", """
+Worker worker = chooseLeft switch
 {
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        Console.WriteLine(value);
-        return value + 2;
-    }
+    true => new ExactWorker(),
+    false => new ExactWorker(),
+};
+
+return worker.Compute(value);
+""");
+        yield return Scenario("VirtualMethodDispatch_ContradictoryConditionImpureBranch_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(int discriminator, int value)", """
+Worker worker = new ExactWorker();
+if (discriminator == 0 && discriminator != 0)
+{
+    worker = new ImpureWorker();
 }
 
-public class TestClass
+return worker.Compute(value);
+""");
+        yield return Scenario("VirtualPropertyDispatch_ContradictoryConditionImpureBranch_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy, "ReadValue(int discriminator)", """
+BaseValue value = new ExactValue();
+if (discriminator == 0 && discriminator != 0)
 {
-    [EnforcePure]
-    public int Process(int value)
-    {
-        IWorker worker = new ExactWorker();
-        IWorker alias = worker;
-        return alias.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_CastExactConcreteLocal_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
+    value = new ImpureValue();
 }
 
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int value)
-    {
-        Worker worker = (Worker)new ExactWorker();
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
+return value.Value;
+""");
+        yield return Scenario("VirtualMethodDispatch_NullCoalescingAssignmentExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(int value)",
+            "Worker worker = new ExactWorker();\nworker ??= new ExactWorker();\nreturn worker.Compute(value);");
+        yield return Scenario(
+            "VirtualMethodDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy, "Process(int value)",
+            "Worker worker = null;\nworker ??= new ExactWorker();\nreturn worker.Compute(value);");
+        yield return Scenario(
+            "VirtualPropertyDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy, "ReadValue()",
+            "BaseValue value = null;\nvalue ??= new ExactValue();\nreturn value.Value;");
     }
 
-    [Test]
-    public async Task VirtualMethodDispatch_SameConcreteConditionalMerge_NoDiagnostic()
+    private static TestCaseData Scenario(string name, string hierarchy, string signature, string body)
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(bool chooseLeft, int value)
-    {
-        Worker worker = chooseLeft ? new ExactWorker() : new ExactWorker();
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
+        return new TestCaseData(hierarchy, signature, body).SetName(name);
     }
 
-    [Test]
-    public async Task VirtualPropertyDispatch_SameConcreteConditionalMerge_NoDiagnostic()
+    [TestCaseSource(nameof(Scenarios))]
+    public async Task ExactConcreteDispatchFlow_NoDiagnostic(string hierarchy, string signature, string body)
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue(bool chooseLeft)
-    {
-        BaseValue value = chooseLeft ? new ExactValue() : new ExactValue();
-        return value.Value;
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_SameConcreteIfElseMerge_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(bool chooseLeft, int value)
-    {
-        Worker worker;
-        if (chooseLeft)
-        {
-            worker = new ExactWorker();
-        }
-        else
-        {
-            worker = new ExactWorker();
-        }
-
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualPropertyDispatch_SameConcreteIfElseMerge_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            System.Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue(bool chooseLeft)
-    {
-        BaseValue value;
-        if (chooseLeft)
-        {
-            value = new ExactValue();
-        }
-        else
-        {
-            value = new ExactValue();
-        }
-
-        return value.Value;
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int value)
-    {
-        ExactWorker primary = new ExactWorker();
-        ExactWorker fallback = new ExactWorker();
-        Worker worker = primary ?? fallback;
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualPropertyDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            System.Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue()
-    {
-        ExactValue primary = new ExactValue();
-        ExactValue fallback = new ExactValue();
-        BaseValue value = primary ?? fallback;
-        return value.Value;
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_SameConcreteSwitchExpressionMerge_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(bool chooseLeft, int value)
-    {
-        Worker worker = chooseLeft switch
-        {
-            true => new ExactWorker(),
-            false => new ExactWorker(),
-        };
-
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int discriminator, int value)
-    {
-        Worker worker = new ExactWorker();
-        if (discriminator == 0 && discriminator != 0)
-        {
-            worker = new ImpureWorker();
-        }
-
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualPropertyDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            System.Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue(int discriminator)
-    {
-        BaseValue value = new ExactValue();
-        if (discriminator == 0 && discriminator != 0)
-        {
-            value = new ImpureValue();
-        }
-
-        return value.Value;
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_NullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int value)
-    {
-        Worker worker = new ExactWorker();
-        worker ??= new ExactWorker();
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualMethodDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
-{
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
-
-public class ExactWorker : Worker
-{
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
-
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        System.Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int value)
-    {
-        Worker worker = null;
-        worker ??= new ExactWorker();
-        return worker.Compute(value);
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    [Test]
-    public async Task VirtualPropertyDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            System.Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue()
-    {
-        BaseValue value = null;
-        value ??= new ExactValue();
-        return value.Value;
-    }
-}";
-        await AssertSinglePurityDiagnosticAsync(test);
-    }
-
-    private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
-    {
-        var (_, diagnostic) = await AnalyzerTestHost.AssertSingleSp0002Async(markedSource);
+        var test = ExactConcreteDispatchTestSources.CreateSource(hierarchy, signature, body);
+        var (_, diagnostic) = await AnalyzerTestHost.AssertSingleSp0002Async(test);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Console.WriteLine"));
     }

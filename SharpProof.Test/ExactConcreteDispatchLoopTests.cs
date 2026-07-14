@@ -7,98 +7,37 @@ namespace SharpProof.Test;
 [TestFixture]
 public class ExactConcreteDispatchLoopTests
 {
-    [Test]
-    public async Task VirtualMethodDispatch_DoWhileFalseAssignedExactConcreteLocal_NoDiagnostic()
+    private static IEnumerable<TestCaseData> Scenarios()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class Worker
+        yield return ExactConcreteDispatchTestSources.Scenario(
+            "VirtualMethodDispatch_DoWhileFalseAssignedExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualMethodHierarchy,
+            "Process(int value)", """
+Worker worker;
+do
 {
-    [EnforcePure]
-    public abstract int Compute(int value);
-}
+    worker = new ExactWorker();
+} while (false);
 
-public class ExactWorker : Worker
+return worker.Compute(value);
+""");
+        yield return ExactConcreteDispatchTestSources.Scenario(
+            "VirtualPropertyDispatch_DoWhileFalseAssignedExactConcreteLocal_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy,
+            "ReadValue()", """
+BaseValue value;
+do
 {
-    [EnforcePure]
-    public override int Compute(int value) => value + 1;
-}
+    value = new ExactValue();
+} while (false);
 
-public class ImpureWorker : ExactWorker
-{
-    [EnforcePure]
-    public override int {|SP0002:Compute|}(int value)
-    {
-        Console.WriteLine(value);
-        return value + 2;
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Process(int value)
-    {
-        Worker worker;
-        do
-        {
-            worker = new ExactWorker();
-        } while (false);
-
-        return worker.Compute(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+return value.Value;
+""");
     }
 
-    [Test]
-    public async Task VirtualPropertyDispatch_DoWhileFalseAssignedExactConcreteLocal_NoDiagnostic()
+    [TestCaseSource(nameof(Scenarios))]
+    public async Task ExactConcreteDispatchLoop_NoDiagnostic(string hierarchy, string signature, string body)
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue()
-    {
-        BaseValue value;
-        do
-        {
-            value = new ExactValue();
-        } while (false);
-
-        return value.Value;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(ExactConcreteDispatchTestSources.CreateSource(hierarchy, signature, body));
     }
 }

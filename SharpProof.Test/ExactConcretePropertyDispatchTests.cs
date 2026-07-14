@@ -7,89 +7,21 @@ namespace SharpProof.Test;
 [TestFixture]
 public class ExactConcretePropertyDispatchTests
 {
-    [Test]
-    public async Task InterfacePropertyDispatch_ExactConcreteLocalWithImpureSubclass_NoDiagnostic()
+    private static IEnumerable<TestCaseData> Scenarios()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public interface IValueProvider
-{
-    int Value { get; }
-}
-
-public class ExactValueProvider : IValueProvider
-{
-    public virtual int Value => 1;
-}
-
-public class ImpureValueProvider : ExactValueProvider
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue()
-    {
-        IValueProvider provider = new ExactValueProvider();
-        return provider.Value;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        yield return ExactConcreteDispatchTestSources.Scenario(
+            "InterfacePropertyDispatch_ExactConcreteLocalWithImpureSubclass_NoDiagnostic",
+            ExactConcreteDispatchTestSources.InterfacePropertyHierarchy,
+            "ReadValue()", "IValueProvider provider = new ExactValueProvider();\nreturn provider.Value;");
+        yield return ExactConcreteDispatchTestSources.Scenario(
+            "VirtualPropertyDispatch_ExactConcreteLocalWithImpureSubclass_NoDiagnostic",
+            ExactConcreteDispatchTestSources.VirtualPropertyHierarchy,
+            "ReadValue()", "BaseValue value = new ExactValue();\nreturn value.Value;");
     }
 
-    [Test]
-    public async Task VirtualPropertyDispatch_ExactConcreteLocalWithImpureSubclass_NoDiagnostic()
+    [TestCaseSource(nameof(Scenarios))]
+    public async Task ExactConcretePropertyDispatch_NoDiagnostic(string hierarchy, string signature, string body)
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public abstract class BaseValue
-{
-    public abstract int Value { get; }
-}
-
-public class ExactValue : BaseValue
-{
-    public override int Value => 1;
-}
-
-public class ImpureValue : ExactValue
-{
-    public override int {|SP0002:Value|}
-    {
-        [EnforcePure]
-        get
-        {
-            Console.WriteLine(1);
-            return 2;
-        }
-    }
-}
-
-public class TestClass
-{
-    [EnforcePure]
-    public int ReadValue()
-    {
-        BaseValue value = new ExactValue();
-        return value.Value;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(ExactConcreteDispatchTestSources.CreateSource(hierarchy, signature, body));
     }
 }

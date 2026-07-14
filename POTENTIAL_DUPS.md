@@ -200,14 +200,6 @@ file-name string and magic args (`20`, `SmtAnalysisOptions.Default`, references)
 
 **Recommendation:** Extract a shared base/helper parameterized by caller-file name (`CallerFilePath`).
 
-### Duplicated dispatch test fixtures across `ExactConcrete*` files
-`ExactConcreteDispatchTests`, `ExactConcreteDispatchFlowTests`, `ExactConcreteDispatchLoopTests`,
-`ExactConcreteDispatchSwitchStatementTests`, `ExactConcretePropertyDispatchTests` embed the
-`Worker`/`ExactWorker`/`ImpureWorker` hierarchy ~13x and the `BaseValue`/`ExactValue`/`ImpureValue`
-property hierarchy ~8x.
-
-**Recommendation:** Introduce shared source-fixture constants/builders; convert flow variants to `[TestCase]`.
-
 ### `Generic*DispatchTests` (lower priority)
 `GenericComparisonDispatchTests`, `GenericEqualityDispatchTests`, `GenericIndexerDispatchTests`
 repeat the same skeleton but exercise genuinely different APIs. Borderline.
