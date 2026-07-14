@@ -76,14 +76,6 @@
     },
     {
       "paths": [
-        "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs"
-      ],
-      "category": "cli-schema-projection",
-      "reason": "Compact complexity JSON repeats stable source-coordinate names from the typed analysis result as an adapter-only schema."
-    },
-    {
-      "paths": [
         "SharpProof.Symbolic/SymbolicCapabilityService.cs",
         "SharpProof.Symbolic/SymbolicComplexityService.cs"
       ],
@@ -114,15 +106,6 @@
       ],
       "category": "cli-schema-projection",
       "reason": "Multiple retained compact JSON shapes mirror canonical program-point coordinates through shared projections."
-    },
-    {
-      "paths": [
-        "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
-        "SharpProof.Symbolic/SymbolicMethodResult.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs"
-      ],
-      "category": "boundary-metadata",
-      "reason": "Internal target, public result, and CLI schema expose the same coordinates across intentionally separate ownership boundaries."
     },
     {
       "paths": [

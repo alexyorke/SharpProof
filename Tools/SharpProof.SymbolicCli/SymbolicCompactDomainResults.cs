@@ -355,114 +355,69 @@ public sealed class SymbolicCompactRuntimeHazardStatusSummary
 
 public sealed class SymbolicCompactRuntimeHazard
 {
+    private readonly SymbolicRuntimeHazard _hazard;
+
     private SymbolicCompactRuntimeHazard(
-        SymbolicRuntimeHazardKind kind,
-        SymbolicRuntimeHazardStatus status,
-        string statusReason,
-        string exceptionType,
-        string category,
-        string filePath,
-        int line,
-        int column,
-        int spanStart,
-        int spanEnd,
-        int nodeStartLine,
-        int nodeStartColumn,
-        int nodeEndLine,
-        int nodeEndColumn,
-        string nodeKind,
-        string operationText,
-        string triggerCondition,
-        SymbolicFactInfo? triggerPrecondition,
-        string mergedInvariantText,
-        int pathConditionCount,
+        SymbolicRuntimeHazard hazard,
         IReadOnlyList<string> pathConditions,
-        SymbolicReachability reachability,
-        string reachabilityReason,
-        SymbolicUnknownReasonInfo unknownReasonInfo,
-        SymbolicAnalysisTruncationInfo analysisTruncation,
         SymbolicCompactRuntimeHazardItemTruncation truncation)
     {
-        Kind = kind;
-        Status = status;
-        StatusReason = statusReason;
-        ExceptionType = exceptionType;
-        Category = category;
-        FilePath = filePath;
-        Line = line;
-        Column = column;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        SpanLength = spanEnd - spanStart;
-        NodeStartLine = nodeStartLine;
-        NodeStartColumn = nodeStartColumn;
-        NodeEndLine = nodeEndLine;
-        NodeEndColumn = nodeEndColumn;
-        NodeKind = nodeKind;
-        OperationText = operationText;
-        TriggerCondition = triggerCondition;
-        TriggerPrecondition = triggerPrecondition;
-        MergedInvariantText = mergedInvariantText;
-        PathConditionCount = pathConditionCount;
-        PathConditions = pathConditions;
-        Reachability = reachability;
-        ReachabilityReason = reachabilityReason;
-        UnknownReasonInfo = unknownReasonInfo;
-        AnalysisTruncation = analysisTruncation;
-        Truncation = truncation;
+        _hazard = hazard ?? throw new ArgumentNullException(nameof(hazard));
+        PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
+        Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
 
-    public SymbolicRuntimeHazardKind Kind { get; }
+    public SymbolicRuntimeHazardKind Kind => _hazard.Kind;
 
-    public SymbolicRuntimeHazardStatus Status { get; }
+    public SymbolicRuntimeHazardStatus Status => _hazard.Status;
 
-    public string StatusReason { get; }
+    public string StatusReason => _hazard.StatusReason;
 
-    public string ExceptionType { get; }
+    public string ExceptionType => _hazard.ExceptionType;
 
-    public string Category { get; }
+    public string Category => _hazard.Category;
 
-    public string FilePath { get; }
+    public string FilePath => _hazard.FilePath;
 
-    public int Line { get; }
+    public int Line => _hazard.Line;
 
-    public int Column { get; }
+    public int Column => _hazard.Column;
 
-    public int SpanStart { get; }
+    public int SpanStart => _hazard.SpanStart;
 
-    public int SpanEnd { get; }
+    public int SpanEnd => _hazard.SpanEnd;
 
-    public int SpanLength { get; }
+    public int SpanLength => _hazard.SpanLength;
 
-    public int NodeStartLine { get; }
+    public int NodeStartLine => _hazard.NodeStartLine;
 
-    public int NodeStartColumn { get; }
+    public int NodeStartColumn => _hazard.NodeStartColumn;
 
-    public int NodeEndLine { get; }
+    public int NodeEndLine => _hazard.NodeEndLine;
 
-    public int NodeEndColumn { get; }
+    public int NodeEndColumn => _hazard.NodeEndColumn;
 
-    public string NodeKind { get; }
+    public string NodeKind => _hazard.NodeKind;
 
-    public string OperationText { get; }
+    public string OperationText => _hazard.OperationText;
 
-    public string TriggerCondition { get; }
+    public string TriggerCondition => _hazard.TriggerCondition;
 
-    public SymbolicFactInfo? TriggerPrecondition { get; }
+    public SymbolicFactInfo? TriggerPrecondition => _hazard.TriggerPrecondition;
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText => _hazard.MergedInvariantText;
 
-    public int PathConditionCount { get; }
+    public int PathConditionCount => _hazard.PathConditionCount;
 
     public IReadOnlyList<string> PathConditions { get; }
 
-    public SymbolicReachability Reachability { get; }
+    public SymbolicReachability Reachability => _hazard.Reachability;
 
-    public string ReachabilityReason { get; }
+    public string ReachabilityReason => _hazard.ReachabilityReason;
 
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
+    public SymbolicUnknownReasonInfo UnknownReasonInfo => _hazard.UnknownReasonInfo;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation => _hazard.AnalysisTruncation;
 
     public SymbolicCompactRuntimeHazardItemTruncation Truncation { get; }
 
@@ -479,31 +434,8 @@ public sealed class SymbolicCompactRuntimeHazard
             options.MaxConditions);
 
         return new SymbolicCompactRuntimeHazard(
-            hazard.Kind,
-            hazard.Status,
-            hazard.StatusReason,
-            hazard.ExceptionType,
-            hazard.Category,
-            hazard.FilePath,
-            hazard.Line,
-            hazard.Column,
-            hazard.SpanStart,
-            hazard.SpanEnd,
-            hazard.NodeStartLine,
-            hazard.NodeStartColumn,
-            hazard.NodeEndLine,
-            hazard.NodeEndColumn,
-            hazard.NodeKind,
-            hazard.OperationText,
-            hazard.TriggerCondition,
-            hazard.TriggerPrecondition,
-            hazard.MergedInvariantText,
-            hazard.PathConditionCount,
+            hazard,
             pathConditionProjection.Items,
-            hazard.Reachability,
-            hazard.ReachabilityReason,
-            hazard.UnknownReasonInfo,
-            hazard.AnalysisTruncation,
             new SymbolicCompactRuntimeHazardItemTruncation(pathConditionProjection.IsTruncated));
     }
 }
