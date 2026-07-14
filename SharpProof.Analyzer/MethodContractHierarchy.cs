@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer;
 
@@ -56,7 +57,7 @@ internal static class MethodContractHierarchy
         IMethodSymbol interfaceMethod)
     {
         return containingType.FindImplementationForInterfaceMember(interfaceMethod) is IMethodSymbol implementation &&
-               IsSameMethodOrOverride(method, implementation);
+               TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation);
     }
 
     private static IMethodSymbol? SelectMatchingAccessor(
@@ -65,22 +66,13 @@ internal static class MethodContractHierarchy
         IPropertySymbol interfaceProperty)
     {
         if (implementation.GetMethod != null &&
-            IsSameMethodOrOverride(method, implementation.GetMethod))
+            TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation.GetMethod))
             return interfaceProperty.GetMethod;
 
         if (implementation.SetMethod != null &&
-            IsSameMethodOrOverride(method, implementation.SetMethod))
+            TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation.SetMethod))
             return interfaceProperty.SetMethod;
 
         return null;
-    }
-
-    private static bool IsSameMethodOrOverride(IMethodSymbol method, IMethodSymbol implementation)
-    {
-        for (var current = method; current != null; current = current.OverriddenMethod)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, implementation.OriginalDefinition))
-                return true;
-
-        return false;
     }
 }

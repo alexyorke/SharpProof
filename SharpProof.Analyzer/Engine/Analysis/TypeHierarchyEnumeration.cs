@@ -54,14 +54,15 @@ internal static class TypeHierarchyEnumeration
 
     internal static bool OverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
     {
-        var current = method.OverriddenMethod;
-        while (current != null)
-        {
+        return method.OverriddenMethod is { } overridden &&
+               IsSameOrOverridesTargetMethod(overridden, target);
+    }
+
+    internal static bool IsSameOrOverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
+    {
+        for (var current = method; current != null; current = current.OverriddenMethod)
             if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
-
-            current = current.OverriddenMethod;
-        }
 
         return false;
     }

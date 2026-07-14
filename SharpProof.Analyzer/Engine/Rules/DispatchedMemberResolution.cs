@@ -64,7 +64,7 @@ internal static class DispatchedMemberResolution
                     candidate.Parameters.Length == rootMethod.Parameters.Length &&
                     (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition,
                          rootMethod.OriginalDefinition) ||
-                     OverridesMethod(candidate, rootMethod)))
+                     TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(candidate, rootMethod)))
                     return candidate.OriginalDefinition;
 
         return methodSymbol.IsAbstract ? null : methodSymbol.OriginalDefinition;
@@ -189,15 +189,6 @@ internal static class DispatchedMemberResolution
     internal static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
     {
         for (var current = property; current != null; current = current.OverriddenProperty)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                return true;
-
-        return false;
-    }
-
-    internal static bool OverridesMethod(IMethodSymbol method, IMethodSymbol target)
-    {
-        for (var current = method; current != null; current = current.OverriddenMethod)
             if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
 
