@@ -88,11 +88,11 @@ internal static class SymbolicCliTextRenderer
     Console.WriteLine($"Runtime hazards: {result.HazardCount}");
     PrintAnalysisTruncation(result.AnalysisTruncation);
     Console.WriteLine("Hazard status summary: " +
-                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Status.ToString())));
+                      FormatCountSummary(SymbolicCliCounts.By(result.Hazards, static hazard => hazard.Status.ToString())));
     Console.WriteLine("Hazard exception summary: " +
-                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.ExceptionType)));
+                      FormatCountSummary(SymbolicCliCounts.By(result.Hazards, static hazard => hazard.ExceptionType)));
     Console.WriteLine("Hazard category summary: " +
-                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Category)));
+                      FormatCountSummary(SymbolicCliCounts.By(result.Hazards, static hazard => hazard.Category)));
     foreach (var hazard in result.Hazards)
     {
         Console.WriteLine();
@@ -202,7 +202,7 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine($"Count: {hazards.HazardCount}");
         PrintAnalysisTruncation(hazards.AnalysisTruncation);
         Console.WriteLine("Status summary: " +
-                          FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
+                          FormatCountSummary(SymbolicCliCounts.By(hazards.Hazards, static hazard => hazard.Status.ToString())));
         var hazardProjection = SymbolicCompactProjection.Project(
             hazards.Hazards,
             options.ReportMaxHazards);
@@ -369,16 +369,6 @@ internal static class SymbolicCliTextRenderer
     return counts.Count == 0
         ? "<none>"
         : string.Join(", ", counts.Select(static pair => $"{pair.Key}={pair.Value}"));
-}
-
-    private static IReadOnlyDictionary<string, int> CountBy<T>(
-    IEnumerable<T> values,
-    Func<T, string> keySelector)
-{
-    return values
-        .GroupBy(keySelector, StringComparer.Ordinal)
-        .OrderBy(static group => group.Key, StringComparer.Ordinal)
-        .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 }
 
     private static void PrintMergedPathFacts(

@@ -232,10 +232,10 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
 
         return new SymbolicCompactRuntimeHazardQueryResult(
             result,
-            CountBy(result.Hazards, static hazard => hazard.Status.ToString()),
-            CountBy(result.Hazards, static hazard => hazard.Kind.ToString()),
-            CountBy(result.Hazards, static hazard => hazard.ExceptionType),
-            CountBy(result.Hazards, static hazard => hazard.Category),
+            SymbolicCliCounts.By(result.Hazards, static hazard => hazard.Status.ToString()),
+            SymbolicCliCounts.By(result.Hazards, static hazard => hazard.Kind.ToString()),
+            SymbolicCliCounts.By(result.Hazards, static hazard => hazard.ExceptionType),
+            SymbolicCliCounts.By(result.Hazards, static hazard => hazard.Category),
             SymbolicCompactRuntimeHazardStatusSummary.FromHazards(result.Hazards, result.SmtDiagnostics),
             hazards,
             new SymbolicCompactRuntimeHazardOutputTruncation(
@@ -244,12 +244,13 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics));
     }
 
-    private static IReadOnlyDictionary<string, int> CountBy(
-        IEnumerable<SymbolicRuntimeHazard> hazards,
-        Func<SymbolicRuntimeHazard, string> keySelector)
+}
+
+internal static class SymbolicCliCounts
+{
+    internal static IReadOnlyDictionary<string, int> By<T>(IEnumerable<T> values, Func<T, string> keySelector)
     {
-        return hazards
-            .GroupBy(keySelector, StringComparer.Ordinal)
+        return values.GroupBy(keySelector, StringComparer.Ordinal)
             .OrderBy(static group => group.Key, StringComparer.Ordinal)
             .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
     }

@@ -335,9 +335,6 @@ Four deterministic comparer symbols defined twice. **Recommendation:** `KnownStr
 
 ## Tools - SymbolicCli
 
-### Duplicated `CountBy` grouping helper - `SymbolicCompactDomainResults.cs:247` vs `SymbolicCliTextRenderer.cs:374`
-**Recommendation:** Single generic `CountBy<T>` in shared internal helper.
-
 ### Repeated `ISymbolicCompactResult` schema-version boilerplate
 Triplet (`SchemaVersion`, `EvidenceSchemaVersion`, `EvidenceSchemaCompatibility`) copy-pasted across `SymbolicCompactDomainResults.cs:25,76,175`, `SymbolicCompactQueryModels.cs:392,644`, `SymbolicCliExplainReport.cs:36`.
 **Recommendation:** `SymbolicCompactResultBase : ISymbolicCompactResult` supplying the triplet by default.
