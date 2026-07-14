@@ -84,15 +84,8 @@ public class TestClass
     [Test]
     public async Task EscapingLocalFunctionDelegateCapturingFreshMutableObject_Diagnostic()
     {
-        var code = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -114,14 +107,8 @@ public class TestClass
     [Test]
     public async Task LocalFunctionReturningFreshMutableObjectUsedLocally_NoDiagnostic()
     {
-        var code = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -143,14 +130,8 @@ public class TestClass
     [Test]
     public async Task LocalFunctionReturningFreshMutableObjectInitializedButUnused_NoDiagnostic()
     {
-        var code = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -171,14 +152,8 @@ public class TestClass
     [Test]
     public async Task LocalFunctionReturningFreshMutableObjectMutatedButNotRead_NoDiagnostic()
     {
-        var code = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -200,14 +175,8 @@ public class TestClass
     [Test]
     public async Task LocalFunctionReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
     {
-        var code = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -227,14 +196,8 @@ public class TestClass
     [Test]
     public async Task LocalFunctionReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
     {
-        var code = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var code = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public sealed class Holder
 {
     public readonly Box Value;

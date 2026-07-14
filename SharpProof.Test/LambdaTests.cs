@@ -93,15 +93,8 @@ public class TestClass
     [Test]
     public async Task EscapingLambdaCapturingFreshMutableObject_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -118,15 +111,8 @@ public class TestClass
     [Test]
     public async Task LambdaFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -145,15 +131,8 @@ public class TestClass
     [Test]
     public async Task LambdaFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -170,15 +149,8 @@ public class TestClass
     [Test]
     public async Task LambdaFactoryReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public sealed class Holder
 {
     public readonly Box Value;
@@ -206,15 +178,8 @@ public class TestClass
     [Test]
     public async Task AnonymousMethodFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -233,15 +198,8 @@ public class TestClass
     [Test]
     public async Task AnonymousMethodFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -258,15 +216,8 @@ public class TestClass
     [Test]
     public async Task MethodGroupFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -290,15 +241,8 @@ public class TestClass
     [Test]
     public async Task MethodGroupFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.SystemUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -320,14 +264,8 @@ public class TestClass
     [Test]
     public async Task OrdinaryFactoryMethodReturningFreshMutableObjectUsedLocally_NoDiagnostic()
     {
-        var test = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -350,14 +288,8 @@ public class TestClass
     [Test]
     public async Task OrdinaryFactoryMethodReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
     {
-        var test = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public class TestClass
 {
     [EnforcePure]
@@ -378,14 +310,8 @@ public class TestClass
     [Test]
     public async Task OrdinaryFactoryMethodReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
     {
-        var test = @"
-using SharpProof.Attributes;
-
-public sealed class Box
-{
-    public int Value;
-}
-
+        var test = MutableObjectTestSources.AttributeUsings +
+                   MutableObjectTestSources.Box + @"
 public sealed class Holder
 {
     public readonly Box Value;

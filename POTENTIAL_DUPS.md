@@ -229,12 +229,6 @@ re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixt
 
 ## SharpProof.Test - K-M
 
-### `Box`/`Holder` helper types duplicated ~17x in `LambdaTests.cs` and `LocalFunctionTests.cs`
-`LambdaTests.cs` defines `Box` at lines 100,125,152,177,213,240,265,297,326,356,384 (11) + `Holder` at 182,389.
-`LocalFunctionTests.cs` defines `Box` at 91,120,149,177,206,233 (6) + `Holder` at 238.
-
-**Recommendation:** Add `BoxSource`/`HolderSource` string constants to a shared sources class (cf. `EqualityTestSources.cs:3`).
-
 ### `GlobalState` static class duplicated 7x in `ListPatternSoundnessTests.cs` and `LinqOperationsTests.cs`
 `ListPatternSoundnessTests.cs`: 52,89,128,171,230. `LinqOperationsTests.cs`: 214,263.
 
