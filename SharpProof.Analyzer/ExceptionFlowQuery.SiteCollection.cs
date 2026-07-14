@@ -10,6 +10,13 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowQuery
 {
+    private readonly record struct ExceptionSiteCollectionContext(
+        SyntaxNode MethodNode,
+        SemanticModel SemanticModel,
+        CancellationToken CancellationToken,
+        IMethodSymbol MethodSymbol,
+        SmtAnalysisService SmtAnalysis);
+
     private static IEnumerable<UncaughtExceptionSiteEntry> CollectUncaughtExceptionSiteEntries(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
@@ -20,6 +27,13 @@ internal static partial class ExceptionFlowQuery
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
+        var siteContext = new ExceptionSiteCollectionContext(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            methodSymbol,
+            smtAnalysis);
+
         foreach (var throwNode in ExceptionSiteClassifier.GetThrowNodes(methodNode))
         {
             if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken, smtAnalysis)) continue;
@@ -103,11 +117,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.DivideByZeroException,
                      ExceptionCategories.DefiniteDivideByZero,
                      ExceptionSources.BinaryOperator))
@@ -125,11 +135,7 @@ internal static partial class ExceptionFlowQuery
                      static node => node is CastExpressionSyntax
                          ? ExceptionSources.CheckedConversion
                          : ExceptionSources.CheckedOperator,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis))
+                     siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
@@ -139,11 +145,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.OverflowException,
                      ExceptionCategories.DefiniteCheckedIntegralOverflow,
                      ExceptionSources.CheckedOperator))
@@ -156,11 +158,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.OverflowException,
                      ExceptionCategories.DefiniteNegativeArrayLength,
                      ExceptionSources.ArrayLength))
@@ -173,11 +171,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.OverflowException,
                      ExceptionCategories.DefiniteNegativeStackAllocLength,
                      ExceptionSources.StackAllocLength))
@@ -197,11 +191,7 @@ internal static partial class ExceptionFlowQuery
                      static node => node is AwaitExpressionSyntax
                          ? ExceptionSources.AwaitExpression
                          : ExceptionSources.NullReceiver,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis))
+                     siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
@@ -211,11 +201,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.ArgumentNullException,
                      ExceptionCategories.DefiniteLockNull,
                      ExceptionSources.LockReceiver))
@@ -231,11 +217,7 @@ internal static partial class ExceptionFlowQuery
                      static _ => SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
                      static site => site.Category,
                      static site => site.Source,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis))
+                     siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
@@ -245,11 +227,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.InvalidOperationException,
                      ExceptionCategories.DefiniteNullableValueWithoutValue,
                      ExceptionSources.NullableValue))
@@ -262,11 +240,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.NullReferenceException,
                      ExceptionCategories.DefiniteUnboxNull,
                      ExceptionSources.Cast))
@@ -279,11 +253,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.InvalidCastException,
                      ExceptionCategories.DefiniteInvalidCast,
                      ExceptionSources.Cast))
@@ -296,11 +266,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.ArrayTypeMismatchException,
                      ExceptionCategories.DefiniteArrayTypeMismatch,
                      ExceptionSources.ArrayStore))
@@ -313,11 +279,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.IndexOutOfRangeException,
                      ExceptionCategories.DefiniteIndexOutOfRange,
                      ExceptionSources.ArrayIndex))
@@ -330,11 +292,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      static node => node,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.IndexOutOfRangeException,
                      ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
                      ExceptionSources.ArrayGetValue))
@@ -352,11 +310,7 @@ internal static partial class ExceptionFlowQuery
                      static node => node is InvocationExpressionSyntax
                          ? ExceptionSources.SpanSlice
                          : ExceptionSources.RangeSlice,
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis))
+                     siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
@@ -366,11 +320,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.ArgumentOutOfRangeException,
                      ExceptionCategories.DefiniteCountIndexOutOfRange,
                      ExceptionSources.CountIndex))
@@ -383,11 +333,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.SwitchExpressionException,
                      ExceptionCategories.DefiniteSwitchExpressionNoMatch,
                      ExceptionSources.SwitchExpression))
@@ -400,11 +346,7 @@ internal static partial class ExceptionFlowQuery
                          cancellationToken,
                          smtAnalysis),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis,
+                     siteContext,
                      ExceptionTypes.InvalidOperationException,
                      ExceptionCategories.DefiniteInvalidCollectionCardinality,
                      ExceptionSources.CollectionOperation))
@@ -420,22 +362,14 @@ internal static partial class ExceptionFlowQuery
                      static hazard => hazard.ExceptionType,
                      static hazard => hazard.Category,
                      static hazard => GetAnalyzerOnlySymbolicHazardSource(hazard.Category),
-                     methodNode,
-                     semanticModel,
-                     cancellationToken,
-                     methodSymbol,
-                     smtAnalysis))
+                     siteContext))
             yield return entry;
     }
 
     private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
         IEnumerable<TCandidate> candidates,
         Func<TCandidate, SyntaxNode> getSite,
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        IMethodSymbol methodSymbol,
-        SmtAnalysisService smtAnalysis,
+        ExceptionSiteCollectionContext context,
         string exceptionMetadataName,
         string category,
         string source)
@@ -446,11 +380,7 @@ internal static partial class ExceptionFlowQuery
             _ => exceptionMetadataName,
             _ => category,
             _ => source,
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            methodSymbol,
-            smtAnalysis);
+            context);
     }
 
     private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
@@ -459,21 +389,13 @@ internal static partial class ExceptionFlowQuery
         Func<TCandidate, string> getExceptionMetadataName,
         Func<TCandidate, string> getCategory,
         Func<TCandidate, string> getSource,
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        IMethodSymbol methodSymbol,
-        SmtAnalysisService smtAnalysis)
+        ExceptionSiteCollectionContext context)
     {
         foreach (var candidate in candidates)
         {
             var entry = TryCreateProvenExceptionSiteEntry(
                 getSite(candidate),
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
+                context,
                 getExceptionMetadataName(candidate),
                 getCategory(candidate),
                 getSource(candidate));
@@ -483,26 +405,38 @@ internal static partial class ExceptionFlowQuery
 
     private static UncaughtExceptionSiteEntry? TryCreateProvenExceptionSiteEntry(
         SyntaxNode site,
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        IMethodSymbol methodSymbol,
-        SmtAnalysisService smtAnalysis,
+        ExceptionSiteCollectionContext context,
         string exceptionMetadataName,
         string category,
         string source)
     {
-        if (IsInStaticallyUnreachableBranch(site, semanticModel, cancellationToken, smtAnalysis)) return null;
+        if (IsInStaticallyUnreachableBranch(
+                site,
+                context.SemanticModel,
+                context.CancellationToken,
+                context.SmtAnalysis))
+            return null;
 
-        if (IsShadowedByThrowingFinally(site, semanticModel, cancellationToken, smtAnalysis)) return null;
+        if (IsShadowedByThrowingFinally(
+                site,
+                context.SemanticModel,
+                context.CancellationToken,
+                context.SmtAnalysis))
+            return null;
 
-        var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName);
-        if (IsCaughtWithinMethod(site, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+        var exceptionType = context.SemanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName);
+        if (IsCaughtWithinMethod(
+                site,
+                exceptionType,
+                context.MethodNode,
+                context.SemanticModel,
+                context.CancellationToken,
+                context.SmtAnalysis))
             return null;
 
         return new UncaughtExceptionSiteEntry(
             site,
-            methodSymbol,
+            context.MethodSymbol,
             new ExceptionCandidate(
                 exceptionType,
                 exceptionMetadataName,
