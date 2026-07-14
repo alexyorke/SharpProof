@@ -665,12 +665,78 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_AffineContradiction_IsAlwaysFalse()
+    public sealed record ConditionAlwaysFalseCase(
+        string Name,
+        string ParameterList,
+        string ConditionExpression,
+        bool Expected,
+        string ExtraSource = "");
+
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart1 =
+    {
+        new("ExecutionVisibility_AffineContradiction_IsAlwaysFalse", "int x", "x + 1 <= 0 && x >= 0", false),
+        new("ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse", "ulong x", "x == 0UL && x != 0UL", true),
+        new("ExecutionVisibility_BigIntegerZeroContradiction_IsAlwaysFalse", "BigInteger x", "x == 0 && x != 0", true, "using System.Numerics;"),
+        new("ExecutionVisibility_BigIntegerAdditionContradiction_IsAlwaysFalse", "BigInteger x", "x + 1 == 5 && x != 4", true, "using System.Numerics;"),
+        new("ExecutionVisibility_BigIntegerGuardedDivisionContradiction_IsAlwaysFalse", "BigInteger value, BigInteger divisor", "divisor != 0 && value / divisor == 2 && value / divisor != 2", true, "using System.Numerics;"),
+        new("ExecutionVisibility_DefaultBigIntegerContradiction_IsAlwaysFalse", "", "default(BigInteger) != 0", true, "using System.Numerics;"),
+        new("ExecutionVisibility_DecimalZeroContradiction_IsAlwaysFalse", "decimal value", "value == 0m && value != 0m", true),
+        new("ExecutionVisibility_DecimalPositiveContradiction_IsAlwaysFalse", "decimal value", "value > 0m && value <= 0m", true),
+        new("ExecutionVisibility_DecimalReversedPositiveContradiction_IsAlwaysFalse", "decimal value", "0m < value && value <= 0m", true),
+        new("ExecutionVisibility_DecimalFractionalRangeRemainsConservative", "decimal value", "value > 0m && value < 1m", false),
+        new("ExecutionVisibility_ConditionalExpressionContradiction_IsAlwaysFalse", "bool flag, int x, int y", "(flag ? x : y) == 5 && flag && x != 5", true),
+        new("ExecutionVisibility_WideningIntegralCastContradiction_IsAlwaysFalse", "int value", "(long)value > 0L && value <= 0", true),
+        new("ExecutionVisibility_ConstantDivisionContradiction_IsAlwaysFalse", "int value", "value / 2 == 3 && value < 6", true),
+        new("ExecutionVisibility_ConstantRemainderContradiction_IsAlwaysFalse", "int value", "value % 5 == 3 && value % 5 == 4", true),
+        new("ExecutionVisibility_UncheckedAdditionWraparoundRemainsReachable", "int value", "unchecked(value + 1) <= value && value == int.MaxValue", false),
+        new("ExecutionVisibility_UncheckedSubtractionWraparoundRemainsReachable", "int value", "unchecked(value - 1) >= value && value == int.MinValue", false),
+        new("ExecutionVisibility_UncheckedMultiplicationWraparoundRemainsReachable", "int value", "unchecked(value * 2) == 0 && value == 1073741824", false),
+        new("ExecutionVisibility_GuardedDivisionContradiction_IsAlwaysFalse", "int value, int divisor", "divisor != 0 && value / divisor == 2 && value / divisor != 2", true),
+        new("ExecutionVisibility_GuardedRemainderContradiction_IsAlwaysFalse", "int value, int divisor", "divisor != 0 && value % divisor == 0 && value % divisor != 0", true),
+        new("ExecutionVisibility_NullableGetValueOrDefaultAbsentContradiction_IsAlwaysFalse", "int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault() != 0", true),
+        new("ExecutionVisibility_NullableGetValueOrDefaultPresentContradiction_IsAlwaysFalse", "int? maybe", "maybe.HasValue && maybe.GetValueOrDefault() != maybe.Value", true),
+        new("ExecutionVisibility_NullableGetValueOrDefaultFallbackContradiction_IsAlwaysFalse", "int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(7) != 7", true),
+        new("ExecutionVisibility_NullableBoolGetValueOrDefaultAbsentContradiction_IsAlwaysFalse", "bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault()", true),
+        new("ExecutionVisibility_NullableBoolGetValueOrDefaultPresentContradiction_IsAlwaysFalse", "bool? maybe", "maybe.HasValue && maybe.GetValueOrDefault() && maybe.Value == false", true),
+        new("ExecutionVisibility_NullableBoolGetValueOrDefaultFallbackContradiction_IsAlwaysFalse", "bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(true) == false", true),
+        new("ExecutionVisibility_ReferenceCoalesceAssignmentNonNullFallbackContradiction_IsAlwaysFalse", "string value, string fallback", "fallback != null && (value ??= fallback) == null", true),
+        new("ExecutionVisibility_NullableCoalesceAssignmentFallbackContradiction_IsAlwaysFalse", "int? maybe", "!maybe.HasValue && (maybe ??= 7) != 7", true),
+        new("ExecutionVisibility_NullableBoolCoalesceAssignmentFallbackContradiction_IsAlwaysFalse", "bool? maybe", "!maybe.HasValue && (maybe ??= true) == false", true),
+        new("ExecutionVisibility_NullableGetValueOrDefaultUnknownFallback_RemainsUnknown", "int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(UnknownFallback.Next()) != 7", false, @"
+public static class UnknownFallback
+{
+    public static int Next() => 7;
+}"),
+        new("ExecutionVisibility_NotNullIfNotNullMethodReturnContradiction_IsAlwaysFalse", "string value", "value != null && NotNullIfNotNullPredicates.Echo(value: value) == null", true, NotNullIfNotNullSource),
+    };
+
+    private static IEnumerable<TestCaseData> SingleCallConditionAlwaysFalseCases()
+    {
+        var cases = SingleCallConditionAlwaysFalseCaseDataPart1
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart2)
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart3)
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart4)
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart5)
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart6)
+            .ToArray();
+
+        if (cases.Length != 178 ||
+            cases.Count(static testCase => testCase.Expected) != 150 ||
+            cases.Count(static testCase => !testCase.Expected) != 28 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 178)
+        {
+            throw new InvalidOperationException("Single-call condition visibility case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(SingleCallConditionAlwaysFalseCases))]
+    public void ExecutionVisibility_SingleCallConditionAlwaysFalseCases(ConditionAlwaysFalseCase testCase)
     {
         Assert.That(
-            IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
-            Is.False);
+            IsConditionAlwaysFalse(testCase.ParameterList, testCase.ConditionExpression, testCase.ExtraSource),
+            Is.EqualTo(testCase.Expected));
     }
 
     [Test]
@@ -2239,10 +2305,18 @@ public class TestClass
         Assert.That(result.SmtDiagnostics.CacheEntryCount, Is.GreaterThanOrEqualTo(1));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications()
+    public sealed record SourceProofCase(
+        string Name,
+        string Source,
+        string FilePath,
+        string LineText,
+        int Column,
+        string Condition,
+        SymbolicTruthValue Expected);
+
+    private static readonly SourceProofCase[] SingleProofCaseDataPart1 =
     {
-        var source = SourcePredicateSource + @"
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2254,23 +2328,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "GuardStyleSourcePredicateImplications.cs",
-            FindLine(source, "return value.Length;"),
-            13,
-            "value != null && value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications()
-    {
-        var source = SourcePredicateSource + @"
+}", "GuardStyleSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2282,23 +2341,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "IfElseSourcePredicateImplications.cs",
-            FindLine(source, "return value.Length;"),
-            13,
-            "value != null && value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateImplications()
-    {
-        var source = SourcePredicateSource + @"
+}", "IfElseSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateImplications", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2310,23 +2354,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LocalAliasSourcePredicateImplications.cs",
-            FindLine(source, "return value.Length;"),
-            13,
-            "value != null && value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications()
-    {
-        var source = SourcePredicateSource + @"
+}", "LocalAliasSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -2338,23 +2367,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LocalAssignmentSourcePredicateImplications.cs",
-            FindLine(source, "return value.Length;"),
-            13,
-            "value != null && value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts()
-    {
-        var source = SourcePredicateSource + @"
+}", "LocalAssignmentSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2366,23 +2380,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "MultiGuardSourcePredicateIndexFacts.cs",
-            FindLine(source, "return values[index];"),
-            13,
-            "values != null && index >= 0 && index < values.Length",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue()
-    {
-        var source = SourcePredicateSource + @"
+}", "MultiGuardSourcePredicateIndexFacts.cs", "return values[index];", 13, "values != null && index >= 0 && index < values.Length", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2394,23 +2393,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "GuardStyleSourcePredicateExactValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            13,
-            "divisor == 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateExactValue()
-    {
-        var source = SourcePredicateSource + @"
+}", "GuardStyleSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateExactValue", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2422,23 +2406,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LocalAliasSourcePredicateExactValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            13,
-            "divisor == 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue()
-    {
-        var source = SourcePredicateSource + @"
+}", "LocalAliasSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(int divisor)
@@ -2450,23 +2419,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LocalAssignmentSourcePredicateExactValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            13,
-            "divisor == 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate()
-    {
-        var source = SourcePredicateSource + @"
+}", "LocalAssignmentSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate", SourcePredicateSource + @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2478,45 +2432,96 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ReassignedIntegerLocalSourcePredicate.cs",
-            FindLine(source, "return value;"),
-            13,
-            "value > -1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
+}", "ReassignedIntegerLocalSourcePredicate.cs", "return value;", 13, "value > -1", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength", @"
+using System;
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue()
-    {
-        var source = SourcePredicateSource + @"
 public class TestClass
 {
-    public int TestMethod(int divisor)
+    public int TestMethod(string text, Range range)
     {
-        if (SourcePredicates.IsZeroWithSwitch(divisor))
+        if (text != null && text.Length >= 2)
         {
-            return 10 / divisor;
+            range = 1..^1;
+            ReadOnlySpan<char> view = text.AsSpan(range);
+            return view.Length;
         }
 
         return 0;
     }
-}";
+}", "AssignedRangeAsSpanResultLength.cs", "return view.Length;", 20, "view.Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        foreach (var value in values)
+        {
+            return values.Length + value;
+        }
+
+        return 0;
+    }
+}", "ForeachReceiverNonNull.cs", "return values.Length + value;", 13, "values != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachArrayLengthPositive", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        foreach (var value in values)
+        {
+            return values.Length + value;
+        }
+
+        return 0;
+    }
+}", "ForeachArrayLengthPositive.cs", "return values.Length + value;", 13, "values.Length > 0", SymbolicTruthValue.ProvenTrue),
+    };
+
+    private static IEnumerable<TestCaseData> SingleProofCases()
+    {
+        var cases = SingleProofCaseDataPart1
+            .Concat(SingleProofCaseDataPart2)
+            .Concat(SingleProofCaseDataPart3)
+            .Concat(SingleProofCaseDataPart4)
+            .ToArray();
+
+        var allConvertedNames = cases.Select(static testCase => testCase.Name)
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart1.Select(static testCase => testCase.Name))
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart2.Select(static testCase => testCase.Name))
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart3.Select(static testCase => testCase.Name))
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart4.Select(static testCase => testCase.Name))
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart5.Select(static testCase => testCase.Name))
+            .Concat(SingleCallConditionAlwaysFalseCaseDataPart6.Select(static testCase => testCase.Name))
+            .ToArray();
+
+        if (cases.Length != 95 ||
+            cases.Count(static testCase => testCase.Expected == SymbolicTruthValue.ProvenTrue) != 85 ||
+            cases.Count(static testCase => testCase.Expected == SymbolicTruthValue.ProvenFalse) != 2 ||
+            cases.Count(static testCase => testCase.Expected == SymbolicTruthValue.Unknown) != 8 ||
+            cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 95 ||
+            allConvertedNames.Length != 273 ||
+            allConvertedNames.Distinct(StringComparer.Ordinal).Count() != 273)
+        {
+            throw new InvalidOperationException("Single-proof source query case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(SingleProofCases))]
+    public void SymbolicSourceQueryService_ProveConditionAtSource_SingleProofCases(SourceProofCase testCase)
+    {
         var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchStatementSourcePredicateExactValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            13,
-            "divisor == 0",
+            testCase.Source,
+            testCase.FilePath,
+            FindLine(testCase.Source, testCase.LineText),
+            testCase.Column,
+            testCase.Condition,
             new SmtAnalysisService(SmtAnalysisOptions.Default),
             AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(proof.TruthValue, Is.EqualTo(testCase.Expected), proof.Reason);
     }
 
     [Test]
@@ -2548,117 +2553,13 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange()
-    {
-        var source = SourcePredicateSource + @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (SourcePredicates.IsSmallPositiveWithSwitch(value))
-        {
-            return value;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchStatementPatternSourcePredicateRange.cs",
-            FindLine(source, "return value;"),
-            13,
-            "value > 0 && value < 10",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanPropertyImplications()
-    {
-        var source = SourcePredicateSource + @"
-public class TestClass
-{
-    public int TestMethod(SourcePredicateBox box)
-    {
-        if (box.HasText)
-        {
-            return box.Value.Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SourceBooleanPropertyImplications.cs",
-            FindLine(source, "return box.Value.Length;"),
-            13,
-            "box.Value != null && box.Value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanGetterLocalAliasExactValue()
-    {
-        var source = SourcePredicateSource + @"
-public class TestClass
-{
-    public int TestMethod(SourcePredicateBox box)
-    {
-        if (box.IsZeroDivisor)
-        {
-            return 10 / box.Divisor;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SourceBooleanGetterLocalAliasExactValue.cs",
-            FindLine(source, "return 10 / box.Divisor;"),
-            13,
-            "box.Divisor == 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications()
-    {
-        var source = SourcePredicateSource + @"
-public class TestClass
-{
-    public int TestMethod(SourcePredicateBox box)
-    {
-        if (box.HasTextMethod())
-        {
-            return box.Value.Length;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "InstanceSourceBooleanMethodImplications.cs",
-            FindLine(source, "return box.Value.Length;"),
-            13,
-            "box.Value != null && box.Value.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void
@@ -2757,297 +2658,25 @@ public class TestClass
         Assert.That(belowLength.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesArrayRangeResultLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values.Length >= 2)
-        {
-            return values[1..^1].Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ArrayRangeResultLength.cs",
-            FindLine(source, "return values[1..^1].Length;"),
-            20,
-            "values[1..^1].Length == values.Length - 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringRangeResultLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null && text.Length >= 3)
-        {
-            return text[1..^1].Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "StringRangeResultLength.cs",
-            FindLine(source, "return text[1..^1].Length;"),
-            20,
-            "text[1..^1].Length == text.Length - 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text, int start)
-    {
-        if (text != null && start >= 0 && start <= text.Length)
-        {
-            return text.Substring(start).Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "StringSubstringOneArgumentResultLength.cs",
-            FindLine(source, "return text.Substring(start).Length;"),
-            20,
-            "text.Substring(start).Length == text.Length - start",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text, int start, int length)
-    {
-        if (text != null && start >= 0 && length >= 0 && start + length <= text.Length)
-        {
-            return text.Substring(start, length).Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "StringSubstringTwoArgumentResultLength.cs",
-            FindLine(source, "return text.Substring(start, length).Length;"),
-            20,
-            "text.Substring(start, length).Length == length",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod(string text, int start)
-    {
-        if (text != null && start >= 0 && start <= text.Length)
-        {
-            return text.AsSpan(start).Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "StringAsSpanOneArgumentResultLength.cs",
-            FindLine(source, "return text.AsSpan(start).Length;"),
-            20,
-            "text.AsSpan(start).Length == text.Length - start",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod(ReadOnlySpan<int> values, int start, int length)
-    {
-        if (start >= 0 && length >= 0 && start + length <= values.Length)
-        {
-            return values.Slice(start, length).Length;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ReadOnlySpanSliceTwoArgumentResultLength.cs",
-            FindLine(source, "return values.Slice(start, length).Length;"),
-            20,
-            "values.Slice(start, length).Length == length",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values != null && values.Length >= 2)
-        {
-            Range range = 1..^1;
-            int[] slice = values[range];
-            return slice.Length;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "AssignedRangeElementAccessResultLength.cs",
-            FindLine(source, "return slice.Length;"),
-            20,
-            "slice.Length == values.Length - 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(string text, Range range)
-    {
-        if (text != null && text.Length >= 2)
-        {
-            range = 1..^1;
-            ReadOnlySpan<char> view = text.AsSpan(range);
-            return view.Length;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "AssignedRangeAsSpanResultLength.cs",
-            FindLine(source, "return view.Length;"),
-            20,
-            "view.Length == text.Length - 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        foreach (var value in values)
-        {
-            return values.Length + value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ForeachReceiverNonNull.cs",
-            FindLine(source, "return values.Length + value;"),
-            13,
-            "values != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachArrayLengthPositive()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        foreach (var value in values)
-        {
-            return values.Length + value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ForeachArrayLengthPositive.cs",
-            FindLine(source, "return values.Length + value;"),
-            13,
-            "values.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachNewEmptyArrayBodyUnreachable()
@@ -3110,10 +2739,9 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSingleElementForeachValue()
+    private static readonly SourceProofCase[] SingleProofCaseDataPart2 =
     {
-        const string source = @"
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSingleElementForeachValue", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3125,23 +2753,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SingleElementForeachValue.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value == 5",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue()
-    {
-        const string source = @"
+}", "SingleElementForeachValue.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3153,23 +2766,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "MultiElementForeachValue.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value == 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesFiniteForeachNonZeroValue()
-    {
-        const string source = @"
+}", "MultiElementForeachValue.cs", "return value;", 20, "value == 0", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFiniteForeachNonZeroValue", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3181,23 +2779,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "FiniteForeachNonZeroValue.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorAssignedFiniteForeachNonZeroValue()
-    {
-        const string source = @"
+}", "FiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorAssignedFiniteForeachNonZeroValue", @"
 public class TestClass
 {
     public int TestMethod()
@@ -3210,23 +2793,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "PriorAssignedFiniteForeachNonZeroValue.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotUseFiniteForeachFactsAfterUnknownReassignment()
-    {
-        const string source = @"
+}", "PriorAssignedFiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotUseFiniteForeachFactsAfterUnknownReassignment", @"
 public class TestClass
 {
     public int TestMethod(int[] replacement)
@@ -3240,23 +2808,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ReassignedFiniteForeachValue.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull()
-    {
-        const string source = @"
+}", "ReassignedFiniteForeachValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull", @"
 public class TestClass
 {
     public int TestMethod(object gate)
@@ -3266,18 +2819,134 @@ public class TestClass
             return gate.GetHashCode();
         }
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LockReceiverNonNull.cs",
-            FindLine(source, "return gate.GetHashCode();"),
-            13,
-            "gate != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+}", "LockReceiverNonNull.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact", @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        lock (gate)
+        {
+            gate = null;
+            return gate.GetHashCode();
+        }
     }
+}", "LockReceiverReassigned.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenFalse),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact", @"
+public sealed class Box
+{
+    public void Clear(ref Box value)
+    {
+        value = null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        box.Clear(ref box);
+        return box.GetHashCode();
+    }
+}", "RefMutatedCompletedReceiver.cs", "return box.GetHashCode();", 16, "box != null", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message.Length;
+        }
+    }
+}", "CatchExceptionVariableNonNull.cs", "return ex.Message.Length;", 13, "ex != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchFilterCondition", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException) when (value > 0)
+        {
+            return 10 / value;
+        }
+    }
+}", "CatchFilterCondition.cs", "return 10 / value;", 13, "value > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value)
+        {
+            return resource == value ? 1 : 0;
+        }
+    }
+}", "UsingDeclarationResourceAlias.cs", "return resource == value ? 1 : 0;", 13, "resource == value", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value ?? throw new InvalidOperationException())
+        {
+            return resource.GetHashCode();
+        }
+    }
+}", "UsingDeclarationThrowGuardedResourceNonNull.cs", "return resource.GetHashCode();", 13, "resource != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingExpressionThrowGuardedResourceNonNull", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (value ?? throw new InvalidOperationException())
+        {
+            return value.GetHashCode();
+        }
+    }
+}", "UsingExpressionThrowGuardedResourceNonNull.cs", "return value.GetHashCode();", 13, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedCoalesceAssignmentLength", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values != null)
+        {
+            return 0;
+        }
+
+        values ??= new int[1];
+        return values.Length;
+    }
+}", "NullDominatedCoalesceAssignmentLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
+    };
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullGuardedLockBodyUnreachable()
@@ -3311,32 +2980,7 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(object gate)
-    {
-        lock (gate)
-        {
-            gate = null;
-            return gate.GetHashCode();
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LockReceiverReassigned.cs",
-            FindLine(source, "return gate.GetHashCode();"),
-            13,
-            "gate != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCompletedLockReceiverNonNull()
@@ -3572,37 +3216,7 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact()
-    {
-        const string source = @"
-public sealed class Box
-{
-    public void Clear(ref Box value)
-    {
-        value = null;
-    }
-}
 
-public class TestClass
-{
-    public int TestMethod(Box box)
-    {
-        box.Clear(ref box);
-        return box.GetHashCode();
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "RefMutatedCompletedReceiver.cs",
-            FindLine(source, "return box.GetHashCode();"),
-            16,
-            "box != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
 
     [Test]
     public void
@@ -3636,69 +3250,9 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod()
-    {
-        try
-        {
-            throw new InvalidOperationException();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ex.Message.Length;
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CatchExceptionVariableNonNull.cs",
-            FindLine(source, "return ex.Message.Length;"),
-            13,
-            "ex != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchFilterCondition()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        try
-        {
-            throw new InvalidOperationException();
-        }
-        catch (InvalidOperationException) when (value > 0)
-        {
-            return 10 / value;
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CatchFilterCondition.cs",
-            FindLine(source, "return 10 / value;"),
-            13,
-            "value > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesContradictoryCatchFilterBranchUnreachable()
@@ -3738,61 +3292,9 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod(IDisposable value)
-    {
-        using (IDisposable resource = value)
-        {
-            return resource == value ? 1 : 0;
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "UsingDeclarationResourceAlias.cs",
-            FindLine(source, "return resource == value ? 1 : 0;"),
-            13,
-            "resource == value",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(IDisposable value)
-    {
-        using (IDisposable resource = value ?? throw new InvalidOperationException())
-        {
-            return resource.GetHashCode();
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "UsingDeclarationThrowGuardedResourceNonNull.cs",
-            FindLine(source, "return resource.GetHashCode();"),
-            13,
-            "resource != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesUsingDeclarationNullBranchUnreachable()
@@ -3828,33 +3330,7 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingExpressionThrowGuardedResourceNonNull()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod(IDisposable value)
-    {
-        using (value ?? throw new InvalidOperationException())
-        {
-            return value.GetHashCode();
-        }
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "UsingExpressionThrowGuardedResourceNonNull.cs",
-            FindLine(source, "return value.GetHashCode();"),
-            13,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesUsingExpressionNullBranchUnreachable()
@@ -4272,278 +3748,23 @@ public class TestClass
         Assert.That(result.ConditionProofs[1].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values, int index)
-    {
-        while (index < values.Length)
-        {
-            index++;
-        }
 
-        return index;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ProveConditionWhileExit.cs",
-            FindLine(source, "return index;"),
-            13,
-            "index >= values.Length",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesEnumImplication()
-    {
-        const string source = SemanticOracleTestSources.ModeEnum + @"public class TestClass
-{
-    public int TestMethod(Mode state)
-    {
-        if (state == Mode.Ready)
-        {
-            return 1;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ProveConditionEnum.cs",
-            FindLine(source, "return 1;"),
-            13,
-            "state != Mode.None",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchExpressionValueImplication()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int mode)
-    {
-        var divisor = mode switch
-        {
-            0 => 1,
-            1 => 2,
-            _ => 3
-        };
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchExpressionValueImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            16,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int mode)
-    {
-        var divisor = mode switch
-        {
-            0 => 1,
-            1 => 2
-        };
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchExpressionNoFallback.cs",
-            FindLine(source, "return 10 / divisor;"),
-            15,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementMergedImplication()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int mode)
-    {
-        var divisor = 0;
-        switch (mode)
-        {
-            case 0:
-                divisor = 1;
-                break;
-            case 1:
-                divisor = 2;
-                break;
-            default:
-                divisor = 3;
-                break;
-        }
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchStatementMergedImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            24,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotMergeSwitchStatementWithoutDefault()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int mode)
-    {
-        var divisor = 0;
-        switch (mode)
-        {
-            case 0:
-                divisor = 1;
-                break;
-            case 1:
-                divisor = 2;
-                break;
-        }
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchStatementNoDefault.cs",
-            FindLine(source, "return 10 / divisor;"),
-            21,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case 0:
-                return 0;
-        }
-
-        return 10 / value;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchStatementExitingSectionExclusion.cs",
-            FindLine(source, "return 10 / value;"),
-            13,
-            "value != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_SwitchExitExclusionSubstitutesPatternBindingInGuard()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case int bound when bound > 0:
-                return bound;
-            default:
-                break;
-        }
-
-        return value;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SwitchPatternBindingExitExclusion.cs",
-            FindLine(source, "return value;"),
-            9,
-            "value <= 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value == 0)
-        {
-            return value;
-        }
-
-        return 1;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ProveConditionFalse.cs",
-            FindLine(source, "return value;"),
-            13,
-            "value != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
-    }
 
     [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ReportsUnreachablePoint()
@@ -4636,29 +3857,7 @@ public class TestClass
                                              fact.Contains("value", StringComparison.Ordinal)), Is.True);
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string value)
-    {
-        value ??= ""safe"";
-        return value.Length;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CoalesceAssignmentNonNullLiteral.cs",
-            FindLine(source, "return value.Length;"),
-            16,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void
@@ -4696,39 +3895,11 @@ public class TestClass
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedCoalesceAssignmentLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values != null)
-        {
-            return 0;
-        }
 
-        values ??= new int[1];
-        return values.Length;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullDominatedCoalesceAssignmentLength.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownNonNullCoalesceAssignmentLength()
+    private static readonly SourceProofCase[] SingleProofCaseDataPart3 =
     {
-        const string source = @"
+        new("SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownNonNullCoalesceAssignmentLength", @"
 public class TestClass
 {
     public int TestMethod()
@@ -4737,23 +3908,8 @@ public class TestClass
         values ??= new int[1];
         return values.Length;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "KnownNonNullCoalesceAssignmentLength.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue()
-    {
-        const string source = @"
+}", "KnownNonNullCoalesceAssignmentLength.cs", "return values.Length;", 16, "values.Length == 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue", @"
 public class TestClass
 {
     public int TestMethod()
@@ -4762,18 +3918,142 @@ public class TestClass
         maybe ??= 5;
         return maybe.Value;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullDominatedNullableCoalesceAssignmentValue.cs",
-            FindLine(source, "return maybe.Value;"),
-            16,
-            "maybe.Value == 5",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
+}", "NullDominatedNullableCoalesceAssignmentValue.cs", "return maybe.Value;", 16, "maybe.Value == 5", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor, "InlineFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor, "PriorFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue", SemanticOracleTestSources.TupleElementNonZeroDivisor, "TupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact", @"
+using System;
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+public class TestClass
+{
+    public int TestMethod(ValueTuple<int, int> pair)
+    {
+        if (pair is (> 0, _))
+        {
+            return pair.Item1;
+        }
+
+        return 0;
     }
+}", "ValueTuplePositionalPatternElementFact.cs", "return pair.Item1;", 20, "pair.Item1 > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue", SemanticOracleTestSources.NamedTupleElementNonZeroDivisor, "NamedTupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor, "TupleLocalDeconstructionAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor, "TupleLocalDeconstructionDeclaredNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementContent", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (text: ""abc"", other: 1);
+        if (pair.text != ""abc"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}", "TupleStringLiteralElementContent.cs", "return 0;", 12, "pair.text == \"abc\"", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementLength", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (text: ""abc"", other: 1);
+        return pair.text.Length;
+    }
+}", "TupleStringLiteralElementLength.cs", "return pair.text.Length;", 16, "pair.text.Length == 3", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleArrayElementLength", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[2], other: 1);
+        return pair.values.Length;
+    }
+}", "TupleArrayElementLength.cs", "return pair.values.Length;", 16, "pair.values.Length == 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[2, 3], other: 1);
+        return pair.values.GetLength(1);
+    }
+}", "TupleMultidimensionalArrayElementGetLength.cs", "return pair.values.GetLength(1);", 16, "pair.values.GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return ((int[,])new int[2, 3]).GetLength(1);
+    }
+}", "CastedMultidimensionalArrayGetLength.cs", "return ((int[,])new int[2, 3]).GetLength(1);", 16, "((int[,])new int[2, 3]).GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (new int[2], ""abc"");
+        var (values, text) = pair;
+        return values.Length + text.Length;
+    }
+}", "TupleDeconstructedArrayLength.cs", "return values.Length + text.Length;", 16, "values.Length == 2 && text.Length == 3", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication", @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}", "DivergentIfElseMergedImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge", @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            flag = false;
+            divisor = 1;
+        }
+        else
+        {
+            flag = true;
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}", "MutatedIfElseMergedImplication.cs", "return 10 / divisor;", 18, "divisor == 1", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesImplicitElseMergedImplication", @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}", "ImplicitElseMergedImplication.cs", "return 10 / divisor;", 14, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+    };
+
+
 
     [Test]
     public void
@@ -5097,37 +4377,9 @@ public class TestClass
                                       fact.Contains("1", StringComparison.Ordinal)), Is.True);
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "InlineFiniteArrayElementAssignedNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "PriorFiniteArrayElementAssignedNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void
@@ -5234,248 +4486,27 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.TupleElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleElementAssignedNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact()
-    {
-        const string source = @"
-using System;
 
-public class TestClass
-{
-    public int TestMethod(ValueTuple<int, int> pair)
-    {
-        if (pair is (> 0, _))
-        {
-            return pair.Item1;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ValueTuplePositionalPatternElementFact.cs",
-            FindLine(source, "return pair.Item1;"),
-            20,
-            "pair.Item1 > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.NamedTupleElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NamedTupleElementAssignedNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleLocalDeconstructionAssignedNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue()
-    {
-        const string source = SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleLocalDeconstructionDeclaredNonZeroValue.cs",
-            FindLine(source, "return 10 / divisor;"),
-            20,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementContent()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (text: ""abc"", other: 1);
-        if (pair.text != ""abc"")
-        {
-            return 1;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleStringLiteralElementContent.cs",
-            FindLine(source, "return 0;"),
-            12,
-            "pair.text == \"abc\"",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (text: ""abc"", other: 1);
-        return pair.text.Length;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleStringLiteralElementLength.cs",
-            FindLine(source, "return pair.text.Length;"),
-            16,
-            "pair.text.Length == 3",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleArrayElementLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (values: new int[2], other: 1);
-        return pair.values.Length;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleArrayElementLength.cs",
-            FindLine(source, "return pair.values.Length;"),
-            16,
-            "pair.values.Length == 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (values: new int[2, 3], other: 1);
-        return pair.values.GetLength(1);
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleMultidimensionalArrayElementGetLength.cs",
-            FindLine(source, "return pair.values.GetLength(1);"),
-            16,
-            "pair.values.GetLength(1) == 3",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        return ((int[,])new int[2, 3]).GetLength(1);
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CastedMultidimensionalArrayGetLength.cs",
-            FindLine(source, "return ((int[,])new int[2, 3]).GetLength(1);"),
-            16,
-            "((int[,])new int[2, 3]).GetLength(1) == 3",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        var pair = (new int[2], ""abc"");
-        var (values, text) = pair;
-        return values.Length + text.Length;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "TupleDeconstructedArrayLength.cs",
-            FindLine(source, "return values.Length + text.Length;"),
-            16,
-            "values.Length == 2 && text.Length == 3",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicInvariantService_CollectsIfElseThenExitFacts()
@@ -5635,162 +4666,15 @@ public class TestClass
         Assert.That(divisorIsTwo.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var divisor = 0;
-        if (flag)
-        {
-            divisor = 1;
-        }
-        else
-        {
-            divisor = 2;
-        }
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "DivergentIfElseMergedImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            16,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var divisor = 0;
-        if (flag)
-        {
-            flag = false;
-            divisor = 1;
-        }
-        else
-        {
-            flag = true;
-            divisor = 2;
-        }
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "MutatedIfElseMergedImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            18,
-            "divisor == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesImplicitElseMergedImplication()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var divisor = 1;
-        if (flag)
-        {
-            divisor = 2;
-        }
 
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ImplicitElseMergedImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            14,
-            "divisor != 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var divisor = 1;
-        if (flag)
-        {
-            flag = false;
-            divisor = 2;
-        }
-
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "MutatedImplicitElseMergedImplication.cs",
-            FindLine(source, "return 10 / divisor;"),
-            15,
-            "divisor == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        var divisor = 1;
-        if (flag)
-        {
-            flag = false;
-            divisor = 1;
-        }
-
-        return 10 / divisor;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "MutatedImplicitElseIdenticalFact.cs",
-            FindLine(source, "return 10 / divisor;"),
-            15,
-            "divisor == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void SymbolicInvariantService_CollectsDefaultLiteralAssignmentFacts()
@@ -5834,10 +4718,43 @@ public class TestClass
                                       fact.Contains("null", StringComparison.Ordinal)), Is.True);
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesFreshObjectAssignmentNonNull()
+
+
+
+
+
+
+
+
+    private static readonly SourceProofCase[] SingleProofCaseDataPart4 =
     {
-        const string source = @"
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNullGuardNoValue", @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value == null)
+        {
+            return 0;
+        }
+
+        return value.Value;
+    }
+}", "NullableNullGuardNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue", @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value is not null)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}", "NullableIsNotNullPatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFreshObjectAssignmentNonNull", @"
 public class TestClass
 {
     public int TestMethod()
@@ -5845,23 +4762,8 @@ public class TestClass
         object value = new object();
         return value.GetHashCode();
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "FreshObjectAssignmentNonNull.cs",
-            FindLine(source, "return value.GetHashCode();"),
-            16,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFreshObjectAssignmentNonNull()
-    {
-        const string source = @"
+}", "FreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFreshObjectAssignmentNonNull", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -5869,23 +4771,8 @@ public class TestClass
         object value = flag ? new object() : new object();
         return value.GetHashCode();
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalFreshObjectAssignmentNonNull.cs",
-            FindLine(source, "return value.GetHashCode();"),
-            16,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedFreshObjectAssignmentNonNull()
-    {
-        const string source = @"
+}", "ConditionalFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedFreshObjectAssignmentNonNull", @"
 public class TestClass
 {
     public int TestMethod(object input)
@@ -5893,23 +4780,8 @@ public class TestClass
         object value = input ?? new object();
         return value.GetHashCode();
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CoalescedFreshObjectAssignmentNonNull.cs",
-            FindLine(source, "return value.GetHashCode();"),
-            16,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLength()
-    {
-        const string source = @"
+}", "CoalescedFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLength", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -5917,23 +4789,401 @@ public class TestClass
         var values = flag ? new int[1] : new int[1];
         return values.Length;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalArrayLength.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction()
+}", "ConditionalArrayLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue", @"
+public class TestClass
+{
+    public int TestMethod(int? value)
     {
-        const string source = @"
+        if (value > 0)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}", "NullableGreaterThanGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesRecursivePatternAliasMemberFact", @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (value is { Length: > 0 } text)
+        {
+            return text.Length;
+        }
+
+        return 0;
+    }
+}", "RecursivePatternAliasMemberFact.cs", "return text.Length;", 20, "text != null && text.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact", ExtendedPropertyPatternSource + @"
+public class TestClass
+{
+    public int TestMethod(ExtendedPatternBox box)
+    {
+        if (box is { Child.Value: > 0 })
+        {
+            return box.Child.Value;
+        }
+
+        return 0;
+    }
+}", "ExtendedPropertyPatternMemberFact.cs", "return box.Child.Value;", 20, "box.Child != null && box.Child.Value > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue", @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value != null)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}", "NullableNotNullGuardHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementMergedImplication", @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = 0;
+        switch (mode)
+        {
+            case 0:
+                divisor = 1;
+                break;
+            case 1:
+                divisor = 2;
+                break;
+            default:
+                divisor = 3;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}", "SwitchStatementMergedImplication.cs", "return 10 / divisor;", 24, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotMergeSwitchStatementWithoutDefault", @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = 0;
+        switch (mode)
+        {
+            case 0:
+                divisor = 1;
+                break;
+            case 1:
+                divisor = 2;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}", "SwitchStatementNoDefault.cs", "return 10 / divisor;", 21, "divisor != 0", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion", @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+        }
+
+        return 10 / value;
+    }
+}", "SwitchStatementExitingSectionExclusion.cs", "return 10 / value;", 13, "value != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_SwitchExitExclusionSubstitutesPatternBindingInGuard", @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case int bound when bound > 0:
+                return bound;
+            default:
+                break;
+        }
+
+        return value;
+    }
+}", "SwitchPatternBindingExitExclusion.cs", "return value;", 9, "value <= 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse", @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == 0)
+        {
+            return value;
+        }
+
+        return 1;
+    }
+}", "ProveConditionFalse.cs", "return value;", 13, "value != 0", SymbolicTruthValue.ProvenFalse),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral", @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value ??= ""safe"";
+        return value.Length;
+    }
+}", "CoalesceAssignmentNonNullLiteral.cs", "return value.Length;", 16, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge", @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            flag = false;
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}", "MutatedImplicitElseMergedImplication.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition", @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            flag = false;
+            divisor = 1;
+        }
+
+        return 10 / divisor;
+    }
+}", "MutatedImplicitElseIdenticalFact.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength", @"
+public class TestClass
+{
+    public int TestMethod(string text, int start, int length)
+    {
+        if (text != null && start >= 0 && length >= 0 && start + length <= text.Length)
+        {
+            return text.Substring(start, length).Length;
+        }
+
+        return 0;
+    }
+}", "StringSubstringTwoArgumentResultLength.cs", "return text.Substring(start, length).Length;", 20, "text.Substring(start, length).Length == length", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.AsSpan(start).Length;
+        }
+
+        return 0;
+    }
+}", "StringAsSpanOneArgumentResultLength.cs", "return text.AsSpan(start).Length;", 20, "text.AsSpan(start).Length == text.Length - start", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length).Length;
+        }
+
+        return 0;
+    }
+}", "ReadOnlySpanSliceTwoArgumentResultLength.cs", "return values.Slice(start, length).Length;", 20, "values.Slice(start, length).Length == length", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength", @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values != null && values.Length >= 2)
+        {
+            Range range = 1..^1;
+            int[] slice = values[range];
+            return slice.Length;
+        }
+
+        return 0;
+    }
+}", "AssignedRangeElementAccessResultLength.cs", "return slice.Length;", 20, "slice.Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication", @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        return index;
+    }
+}", "ProveConditionWhileExit.cs", "return index;", 13, "index >= values.Length", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesEnumImplication", SemanticOracleTestSources.ModeEnum + @"public class TestClass
+{
+    public int TestMethod(Mode state)
+    {
+        if (state == Mode.Ready)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}", "ProveConditionEnum.cs", "return 1;", 13, "state != Mode.None", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchExpressionValueImplication", @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2,
+            _ => 3
+        };
+
+        return 10 / divisor;
+    }
+}", "SwitchExpressionValueImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback", @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2
+        };
+
+        return 10 / divisor;
+    }
+}", "SwitchExpressionNoFallback.cs", "return 10 / divisor;", 15, "divisor != 0", SymbolicTruthValue.Unknown),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue", SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithSwitch(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}", "SwitchStatementSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange", SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (SourcePredicates.IsSmallPositiveWithSwitch(value))
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}", "SwitchStatementPatternSourcePredicateRange.cs", "return value;", 13, "value > 0 && value < 10", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanPropertyImplications", SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.HasText)
+        {
+            return box.Value.Length;
+        }
+
+        return 0;
+    }
+}", "SourceBooleanPropertyImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanGetterLocalAliasExactValue", SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.IsZeroDivisor)
+        {
+            return 10 / box.Divisor;
+        }
+
+        return 0;
+    }
+}", "SourceBooleanGetterLocalAliasExactValue.cs", "return 10 / box.Divisor;", 13, "box.Divisor == 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications", SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.HasTextMethod())
+        {
+            return box.Value.Length;
+        }
+
+        return 0;
+    }
+}", "InstanceSourceBooleanMethodImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesArrayRangeResultLength", @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values.Length >= 2)
+        {
+            return values[1..^1].Length;
+        }
+
+        return 0;
+    }
+}", "ArrayRangeResultLength.cs", "return values[1..^1].Length;", 20, "values[1..^1].Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringRangeResultLength", @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && text.Length >= 3)
+        {
+            return text[1..^1].Length;
+        }
+
+        return 0;
+    }
+}", "StringRangeResultLength.cs", "return text[1..^1].Length;", 20, "text[1..^1].Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength", @"
+public class TestClass
+{
+    public int TestMethod(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.Substring(start).Length;
+        }
+
+        return 0;
+    }
+}", "StringSubstringOneArgumentResultLength.cs", "return text.Substring(start).Length;", 20, "text.Substring(start).Length == text.Length - start", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -5941,23 +5191,8 @@ public class TestClass
         var values = flag ? new int[1] : new int[2];
         return values.Length;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalArrayLengthDisjunction.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == 1 || values.Length == 2",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayFallbackLength()
-    {
-        const string source = @"
+}", "ConditionalArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == 1 || values.Length == 2", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayFallbackLength", @"
 public class TestClass
 {
     public int TestMethod(int[] input)
@@ -5970,23 +5205,8 @@ public class TestClass
         var values = input ?? new int[1];
         return values.Length;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CoalescedArrayFallbackLength.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayLengthDisjunction()
-    {
-        const string source = @"
+}", "CoalescedArrayFallbackLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayLengthDisjunction", @"
 public class TestClass
 {
     public int TestMethod(int[] input)
@@ -5994,23 +5214,8 @@ public class TestClass
         var values = input ?? new int[1];
         return values.Length;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CoalescedArrayLengthDisjunction.cs",
-            FindLine(source, "return values.Length;"),
-            16,
-            "values.Length == input.Length || values.Length == 1",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts()
-    {
-        const string source = @"
+}", "CoalescedArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == input.Length || values.Length == 1", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts", @"
 public class TestClass
 {
     public int TestMethod()
@@ -6018,23 +5223,8 @@ public class TestClass
         int? value = 5;
         return value.Value;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableLiteralAssignmentFacts.cs",
-            FindLine(source, "return value.Value;"),
-            16,
-            "value.HasValue && value.Value == 5",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue()
-    {
-        const string source = @"
+}", "NullableLiteralAssignmentFacts.cs", "return value.Value;", 16, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -6046,191 +5236,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableEqualsConstantGuardValue.cs",
-            FindLine(source, "return value.Value;"),
-            20,
-            "value.HasValue && value.Value == 5",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (value > 0)
-        {
-            return value.Value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableGreaterThanGuardValue.cs",
-            FindLine(source, "return value.Value;"),
-            20,
-            "value.HasValue && value.Value > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesRecursivePatternAliasMemberFact()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string value)
-    {
-        if (value is { Length: > 0 } text)
-        {
-            return text.Length;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "RecursivePatternAliasMemberFact.cs",
-            FindLine(source, "return text.Length;"),
-            20,
-            "text != null && text.Length > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact()
-    {
-        const string source = ExtendedPropertyPatternSource + @"
-public class TestClass
-{
-    public int TestMethod(ExtendedPatternBox box)
-    {
-        if (box is { Child.Value: > 0 })
-        {
-            return box.Child.Value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ExtendedPropertyPatternMemberFact.cs",
-            FindLine(source, "return box.Child.Value;"),
-            20,
-            "box.Child != null && box.Child.Value > 0",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (value != null)
-        {
-            return value.Value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableNotNullGuardHasValue.cs",
-            FindLine(source, "return value.Value;"),
-            20,
-            "value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNullGuardNoValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (value == null)
-        {
-            return 0;
-        }
-
-        return value.Value;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableNullGuardNoValue.cs",
-            FindLine(source, "return 0;"),
-            20,
-            "!value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (value is not null)
-        {
-            return value.Value;
-        }
-
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableIsNotNullPatternHasValue.cs",
-            FindLine(source, "return value.Value;"),
-            20,
-            "value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue()
-    {
-        const string source = @"
+}", "NullableEqualsConstantGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -6242,23 +5249,8 @@ public class TestClass
 
         return value.Value;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableIsNullPatternNoValue.cs",
-            FindLine(source, "return 0;"),
-            20,
-            "!value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRecursivePatternHasValue()
-    {
-        const string source = @"
+}", "NullableIsNullPatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRecursivePatternHasValue", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -6270,23 +5262,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableRecursivePatternHasValue.cs",
-            FindLine(source, "return value.Value;"),
-            20,
-            "value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotRecursivePatternNoValue()
-    {
-        const string source = @"
+}", "NullableRecursivePatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotRecursivePatternNoValue", @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -6298,23 +5275,8 @@ public class TestClass
 
         return value.Value;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableNotRecursivePatternNoValue.cs",
-            FindLine(source, "return 0;"),
-            20,
-            "!value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue()
-    {
-        const string source = @"
+}", "NullableNotRecursivePatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue", @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -6327,23 +5289,8 @@ public class TestClass
 
         return 0;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "GuardedConditionalNullableFacts.cs",
-            FindLine(source, "return value.Value;"),
-            16,
-            "value.HasValue",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullSourceResultNull()
-    {
-        const string source = @"
+}", "GuardedConditionalNullableFacts.cs", "return value.Value;", 16, "value.HasValue", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullSourceResultNull", @"
 public class TestClass
 {
     public string TestMethod()
@@ -6352,23 +5299,8 @@ public class TestClass
         var text = value as string;
         return text;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "AsExpressionNullSourceResultNull.cs",
-            FindLine(source, "return text;"),
-            16,
-            "text == null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesSourceNonNull()
-    {
-        const string source = @"
+}", "AsExpressionNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesSourceNonNull", @"
 public class TestClass
 {
     public string TestMethod(object value)
@@ -6381,18 +5313,116 @@ public class TestClass
 
         return string.Empty;
     }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "AsExpressionNonNullResultImpliesSourceNonNull.cs",
-            FindLine(source, "return text;"),
-            20,
-            "value != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
+}", "AsExpressionNonNullResultImpliesSourceNonNull.cs", "return text;", 20, "value != null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullableValueWhenPresent", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string text = ""abc"";
+        int? length = text?.Length;
+        if (length.HasValue)
+        {
+            return length.Value;
+        }
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        return 0;
     }
+}", "ConditionalAccessNullableValueWhenPresent.cs", "return length.Value;", 20, "length.Value == 3", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = 5;
+        if (maybe is int value)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}", "NullableDeclarationPatternBinding.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRelationalPattern", @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = 5;
+        return maybe.GetValueOrDefault();
+    }
+}", "NullableRelationalPattern.cs", "return maybe.GetValueOrDefault();", 16, "maybe is > 3 and < 10", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull", @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod()
+    {
+        Holder holder = null;
+        var text = holder?.Text;
+        return text;
+    }
+}", "ConditionalAccessReferenceNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull", @"
+public class TestClass
+{
+    public string TestMethod(string value, string fallback)
+    {
+        var result = value ?? fallback;
+        return result;
+    }
+}", "CoalesceNullResultImpliesOperandsNull.cs", "return result;", 16, "result != null || (value == null && fallback == null)", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicSourceQueryService_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown", @"
+public sealed class Holder
+{
+    public string GetText() => null;
+}
+
+public class TestClass
+{
+    public string TestMethod(Holder holder)
+    {
+        var text = holder?.GetText();
+        return text;
+    }
+}", "ConditionalAccessInvocationResultRemainsUnknown.cs", "return text;", 16, "holder == null || text != null", SymbolicTruthValue.Unknown),
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public void
@@ -6570,35 +5600,7 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullableValueWhenPresent()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        string text = ""abc"";
-        int? length = text?.Length;
-        if (length.HasValue)
-        {
-            return length.Value;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalAccessNullableValueWhenPresent.cs",
-            FindLine(source, "return length.Value;"),
-            20,
-            "length.Value == 3",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void
@@ -6682,112 +5684,13 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        int? maybe = 5;
-        if (maybe is int value)
-        {
-            return value;
-        }
 
-        return 0;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableDeclarationPatternBinding.cs",
-            FindLine(source, "return value;"),
-            20,
-            "value == 5",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRelationalPattern()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        int? maybe = 5;
-        return maybe.GetValueOrDefault();
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "NullableRelationalPattern.cs",
-            FindLine(source, "return maybe.GetValueOrDefault();"),
-            16,
-            "maybe is > 3 and < 10",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull()
-    {
-        const string source = @"
-public sealed class Holder
-{
-    public string Text;
-}
 
-public class TestClass
-{
-    public string TestMethod()
-    {
-        Holder holder = null;
-        var text = holder?.Text;
-        return text;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalAccessReferenceNullSourceResultNull.cs",
-            FindLine(source, "return text;"),
-            16,
-            "text == null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public string TestMethod(string value, string fallback)
-    {
-        var result = value ?? fallback;
-        return result;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "CoalesceNullResultImpliesOperandsNull.cs",
-            FindLine(source, "return result;"),
-            16,
-            "result != null || (value == null && fallback == null)",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-    }
 
     [Test]
     public void
@@ -6913,34 +5816,7 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown()
-    {
-        const string source = @"
-public sealed class Holder
-{
-    public string GetText() => null;
-}
 
-public class TestClass
-{
-    public string TestMethod(Holder holder)
-    {
-        var text = holder?.GetText();
-        return text;
-    }
-}";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ConditionalAccessInvocationResultRemainsUnknown.cs",
-            FindLine(source, "return text;"),
-            16,
-            "holder == null || text != null",
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-    }
 
     [Test]
     public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
@@ -6963,659 +5839,209 @@ public class TestClass
                                       fact.Contains("==", StringComparison.Ordinal)), Is.False);
     }
 
-    [Test]
-    public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("ulong x", "x == 0UL && x != 0UL"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_BigIntegerZeroContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("BigInteger x", "x == 0 && x != 0", "using System.Numerics;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_BigIntegerAdditionContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("BigInteger x", "x + 1 == 5 && x != 4", "using System.Numerics;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_BigIntegerGuardedDivisionContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "BigInteger value, BigInteger divisor",
-                "divisor != 0 && value / divisor == 2 && value / divisor != 2",
-                "using System.Numerics;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DefaultBigIntegerContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("", "default(BigInteger) != 0", "using System.Numerics;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DecimalZeroContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("decimal value", "value == 0m && value != 0m"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DecimalPositiveContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("decimal value", "value > 0m && value <= 0m"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DecimalReversedPositiveContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("decimal value", "0m < value && value <= 0m"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DecimalFractionalRangeRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("decimal value", "value > 0m && value < 1m"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ConditionalExpressionContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool flag, int x, int y", "(flag ? x : y) == 5 && flag && x != 5"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_WideningIntegralCastContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "(long)value > 0L && value <= 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ConstantDivisionContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "value / 2 == 3 && value < 6"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ConstantRemainderContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "value % 5 == 3 && value % 5 == 4"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UncheckedAdditionWraparoundRemainsReachable()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "unchecked(value + 1) <= value && value == int.MaxValue"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UncheckedSubtractionWraparoundRemainsReachable()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "unchecked(value - 1) >= value && value == int.MinValue"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UncheckedMultiplicationWraparoundRemainsReachable()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "unchecked(value * 2) == 0 && value == 1073741824"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_GuardedDivisionContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value, int divisor",
-                "divisor != 0 && value / divisor == 2 && value / divisor != 2"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_GuardedRemainderContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value, int divisor",
-                "divisor != 0 && value % divisor == 0 && value % divisor != 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableGetValueOrDefaultAbsentContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault() != 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableGetValueOrDefaultPresentContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int? maybe", "maybe.HasValue && maybe.GetValueOrDefault() != maybe.Value"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableGetValueOrDefaultFallbackContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(7) != 7"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableBoolGetValueOrDefaultAbsentContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault()"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableBoolGetValueOrDefaultPresentContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool? maybe",
-                "maybe.HasValue && maybe.GetValueOrDefault() && maybe.Value == false"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableBoolGetValueOrDefaultFallbackContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(true) == false"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ReferenceCoalesceAssignmentNonNullFallbackContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string value, string fallback", "fallback != null && (value ??= fallback) == null"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableCoalesceAssignmentFallbackContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && (maybe ??= 7) != 7"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableBoolCoalesceAssignmentFallbackContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && (maybe ??= true) == false"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NullableGetValueOrDefaultUnknownFallback_RemainsUnknown()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "int? maybe",
-                "!maybe.HasValue && maybe.GetValueOrDefault(UnknownFallback.Next()) != 7",
-                @"
-public static class UnknownFallback
-{
-    public static int Next() => 7;
-}"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NotNullIfNotNullMethodReturnContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string value",
-                "value != null && NotNullIfNotNullPredicates.Echo(value: value) == null",
-                NotNullIfNotNullSource),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NotNullIfNotNullIndexerReturnContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "NotNullIfNotNullIndexer box, string key",
-                "box != null && key != null && box[key] == null",
-                NotNullIfNotNullSource),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NotNullIfNotNullNullSourceReturn_RemainsUnknown()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string value",
-                "value == null && NotNullIfNotNullPredicates.Echo(value) != null",
-                NotNullIfNotNullSource),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UnguardedVariableDivision_RemainsUnknown()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value, int divisor", "value / divisor == 2 && value / divisor != 2"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_EnumContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "Mode state",
-                "state == Mode.Ready && state != Mode.Ready",
-                "public enum Mode { None = 0, Ready = 1 }"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NarrowingIntegralCast_RemainsUnknown()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "(byte)value == 0 && value == 256"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_CheckedNarrowingIntegralCastContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "checked((byte)value) == 5 && value != 5"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_CheckedNarrowingIntegralCastOutOfRangeComparison_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "checked((byte)value) > 255"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_PropertyPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text is { Length: > 3 } && text.Length <= 3"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ExtendedPropertyPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "ExtendedPatternBox box",
-                "box is { Child.Value: > 0 } && box.Child.Value <= 0",
-                ExtendedPropertyPatternSource),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ValueTuplePositionalPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "ValueTuple<int, int> pair",
-                "pair is (_, < 10) && pair.Item2 >= 10",
-                "using System;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ArrayEmptyListPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values", "values is [] && values.Length > 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ArrayNonEmptyListPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values", "values is [_, ..] && values.Length == 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ArrayConstrainedNonEmptyListPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values", "values is [0, ..] && values.Length == 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ArrayNestedSliceListPatternContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values", "values is [.. [_, _]] && values.Length < 2"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StringListPatternExactLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text is [_, _] && text.Length != 2"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ArrayLengthNegative_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values", "values.Length < 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UnsignedCastBoundsCheckImpliesNonNegativeIndex()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values, int index", "(uint)index < (uint)values.Length && index < 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UnsignedCastBoundsCheckImpliesUpperBound()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values, int index",
-                "(uint)index < (uint)values.Length && index >= values.Length"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UnsignedCastBoundsCheckFalseBranchImpliesOutOfRange()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int[] values, int index",
-                "!((uint)index < (uint)values.Length) && index >= 0 && index < values.Length"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_UnsignedCastUpperBoundGuardImpliesOutOfRange()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text, int index",
-                "(uint)index >= (uint)text.Length && index >= 0 && index < text.Length"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StringLengthNegative_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.Length < 0"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StrictRegexLiteralImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A[A-Z][0-9]\z"") && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ExplicitCaptureOptionRegexImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A(?n:[A-Z][0-9])\z"") && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticExplicitCaptureRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A(A)B\z"", RegexOptions.ExplicitCapture) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticCompiledRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Compiled) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticCultureInvariantRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.CultureInvariant) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticSinglelineRegexOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Singleline) && text == ""\n""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticIgnorePatternWhitespaceRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace) && text != ""A B""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticCombinedSupportedRegexOptionsContradictsNegatedNewlineMatch()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!Regex.IsMatch(text, @""\A . \z"", RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace | RegexOptions.ExplicitCapture) && text == ""\n""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticCompiledCombinedWithSinglelineRegexOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Compiled | RegexOptions.Singleline) && text == ""\n""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StaticCultureInvariantCombinedWithSinglelineRegexOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.CultureInvariant | RegexOptions.Singleline) && text == ""\n""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ScopedSinglelineDisableRegexDotRejectsNewline()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A(?s:A(?-s:.)C)\z"") && text == ""A\nC""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_NamedCaptureRegexContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A(?<prefix>AB)C\z"") && text != ""ABC""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_DollarRegexAnchorAllowsTrailingNewline()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.IsMatch(text, \"^AB$\") && text == \"AB\\n\"",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
-
-    [Test]
-    public void ExecutionVisibility_StrictRegexLiteralContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\AAB\z"") && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_RegexMatchSuccessImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.Match(text, @""\A[A-Z][0-9]\z"").Success && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_InstanceRegexMatchSuccessImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\A[A-Z][0-9]\z"").Match(text).Success && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_RegexMatchesCountPositiveImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count > 0 && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_RegexMatchesCountZeroImpliesNonMatch()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.Matches(text, @""\AAB\z"").Count == 0 && text == ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_ReversedRegexMatchesCountPositiveImpliesStringLength()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart2 =
     {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"1 <= Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
-
-    [Test]
-    public void ExecutionVisibility_InstanceRegexMatchesCountPositiveImpliesStringLength()
+        new("ExecutionVisibility_NotNullIfNotNullIndexerReturnContradiction_IsAlwaysFalse", "NotNullIfNotNullIndexer box, string key", "box != null && key != null && box[key] == null", true, NotNullIfNotNullSource),
+        new("ExecutionVisibility_NotNullIfNotNullNullSourceReturn_RemainsUnknown", "string value", "value == null && NotNullIfNotNullPredicates.Echo(value) != null", false, NotNullIfNotNullSource),
+        new("ExecutionVisibility_UnguardedVariableDivision_RemainsUnknown", "int value, int divisor", "value / divisor == 2 && value / divisor != 2", false),
+        new("ExecutionVisibility_EnumContradiction_IsAlwaysFalse", "Mode state", "state == Mode.Ready && state != Mode.Ready", true, "public enum Mode { None = 0, Ready = 1 }"),
+        new("ExecutionVisibility_NarrowingIntegralCast_RemainsUnknown", "int value", "(byte)value == 0 && value == 256", false),
+        new("ExecutionVisibility_CheckedNarrowingIntegralCastContradiction_IsAlwaysFalse", "int value", "checked((byte)value) == 5 && value != 5", true),
+        new("ExecutionVisibility_CheckedNarrowingIntegralCastOutOfRangeComparison_IsAlwaysFalse", "int value", "checked((byte)value) > 255", true),
+        new("ExecutionVisibility_PropertyPatternContradiction_IsAlwaysFalse", "string text", "text is { Length: > 3 } && text.Length <= 3", true),
+        new("ExecutionVisibility_ExtendedPropertyPatternContradiction_IsAlwaysFalse", "ExtendedPatternBox box", "box is { Child.Value: > 0 } && box.Child.Value <= 0", true, ExtendedPropertyPatternSource),
+        new("ExecutionVisibility_ValueTuplePositionalPatternContradiction_IsAlwaysFalse", "ValueTuple<int, int> pair", "pair is (_, < 10) && pair.Item2 >= 10", true, "using System;"),
+        new("ExecutionVisibility_ArrayEmptyListPatternContradiction_IsAlwaysFalse", "int[] values", "values is [] && values.Length > 0", true),
+        new("ExecutionVisibility_ArrayNonEmptyListPatternContradiction_IsAlwaysFalse", "int[] values", "values is [_, ..] && values.Length == 0", true),
+        new("ExecutionVisibility_ArrayConstrainedNonEmptyListPatternContradiction_IsAlwaysFalse", "int[] values", "values is [0, ..] && values.Length == 0", true),
+        new("ExecutionVisibility_ArrayNestedSliceListPatternContradiction_IsAlwaysFalse", "int[] values", "values is [.. [_, _]] && values.Length < 2", true),
+        new("ExecutionVisibility_StringListPatternExactLengthContradiction_IsAlwaysFalse", "string text", "text is [_, _] && text.Length != 2", true),
+        new("ExecutionVisibility_ArrayLengthNegative_IsAlwaysFalse", "int[] values", "values.Length < 0", true),
+        new("ExecutionVisibility_UnsignedCastBoundsCheckImpliesNonNegativeIndex", "int[] values, int index", "(uint)index < (uint)values.Length && index < 0", true),
+        new("ExecutionVisibility_UnsignedCastBoundsCheckImpliesUpperBound", "int[] values, int index", "(uint)index < (uint)values.Length && index >= values.Length", true),
+        new("ExecutionVisibility_UnsignedCastBoundsCheckFalseBranchImpliesOutOfRange", "int[] values, int index", "!((uint)index < (uint)values.Length) && index >= 0 && index < values.Length", true),
+        new("ExecutionVisibility_UnsignedCastUpperBoundGuardImpliesOutOfRange", "string text, int index", "(uint)index >= (uint)text.Length && index >= 0 && index < text.Length", true),
+        new("ExecutionVisibility_StringLengthNegative_IsAlwaysFalse", "string text", "text.Length < 0", true),
+        new("ExecutionVisibility_StrictRegexLiteralImpliesStringLength", "string text", @"Regex.IsMatch(text, @""\A[A-Z][0-9]\z"") && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_ExplicitCaptureOptionRegexImpliesStringLength", "string text", @"Regex.IsMatch(text, @""\A(?n:[A-Z][0-9])\z"") && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticExplicitCaptureRegexOptionContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\A(A)B\z"", RegexOptions.ExplicitCapture) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticCompiledRegexOptionContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Compiled) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticCultureInvariantRegexOptionContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.CultureInvariant) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticSinglelineRegexOptionAllowsNewlineDot", "string text", @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Singleline) && text == ""\n""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticIgnorePatternWhitespaceRegexOptionContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace) && text != ""A B""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticCombinedSupportedRegexOptionsContradictsNegatedNewlineMatch", "string text", @"!Regex.IsMatch(text, @""\A . \z"", RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace | RegexOptions.ExplicitCapture) && text == ""\n""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticCompiledCombinedWithSinglelineRegexOptionAllowsNewlineDot", "string text", @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Compiled | RegexOptions.Singleline) && text == ""\n""", true, "using System.Text.RegularExpressions;"),
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart3 =
     {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\A[A-Z][0-9]\z"").Matches(text).Count != 0 && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
+        new("ExecutionVisibility_StaticCultureInvariantCombinedWithSinglelineRegexOptionAllowsNewlineDot", "string text", @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.CultureInvariant | RegexOptions.Singleline) && text == ""\n""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_ScopedSinglelineDisableRegexDotRejectsNewline", "string text", @"Regex.IsMatch(text, @""\A(?s:A(?-s:.)C)\z"") && text == ""A\nC""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_NamedCaptureRegexContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\A(?<prefix>AB)C\z"") && text != ""ABC""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_DollarRegexAnchorAllowsTrailingNewline", "string text", "Regex.IsMatch(text, \"^AB$\") && text == \"AB\\n\"", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StrictRegexLiteralContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\AAB\z"") && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_RegexMatchSuccessImpliesStringLength", "string text", @"Regex.Match(text, @""\A[A-Z][0-9]\z"").Success && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceRegexMatchSuccessImpliesStringLength", "string text", @"new Regex(@""\A[A-Z][0-9]\z"").Match(text).Success && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_RegexMatchesCountPositiveImpliesStringLength", "string text", @"Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count > 0 && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_RegexMatchesCountZeroImpliesNonMatch", "string text", @"Regex.Matches(text, @""\AAB\z"").Count == 0 && text == ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_ReversedRegexMatchesCountPositiveImpliesStringLength", "string text", @"1 <= Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceRegexMatchesCountPositiveImpliesStringLength", "string text", @"new Regex(@""\A[A-Z][0-9]\z"").Matches(text).Count != 0 && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_RegexMatchesCountThresholdAboveOneRemainsConservative", "string text", @"Regex.Matches(text, ""A"").Count > 1 && text == ""A""", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceRegexLiteralContradictsStringEquality", "string text", @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_GeneratedRegexFactoryMatchSuccessImpliesStringLength", "string text", @"RegexFactories.Ab().Match(text).Success && text.Length != 2", true, GeneratedRegexFactorySource),
+        new("ExecutionVisibility_GeneratedRegexFactoryMatchesCountImpliesStringLength", "string text", @"RegexFactories.Ab().Matches(text).Count > 0 && text.Length != 2", true, GeneratedRegexFactorySource),
+        new("ExecutionVisibility_GeneratedRegexFactorySinglelineOptionAllowsNewlineDot", "string text", @"!RegexFactories.SinglelineAny().IsMatch(text) && text == ""\n""", true, GeneratedRegexFactorySource),
+        new("ExecutionVisibility_StaticReadonlyRegexLiteralContradictsStringEquality", "string text", @"RegexCache.Ab.IsMatch(text) && text != ""AB""", true, StaticRegexCacheSource),
+        new("ExecutionVisibility_StaticReadonlyRegexMatchSuccessImpliesStringLength", "string text", "RegexCache.Ab.Match(text).Success && text.Length != 2", true, StaticRegexCacheSource),
+        new("ExecutionVisibility_StaticReadonlyRegexMatchesCountImpliesStringLength", "string text", "RegexCache.Ab.Matches(text).Count > 0 && text.Length != 2", true, StaticRegexCacheSource),
+        new("ExecutionVisibility_MutableStaticRegexFieldRemainsConservative", "string text", @"RegexCache.MutableAb.IsMatch(text) && text != ""AB""", false, StaticRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyRegexLiteralContradictsStringEquality", "RegexBox box, string text", @"box.Ab.IsMatch(text) && text != ""AB""", true, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyRegexMatchSuccessImpliesStringLength", "RegexBox box, string text", "box.Ab.Match(text).Success && text.Length != 2", true, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyRegexMatchesCountImpliesStringLength", "RegexBox box, string text", "box.Ab.Matches(text).Count > 0 && text.Length != 2", true, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyRegexSinglelineOptionAllowsNewlineDot", "RegexBox box, string text", @"!box.SinglelineAny.IsMatch(text) && text == ""\n""", true, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyRegexMultilineOptionStartAtZeroContradictsStringEquality", "RegexBox box, string text", @"box.MultilineAb.IsMatch(text, 0) && text != ""AB""", true, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceReadonlyGeneratedRegexFieldContradictsStringEquality", "GeneratedRegexBox box, string text", @"box.Ab.IsMatch(text) && text != ""AB""", true, GeneratedRegexFactorySource + InstanceRegexCacheSource),
+        new("ExecutionVisibility_MutableInstanceRegexFieldRemainsConservative", "RegexBox box, string text", @"box.MutableAb.IsMatch(text) && text != ""AB""", false, InstanceRegexCacheSource),
+        new("ExecutionVisibility_ConstructorAssignedReadonlyRegexFieldRemainsConservative", "ConstructorAssignedRegexBox box, string text", @"box.Ab.IsMatch(text) && text != ""AB""", false, InstanceRegexCacheSource),
+        new("ExecutionVisibility_StaticReadonlyRegexAssignedInStaticConstructorRemainsConservative", "string text", @"StaticCtorRegexCache.Ab.IsMatch(text) && text != ""AB""", false, InstanceRegexCacheSource),
+        new("ExecutionVisibility_InstanceRegexStartAtZeroContradictsStringEquality", "string text", @"new Regex(@""\AAB\z"").IsMatch(text, 0) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public void ExecutionVisibility_LocalRegexMatchesCountPositiveImpliesStringLength()
@@ -7641,27 +6067,9 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_RegexMatchesCountThresholdAboveOneRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.Matches(text, ""A"").Count > 1 && text == ""A""",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceRegexLiteralContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
+
+
 
     public void ExecutionVisibility_GeneratedRegexFactoryLiteralContradictsStringEquality()
     {
@@ -7673,38 +6081,11 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_GeneratedRegexFactoryMatchSuccessImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"RegexFactories.Ab().Match(text).Success && text.Length != 2",
-                GeneratedRegexFactorySource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_GeneratedRegexFactoryMatchesCountImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"RegexFactories.Ab().Matches(text).Count > 0 && text.Length != 2",
-                GeneratedRegexFactorySource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_GeneratedRegexFactorySinglelineOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!RegexFactories.SinglelineAny().IsMatch(text) && text == ""\n""",
-                GeneratedRegexFactorySource),
-            Is.True);
-    }
+
+
+
 
     [Test]
     public void ExecutionVisibility_LocalGeneratedRegexFactoryLiteralContradictsStringEquality()
@@ -7729,170 +6110,67 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_StaticReadonlyRegexLiteralContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"RegexCache.Ab.IsMatch(text) && text != ""AB""",
-                StaticRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticReadonlyRegexMatchSuccessImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "RegexCache.Ab.Match(text).Success && text.Length != 2",
-                StaticRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticReadonlyRegexMatchesCountImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "RegexCache.Ab.Matches(text).Count > 0 && text.Length != 2",
-                StaticRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_MutableStaticRegexFieldRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"RegexCache.MutableAb.IsMatch(text) && text != ""AB""",
-                StaticRegexCacheSource),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyRegexLiteralContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                @"box.Ab.IsMatch(text) && text != ""AB""",
-                InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyRegexMatchSuccessImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                "box.Ab.Match(text).Success && text.Length != 2",
-                InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyRegexMatchesCountImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                "box.Ab.Matches(text).Count > 0 && text.Length != 2",
-                InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyRegexSinglelineOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                @"!box.SinglelineAny.IsMatch(text) && text == ""\n""",
-                InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyRegexMultilineOptionStartAtZeroContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                @"box.MultilineAb.IsMatch(text, 0) && text != ""AB""",
-                InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceReadonlyGeneratedRegexFieldContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "GeneratedRegexBox box, string text",
-                @"box.Ab.IsMatch(text) && text != ""AB""",
-                GeneratedRegexFactorySource + InstanceRegexCacheSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_MutableInstanceRegexFieldRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "RegexBox box, string text",
-                @"box.MutableAb.IsMatch(text) && text != ""AB""",
-                InstanceRegexCacheSource),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_ConstructorAssignedReadonlyRegexFieldRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "ConstructorAssignedRegexBox box, string text",
-                @"box.Ab.IsMatch(text) && text != ""AB""",
-                InstanceRegexCacheSource),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticReadonlyRegexAssignedInStaticConstructorRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"StaticCtorRegexCache.Ab.IsMatch(text) && text != ""AB""",
-                InstanceRegexCacheSource),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceRegexStartAtZeroContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\AAB\z"").IsMatch(text, 0) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceRegexNonZeroStartAtRemainsConservative()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart4 =
     {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!new Regex(""AB"").IsMatch(text, 1) && text == ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
+        new("ExecutionVisibility_InstanceRegexNonZeroStartAtRemainsConservative", "string text", @"!new Regex(""AB"").IsMatch(text, 1) && text == ""AB""", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceCompiledRegexOptionContradictsStringEquality", "string text", @"new Regex(@""\AAB\z"", RegexOptions.Compiled).IsMatch(text) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceCultureInvariantRegexOptionContradictsStringEquality", "string text", @"new Regex(@""\AAB\z"", RegexOptions.CultureInvariant).IsMatch(text) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceSinglelineRegexOptionAllowsNewlineDot", "string text", @"!new Regex(@""\A.\z"", RegexOptions.Singleline).IsMatch(text) && text == ""\n""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceMultilineRegexOptionStartAtZeroContradictsStringEquality", "string text", @"new Regex(@""\AAB\z"", RegexOptions.Multiline).IsMatch(text, 0) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StaticMultilineRegexOptionContradictsStringEquality", "string text", @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Multiline) && text != ""AB""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceIgnorePatternWhitespaceRegexOptionContradictsStringEquality", "string text", @"new Regex(@""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace).IsMatch(text) && text != ""A B""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_RegexIsMatchImpliesInputNonNull", "string text", "Regex.IsMatch(text, \"A\") && text == null", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_NegatedRegexIsMatchStillImpliesInputNonNull", "string text", "!Regex.IsMatch(text, \"A\") && text == null", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_ZeroRegexMatchesStillImpliesInputNonNull", "string text", "Regex.Matches(text, \"A\").Count == 0 && text == null", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_ShorthandRegexImpliesStringLength", "string text", @"Regex.IsMatch(text, @""\A\d\s\w\z"") && text.Length != 3", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_NegatedShorthandRegexClassRemainsConservative", "string text", @"Regex.IsMatch(text, @""\A[^\d]\z"") && text == ""A""", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_CategoryRegexImpliesStringLength", "string text", @"Regex.IsMatch(text, @""\A\p{Lu}\P{Ll}\z"") && text.Length != 2", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_WordBoundaryRegexLengthImplicationRemainsConservative", "string text", @"Regex.IsMatch(text, @""\A\bAB\B?\z"") && text.Length != 2", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_NegatedCategoryRegexClassConcreteMismatchIsUnreachable", "string text", @"Regex.IsMatch(text, @""\A[^\p{Lu}]\z"") && text == ""A""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_UnsupportedRegexOptionsRemainConservative", "string text", "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"AB\"", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_UnsupportedRegexOptionsConcreteMismatchUsesSelfVerification", "string text", "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"CD\"", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_CultureInvariantWithUnsupportedRegexOptionsRemainConservative", "string text", "Regex.IsMatch(text, \"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase) && text == \"AB\"", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceUnsupportedRegexOptionsRemainConservative", "string text", "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceUnsupportedRegexOptionsConcreteMismatchUsesSelfVerification", "string text", "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"CD\"", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_InstanceCultureInvariantWithUnsupportedRegexOptionsRemainConservative", "string text", "new Regex(\"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"", false, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_UnsupportedInlineIgnoreCaseRegexConcreteMismatchUsesSelfVerification", "string text", @"Regex.IsMatch(text, @""\A(?i:ab)\z"") && text == ""CD""", true, "using System.Text.RegularExpressions;"),
+        new("ExecutionVisibility_StringContainsContradictsStringEquality", "string text", "text.Contains(\"Z\") && text == \"ABC\"", true),
+        new("ExecutionVisibility_StringContainsCharContradictsStringEquality", "string text", "text.Contains('Z') && text == \"ABC\"", true),
+        new("ExecutionVisibility_StringContainsOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.Contains(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"BBB\"", true, "using System;"),
+        new("ExecutionVisibility_StringStartsWithOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.StartsWith(\"ab\", StringComparison.OrdinalIgnoreCase) && text == \"zzAB\"", true, "using System;"),
+        new("ExecutionVisibility_StringEndsWithOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.EndsWith(\"xy\", StringComparison.OrdinalIgnoreCase) && text == \"XYzz\"", true, "using System;"),
+        new("ExecutionVisibility_StringIndexOfCharFoundContradictsStringEquality", "string text", "text.IndexOf('Z') >= 0 && text == \"ABC\"", true),
+        new("ExecutionVisibility_StringIndexOfCharNotFoundContradictsStringEquality", "string text", "text.IndexOf('A') == -1 && text == \"ABC\"", true),
+        new("ExecutionVisibility_StringIndexOfCharReversedFoundComparisonContradictsStringEquality", "string text", "0 <= text.IndexOf('Z') && text == \"ABC\"", true),
+    };
 
     [Test]
     public void ExecutionVisibility_LocalInstanceRegexLiteralContradictsStringEquality()
@@ -7918,60 +6196,15 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_InstanceCompiledRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\AAB\z"", RegexOptions.Compiled).IsMatch(text) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceCultureInvariantRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\AAB\z"", RegexOptions.CultureInvariant).IsMatch(text) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceSinglelineRegexOptionAllowsNewlineDot()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"!new Regex(@""\A.\z"", RegexOptions.Singleline).IsMatch(text) && text == ""\n""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceMultilineRegexOptionStartAtZeroContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\AAB\z"", RegexOptions.Multiline).IsMatch(text, 0) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticMultilineRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Multiline) && text != ""AB""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
+
+
+
+
+
 
     [Test]
     public void ExecutionVisibility_LocalInstanceSinglelineRegexOptionAllowsNewlineDot()
@@ -8022,579 +6255,181 @@ public class TestClass
             Is.False);
     }
 
-    [Test]
-    public void ExecutionVisibility_InstanceIgnorePatternWhitespaceRegexOptionContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"new Regex(@""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace).IsMatch(text) && text != ""A B""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_RegexIsMatchImpliesInputNonNull()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.IsMatch(text, \"A\") && text == null",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_NegatedRegexIsMatchStillImpliesInputNonNull()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "!Regex.IsMatch(text, \"A\") && text == null",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_ZeroRegexMatchesStillImpliesInputNonNull()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.Matches(text, \"A\").Count == 0 && text == null",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_ShorthandRegexImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A\d\s\w\z"") && text.Length != 3",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_NegatedShorthandRegexClassRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A[^\d]\z"") && text == ""A""",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_CategoryRegexImpliesStringLength()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A\p{Lu}\P{Ll}\z"") && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_WordBoundaryRegexLengthImplicationRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A\bAB\B?\z"") && text.Length != 2",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_NegatedCategoryRegexClassConcreteMismatchIsUnreachable()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A[^\p{Lu}]\z"") && text == ""A""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_UnsupportedRegexOptionsRemainConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"AB\"",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_UnsupportedRegexOptionsConcreteMismatchUsesSelfVerification()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"CD\"",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_CultureInvariantWithUnsupportedRegexOptionsRemainConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "Regex.IsMatch(text, \"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase) && text == \"AB\"",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceUnsupportedRegexOptionsRemainConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceUnsupportedRegexOptionsConcreteMismatchUsesSelfVerification()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"CD\"",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceCultureInvariantWithUnsupportedRegexOptionsRemainConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "new Regex(\"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
-                "using System.Text.RegularExpressions;"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_UnsupportedInlineIgnoreCaseRegexConcreteMismatchUsesSelfVerification()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                @"Regex.IsMatch(text, @""\A(?i:ab)\z"") && text == ""CD""",
-                "using System.Text.RegularExpressions;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringContainsContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.Contains(\"Z\") && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringContainsCharContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.Contains('Z') && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringContainsOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.Contains(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"BBB\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringStartsWithOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.StartsWith(\"ab\", StringComparison.OrdinalIgnoreCase) && text == \"zzAB\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringEndsWithOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.EndsWith(\"xy\", StringComparison.OrdinalIgnoreCase) && text == \"XYzz\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfCharFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.IndexOf('Z') >= 0 && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfCharNotFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.IndexOf('A') == -1 && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfCharReversedFoundComparisonContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "0 <= text.IndexOf('Z') && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfOrdinalFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.IndexOf(\"ZZ\", StringComparison.Ordinal) >= 0 && text == \"ABC\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfOrdinalNotFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.IndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfDefaultStringSearchRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.IndexOf(\"a\") >= 0 && text == \"A\""),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIndexOfOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.IndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLastIndexOfCharFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.LastIndexOf('Z') >= 0 && text == \"ABC\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLastIndexOfOrdinalNotFoundContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.LastIndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLastIndexOfDefaultStringSearchRemainsConservative()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.LastIndexOf(\"a\") >= 0 && text == \"A\""),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLastIndexOfOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.LastIndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringStartsWithCharContradictsEmptyString()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text.StartsWith('A') && text == string.Empty"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceStringEqualsOrdinalContradictsInequality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.Equals(\"A\", StringComparison.Ordinal) && text != \"A\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticStringEqualsOrdinalContradictsInequality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "string.Equals(text, \"A\", StringComparison.Ordinal) && text != \"A\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceStringEqualsOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.Equals(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"B\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StaticStringEqualsOrdinalIgnoreCaseContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "string.Equals(\"a\", text, StringComparison.OrdinalIgnoreCase) && text == \"B\"",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLiteralEqualityImpliesNonNull()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "text == \"A\" && text == null"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringConcatContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string left, string right",
-                "left == \"A\" && right == \"B\" && (left + right) != \"AB\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_NullStringConcatUsesEmptyString()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text == null && (text + \"X\") != \"X\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringConcatLengthContradiction_IsAlwaysFalseAfterNormalCompletion()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string left, string right",
-                "left != null && right != null && (left + right).Length != left.Length + right.Length"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringPredicateOnConcatContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string suffix",
-                "!(\"PRE\" + suffix).StartsWith(\"PRE\", StringComparison.Ordinal)",
-                "using System;"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringSubstringLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text, int start",
-                "text != null && start >= 0 && start <= text.Length && text.Substring(start).Length != text.Length - start"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringPrefixSubstringEqualityContradictsStringEquality()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "text.Substring(0, 3) == \"PRE\" && text == \"ALT\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIsNullOrWhiteSpaceContradictsNonWhitespaceLiteral()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "string.IsNullOrWhiteSpace(text) && text == \"A\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchImpliesNonEmpty()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "!string.IsNullOrWhiteSpace(text) && text.Length == 0"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchRejectsWhitespaceLiteral()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "!string.IsNullOrWhiteSpace(text) && text == \" \\t\\r\\n\""),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringIsNullOrWhiteSpaceAllowsNonEmptyWhitespace()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "string text",
-                "string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0"),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_CustomLengthNegative_RemainsUnknown()
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart5 =
     {
-        Assert.That(
-            IsConditionAlwaysFalse("HasLength value", "value.Length < 0",
-                "public sealed class HasLength { public int Length => -1; }"),
-            Is.False);
-    }
+        new("ExecutionVisibility_StringIndexOfOrdinalFoundContradictsStringEquality", "string text", "text.IndexOf(\"ZZ\", StringComparison.Ordinal) >= 0 && text == \"ABC\"", true, "using System;"),
+        new("ExecutionVisibility_StringIndexOfOrdinalNotFoundContradictsStringEquality", "string text", "text.IndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"", true, "using System;"),
+        new("ExecutionVisibility_StringIndexOfDefaultStringSearchRemainsConservative", "string text", "text.IndexOf(\"a\") >= 0 && text == \"A\"", false),
+        new("ExecutionVisibility_StringIndexOfOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.IndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"", true, "using System;"),
+        new("ExecutionVisibility_StringLastIndexOfCharFoundContradictsStringEquality", "string text", "text.LastIndexOf('Z') >= 0 && text == \"ABC\"", true),
+        new("ExecutionVisibility_StringLastIndexOfOrdinalNotFoundContradictsStringEquality", "string text", "text.LastIndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"", true, "using System;"),
+        new("ExecutionVisibility_StringLastIndexOfDefaultStringSearchRemainsConservative", "string text", "text.LastIndexOf(\"a\") >= 0 && text == \"A\"", false),
+        new("ExecutionVisibility_StringLastIndexOfOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.LastIndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"", true, "using System;"),
+        new("ExecutionVisibility_StringStartsWithCharContradictsEmptyString", "string text", "text.StartsWith('A') && text == string.Empty", true),
+        new("ExecutionVisibility_InstanceStringEqualsOrdinalContradictsInequality", "string text", "text.Equals(\"A\", StringComparison.Ordinal) && text != \"A\"", true, "using System;"),
+        new("ExecutionVisibility_StaticStringEqualsOrdinalContradictsInequality", "string text", "string.Equals(text, \"A\", StringComparison.Ordinal) && text != \"A\"", true, "using System;"),
+        new("ExecutionVisibility_InstanceStringEqualsOrdinalIgnoreCaseContradictsStringEquality", "string text", "text.Equals(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"B\"", true, "using System;"),
+        new("ExecutionVisibility_StaticStringEqualsOrdinalIgnoreCaseContradictsStringEquality", "string text", "string.Equals(\"a\", text, StringComparison.OrdinalIgnoreCase) && text == \"B\"", true, "using System;"),
+        new("ExecutionVisibility_StringLiteralEqualityImpliesNonNull", "string text", "text == \"A\" && text == null", true),
+        new("ExecutionVisibility_StringConcatContradictsStringEquality", "string left, string right", "left == \"A\" && right == \"B\" && (left + right) != \"AB\"", true),
+        new("ExecutionVisibility_NullStringConcatUsesEmptyString", "string text", "text == null && (text + \"X\") != \"X\"", true),
+        new("ExecutionVisibility_StringConcatLengthContradiction_IsAlwaysFalseAfterNormalCompletion", "string left, string right", "left != null && right != null && (left + right).Length != left.Length + right.Length", true),
+        new("ExecutionVisibility_StringPredicateOnConcatContradiction_IsAlwaysFalse", "string suffix", "!(\"PRE\" + suffix).StartsWith(\"PRE\", StringComparison.Ordinal)", true, "using System;"),
+        new("ExecutionVisibility_StringSubstringLengthContradiction_IsAlwaysFalse", "string text, int start", "text != null && start >= 0 && start <= text.Length && text.Substring(start).Length != text.Length - start", true),
+        new("ExecutionVisibility_StringPrefixSubstringEqualityContradictsStringEquality", "string text", "text.Substring(0, 3) == \"PRE\" && text == \"ALT\"", true),
+        new("ExecutionVisibility_StringIsNullOrWhiteSpaceContradictsNonWhitespaceLiteral", "string text", "string.IsNullOrWhiteSpace(text) && text == \"A\"", true),
+        new("ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchImpliesNonEmpty", "string text", "!string.IsNullOrWhiteSpace(text) && text.Length == 0", true),
+        new("ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchRejectsWhitespaceLiteral", "string text", "!string.IsNullOrWhiteSpace(text) && text == \" \\t\\r\\n\"", true),
+        new("ExecutionVisibility_StringIsNullOrWhiteSpaceAllowsNonEmptyWhitespace", "string text", "string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0", false),
+        new("ExecutionVisibility_CustomLengthNegative_RemainsUnknown", "HasLength value", "value.Length < 0", false, "public sealed class HasLength { public int Length => -1; }"),
+        new("ExecutionVisibility_SourceNullOrEmptyPredicateTrueBranchLengthContradiction_IsAlwaysFalse", "string text", "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length > 0", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceNullOrEmptyPredicateFalseBranchLengthContradiction_IsAlwaysFalse", "string text", "!SourcePredicates.IsNullOrEmptyLike(text) && text.Length <= 0", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceRangePredicateContradiction_IsAlwaysFalse", "int value", "SourcePredicates.InRange(value) && (value < 10 || value > 20)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceSwitchStatementPredicateContradiction_IsAlwaysFalse", "int value", "SourcePredicates.IsZeroWithSwitch(value) && value != 0", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceSwitchStatementPatternPredicateContradiction_IsAlwaysFalse", "int value", "SourcePredicates.IsSmallPositiveWithSwitch(value) && (value <= 0 || value >= 10)", true, SourcePredicateSource),
+    };
 
-    [Test]
-    public void ExecutionVisibility_SourceNullOrEmptyPredicateTrueBranchLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length > 0", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceNullOrEmptyPredicateFalseBranchLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "!SourcePredicates.IsNullOrEmptyLike(text) && text.Length <= 0",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceRangePredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "SourcePredicates.InRange(value) && (value < 10 || value > 20)",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceSwitchStatementPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "SourcePredicates.IsZeroWithSwitch(value) && value != 0",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceSwitchStatementPatternPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "int value",
-                "SourcePredicates.IsSmallPositiveWithSwitch(value) && (value <= 0 || value >= 10)",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceMultiGuardIndexPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse(
-                "int[] values, int index",
-                "SourcePredicates.IsValidIndex(values, index) && (values == null || index < 0 || index >= values.Length)",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourcePositivePredicateArgumentExpression_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositive(value + 1) && value < -1",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourcePositivePredicateReachable_RemainsUnknown()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly ConditionAlwaysFalseCase[] SingleCallConditionAlwaysFalseCaseDataPart6 =
     {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositive(value) && value > 10",
-                SourcePredicateSource),
-            Is.False);
-    }
+        new("ExecutionVisibility_SourceMultiGuardIndexPredicateContradiction_IsAlwaysFalse", "int[] values, int index", "SourcePredicates.IsValidIndex(values, index) && (values == null || index < 0 || index >= values.Length)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourcePositivePredicateArgumentExpression_IsAlwaysFalse", "int value", "SourcePredicates.IsPositive(value + 1) && value < -1", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourcePositivePredicateReachable_RemainsUnknown", "int value", "SourcePredicates.IsPositive(value) && value > 10", false, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextPredicateNullContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasText(text) && text == null", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextPredicateLengthContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasText(text) && text.Length <= 0", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextGuardPredicateContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasTextWithGuard(text) && (text == null || text.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextIfElsePredicateContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasTextWithIfElse(text) && (text == null || text.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextLocalAliasPredicateContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasTextViaLocal(text) && (text == null || text.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextLocalAssignmentPredicateContradiction_IsAlwaysFalse", "string text", "SourcePredicates.HasTextViaAssignment(text) && (text == null || text.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceLocalAssignmentIntegerPredicateContradiction_IsAlwaysFalse", "int value", "SourcePredicates.IsPositiveAfterLocalAssignment(value) && value < -1", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceBooleanPropertyContradiction_IsAlwaysFalse", "SourcePredicateBox box", "box.HasText && (box.Value == null || box.Value.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_InstanceSourceBooleanMethodContradiction_IsAlwaysFalse", "SourcePredicateBox box", "box.HasTextMethod() && (box.Value == null || box.Value.Length <= 0)", true, SourcePredicateSource),
+        new("ExecutionVisibility_StringLiteralLengthContradiction_IsAlwaysFalse", "", "\"abc\".Length != 3", true),
+        new("ExecutionVisibility_StringEmptyLengthContradiction_IsAlwaysFalse", "", "string.Empty.Length > 0", true),
+        new("ExecutionVisibility_CollectionCountNegativeContradiction_IsAlwaysFalse", "System.Collections.Generic.IReadOnlyCollection<int> values", "values.Count < 0", true),
+        new("ExecutionVisibility_SourceNullOrEmptyPredicateNestedInNegation_IsAlwaysFalse", "string text", "!(SourcePredicates.IsNullOrEmptyLike(text)) && text.Length <= 0", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceHasTextPredicateInOrFalseBranch_IsAlwaysFalse", "string text", "!(SourcePredicates.HasText(text) || false) && text.Length > 0 && text != null", true, SourcePredicateSource),
+        new("ExecutionVisibility_SourceNullOrEmptyPredicateReachable_RemainsUnknown", "string text", "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length == 0", false, SourcePredicateSource),
+        new("ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse", "object value", "value is string && value == null", true),
+        new("ExecutionVisibility_AsExpressionNonNullImpliesSourceNonNull_IsAlwaysFalse", "object value", "(value as string) != null && value == null", true),
+        new("ExecutionVisibility_AsExpressionNonNullImpliesRuntimeType_IsAlwaysFalse", "object value", "(value as string) != null && value is not string", true),
+        new("ExecutionVisibility_AsExpressionNullContradictsRuntimeType_IsAlwaysFalse", "object value", "(value as string) == null && value is string", true),
+        new("ExecutionVisibility_BooleanVariableContradiction_IsAlwaysFalse", "bool ready", "ready && !ready", true),
+        new("ExecutionVisibility_BitwiseBooleanAndContradiction_IsAlwaysFalse", "int value", "(value == 0) & (value != 0)", true),
+        new("ExecutionVisibility_BitwiseBooleanOrFalseBranchContradiction_IsAlwaysFalse", "int value", "!((value < 0) | (value > 0)) && value != 0", true),
+        new("ExecutionVisibility_BooleanExclusiveOrContradiction_IsAlwaysFalse", "bool left, bool right", "(left ^ right) && left == right", true),
+        new("ExecutionVisibility_DefaultLiteralNullContradiction_IsAlwaysFalse", "string value", "value != null && value == default", true),
+        new("ExecutionVisibility_DefaultExpressionZeroContradiction_IsAlwaysFalse", "int value", "value == default(int) && value != 0", true),
+    };
+
+
+
+
 
     [Test]
     public void ExecutionVisibility_LocalDelegatePredicateDirectCallContradiction_IsAlwaysFalse()
@@ -8988,219 +6823,55 @@ public class TestClass
             Is.True);
     }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextPredicateNullContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "SourcePredicates.HasText(text) && text == null",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextPredicateLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "SourcePredicates.HasText(text) && text.Length <= 0",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextGuardPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.HasTextWithGuard(text) && (text == null || text.Length <= 0)", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextIfElsePredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.HasTextWithIfElse(text) && (text == null || text.Length <= 0)",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextLocalAliasPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.HasTextViaLocal(text) && (text == null || text.Length <= 0)", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextLocalAssignmentPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.HasTextViaAssignment(text) && (text == null || text.Length <= 0)",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceLocalAssignmentIntegerPredicateContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositiveAfterLocalAssignment(value) && value < -1",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceBooleanPropertyContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("SourcePredicateBox box",
-                "box.HasText && (box.Value == null || box.Value.Length <= 0)", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_InstanceSourceBooleanMethodContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("SourcePredicateBox box",
-                "box.HasTextMethod() && (box.Value == null || box.Value.Length <= 0)", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringLiteralLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("", "\"abc\".Length != 3"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_StringEmptyLengthContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("", "string.Empty.Length > 0"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_CollectionCountNegativeContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("System.Collections.Generic.IReadOnlyCollection<int> values", "values.Count < 0"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceNullOrEmptyPredicateNestedInNegation_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text", "!(SourcePredicates.IsNullOrEmptyLike(text)) && text.Length <= 0",
-                SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceHasTextPredicateInOrFalseBranch_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "!(SourcePredicates.HasText(text) || false) && text.Length > 0 && text != null", SourcePredicateSource),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_SourceNullOrEmptyPredicateReachable_RemainsUnknown()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string text",
-                "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length == 0", SourcePredicateSource),
-            Is.False);
-    }
 
-    [Test]
-    public void ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("object value", "value is string && value == null"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_AsExpressionNonNullImpliesSourceNonNull_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("object value", "(value as string) != null && value == null"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_AsExpressionNonNullImpliesRuntimeType_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("object value", "(value as string) != null && value is not string"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_AsExpressionNullContradictsRuntimeType_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("object value", "(value as string) == null && value is string"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_BooleanVariableContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool ready", "ready && !ready"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_BitwiseBooleanAndContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "(value == 0) & (value != 0)"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_BitwiseBooleanOrFalseBranchContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "!((value < 0) | (value > 0)) && value != 0"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_BooleanExclusiveOrContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("bool left, bool right", "(left ^ right) && left == right"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_DefaultLiteralNullContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("string value", "value != null && value == default"),
-            Is.True);
-    }
 
-    [Test]
-    public void ExecutionVisibility_DefaultExpressionZeroContradiction_IsAlwaysFalse()
-    {
-        Assert.That(
-            IsConditionAlwaysFalse("int value", "value == default(int) && value != 0"),
-            Is.True);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public void SmtConfiguration_BoundedDefaults_UseExpandedBudgets()
