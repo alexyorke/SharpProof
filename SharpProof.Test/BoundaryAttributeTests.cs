@@ -4,8 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
 
 namespace SharpProof.Test;
 

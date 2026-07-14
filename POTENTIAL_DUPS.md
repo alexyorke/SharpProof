@@ -139,10 +139,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## SharpProof.Test - H-J
 
-### Repeated `VerifyCS` type-alias boilerplate (borderline)
-`using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.SharpProofAnalyzer>;`
-re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixture / `GlobalUsings.cs`.
-
 ---
 
 ## SharpProof.Test - K-M

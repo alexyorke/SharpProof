@@ -5,8 +5,6 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 using static SharpProof.Test.TestReflectionFacts;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
 
 namespace SharpProof.Test;
 

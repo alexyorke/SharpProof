@@ -1,8 +1,6 @@
 #if false // Inactive reference snapshot: active required-members coverage lives in RequiredMembersSmokeTests.
 using NUnit.Framework;
 using Microsoft.CodeAnalysis.Testing;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
 using System.Threading.Tasks;
 using SharpProof.Attributes; // Needed for EnforcePure
 
