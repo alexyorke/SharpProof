@@ -226,38 +226,33 @@ public sealed class FuzzCaseGenerator
 
     private static string BuildPureNestedOwnershipChain(int index, Random random, string className)
     {
-        return $$"""
-                 using SharpProof.Attributes;
-
-                 public sealed class {{className}}Box
-                 {
-                     public int Value;
-                 }
-
-                 public sealed class {{className}}Middle
-                 {
-                     public {{className}}Box Value { get; init; }
-                 }
-
-                 public sealed class {{className}}Outer
-                 {
-                     public {{className}}Middle Value { get; init; }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod()
-                     {
-                         var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-                         outer.Value.Value.Value = 1;
-                         return outer.Value.Value.Value;
-                     }
-                 }
-                 """;
+        return BuildOwnershipChainClass(
+            className,
+            $$"""
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                    outer.Value.Value.Value = 1;
+                    return outer.Value.Value.Value;
+                }
+            """);
     }
 
     private static string BuildImpureOwnershipEscapeChain(int index, Random random, string className)
+    {
+        return BuildOwnershipChainClass(
+            className,
+            $$"""
+                [EnforcePure]
+                public {{className}}Outer TestMethod()
+                {
+                    return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                }
+            """);
+    }
+
+    private static string BuildOwnershipChainClass(string className, string testMethod)
     {
         return $$"""
                  using SharpProof.Attributes;
@@ -279,11 +274,7 @@ public sealed class FuzzCaseGenerator
 
                  public class {{className}}
                  {
-                     [EnforcePure]
-                     public {{className}}Outer TestMethod()
-                     {
-                         return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-                     }
+                 {{testMethod}}
                  }
                  """;
     }
