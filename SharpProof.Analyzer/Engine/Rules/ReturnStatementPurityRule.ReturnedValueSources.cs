@@ -120,7 +120,9 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         if (match(normalizedReturnedValue, out result)) return true;
 
         if (normalizedReturnedValue is IConditionalOperation or ICoalesceOperation)
-            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(normalizedReturnedValue))
+            foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
+                         normalizedReturnedValue,
+                         CancellationToken.None))
                 if (TryMatchReturnedValueAlternative(alternative, normalize, match, out result))
                     return true;
 

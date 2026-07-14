@@ -8,7 +8,7 @@ internal static class RuleAnalysisHelper
 {
     internal static IEnumerable<IOperation> EnumerateReachableAlternatives(
         IOperation operation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         switch (operation)
