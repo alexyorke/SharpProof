@@ -115,14 +115,13 @@ internal static partial class ExceptionFlowAnalyzer
 
         var sortedTypes = queryResult.ExceptionEvidence.Types;
         var exceptionList = string.Join(", ", sortedTypes);
-        var properties = BaselineDiagnosticProperties.Add(
+        var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             CreateExceptionProperties(queryResult.ExceptionEvidence),
             methodSymbol,
             context.Node.SyntaxTree,
             "ExceptionSummary",
-            evidenceKey: CreateExceptionEvidenceKey("summary", queryResult.ExceptionEvidence));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            null,
+            CreateExceptionEvidenceKey("summary", queryResult.ExceptionEvidence),
             diagnosticLocation,
             "runtime hazards",
             "may_throw");
@@ -164,14 +163,13 @@ internal static partial class ExceptionFlowAnalyzer
                     hazard.Proof.UnknownReason.ToString());
             properties = UnknownReasonDiagnosticProperties.Add(properties, hazard.UnknownReasonInfo);
             properties = AnalysisTruncationDiagnosticProperties.Add(properties, hazard.AnalysisTruncation);
-            properties = BaselineDiagnosticProperties.Add(
+            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
                 methodSymbol,
                 context.Node.SyntaxTree,
                 hazard.NodeKind,
-                evidenceKey: CreateUnknownRuntimeHazardEvidenceKey(hazard));
-            properties = ExplainDiagnosticProperties.Add(
-                properties,
+                null,
+                CreateUnknownRuntimeHazardEvidenceKey(hazard),
                 location,
                 "runtime hazard candidate",
                 hazard.Proof.Status.ToString(),
@@ -245,14 +243,13 @@ internal static partial class ExceptionFlowAnalyzer
             if (!string.IsNullOrWhiteSpace(exceptionSymbol))
                 properties = properties.Add(SharpProofDiagnostics.ExceptionSymbolProperty, exceptionSymbol);
 
-            properties = BaselineDiagnosticProperties.Add(
+            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
                 methodSymbol,
                 context.Node.SyntaxTree,
                 firstEntry.Site.Kind().ToString(),
-                evidenceKey: CreateExceptionEvidenceKey(CreateExceptionSiteKey(firstEntry.Site), siteEvidence));
-            properties = ExplainDiagnosticProperties.Add(
-                properties,
+                null,
+                CreateExceptionEvidenceKey(CreateExceptionSiteKey(firstEntry.Site), siteEvidence),
                 siteLocation,
                 "runtime hazards",
                 "hazard",

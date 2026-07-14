@@ -97,7 +97,7 @@ internal static partial class ExceptionFlowAnalyzer
                 .Add(SharpProofDiagnostics.ExceptionContractAttributeProperty, contract.AttributeDisplay)
                 .Add(SharpProofDiagnostics.ExceptionContractAllowedTypesProperty, FormatAllowedTypes(contract))
                 .Add(SharpProofDiagnostics.ExceptionContractDisallowedTypesProperty, exceptionList);
-            properties = BaselineDiagnosticProperties.Add(
+            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
                 methodSymbol,
                 context.Node.SyntaxTree,
@@ -105,9 +105,7 @@ internal static partial class ExceptionFlowAnalyzer
                 operationDisplay,
                 CreateExceptionEvidenceKey(
                     contract.AttributeDisplay + ":" + CreateExceptionSiteKey(firstEntry.Site),
-                    disallowedEvidence));
-            properties = ExplainDiagnosticProperties.Add(
-                properties,
+                    disallowedEvidence),
                 siteLocation,
                 operationDisplay,
                 "exception_contract_violation",

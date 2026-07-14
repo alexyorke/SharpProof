@@ -23,7 +23,7 @@ internal static class MethodPurityAnalyzer
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
 
-        if (!methodSymbol.Locations.Any(static location => location.IsInSource)) return;
+        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
 
 
         var enforcePureAttributeSymbol =
@@ -74,14 +74,13 @@ internal static class MethodPurityAnalyzer
             var conflictingDiagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             if (conflictingDiagnosticLocation != null)
             {
-                var properties = BaselineDiagnosticProperties.Add(
+                var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     ImmutableDictionary<string, string?>.Empty,
                     methodSymbol,
                     context.Node.SyntaxTree,
                     "PurityAttributeConflict",
-                    evidenceKey: "conflicting_purity_attributes");
-                properties = ExplainDiagnosticProperties.Add(
-                    properties,
+                    null,
+                    "conflicting_purity_attributes",
                     conflictingDiagnosticLocation,
                     "purity attributes",
                     "invalid",
@@ -108,14 +107,13 @@ internal static class MethodPurityAnalyzer
             var allowSyncLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             if (allowSyncLocation != null)
             {
-                var properties = BaselineDiagnosticProperties.Add(
+                var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     ImmutableDictionary<string, string?>.Empty,
                     methodSymbol,
                     context.Node.SyntaxTree,
                     "AllowSynchronizationContract",
-                    evidenceKey: "allow_synchronization_without_purity");
-                properties = ExplainDiagnosticProperties.Add(
-                    properties,
+                    null,
+                    "allow_synchronization_without_purity",
                     allowSyncLocation,
                     "[AllowSynchronization]",
                     "invalid",
@@ -138,14 +136,13 @@ internal static class MethodPurityAnalyzer
                 var redundantLoc = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
                 if (redundantLoc != null)
                 {
-                    var properties = BaselineDiagnosticProperties.Add(
+                    var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                         ImmutableDictionary<string, string?>.Empty,
                         methodSymbol,
                         context.Node.SyntaxTree,
                         "AllowSynchronizationContract",
-                        evidenceKey: "redundant_allow_synchronization");
-                    properties = ExplainDiagnosticProperties.Add(
-                        properties,
+                        null,
+                        "redundant_allow_synchronization",
                         redundantLoc,
                         "[AllowSynchronization]",
                         "redundant");
@@ -212,16 +209,15 @@ internal static class MethodPurityAnalyzer
 
             if (diagnosticLocation != null)
             {
-                var properties = BaselineDiagnosticProperties.Add(
+                var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     AnalysisTruncationDiagnosticProperties.Add(
                         purityResult.Evidence.ToDiagnosticProperties(),
                         purityResult.AnalysisTruncation),
                     methodSymbol,
                     context.Node.SyntaxTree,
                     purityResult.Evidence.OperationKind,
-                    evidenceKey: CreatePurityEvidenceKey(purityResult.Evidence));
-                properties = ExplainDiagnosticProperties.Add(
-                    properties,
+                    null,
+                    CreatePurityEvidenceKey(purityResult.Evidence),
                     diagnosticLocation,
                     hasEnforcePureAttribute ? "[EnforcePure]" : "[Pure]",
                     "not_proven",
@@ -278,14 +274,13 @@ internal static class MethodPurityAnalyzer
 
                 if (diagnosticLocation != null)
                 {
-                    var properties = BaselineDiagnosticProperties.Add(
+                    var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                         ImmutableDictionary<string, string?>.Empty,
                         methodSymbol,
                         context.Node.SyntaxTree,
                         "MissingEnforcePureAttribute",
-                        evidenceKey: "missing_enforce_pure");
-                    properties = ExplainDiagnosticProperties.Add(
-                        properties,
+                        null,
+                        "missing_enforce_pure",
                         diagnosticLocation,
                         "[EnforcePure]",
                         "suggested");
