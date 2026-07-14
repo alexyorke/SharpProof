@@ -676,43 +676,16 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
 public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
 {
+    private readonly SymbolicCompactQueryResult _result;
+
     private SymbolicInvariantQueryResult(
-        string scopeKind,
-        string filePath,
-        SymbolicCompactSourceQueryDescriptor queryDescriptor,
+        SymbolicCompactQueryResult result,
         SymbolicInvariantQuerySummary querySummary,
-        SymbolicInvariantQueryFocus focus,
-        string mergedInvariantText,
-        SymbolicCompactInvariantQueryView invariantQuery,
-        SymbolicCompactAnalysisSummary analysisSummary,
-        SymbolicReachabilitySummary reachability,
-        SymbolicProgramPointSummary programPointSummary,
-        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
-        bool conditionProofsTruncated,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicAnalysisTruncationInfo analysisTruncation,
-        int? lineCount,
-        int linesWithProgramPoints,
-        int programPointCount)
+        SymbolicInvariantQueryFocus focus)
     {
-        ScopeKind = scopeKind ?? string.Empty;
-        FilePath = filePath ?? string.Empty;
-        QueryDescriptor = queryDescriptor ?? throw new ArgumentNullException(nameof(queryDescriptor));
+        _result = result ?? throw new ArgumentNullException(nameof(result));
         QuerySummary = querySummary ?? throw new ArgumentNullException(nameof(querySummary));
         Focus = focus ?? throw new ArgumentNullException(nameof(focus));
-        MergedInvariantText = mergedInvariantText ?? string.Empty;
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        AnalysisSummary = analysisSummary ?? throw new ArgumentNullException(nameof(analysisSummary));
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        ProofOutcomes = ProgramPointSummary.ProofOutcomes;
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
-        ConditionProofsTruncated = conditionProofsTruncated;
-        SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
-        AnalysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
-        LineCount = lineCount;
-        LinesWithProgramPoints = linesWithProgramPoints;
-        ProgramPointCount = programPointCount;
     }
 
     public string Kind => "invariantQuery";
@@ -723,43 +696,43 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
 
     public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
-    public string ScopeKind { get; }
+    public string ScopeKind => _result.Kind;
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
+    public SymbolicCompactSourceQueryDescriptor QueryDescriptor => _result.QueryDescriptor;
 
     public SymbolicInvariantQuerySummary QuerySummary { get; }
 
     public SymbolicInvariantQueryFocus Focus { get; }
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText => _result.InvariantQuery.Text;
 
-    public SymbolicCompactInvariantQueryView InvariantQuery { get; }
+    public SymbolicCompactInvariantQueryView InvariantQuery => _result.InvariantQuery;
 
-    public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
+    public SymbolicCompactAnalysisSummary AnalysisSummary => _result.AnalysisSummary;
 
-    public SymbolicReachabilitySummary Reachability { get; }
+    public SymbolicReachabilitySummary Reachability => _result.Reachability;
 
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
+    public SymbolicProgramPointSummary ProgramPointSummary => _result.ProgramPointSummary;
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => _result.ProofOutcomes;
 
     public int ConditionProofCount => ConditionProofs.Count;
 
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _result.ConditionProofs;
 
-    public bool ConditionProofsTruncated { get; }
+    public bool ConditionProofsTruncated => _result.Truncation.Proofs;
 
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _result.SmtDiagnostics;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation => _result.AnalysisTruncation;
 
-    public int? LineCount { get; }
+    public int? LineCount => _result.LineCount;
 
-    public int LinesWithProgramPoints { get; }
+    public int LinesWithProgramPoints => _result.LinesWithProgramPoints;
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _result.ProgramPointCount;
 
     public static SymbolicInvariantQueryResult FromPoint(
         SymbolicProgramPointResult result,
@@ -798,23 +771,9 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         SymbolicCompactQueryOptions options)
     {
         return new SymbolicInvariantQueryResult(
-            result.Kind,
-            result.FilePath,
-            result.QueryDescriptor,
+            result,
             SymbolicInvariantQuerySummary.FromCompactResult(result, options),
-            SymbolicInvariantQueryFocus.FromCompactResult(result),
-            result.InvariantQuery.Text,
-            result.InvariantQuery,
-            result.AnalysisSummary,
-            result.Reachability,
-            result.ProgramPointSummary,
-            result.ConditionProofs,
-            result.Truncation.Proofs,
-            result.SmtDiagnostics,
-            result.AnalysisTruncation,
-            result.LineCount,
-            result.LinesWithProgramPoints,
-            result.ProgramPointCount);
+            SymbolicInvariantQueryFocus.FromCompactResult(result));
     }
 
     private static SymbolicCompactQueryOptions NormalizeOptions(SymbolicCompactQueryOptions? options)
