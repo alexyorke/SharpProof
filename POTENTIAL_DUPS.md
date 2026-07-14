@@ -206,11 +206,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## SharpProof.Test - T-V
 
-### `TypedSymbolicTestLowering.cs`: repeated "call pipeline, assign out, return IsExact" boilerplate
-Pattern repeated ~10x (lines 11-19, 21-29, ... 127-145).
-
-**Recommendation:** Generic helper `TryLower(Func<...> lower, out T value)`.
-
 ---
 
 ## SharpProof.Test - W-Z + Smt/Verifiers

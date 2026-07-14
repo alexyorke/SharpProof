@@ -13,9 +13,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        var lowering = SymbolicSemanticPipeline.LowerCondition(expression, context);
-        condition = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerCondition(expression, context), out condition);
     }
 
     internal static bool TryLowerTerm(
@@ -23,9 +21,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerTerm(expression, context), out term);
     }
 
     internal static bool TryLowerBuiltInLengthTerm(
@@ -33,9 +29,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expression, context);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expression, context), out term);
     }
 
     internal static bool TryLowerArrayDimensionLengthTerm(
@@ -44,9 +38,9 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        var lowering = SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(
+            SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context),
+            out term);
     }
 
     internal static bool TryLowerNullableHasValueTerm(
@@ -54,9 +48,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context), out term);
     }
 
     internal static bool TryLowerStringNonNullCondition(
@@ -64,9 +56,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        var lowering = SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context);
-        condition = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context), out condition);
     }
 
     internal static bool TryLowerStringTerm(
@@ -74,9 +64,7 @@ internal static class TypedSymbolicTestLowering
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        var lowering = SymbolicSemanticPipeline.LowerStringTerm(expression, context);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.LowerStringTerm(expression, context), out term);
     }
 
     internal static bool TryCreateStringContentReferenceTerm(
@@ -84,9 +72,7 @@ internal static class TypedSymbolicTestLowering
         out SymbolicTerm term)
     {
         var source = SyntaxFactory.IdentifierName("string-content");
-        var lowering = SymbolicSemanticPipeline.ProjectStringContentTerm(reference, source);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(SymbolicSemanticPipeline.ProjectStringContentTerm(reference, source), out term);
     }
 
     internal static bool TryCreateBuiltInElementAccessInRangeCondition(
@@ -98,13 +84,13 @@ internal static class TypedSymbolicTestLowering
         out SymbolicCondition condition)
     {
         _ = provenance;
-        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
-            receiverExpression,
-            indexExpression,
-            source,
-            context);
-        condition = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
+        return TryGetExact(
+            SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+                receiverExpression,
+                indexExpression,
+                source,
+                context),
+            out condition);
     }
 
     internal static bool TryCreateBuiltInElementAccessInRangeCondition(
@@ -211,5 +197,12 @@ internal static class TypedSymbolicTestLowering
             semanticModel,
             cancellationToken,
             formulas);
+    }
+
+    private static bool TryGetExact<T>(SymbolicLoweringResult<T> lowering, out T value)
+        where T : class
+    {
+        value = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
     }
 }
