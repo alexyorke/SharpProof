@@ -80,25 +80,16 @@ internal static partial class SmtSyntacticClassifier
             term = null!;
             isNull = false;
 
-            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
-                TryGetReferenceNullComparison(negated.Operand, out term, out isNull))
-            {
-                isNull = !isNull;
-                return true;
-            }
-
-            if (formula is not SmtBinaryFormula binary ||
-                binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual))
+            if (!SmtSyntacticFormulaOperations.TryGetComparison(
+                    formula,
+                    out var binary,
+                    out var negationCount))
                 return false;
 
-            var comparisonIsNull = binary.Operator == SmtBinaryOperator.Equal;
-            if (binary.Left is SmtNullConstant && binary.Right is SmtNullConstant)
-            {
-                term = binary.Right;
-                isNull = comparisonIsNull;
-                return true;
-            }
+            var op = SmtSyntacticFormulaOperations.ApplyNegations(binary.Operator, negationCount);
+            if (op is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
+            var comparisonIsNull = op == SmtBinaryOperator.Equal;
             if (binary.Left is SmtNullConstant && binary.Right.Kind == SmtValueKind.Reference)
             {
                 term = binary.Right;
@@ -276,22 +267,20 @@ internal static partial class SmtSyntacticClassifier
             term = null!;
             op = default;
             value = string.Empty;
-            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
-                TryGetStringComparison(negated.Operand, out term, out op, out value))
-            {
-                op = SmtComparisonOperatorFacts.Negate(op);
-                return op is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
-            }
-
-            if (formula is not SmtBinaryFormula binary ||
-                binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual))
+            if (!SmtSyntacticFormulaOperations.TryGetComparison(
+                    formula,
+                    out var binary,
+                    out var negationCount))
                 return false;
+
+            var effectiveOperator = SmtSyntacticFormulaOperations.ApplyNegations(binary.Operator, negationCount);
+            if (effectiveOperator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
             if (binary.Left.Kind == SmtValueKind.String &&
                 binary.Right is SmtStringConstant rightConstant)
             {
                 term = binary.Left;
-                op = binary.Operator;
+                op = effectiveOperator;
                 value = rightConstant.Value;
                 return true;
             }
@@ -300,7 +289,7 @@ internal static partial class SmtSyntacticClassifier
                 binary.Right.Kind == SmtValueKind.String)
             {
                 term = binary.Right;
-                op = binary.Operator;
+                op = effectiveOperator;
                 value = leftConstant.Value;
                 return true;
             }

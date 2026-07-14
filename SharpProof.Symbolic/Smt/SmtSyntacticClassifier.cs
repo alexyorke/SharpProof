@@ -510,22 +510,16 @@ internal static partial class SmtSyntacticClassifier
             op = default;
             right = null!;
 
-            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
-            {
-                if (!TryGetIntegerBinaryComparison(negated.Operand, out left, out op, out right)) return false;
-
-                op = SmtComparisonOperatorFacts.Negate(op);
-                return true;
-            }
-
-            if (formula is not SmtBinaryFormula binary ||
-                !SmtComparisonOperatorFacts.IsComparison(binary.Operator) ||
+            if (!SmtSyntacticFormulaOperations.TryGetComparison(
+                    formula,
+                    out var binary,
+                    out var negationCount) ||
                 binary.Left.Kind != SmtValueKind.Int ||
                 binary.Right.Kind != SmtValueKind.Int)
                 return false;
 
             left = binary.Left;
-            op = binary.Operator;
+            op = SmtSyntacticFormulaOperations.ApplyNegations(binary.Operator, negationCount);
             right = binary.Right;
             return true;
         }

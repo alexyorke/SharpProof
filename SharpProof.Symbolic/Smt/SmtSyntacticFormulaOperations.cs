@@ -67,6 +67,29 @@ internal static class SmtSyntacticFormulaOperations
             .Select(static conditional => conditional.Condition);
     }
 
+    internal static bool TryGetComparison(SmtFormula formula, out SmtBinaryFormula comparison, out int negationCount)
+    {
+        negationCount = 0;
+        while (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+        {
+            negationCount++;
+            formula = negated.Operand;
+        }
+
+        if (formula is SmtBinaryFormula binary &&
+            SmtComparisonOperatorFacts.IsComparison(binary.Operator))
+        {
+            comparison = binary;
+            return true;
+        }
+
+        comparison = null!;
+        return false;
+    }
+
+    internal static SmtBinaryOperator ApplyNegations(SmtBinaryOperator op, int negationCount)
+        => (negationCount & 1) == 0 ? op : SmtComparisonOperatorFacts.Negate(op);
+
     internal static bool TryGetIntegerComparison(
         SmtFormula formula,
         out SmtFormula term,
@@ -76,15 +99,17 @@ internal static class SmtSyntacticFormulaOperations
         term = null!;
         op = default;
         constant = default;
-        if (formula is not SmtBinaryFormula binary ||
-            !SmtComparisonOperatorFacts.IsComparison(binary.Operator))
-            return TryGetNegatedIntegerComparison(formula, out term, out op, out constant);
+        if (!TryGetComparison(formula, out var binary, out var negationCount) ||
+            negationCount > 1)
+            return false;
+
+        var effectiveOperator = ApplyNegations(binary.Operator, negationCount);
 
         if (binary.Left.Kind == SmtValueKind.Int &&
             binary.Right is SmtIntegerConstant rightConstant)
         {
             term = binary.Left;
-            op = binary.Operator;
+            op = effectiveOperator;
             constant = rightConstant.Value;
             return true;
         }
@@ -93,31 +118,12 @@ internal static class SmtSyntacticFormulaOperations
             binary.Right.Kind == SmtValueKind.Int)
         {
             term = binary.Right;
-            op = SmtComparisonOperatorFacts.Reverse(binary.Operator);
+            op = SmtComparisonOperatorFacts.Reverse(effectiveOperator);
             constant = leftConstant.Value;
             return true;
         }
 
         return false;
-    }
-
-    internal static bool TryGetNegatedIntegerComparison(
-        SmtFormula formula,
-        out SmtFormula term,
-        out SmtBinaryOperator op,
-        out long constant)
-    {
-        term = null!;
-        op = default;
-        constant = default;
-
-        if (formula is not SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated ||
-            negated.Operand is not SmtBinaryFormula comparison ||
-            !TryGetIntegerComparison(comparison, out term, out op, out constant))
-            return false;
-
-        op = SmtComparisonOperatorFacts.Negate(op);
-        return true;
     }
 
     internal static bool AreSyntacticComplements(SmtFormula left, SmtFormula right)

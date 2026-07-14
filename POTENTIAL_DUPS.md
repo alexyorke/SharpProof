@@ -248,9 +248,6 @@ Identical tie-break snippet. **Recommendation:** `SelectCanonical(SmtFormula a, 
 ### Duplicated FloorDiv / CeilingDiv - `SmtSyntacticClassifier.Numeric.cs:552-566` (BigInteger) vs `:776-792` (long)
 **Recommendation:** Implement `long` versions by delegating to BigInteger overloads.
 
-### Duplicated "TryGet*Comparison" Not-unwrap + binary dispatch - `SmtSyntacticFormulaOperations.cs:70`, `SmtSyntacticClassifier.cs:503-531`, `SmtSyntacticClassifier.ReferenceString.cs:270-309`, `:75-117`
-**Recommendation:** Generic `TryGetComparison(formula, out term, out op, out rhs, kindPredicate, allowNegation)`.
-
 ### Duplicated conditional-formula "known value" recursion - `SmtSyntacticClassifier.Numeric.cs:156-159`, `ReferenceString.cs:203-206,250-255,159-163`
 Same `conditionValue ? WhenTrue : WhenFalse` dispatch per kind. **Recommendation:** `TryGetConditionalKnownValue(...)` generic helper.
 

@@ -11,6 +11,61 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SmtSyntacticClassifierTests
 {
+    [TestCase(0, (int)SmtBinaryOperator.Equal)]
+    [TestCase(1, (int)SmtBinaryOperator.NotEqual)]
+    [TestCase(2, (int)SmtBinaryOperator.Equal)]
+    public void ComparisonExtraction_PreservesNestedNegationParity(
+        int negationCount,
+        int expectedOperatorValue)
+    {
+        var expectedOperator = (SmtBinaryOperator)expectedOperatorValue;
+        SmtFormula formula = new SmtBinaryFormula(
+            SmtBinaryOperator.Equal,
+            new SmtVariable("value", SmtValueKind.Int),
+            new SmtIntegerConstant(0));
+        for (var index = 0; index < negationCount; index++)
+            formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
+
+        Assert.That(
+            SmtSyntacticFormulaOperations.TryGetComparison(formula, out var comparison, out var actualNegationCount),
+            Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(comparison.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
+            Assert.That(actualNegationCount, Is.EqualTo(negationCount));
+            Assert.That(
+                SmtSyntacticFormulaOperations.ApplyNegations(comparison.Operator, actualNegationCount),
+                Is.EqualTo(expectedOperator));
+        });
+    }
+
+    [TestCase("integer")]
+    [TestCase("string")]
+    [TestCase("reference")]
+    public void ComparisonExtraction_DomainFactsRetainContradictionDetection(string domain)
+    {
+        (SmtFormula left, SmtFormula right) = domain switch
+        {
+            "integer" => ((SmtFormula)new SmtVariable("value", SmtValueKind.Int),
+                (SmtFormula)new SmtIntegerConstant(0)),
+            "string" => ((SmtFormula)new SmtVariable("value", SmtValueKind.String),
+                (SmtFormula)new SmtStringConstant("known")),
+            "reference" => ((SmtFormula)new SmtVariable("value", SmtValueKind.Reference),
+                (SmtFormula)new SmtNullConstant()),
+            _ => throw new ArgumentOutOfRangeException(nameof(domain))
+        };
+        var equality = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+        var pathConditions = ImmutableArray.Create<SmtFormula>(
+            equality,
+            new SmtUnaryFormula(SmtUnaryOperator.Not, equality));
+        var query = new PurityProofQuery(
+            pathConditions,
+            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
+        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+    }
+
     [Test]
     public void SyntacticFactSetCopy_PreservesDepthAndSharesWorkBudget()
     {
