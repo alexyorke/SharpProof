@@ -16,10 +16,7 @@ internal static class MethodCapabilityAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        void Report(Diagnostic diagnostic)
-        {
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
-        }
+        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
         if (!TryGetAllowedCapabilities(
                 methodSymbol,
@@ -38,7 +35,7 @@ internal static class MethodCapabilityAnalyzer
                 invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            Report(diagnostic);
+            report(diagnostic);
 
             return;
         }
@@ -53,7 +50,7 @@ internal static class MethodCapabilityAnalyzer
                 methodSymbol,
                 outcome.Error!,
                 context.Node.SyntaxTree);
-            Report(queryFailure);
+            report(queryFailure);
             return;
         }
 
@@ -64,7 +61,7 @@ internal static class MethodCapabilityAnalyzer
             if (site.IsUnknown)
             {
                 var unknownSiteDiagnostic = CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree);
-                Report(unknownSiteDiagnostic);
+                report(unknownSiteDiagnostic);
 
                 continue;
             }
@@ -75,7 +72,7 @@ internal static class MethodCapabilityAnalyzer
 
             var diagnostic =
                 CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree);
-            Report(diagnostic);
+            report(diagnostic);
         }
 
         if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0)
@@ -108,7 +105,7 @@ internal static class MethodCapabilityAnalyzer
                     methodSymbol.Name,
                     result.UnknownReasons[0].ToString()
                 });
-            Report(diagnostic);
+            report(diagnostic);
         }
     }
 

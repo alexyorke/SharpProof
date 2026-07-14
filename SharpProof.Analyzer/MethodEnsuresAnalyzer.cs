@@ -21,10 +21,7 @@ internal static class MethodEnsuresAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        void Report(Diagnostic diagnostic)
-        {
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
-        }
+        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -48,7 +45,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "auto-property getter result is not source-visible for [Ensures] verification",
                     null);
-                Report(diagnostic);
+                report(diagnostic);
             }
 
             return;
@@ -64,7 +61,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     unsupportedReason,
                     null);
-                Report(diagnostic);
+                report(diagnostic);
             }
 
             return;
@@ -92,7 +89,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "condition parse failure",
                     null);
-                Report(diagnostic);
+                report(diagnostic);
 
                 continue;
             }
@@ -109,7 +106,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "condition binding failure",
                     null);
-                Report(diagnostic);
+                report(diagnostic);
 
                 continue;
             }
@@ -123,7 +120,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "result is not available for [Ensures] on void-returning members or constructors",
                     null);
-                Report(diagnostic);
+                report(diagnostic);
 
                 continue;
             }
@@ -137,7 +134,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "local variables are not supported in [Ensures] conditions",
                     null);
-                Report(diagnostic);
+                report(diagnostic);
 
                 continue;
             }
@@ -152,7 +149,7 @@ internal static class MethodEnsuresAnalyzer
                         completionSite.Location,
                         "SMT is disabled for [Ensures] verification",
                         contract.Location == null ? null : new[] { contract.Location });
-                    Report(diagnostic);
+                    report(diagnostic);
 
                     continue;
                 }
@@ -170,7 +167,7 @@ internal static class MethodEnsuresAnalyzer
                         contract.Location,
                         "result placeholder rewrite failed",
                         new[] { completionSite.Location });
-                    Report(diagnostic);
+                    report(diagnostic);
 
                     continue;
                 }
@@ -245,7 +242,7 @@ internal static class MethodEnsuresAnalyzer
                         completionSite,
                         contract.Location,
                         proof);
-                    Report(diagnostic);
+                    report(diagnostic);
 
                     continue;
                 }
@@ -257,7 +254,7 @@ internal static class MethodEnsuresAnalyzer
                     ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
                     contract.Location == null ? null : new[] { contract.Location },
                     proof.AnalysisTruncation);
-                Report(unsupportedDiagnostic);
+                report(unsupportedDiagnostic);
             }
         }
     }

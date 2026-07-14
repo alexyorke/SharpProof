@@ -20,10 +20,7 @@ internal static class MethodPurityAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        void Report(Diagnostic diagnostic)
-        {
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
-        }
+        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
 
         if (!methodSymbol.Locations.Any(static location => location.IsInSource)) return;
@@ -94,7 +91,7 @@ internal static class MethodPurityAnalyzer
                     conflictingDiagnosticLocation,
                     null,
                     properties, methodSymbol.Name);
-                Report(conflicting);
+                report(conflicting);
             }
         }
 
@@ -128,7 +125,7 @@ internal static class MethodPurityAnalyzer
                     allowSyncLocation,
                     null,
                     properties, methodSymbol.Name);
-                Report(diag);
+                report(diag);
             }
         }
 
@@ -157,7 +154,7 @@ internal static class MethodPurityAnalyzer
                         redundantLoc,
                         null,
                         properties, methodSymbol.Name);
-                    Report(redundant);
+                    report(redundant);
                 }
             }
         }
@@ -244,7 +241,7 @@ internal static class MethodPurityAnalyzer
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.ToSummary());
-                    Report(explanation);
+                    report(explanation);
                 }
 
                 if ((effectiveEmitExplanations || effectiveReportBclFallbackGuesses) &&
@@ -256,7 +253,7 @@ internal static class MethodPurityAnalyzer
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.BclFallbackGuess,
                         BclPurityFallbackHeuristics.GetDisplayReason(purityResult.Evidence.BclFallbackReason));
-                    Report(fallbackDiagnostic);
+                    report(fallbackDiagnostic);
                 }
             }
         }
@@ -297,7 +294,7 @@ internal static class MethodPurityAnalyzer
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name);
-                    Report(diagnostic);
+                    report(diagnostic);
                 }
             }
         }

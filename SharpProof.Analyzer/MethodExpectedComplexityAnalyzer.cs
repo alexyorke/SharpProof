@@ -15,10 +15,7 @@ internal static class MethodExpectedComplexityAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
-        void Report(Diagnostic diagnostic)
-        {
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
-        }
+        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -41,7 +38,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            Report(diagnostic);
+            report(diagnostic);
 
             return;
         }
@@ -61,7 +58,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 context.CancellationToken,
                 context.Node.SyntaxTree,
                 SymbolicUnknownReasonTaxonomy.ForComplexityFailure(error.Code + ": " + error.Message));
-            Report(diagnostic);
+            report(diagnostic);
 
             return;
         }
@@ -82,7 +79,7 @@ internal static class MethodExpectedComplexityAnalyzer
                     attributeLocation,
                     context.CancellationToken,
                     context.Node.SyntaxTree);
-                Report(exceededDiagnostic);
+                report(exceededDiagnostic);
 
                 return;
 
@@ -95,7 +92,7 @@ internal static class MethodExpectedComplexityAnalyzer
                     context.CancellationToken,
                     context.Node.SyntaxTree,
                     result.UnknownReasonDetails.FirstOrDefault());
-                Report(unknownDiagnostic);
+                report(unknownDiagnostic);
 
                 return;
         }

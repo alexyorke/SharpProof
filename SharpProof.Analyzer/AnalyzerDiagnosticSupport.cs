@@ -8,6 +8,11 @@ namespace SharpProof.Analyzer;
 
 internal static class AnalyzerDiagnosticReporter
 {
+    internal static Action<Diagnostic> CreateBaselineReporter(
+        MethodBodyAnalysisContext context,
+        DiagnosticBaseline baseline) =>
+        diagnostic => ReportIfNotSuppressed(context, baseline, diagnostic);
+
     internal static void ReportIfNotSuppressed(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
