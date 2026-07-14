@@ -9,6 +9,14 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicLoopStateTransfer
 {
+    private delegate bool TryLowerLoopInitializerBound(
+        ExpressionSyntax expression,
+        ISymbol initializedSymbol,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicTerm bound,
+        out IReadOnlyList<ISymbol> boundSymbols);
+
     internal static void AddForLoopBodyInvariantStateFacts(
         ref SymbolicState state,
         ForStatementSyntax forStatement,
@@ -197,65 +205,46 @@ internal static class SymbolicLoopStateTransfer
         EnumerateForLoopInitializerBoundTerms(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-    {
-        if (forStatement.Declaration != null)
-            foreach (var declarator in forStatement.Declaration.Variables)
-            {
-                if (declarator.Initializer == null ||
-                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
-                    !TryLowerInitializerBoundTerm(
-                        declarator.Initializer.Value,
-                        localSymbol.OriginalDefinition,
-                        semanticModel,
-                        cancellationToken,
-                        out var lowerBound,
-                        out var boundSymbols))
-                    continue;
-
-                yield return (localSymbol.OriginalDefinition, lowerBound, boundSymbols);
-            }
-
-        foreach (var expression in forStatement.Initializers)
-        {
-            if (expression is not AssignmentExpressionSyntax assignment ||
-                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
-                symbol is not ILocalSymbol and not IParameterSymbol ||
-                !TryLowerInitializerBoundTerm(
-                    assignment.Right,
-                    symbol.OriginalDefinition,
-                    semanticModel,
-                    cancellationToken,
-                    out var lowerBound,
-                    out var boundSymbols))
-                continue;
-
-            yield return (symbol.OriginalDefinition, lowerBound, boundSymbols);
-        }
-    }
+            CancellationToken cancellationToken) =>
+        EnumerateForLoopBoundTerms(
+            forStatement,
+            semanticModel,
+            cancellationToken,
+            TryLowerInitializerBoundTerm);
 
     private static IEnumerable<(ISymbol Symbol, SymbolicTerm UpperBound, IReadOnlyList<ISymbol> BoundSymbols)>
         EnumerateForLoopStrictUpperBoundInitializerTerms(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken) =>
+        EnumerateForLoopBoundTerms(
+            forStatement,
+            semanticModel,
+            cancellationToken,
+            TryGetStrictUpperBoundInitializerTerm);
+
+    private static IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)>
+        EnumerateForLoopBoundTerms(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            TryLowerLoopInitializerBound tryLowerBound)
     {
         if (forStatement.Declaration != null)
             foreach (var declarator in forStatement.Declaration.Variables)
             {
                 if (declarator.Initializer == null ||
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
-                    !TryGetStrictUpperBoundInitializerTerm(
+                    !tryLowerBound(
                         declarator.Initializer.Value,
                         localSymbol.OriginalDefinition,
                         semanticModel,
                         cancellationToken,
-                        out var upperBound,
+                        out var bound,
                         out var boundSymbols))
                     continue;
 
-                yield return (localSymbol.OriginalDefinition, upperBound, boundSymbols);
+                yield return (localSymbol.OriginalDefinition, bound, boundSymbols);
             }
 
         foreach (var expression in forStatement.Initializers)
@@ -264,16 +253,16 @@ internal static class SymbolicLoopStateTransfer
                 !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                 semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
                 symbol is not ILocalSymbol and not IParameterSymbol ||
-                !TryGetStrictUpperBoundInitializerTerm(
+                !tryLowerBound(
                     assignment.Right,
                     symbol.OriginalDefinition,
                     semanticModel,
                     cancellationToken,
-                    out var upperBound,
+                    out var bound,
                     out var boundSymbols))
                 continue;
 
-            yield return (symbol.OriginalDefinition, upperBound, boundSymbols);
+            yield return (symbol.OriginalDefinition, bound, boundSymbols);
         }
     }
 
@@ -281,11 +270,34 @@ internal static class SymbolicLoopStateTransfer
         EnumeratePreLoopInitializerBoundTerms(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken) =>
+        EnumeratePreLoopBoundTerms(
+            loopStatement,
+            semanticModel,
+            cancellationToken,
+            TryLowerInitializerBoundTerm);
+
+    private static IEnumerable<(ISymbol Symbol, SymbolicTerm UpperBound, IReadOnlyList<ISymbol> BoundSymbols)>
+        EnumeratePreLoopStrictUpperBoundInitializerTerms(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken) =>
+        EnumeratePreLoopBoundTerms(
+            loopStatement,
+            semanticModel,
+            cancellationToken,
+            TryGetStrictUpperBoundInitializerTerm);
+
+    private static IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)>
+        EnumeratePreLoopBoundTerms(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            TryLowerLoopInitializerBound tryLowerBound)
     {
         foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel,
                      cancellationToken))
-            if (TryLowerInitializerBoundTerm(
+            if (tryLowerBound(
                     initializer.Value,
                     initializer.Symbol,
                     semanticModel,
@@ -299,30 +311,6 @@ internal static class SymbolicLoopStateTransfer
                     semanticModel,
                     cancellationToken))
                 yield return (initializer.Symbol, bound, boundSymbols);
-    }
-
-    private static IEnumerable<(ISymbol Symbol, SymbolicTerm UpperBound, IReadOnlyList<ISymbol> BoundSymbols)>
-        EnumeratePreLoopStrictUpperBoundInitializerTerms(
-            StatementSyntax loopStatement,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-    {
-        foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel,
-                     cancellationToken))
-            if (TryGetStrictUpperBoundInitializerTerm(
-                    initializer.Value,
-                    initializer.Symbol,
-                    semanticModel,
-                    cancellationToken,
-                    out var upperBound,
-                    out var boundSymbols) &&
-                !AnyPriorStatementsInvalidateInitializer(
-                    initializer,
-                    loopStatement,
-                    boundSymbols,
-                    semanticModel,
-                    cancellationToken))
-                yield return (initializer.Symbol, upperBound, boundSymbols);
     }
 
     private static bool TryGetStrictUpperBoundInitializerTerm(
