@@ -924,39 +924,32 @@ internal sealed class SymbolicState
 
     private static IEnumerable<SymbolicFact> EnumerateConditionFacts(SymbolicCondition condition)
     {
-        switch (condition)
-        {
-            case SymbolicFactCondition factCondition:
-                yield return factCondition.Fact;
-                break;
-            case SymbolicNotCondition { Operand: var operand }:
-                foreach (var fact in EnumerateNegatedConditionFacts(operand)) yield return fact;
-
-                break;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
-                foreach (var fact in EnumerateConditionFacts(binary.Left)) yield return fact;
-
-                foreach (var fact in EnumerateConditionFacts(binary.Right)) yield return fact;
-
-                break;
-        }
+        return EnumerateConjunctiveFacts(condition, false);
     }
 
     private static IEnumerable<SymbolicFact> EnumerateNegatedConditionFacts(SymbolicCondition condition)
     {
+        return EnumerateConjunctiveFacts(condition, true);
+    }
+
+    private static IEnumerable<SymbolicFact> EnumerateConjunctiveFacts(
+        SymbolicCondition condition,
+        bool negate)
+    {
         switch (condition)
         {
             case SymbolicFactCondition factCondition:
-                yield return factCondition.Fact.Negate();
+                yield return negate ? factCondition.Fact.Negate() : factCondition.Fact;
                 break;
             case SymbolicNotCondition { Operand: var operand }:
-                foreach (var fact in EnumerateConditionFacts(operand)) yield return fact;
+                foreach (var fact in EnumerateConjunctiveFacts(operand, !negate)) yield return fact;
 
                 break;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
-                foreach (var fact in EnumerateNegatedConditionFacts(binary.Left)) yield return fact;
+            case SymbolicBinaryCondition binary
+                when binary.Operator == (negate ? SymbolicConditionOperator.Or : SymbolicConditionOperator.And):
+                foreach (var fact in EnumerateConjunctiveFacts(binary.Left, negate)) yield return fact;
 
-                foreach (var fact in EnumerateNegatedConditionFacts(binary.Right)) yield return fact;
+                foreach (var fact in EnumerateConjunctiveFacts(binary.Right, negate)) yield return fact;
 
                 break;
         }
