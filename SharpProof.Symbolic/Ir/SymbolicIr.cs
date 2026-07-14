@@ -478,7 +478,7 @@ internal sealed class SymbolicState
         {
             if (ContainsConstant(condition, false)) return true;
 
-            if (ContainsConjunctionContradiction(condition)) return true;
+            if (ContainsPolarityConflict(condition, SymbolicConditionOperator.And)) return true;
 
             foreach (var fact in EnumerateConditionFacts(condition))
             {
@@ -543,24 +543,17 @@ internal sealed class SymbolicState
         return false;
     }
 
-    private static bool ContainsConjunctionContradiction(SymbolicCondition condition)
+    private static bool ContainsPolarityConflict(
+        SymbolicCondition condition,
+        SymbolicConditionOperator conditionOperator)
     {
-        if (condition is not SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And }) return false;
+        if (condition is not SymbolicBinaryCondition binary || binary.Operator != conditionOperator) return false;
 
         var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var fact in EnumerateConditionFacts(condition))
-            if (HasOppositePolarity(polarities, fact))
-                return true;
-
-        return false;
-    }
-
-    private static bool ContainsDisjunctionTautology(SymbolicCondition condition)
-    {
-        if (condition is not SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or }) return false;
-
-        var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var fact in EnumerateDisjunctionFacts(condition))
+        var facts = conditionOperator == SymbolicConditionOperator.And
+            ? EnumerateConditionFacts(condition)
+            : EnumerateDisjunctionFacts(condition);
+        foreach (var fact in facts)
             if (HasOppositePolarity(polarities, fact))
                 return true;
 
@@ -906,7 +899,7 @@ internal sealed class SymbolicState
             SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary => expected
                 ? ContainsConstant(binary.Left, true) ||
                   ContainsConstant(binary.Right, true) ||
-                  ContainsDisjunctionTautology(condition)
+                  ContainsPolarityConflict(condition, SymbolicConditionOperator.Or)
                 : ContainsConstant(binary.Left, false) && ContainsConstant(binary.Right, false),
             _ => false
         };
