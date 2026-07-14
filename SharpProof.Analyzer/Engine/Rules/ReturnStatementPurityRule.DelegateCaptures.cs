@@ -6,38 +6,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class ReturnStatementPurityRule : IPurityRule
 {
-    private static bool TryFindReturnedDelegateFreshMutableObjectCapture(
-        IOperation? returnedValue,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        return TryFindReturnedDelegateCapture(
-            returnedValue,
-            context,
-            currentState,
-            ReturnedDelegateCaptureKind.FreshMutableObject,
-            out captureSyntax,
-            out capturedLocal);
-    }
-
-    private static bool TryFindReturnedDelegateOwnedLocalArrayCapture(
-        IOperation? returnedValue,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        return TryFindReturnedDelegateCapture(
-            returnedValue,
-            context,
-            currentState,
-            ReturnedDelegateCaptureKind.OwnedLocalArray,
-            out captureSyntax,
-            out capturedLocal);
-    }
-
     private static bool TryFindReturnedDelegateCapture(
         IOperation? returnedValue,
         PurityAnalysisContext context,

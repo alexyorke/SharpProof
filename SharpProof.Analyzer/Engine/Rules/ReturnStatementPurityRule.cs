@@ -72,10 +72,11 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     "owned_local_array_return",
                     currentState);
 
-            if (TryFindReturnedDelegateOwnedLocalArrayCapture(
+            if (TryFindReturnedDelegateCapture(
                     sourceReturnedValue,
                     context,
                     currentState,
+                    ReturnedDelegateCaptureKind.OwnedLocalArray,
                     out var delegateCaptureSyntax,
                     out var delegateCapturedArrayLocal))
                 return CreateMutableStateEscapeResult(
@@ -85,10 +86,11 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     "escaping_closure_owned_array_capture",
                     currentState);
 
-            if (TryFindReturnedDelegateFreshMutableObjectCapture(
+            if (TryFindReturnedDelegateCapture(
                     sourceReturnedValue,
                     context,
                     currentState,
+                    ReturnedDelegateCaptureKind.FreshMutableObject,
                     out var objectDelegateCaptureSyntax,
                     out var objectDelegateCapturedLocal))
                 return CreateMutableStateEscapeResult(
