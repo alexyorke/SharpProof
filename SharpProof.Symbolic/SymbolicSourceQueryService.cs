@@ -934,14 +934,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
+        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
 
         var query = AnalyzeProgramPointNode(
             semanticModel,
@@ -968,16 +961,9 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default)
     {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (node == null) throw new ArgumentNullException(nameof(node));
+        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
 
         if (analysis == null) throw new ArgumentNullException(nameof(analysis));
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
 
         return ProveCondition(
             semanticModel,
@@ -999,18 +985,11 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
+        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
 
         if (symbolicCondition == null) throw new ArgumentNullException(nameof(symbolicCondition));
 
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
 
         var query = AnalyzeProgramPointNode(
             semanticModel,
@@ -1028,6 +1007,19 @@ internal sealed class SymbolicSourceQueryService
             conditionText,
             symbolicCondition,
             smtAnalysis).WithAnalysisTruncation(query.Analysis.Truncation);
+    }
+
+    private static void ValidateProofRequest(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        string conditionText,
+        SmtAnalysisService smtAnalysis)
+    {
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        if (string.IsNullOrWhiteSpace(conditionText))
+            throw new ArgumentException("Condition text is required.", nameof(conditionText));
+        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
     }
 
     private ProgramPointQueryContext AnalyzeProgramPoint(
