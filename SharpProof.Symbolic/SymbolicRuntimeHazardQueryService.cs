@@ -226,10 +226,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-
         return QueryRuntimeHazardsCore(
             node.SyntaxTree,
             semanticModel,
@@ -251,10 +247,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         bool includeNestedCallables = false)
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
 
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
 
