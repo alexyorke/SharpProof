@@ -4,6 +4,7 @@ using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.SourceMarker;
 
 namespace SharpProof.Test;
 
@@ -195,16 +196,4 @@ public sealed class CompactDomainProjectionTests
         return document.RootElement.Clone();
     }
 
-    private static int FindLine(string source, string marker)
-    {
-        var position = source.IndexOf(marker, StringComparison.Ordinal);
-        if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
-
-        var line = 1;
-        for (var index = 0; index < position; index++)
-            if (source[index] == '\n')
-                line++;
-
-        return line;
-    }
 }
