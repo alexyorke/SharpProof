@@ -1,5 +1,85 @@
 internal static class EffectSummaryGeneratedPurityRules
 {
+    private static readonly GeneratedImpureRule[] GeneratedImpureRules =
+    [
+        new(["System.Guid.NewGuid()", "System.Decimal.ToInt32(decimal)"], [], ["throw"]),
+        new([], ["System.Char.ConvertToUtf32(", "System.Char.ConvertFromUtf32("], ["throw"]),
+        new(["System.TimeZoneInfo.FindSystemTimeZoneById(string)"], ["System.IO.Path.GetFullPath("], ["throw"]),
+        new(["System.IO.FileSystemInfo.get_Extension()"], [], ["impure_callee"]),
+        new([], ["System.Console.Beep", "System.Array.BinarySearch(", "System.String.Format("], ["impure_callee"]),
+        new([], ["System.Console.Read", "System.Console.Write"], ["catalog_hit"]),
+        new([], ["System.Console.get_"], ["global_state_read"]),
+        new(
+            [
+                "System.Diagnostics.Stopwatch.GetTimestamp()",
+                "System.Diagnostics.Stopwatch.get_ElapsedTicks()",
+                "System.Diagnostics.Stopwatch.Start()",
+                "System.Environment.get_StackTrace()"
+            ],
+            [],
+            ["impure_callee"]),
+        new([], ["System.Diagnostics.Process.Start("], ["global_state_write"]),
+        new(
+            [],
+            [
+                "System.Diagnostics.Process.GetCurrentProcess(",
+                "System.Diagnostics.Process.GetProcesses",
+                "System.Diagnostics.Process.get_"
+            ],
+            ["global_state_read"]),
+        new(
+            [],
+            [
+                "System.Text.StringBuilder.Append(",
+                "System.Text.StringBuilder.AppendLine(",
+                "System.Text.StringBuilder.Clear(",
+                "System.Text.StringBuilder.Insert(",
+                "System.Text.StringBuilder.Remove(",
+                "System.Text.StringBuilder.Replace("
+            ],
+            ["catalog_hit"]),
+        new([], ["System.Threading.Tasks.Task.Run("], ["caller_visible_memory_write"]),
+        new(
+            [
+                "System.AppContext.get_TargetFrameworkName()",
+                "System.Environment.set_CurrentDirectory(string)",
+                "System.IO.Directory.SetCurrentDirectory(string)",
+                "System.Threading.Thread.get_CurrentThread()"
+            ],
+            [
+                "System.Activator.CreateInstance",
+                "System.Activator.CreateInstanceFrom",
+                "System.IO.Path.GetTempPath",
+                "System.Threading.Tasks.Task.Delay("
+            ],
+            ["global_state_write"]),
+        new(
+            [
+                "System.AppDomain.get_BaseDirectory()",
+                "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
+                "System.Configuration.ConfigurationManager.get_AppSettings()",
+                "System.Configuration.ConfigurationManager.get_ConnectionStrings()"
+            ],
+            [],
+            ["global_state_read"]),
+        new(
+            [
+                "System.Environment.get_TickCount()",
+                "System.Environment.get_TickCount64()",
+                "System.Environment.get_CurrentManagedThreadId()",
+                "System.Environment.get_ExitCode()"
+            ],
+            [],
+            ["metadata_only_or_external"]),
+        new(["System.Environment.Exit(int)"], [], ["unknown_callee"]),
+        new(
+            ["System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)"],
+            ["System.Array.ConvertAll("],
+            ["caller_visible_memory_write"]),
+        new([], [], ["global_state_read", "impure_callee"], IsGeneratedArrayComparerSort),
+        new(["System.Security.Claims.ClaimsPrincipal.IsInRole(string)"], [], ["global_state_read"])
+    ];
+
     internal static bool TryGetKnownGeneratedPureVisibility(string symbol, out string effectVisibilityClassification)
     {
         effectVisibilityClassification = "none";
@@ -82,158 +162,29 @@ internal static class EffectSummaryGeneratedPurityRules
     {
         categories = new[] { "impure_callee" };
 
-        if (symbol is
-            "System.Guid.NewGuid()" or
-            "System.Decimal.ToInt32(decimal)")
+        foreach (var rule in GeneratedImpureRules)
         {
-            categories = new[] { "throw" };
-            return true;
-        }
+            if (!rule.Matches(symbol)) continue;
 
-        if (symbol.StartsWith("System.Char.ConvertToUtf32(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Char.ConvertFromUtf32(", StringComparison.Ordinal))
-        {
-            categories = new[] { "throw" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.IO.Path.GetFullPath(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", StringComparison.Ordinal))
-        {
-            categories = new[] { "throw" };
-            return true;
-        }
-
-        if (string.Equals(symbol, "System.IO.FileSystemInfo.get_Extension()", StringComparison.Ordinal))
-        {
-            categories = new[] { "impure_callee" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Console.Beep", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Array.BinarySearch(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.Format(", StringComparison.Ordinal))
-        {
-            categories = new[] { "impure_callee" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Console.Read", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Console.Write", StringComparison.Ordinal))
-        {
-            categories = new[] { "catalog_hit" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Console.get_", StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_read" };
-            return true;
-        }
-
-        if (symbol is
-            "System.Diagnostics.Stopwatch.GetTimestamp()" or
-            "System.Diagnostics.Stopwatch.get_ElapsedTicks()" or
-            "System.Diagnostics.Stopwatch.Start()" or
-            "System.Environment.get_StackTrace()")
-        {
-            categories = new[] { "impure_callee" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Diagnostics.Process.Start(", StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_write" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Diagnostics.Process.GetCurrentProcess(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Diagnostics.Process.GetProcesses", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Diagnostics.Process.get_", StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_read" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Text.StringBuilder.Append(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Text.StringBuilder.AppendLine(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Text.StringBuilder.Clear(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Text.StringBuilder.Insert(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Text.StringBuilder.Remove(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Text.StringBuilder.Replace(", StringComparison.Ordinal))
-        {
-            categories = new[] { "catalog_hit" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Threading.Tasks.Task.Run(", StringComparison.Ordinal))
-        {
-            categories = new[] { "caller_visible_memory_write" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Activator.CreateInstance", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Activator.CreateInstanceFrom", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.AppContext.get_TargetFrameworkName()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Environment.set_CurrentDirectory(string)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.IO.Directory.SetCurrentDirectory(string)", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.GetTempPath", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Threading.Tasks.Task.Delay(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Threading.Thread.get_CurrentThread()", StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_write" };
-            return true;
-        }
-
-        if (string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
-                StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_AppSettings()",
-                StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_ConnectionStrings()",
-                StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_read" };
-            return true;
-        }
-
-        if (symbol is
-            "System.Environment.get_TickCount()" or
-            "System.Environment.get_TickCount64()" or
-            "System.Environment.get_CurrentManagedThreadId()" or
-            "System.Environment.get_ExitCode()")
-        {
-            categories = new[] { "metadata_only_or_external" };
-            return true;
-        }
-
-        if (string.Equals(symbol, "System.Environment.Exit(int)", StringComparison.Ordinal))
-        {
-            categories = new[] { "unknown_callee" };
-            return true;
-        }
-
-        if (symbol.StartsWith("System.Array.ConvertAll(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)",
-                StringComparison.Ordinal))
-        {
-            categories = new[] { "caller_visible_memory_write" };
-            return true;
-        }
-
-        if (IsGeneratedArrayComparerSort(symbol))
-        {
-            categories = new[] { "global_state_read", "impure_callee" };
-            return true;
-        }
-
-        if (string.Equals(symbol, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", StringComparison.Ordinal))
-        {
-            categories = new[] { "global_state_read" };
+            categories = [.. rule.Categories];
             return true;
         }
 
         return false;
+    }
+
+    private sealed record GeneratedImpureRule(
+        string[] ExactSymbols,
+        string[] SymbolPrefixes,
+        string[] Categories,
+        Func<string, bool>? Predicate = null)
+    {
+        internal bool Matches(string symbol)
+        {
+            return ExactSymbols.Contains(symbol, StringComparer.Ordinal) ||
+                   SymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal)) ||
+                   Predicate?.Invoke(symbol) == true;
+        }
     }
 
     internal static bool IsPureGeneratedArrayRead(string symbol)
