@@ -32,7 +32,7 @@ internal partial class MethodInvocationPurityRule
             .FirstOrDefault(candidate => candidate.Parameters.Length == 0);
         if (arrayGetEnumerator == null) return false;
 
-        result = PurityCalleeResolver.GetCalleePurityAtUse(
+        result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
             arrayGetEnumerator,
             invocationOperation.Syntax,
             context);

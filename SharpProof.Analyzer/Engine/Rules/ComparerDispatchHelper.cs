@@ -32,7 +32,7 @@ internal static class ComparerDispatchHelper
         var implementation = ResolveDefaultComparisonImplementation(keyType);
         return implementation == null
             ? createUnknownResult()
-            : PurityCalleeResolver.GetCalleePurityAtUse(implementation, useSyntax, context);
+            : PurityCalleeResolver.GetCanonicalCalleePurityAtUse(implementation, useSyntax, context);
     }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckSubtypeConstructorComparerPurity(
@@ -153,8 +153,8 @@ internal static class ComparerDispatchHelper
         foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType))
         {
             foundImplementation = true;
-            var comparisonPurity = PurityCalleeResolver.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
-            if (!comparisonPurity.IsPure) return comparisonPurity.WithCallee(comparisonMethod, impureCalleeSyntax);
+            var comparisonPurity = PurityCalleeResolver.GetCalleePurityAtUse(comparisonMethod, impureCalleeSyntax, context);
+            if (!comparisonPurity.IsPure) return comparisonPurity;
         }
 
         if (!foundImplementation && IsUnresolvedComparerDispatch(comparerType))

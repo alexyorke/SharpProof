@@ -76,7 +76,7 @@ internal static partial class ComparerInvocationPurity
             if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(elementType,
                     out var equalsImplementation))
             {
-                result = PurityCalleeResolver.GetCalleePurityAtUse(
+                result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     equalsImplementation,
                     invocationOperation.Syntax,
                     context);
@@ -86,7 +86,7 @@ internal static partial class ComparerInvocationPurity
             if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.Equals), 1,
                     out var objectEqualsOverride))
             {
-                result = PurityCalleeResolver.GetCalleePurityAtUse(
+                result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     objectEqualsOverride,
                     invocationOperation.Syntax,
                     context);
@@ -98,7 +98,7 @@ internal static partial class ComparerInvocationPurity
             if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
                     out var getHashCodeOverride))
             {
-                result = PurityCalleeResolver.GetCalleePurityAtUse(
+                result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     getHashCodeOverride,
                     invocationOperation.Syntax,
                     context);

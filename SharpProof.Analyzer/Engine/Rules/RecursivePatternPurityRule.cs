@@ -16,7 +16,7 @@ internal sealed class RecursivePatternPurityRule : IPurityRule
         if (operation is IRecursivePatternOperation recursivePatternOperation &&
             recursivePatternOperation.DeconstructSymbol is IMethodSymbol deconstructMethod)
         {
-            var deconstructResult = PurityCalleeResolver.GetCalleePurityAtUse(
+            var deconstructResult = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                 deconstructMethod,
                 operation.Syntax,
                 context);

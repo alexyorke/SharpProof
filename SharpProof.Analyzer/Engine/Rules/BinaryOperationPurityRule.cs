@@ -95,9 +95,8 @@ internal class BinaryOperationPurityRule : IPurityRule
                         binaryOperation,
                         symbol: operatorMethod));
 
-            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
-
-            if (!operatorPurity.IsPure) return operatorPurity.WithCallee(operatorMethod, binaryOperation.Syntax);
+            var operatorPurity = PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, binaryOperation.Syntax, context);
+            if (!operatorPurity.IsPure) return operatorPurity;
         }
 
 

@@ -68,12 +68,17 @@ internal static class PurityCalleeResolver
             : result;
     }
 
+    internal static PurityAnalysisResult GetCanonicalCalleePurityAtUse(
+        IMethodSymbol methodSymbol,
+        SyntaxNode useSyntax,
+        PurityAnalysisContext context) =>
+        GetCalleePurityAtUse(methodSymbol.OriginalDefinition, useSyntax, context);
+
     internal static PurityAnalysisResult GetCalleePurityAtUse(
         IMethodSymbol methodSymbol,
         SyntaxNode useSyntax,
         PurityAnalysisContext context)
     {
-        methodSymbol = methodSymbol.OriginalDefinition;
         var result = GetCalleePurity(methodSymbol, context);
         return result.IsPure ? PurityAnalysisResult.Pure : result.WithCallee(methodSymbol, useSyntax);
     }

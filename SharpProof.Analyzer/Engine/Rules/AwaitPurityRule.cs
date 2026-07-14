@@ -185,7 +185,7 @@ internal class AwaitPurityRule : IPurityRule
     {
         if (methodSymbol == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        return PurityCalleeResolver.GetCalleePurityAtUse(methodSymbol, awaitSyntax, context);
+        return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(methodSymbol, awaitSyntax, context);
     }
 
 }

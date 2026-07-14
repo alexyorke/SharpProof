@@ -167,7 +167,7 @@ internal class InterpolatedStringPurityRule : IPurityRule
         if (policy.Decision == PurityPolicyDecision.Pure)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        return PurityCalleeResolver.GetCalleePurityAtUse(originalDefinition, interpolation.Syntax, context);
+        return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(originalDefinition, interpolation.Syntax, context);
     }
 
     private static IMethodSymbol? FindParameterlessToString(INamedTypeSymbol type)

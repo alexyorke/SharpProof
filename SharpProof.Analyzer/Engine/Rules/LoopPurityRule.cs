@@ -131,9 +131,9 @@ internal class LoopPurityRule : IPurityRule
 
         foreach (var getEnumerator in getEnumerators)
         {
-            var enumeratorPurity = PurityCalleeResolver.GetCalleePurity(getEnumerator.OriginalDefinition, context);
-            if (!enumeratorPurity.IsPure)
-                return enumeratorPurity.WithCallee(getEnumerator, unwrappedCollection.Syntax);
+            var enumeratorPurity =
+                PurityCalleeResolver.GetCalleePurityAtUse(getEnumerator, unwrappedCollection.Syntax, context);
+            if (!enumeratorPurity.IsPure) return enumeratorPurity;
 
             var runtimeMemberPurity = CheckForEachEnumeratorRuntimeMemberPurity(
                 getEnumerator.ReturnType,
@@ -172,13 +172,14 @@ internal class LoopPurityRule : IPurityRule
 
         foreach (var runtimeMember in runtimeMembers)
         {
-            var memberPurity = PurityCalleeResolver.GetCalleePurity(runtimeMember.OriginalDefinition, context);
+            var memberPurity =
+                PurityCalleeResolver.GetCalleePurityAtUse(runtimeMember, foreachSyntax, context);
             if (!memberPurity.IsPure &&
                 !EnumeratorRuntimeMemberClassifier.IsLocalEnumeratorStateMutation(
                     runtimeMember,
                     enumeratorType,
                     context.SemanticModel.Compilation))
-                return memberPurity.WithCallee(runtimeMember, foreachSyntax);
+                return memberPurity;
 
             if (isAsync && runtimeMember.Name is ("MoveNextAsync" or "DisposeAsync"))
             {

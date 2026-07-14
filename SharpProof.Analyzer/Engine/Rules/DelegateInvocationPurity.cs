@@ -115,8 +115,9 @@ internal static class DelegateInvocationPurity
 
         foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
         {
-            var targetPurity = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
-            if (!targetPurity.IsPure) return targetPurity.WithCallee(targetMethod, argument.Value.Syntax);
+            var targetPurity =
+                PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, argument.Value.Syntax, context);
+            if (!targetPurity.IsPure) return targetPurity;
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;

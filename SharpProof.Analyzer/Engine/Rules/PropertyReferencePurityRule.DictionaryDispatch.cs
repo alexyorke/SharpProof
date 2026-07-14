@@ -80,21 +80,21 @@ internal partial class PropertyReferencePurityRule
         if (!DispatchedMemberResolution.TryGetObjectOverride(keyType, nameof(GetHashCode), 0,
                 out var getHashCodeOverride)) return UnknownKeyDispatch(propertyReferenceOperation);
 
-        var hashPurity = PurityCalleeResolver.GetCalleePurityAtUse(
+        var hashPurity = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
             getHashCodeOverride,
             propertyReferenceOperation.Syntax,
             context);
         if (!hashPurity.IsPure) return hashPurity;
 
         if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(keyType, out var equalsImplementation))
-            return PurityCalleeResolver.GetCalleePurityAtUse(
+            return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                 equalsImplementation,
                 propertyReferenceOperation.Syntax,
                 context);
 
         if (DispatchedMemberResolution.TryGetObjectOverride(keyType, nameof(object.Equals), 1,
                 out var objectEqualsOverride))
-            return PurityCalleeResolver.GetCalleePurityAtUse(
+            return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                 objectEqualsOverride,
                 propertyReferenceOperation.Syntax,
                 context);

@@ -9,10 +9,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         IOperation operation,
         PurityAnalysisContext context)
     {
-        var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
-        return operatorPurity.IsPure
-            ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-            : operatorPurity.WithCallee(operatorMethod, operation.Syntax);
+        return PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, operation.Syntax, context);
     }
 
     private static bool TryCreateMutableBorrowConflictEvidence(

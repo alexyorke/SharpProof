@@ -89,9 +89,8 @@ internal class DelegateCreationPurityRule : IPurityRule
 
             foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
             {
-                var methodResult = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
-
-                if (!methodResult.IsPure) return methodResult.WithCallee(targetMethod, delegateCreation.Syntax);
+                var methodResult = PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, delegateCreation.Syntax, context);
+                if (!methodResult.IsPure) return methodResult;
 
                 if (IsEscapingDelegateCreation(delegateCreation) &&
                     targetMethod.MethodKind == MethodKind.LocalFunction &&
@@ -157,9 +156,8 @@ internal class DelegateCreationPurityRule : IPurityRule
         if (lambdaSymbol == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(anonymousFunction.Syntax);
 
-        var bodyResult = PurityCalleeResolver.GetCalleePurity(lambdaSymbol, context);
-        if (!bodyResult.IsPure)
-            return bodyResult.WithCallee(lambdaSymbol, delegateCreation.Syntax);
+        var bodyResult = PurityCalleeResolver.GetCalleePurityAtUse(lambdaSymbol, delegateCreation.Syntax, context);
+        if (!bodyResult.IsPure) return bodyResult;
 
         if (TryFindCapturedLocalMutation(
                 anonymousFunction,

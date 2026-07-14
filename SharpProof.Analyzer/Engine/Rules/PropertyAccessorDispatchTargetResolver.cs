@@ -34,8 +34,8 @@ internal static class PropertyAccessorDispatchTargetResolver
 
         foreach (var candidate in candidates)
         {
-            var candidateResult = PurityCalleeResolver.GetCalleePurity(candidate, context);
-            if (!candidateResult.IsPure) return candidateResult.WithCallee(candidate, propertyReference.Syntax);
+            var candidateResult = PurityCalleeResolver.GetCalleePurityAtUse(candidate, propertyReference.Syntax, context);
+            if (!candidateResult.IsPure) return candidateResult;
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;

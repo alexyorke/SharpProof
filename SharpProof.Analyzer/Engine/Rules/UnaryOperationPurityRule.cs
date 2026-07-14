@@ -36,9 +36,8 @@ internal class UnaryOperationPurityRule : IPurityRule
                     nameof(UnaryOperationPurityRule),
                     operatorMethod);
 
-            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
-
-            if (!operatorPurity.IsPure) return operatorPurity.WithCallee(operatorMethod, unaryOperation.Syntax);
+            var operatorPurity = PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, unaryOperation.Syntax, context);
+            if (!operatorPurity.IsPure) return operatorPurity;
         }
 
 

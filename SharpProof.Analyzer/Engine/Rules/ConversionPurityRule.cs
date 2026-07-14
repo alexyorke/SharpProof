@@ -49,9 +49,8 @@ internal class ConversionPurityRule : IPurityRule
                         conversionOperation,
                         symbol: operatorMethod));
 
-            var operatorResult = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
-
-            if (!operatorResult.IsPure) return operatorResult.WithCallee(operatorMethod, conversionOperation.Syntax);
+            var operatorResult = PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, conversionOperation.Syntax, context);
+            if (!operatorResult.IsPure) return operatorResult;
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }

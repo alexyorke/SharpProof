@@ -74,8 +74,8 @@ internal static class InvocationDispatchPurity
                     context.ContainingMethodSymbol.OriginalDefinition))
                 continue;
 
-            var candidatePurity = PurityCalleeResolver.GetCalleePurity(candidateMethod, context);
-            if (!candidatePurity.IsPure) return candidatePurity.WithCallee(candidateMethod, invocationOperation.Syntax);
+            var candidatePurity = PurityCalleeResolver.GetCalleePurityAtUse(candidateMethod, invocationOperation.Syntax, context);
+            if (!candidatePurity.IsPure) return candidatePurity;
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;

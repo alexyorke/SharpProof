@@ -162,8 +162,8 @@ internal class UsingStatementPurityRule : IPurityRule
         bool isAwaitUsing,
         string resourceDescription)
     {
-        var disposeResult = PurityCalleeResolver.GetCalleePurity(disposeMethod, context);
-        if (!disposeResult.IsPure) return disposeResult.WithCallee(disposeMethod, syntaxNode);
+        var disposeResult = PurityCalleeResolver.GetCalleePurityAtUse(disposeMethod, syntaxNode, context);
+        if (!disposeResult.IsPure) return disposeResult;
 
         return isAwaitUsing
             ? AwaitPurityRule.CheckAwaitablePatternMembers(disposeMethod.ReturnType, syntaxNode, context)

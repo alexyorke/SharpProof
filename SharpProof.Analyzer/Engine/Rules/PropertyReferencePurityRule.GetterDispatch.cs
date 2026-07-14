@@ -36,10 +36,10 @@ internal partial class PropertyReferencePurityRule
                 false);
             if (exactGetter != null)
             {
-                var getterResult = PurityCalleeResolver.GetCalleePurity(exactGetter, context);
-                return getterResult.IsPure
-                    ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                    : getterResult.WithCallee(exactGetter, propertyReferenceOperation.Syntax);
+                return PurityCalleeResolver.GetCalleePurityAtUse(
+                    exactGetter,
+                    propertyReferenceOperation.Syntax,
+                    context);
             }
         }
 
