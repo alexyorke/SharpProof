@@ -153,19 +153,6 @@ Identical body `return (int)instance.GetType().GetProperty("Count")!.GetValue(in
 
 ## SharpProof.Test - E-G
 
-### Duplicated `FindLine(string source, string text)` helper
-`ElementAccessSmtTests.cs:703`, `ExpressionAtomSmtTests.cs:741`, `ForeachSmtInvariantTests.cs:365`,
-and a canonical `internal static` in `SemanticOracleSmtTestBase.cs:408`.
-
-**Recommendation:** Reuse the existing `SemanticOracleSmtTestBase.FindLine`.
-
-### Duplicated SMT `ProveCondition`/`AssertConditionProven`/`AssertConditionUnknown` scaffolding
-`ElementAccessSmtTests.cs:676-701`, `ExpressionAtomSmtTests.cs:722-739`,
-`ExpressionSmtTranslationTests.cs:244-273` are near-parallel copies differing only in the hard-coded
-file-name string and magic args (`20`, `SmtAnalysisOptions.Default`, references).
-
-**Recommendation:** Extract a shared base/helper parameterized by caller-file name (`CallerFilePath`).
-
 ### `Generic*DispatchTests` (lower priority)
 `GenericComparisonDispatchTests`, `GenericEqualityDispatchTests`, `GenericIndexerDispatchTests`
 repeat the same skeleton but exercise genuinely different APIs. Borderline.

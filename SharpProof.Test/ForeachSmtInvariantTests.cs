@@ -3,6 +3,7 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.SemanticOracleSmtTestBase;
 
 namespace SharpProof.Test;
 
@@ -362,13 +363,4 @@ public class TestClass
         Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
 
-    private static int FindLine(string source, string text)
-    {
-        var lines = source.Split('\n');
-        for (var index = 0; index < lines.Length; index++)
-            if (lines[index].Contains(text, StringComparison.Ordinal))
-                return index + 1;
-
-        throw new InvalidOperationException("Text was not found in source.");
-    }
 }

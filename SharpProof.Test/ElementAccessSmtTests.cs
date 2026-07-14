@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.SymbolicProofTestAssertions;
 
 namespace SharpProof.Test;
 
@@ -673,40 +674,4 @@ public class TestClass
             "result == values.Length - 2");
     }
 
-    private static void AssertConditionProven(string source, string sourceLine, string condition)
-    {
-        var proof = ProveCondition(source, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-    }
-
-    private static void AssertConditionUnknown(string source, string sourceLine, string condition)
-    {
-        var proof = ProveCondition(source, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-    }
-
-    private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
-    {
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "ElementAccessSmtTests.cs",
-            FindLine(source, sourceLine),
-            20,
-            condition,
-            smtAnalysis,
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-    }
-
-    private static int FindLine(string source, string text)
-    {
-        var lines = source.Split('\n');
-        for (var index = 0; index < lines.Length; index++)
-            if (lines[index].Contains(text, StringComparison.Ordinal))
-                return index + 1;
-
-        throw new InvalidOperationException("Text was not found in source.");
-    }
 }

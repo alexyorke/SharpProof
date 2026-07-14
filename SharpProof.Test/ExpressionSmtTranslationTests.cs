@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
+using static SharpProof.Test.SymbolicProofTestAssertions;
 
 namespace SharpProof.Test;
 
@@ -241,34 +242,4 @@ public class TestClass
         AssertConditionProven(session, "return right.Count;", "right.Count == 3");
     }
 
-    private static void AssertConditionProven(SymbolicSourceQueryTestSession session, string sourceLine,
-        string condition)
-    {
-        var proof = ProveCondition(session, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-    }
-
-    private static void AssertConditionUnknown(SymbolicSourceQueryTestSession session, string sourceLine,
-        string condition)
-    {
-        var proof = ProveCondition(session, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-    }
-
-    private static SymbolicSourceQueryTestSession CreateSession(string source)
-    {
-        return new SymbolicSourceQueryTestSession(source, "ExpressionSmtTranslationTests.cs");
-    }
-
-    private static SymbolicConditionProofResult ProveCondition(
-        SymbolicSourceQueryTestSession session,
-        string sourceLine,
-        string condition)
-    {
-        return session.ProveAtMarker(
-            (session.FindLine(sourceLine), 20, 0),
-            condition);
-    }
 }
