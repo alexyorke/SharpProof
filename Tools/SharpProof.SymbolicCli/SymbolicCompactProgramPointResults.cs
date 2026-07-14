@@ -13,10 +13,10 @@ namespace SharpProof.Symbolic;
 
 public sealed class SymbolicCompactLineResult
 {
+    private readonly SymbolicLineQueryResult _result;
+
     private SymbolicCompactLineResult(
-        string filePath,
-        int line,
-        int programPointCount,
+        SymbolicLineQueryResult result,
         SymbolicCompactInvariantSummary observedInvariant,
         SymbolicCompactInvariantSummary conservativeInvariant,
         SymbolicCompactInvariantQueryView invariantQuery,
@@ -27,9 +27,7 @@ public sealed class SymbolicCompactLineResult
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         SymbolicCompactOutputTruncation truncation)
     {
-        FilePath = filePath ?? string.Empty;
-        Line = line;
-        ProgramPointCount = programPointCount;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
         ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
         ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
         InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
@@ -43,11 +41,11 @@ public sealed class SymbolicCompactLineResult
         Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public int Line { get; }
+    public int Line => _result.Line;
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _result.ProgramPoints.Count;
 
     public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
@@ -91,9 +89,7 @@ public sealed class SymbolicCompactLineResult
             maxProgramPoints);
 
         return new SymbolicCompactLineResult(
-            result.FilePath,
-            result.Line,
-            result.ProgramPoints.Count,
+            result,
             projection.ObservedInvariant,
             projection.ConservativeInvariant,
             projection.InvariantQuery,
@@ -266,42 +262,37 @@ public sealed class SymbolicCompactProgramPointResult
 
 public sealed class SymbolicCompactInvariantSummary
 {
+    private readonly SymbolicInvariantResult _invariant;
+
     private SymbolicCompactInvariantSummary(
-        string mergeKind,
-        string text,
-        int conditionCount,
+        SymbolicInvariantResult invariant,
         IReadOnlyList<string> conditions,
         int targetCount,
         IReadOnlyList<string> targets,
         int rawFactCount,
         IReadOnlyList<string> rawFacts,
-        int conservativeUnknownCount,
         SymbolicCompactMergedPathFacts? mergedPathFacts,
         bool conditionsTruncated,
         bool targetsTruncated,
         bool rawFactsTruncated)
     {
-        MergeKind = mergeKind ?? string.Empty;
-        Text = text ?? string.Empty;
-        ConditionCount = conditionCount;
+        _invariant = invariant ?? throw new ArgumentNullException(nameof(invariant));
         Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
         TargetCount = targetCount;
         Targets = targets ?? throw new ArgumentNullException(nameof(targets));
         RawFactCount = rawFactCount;
         RawFacts = rawFacts ?? throw new ArgumentNullException(nameof(rawFacts));
-        ConservativeUnknownCount = conservativeUnknownCount;
-        HasConservativeUnknowns = conservativeUnknownCount != 0;
         MergedPathFacts = mergedPathFacts;
         ConditionsTruncated = conditionsTruncated;
         TargetsTruncated = targetsTruncated;
         RawFactsTruncated = rawFactsTruncated;
     }
 
-    public string MergeKind { get; }
+    public string MergeKind => _invariant.MergeKind.ToString();
 
-    public string Text { get; }
+    public string Text => _invariant.MergedInvariantText;
 
-    public int ConditionCount { get; }
+    public int ConditionCount => _invariant.ConditionCount;
 
     public IReadOnlyList<string> Conditions { get; }
 
@@ -313,9 +304,9 @@ public sealed class SymbolicCompactInvariantSummary
 
     public IReadOnlyList<string> RawFacts { get; }
 
-    public int ConservativeUnknownCount { get; }
+    public int ConservativeUnknownCount => _invariant.ConservativeUnknownCount;
 
-    public bool HasConservativeUnknowns { get; }
+    public bool HasConservativeUnknowns => _invariant.HasConservativeUnknowns;
 
     public SymbolicCompactMergedPathFacts? MergedPathFacts { get; }
 
@@ -355,15 +346,12 @@ public sealed class SymbolicCompactInvariantSummary
         var targetProjection = SymbolicCompactProjection.Project(targets, options.MaxConditions);
         var rawFactProjection = SymbolicCompactProjection.Project(rawFacts, options.MaxFacts);
         return new SymbolicCompactInvariantSummary(
-            invariant.MergeKind.ToString(),
-            invariant.MergedInvariantText,
-            invariant.ConditionCount,
+            invariant,
             conditionProjection.Items,
             targetProjection.TotalCount,
             targetProjection.Items,
             rawFactProjection.TotalCount,
             rawFactProjection.Items,
-            invariant.ConservativeUnknownCount,
             mergedPathFacts == null
                 ? null
                 : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
@@ -384,58 +372,50 @@ public sealed class SymbolicCompactInvariantSummary
 
 public sealed class SymbolicCompactMergedPathFacts
 {
+    private readonly SymbolicMergedPathFacts _facts;
+
     private SymbolicCompactMergedPathFacts(
-        int alwaysFactCount,
+        SymbolicMergedPathFacts facts,
         IReadOnlyList<string> alwaysFacts,
-        int maybeFactCount,
         IReadOnlyList<string> maybeFacts,
-        int conservativeUnknownCount,
         IReadOnlyList<string> conservativeUnknowns,
         IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
-        int candidateProgramPointCount,
-        int unreachableProgramPointCount,
-        bool isUnreachable,
         bool alwaysFactsTruncated,
         bool maybeFactsTruncated,
         bool conservativeUnknownsTruncated,
         bool conservativeUnknownDiagnosticsTruncated)
     {
-        AlwaysFactCount = alwaysFactCount;
+        _facts = facts ?? throw new ArgumentNullException(nameof(facts));
         AlwaysFacts = alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
-        MaybeFactCount = maybeFactCount;
         MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        ConservativeUnknownCount = conservativeUnknownCount;
         ConservativeUnknowns = conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
         ConservativeUnknownDiagnostics = conservativeUnknownDiagnostics ??
                                          throw new ArgumentNullException(nameof(conservativeUnknownDiagnostics));
-        CandidateProgramPointCount = candidateProgramPointCount;
-        UnreachableProgramPointCount = unreachableProgramPointCount;
-        IsUnreachable = isUnreachable;
         AlwaysFactsTruncated = alwaysFactsTruncated;
         MaybeFactsTruncated = maybeFactsTruncated;
         ConservativeUnknownsTruncated = conservativeUnknownsTruncated;
         ConservativeUnknownDiagnosticsTruncated = conservativeUnknownDiagnosticsTruncated;
     }
 
-    public int AlwaysFactCount { get; }
+    public int AlwaysFactCount => _facts.AlwaysFacts.Count;
 
     public IReadOnlyList<string> AlwaysFacts { get; }
 
-    public int MaybeFactCount { get; }
+    public int MaybeFactCount => _facts.MaybeFacts.Count;
 
     public IReadOnlyList<string> MaybeFacts { get; }
 
-    public int ConservativeUnknownCount { get; }
+    public int ConservativeUnknownCount => _facts.ConservativeUnknownCount;
 
     public IReadOnlyList<string> ConservativeUnknowns { get; }
 
     public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; }
 
-    public int CandidateProgramPointCount { get; }
+    public int CandidateProgramPointCount => _facts.CandidateProgramPointCount;
 
-    public int UnreachableProgramPointCount { get; }
+    public int UnreachableProgramPointCount => _facts.UnreachableProgramPointCount;
 
-    public bool IsUnreachable { get; }
+    public bool IsUnreachable => _facts.IsUnreachable;
 
     public bool AlwaysFactsTruncated { get; }
 
@@ -461,16 +441,11 @@ public sealed class SymbolicCompactMergedPathFacts
             .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
         return new SymbolicCompactMergedPathFacts(
-            facts.AlwaysFacts.Count,
+            facts,
             SymbolicCompactProjection.Take(facts.AlwaysFacts, options.MaxConditions),
-            facts.MaybeFacts.Count,
             SymbolicCompactProjection.Take(facts.MaybeFacts, options.MaxConditions),
-            facts.ConservativeUnknowns.Count,
             SymbolicCompactProjection.Take(facts.ConservativeUnknowns, options.MaxConditions),
             conservativeUnknownDiagnostics,
-            facts.CandidateProgramPointCount,
-            facts.UnreachableProgramPointCount,
-            facts.IsUnreachable,
             facts.AlwaysFacts.Count > options.MaxConditions,
             facts.MaybeFacts.Count > options.MaxConditions,
             facts.ConservativeUnknowns.Count > options.MaxConditions,
@@ -480,39 +455,31 @@ public sealed class SymbolicCompactMergedPathFacts
 
 public sealed class SymbolicCompactConservativeUnknownDiagnostic
 {
+    private readonly SymbolicConservativeUnknownDiagnostic _diagnostic;
+
     private SymbolicCompactConservativeUnknownDiagnostic(
-        string target,
-        string unknownText,
-        string reason,
-        int maybeFactCount,
+        SymbolicConservativeUnknownDiagnostic diagnostic,
         IReadOnlyList<string> maybeFacts,
-        int candidateProgramPointCount,
-        int unreachableProgramPointCount,
         bool maybeFactsTruncated)
     {
-        Target = target ?? string.Empty;
-        UnknownText = unknownText ?? string.Empty;
-        Reason = reason ?? string.Empty;
-        MaybeFactCount = maybeFactCount;
+        _diagnostic = diagnostic ?? throw new ArgumentNullException(nameof(diagnostic));
         MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        CandidateProgramPointCount = candidateProgramPointCount;
-        UnreachableProgramPointCount = unreachableProgramPointCount;
         MaybeFactsTruncated = maybeFactsTruncated;
     }
 
-    public string Target { get; }
+    public string Target => _diagnostic.Target;
 
-    public string UnknownText { get; }
+    public string UnknownText => _diagnostic.UnknownText;
 
-    public string Reason { get; }
+    public string Reason => _diagnostic.Reason;
 
-    public int MaybeFactCount { get; }
+    public int MaybeFactCount => _diagnostic.MaybeFactCount;
 
     public IReadOnlyList<string> MaybeFacts { get; }
 
-    public int CandidateProgramPointCount { get; }
+    public int CandidateProgramPointCount => _diagnostic.CandidateProgramPointCount;
 
-    public int UnreachableProgramPointCount { get; }
+    public int UnreachableProgramPointCount => _diagnostic.UnreachableProgramPointCount;
 
     public bool MaybeFactsTruncated { get; }
 
@@ -521,13 +488,8 @@ public sealed class SymbolicCompactConservativeUnknownDiagnostic
         SymbolicCompactQueryOptions options)
     {
         return new SymbolicCompactConservativeUnknownDiagnostic(
-            diagnostic.Target,
-            diagnostic.UnknownText,
-            diagnostic.Reason,
-            diagnostic.MaybeFacts.Count,
+            diagnostic,
             SymbolicCompactProjection.Take(diagnostic.MaybeFacts, options.MaxConditions),
-            diagnostic.CandidateProgramPointCount,
-            diagnostic.UnreachableProgramPointCount,
             diagnostic.MaybeFacts.Count > options.MaxConditions);
     }
 }
