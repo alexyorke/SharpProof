@@ -243,10 +243,13 @@ public class TestClass
         }
     }
 
-    [Test]
-    public void QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState()
+    public enum StateFlowQueryMode { Line, Node }
+
+    public sealed record StateFlowScenario(string Source, string Name, string FileName, string Marker, StateFlowQueryMode QueryMode, string Target, string[] RequiredFactFragments, string[] ForbiddenFactFragments, SymbolicTruthValue? ExpectedProof, SymbolicReachability? ExpectedReachability);
+
+    private static readonly StateFlowScenario[] StateFlowScenarios =
     {
-        const string source = @"
+        new(@"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -259,20 +262,9 @@ public class TestClass
                 return 0;
         }
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "SwitchStateFacts.cs");
-        var result = session.AnalyzeLine("return value;");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(returnPoint.SymbolicFacts.Select(static fact => fact.Kind), Does.Contain("SymbolicRelationAtom"));
-        Assert.That(returnPoint.Facts, Does.Contain("value == 1"));
-        Assert.That(returnPoint.MergedInvariantText, Does.Contain("value == 1"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState", "SwitchStateFacts.cs", "return value;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["kind=SymbolicRelationAtom", "facts=value == 1", "merged~value == 1"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -284,25 +276,9 @@ public class TestClass
 
         return 0;
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "ForeachStateFacts.cs");
-        var result = session.AnalyzeLine("return value;");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.foreach-entry.not-null"));
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.foreach-entry.length-positive"));
-        Assert.That(returnPoint.Facts, Does.Contain("values != null"));
-        Assert.That(returnPoint.MergedInvariantText, Does.Contain("values.Length > 0"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState", "ForeachStateFacts.cs", "return value;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.foreach-entry.not-null", "provenance=ir.path.foreach-entry.length-positive", "facts=values != null", "merged~values.Length > 0"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod()
@@ -310,24 +286,9 @@ public class TestClass
         var divisor = 5;
         return 10 / divisor;
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "PriorAssignmentStateFacts.cs");
-        var result = session.AnalyzeLine("return 10 / divisor;");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.prior-statement.assigned-value"));
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Text),
-            Does.Contain("divisor == 5"));
-        Assert.That(returnPoint.Facts, Does.Contain("divisor == 5"));
-    }
-
-    [Test]
-    public void SymbolicQueryService_ForInitialEntryFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState", "PriorAssignmentStateFacts.cs", "return 10 / divisor;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.prior-statement.assigned-value", "text=divisor == 5", "facts=divisor == 5"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod()
@@ -339,41 +300,9 @@ public class TestClass
 
         return -1;
     }
-}";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "ForInitialEntryStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "ForInitialEntryStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var forStatement = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<ForStatementSyntax>()
-            .Single();
-
-        var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
-            SymbolicSourceInput.FromNode(forStatement, semanticModel),
-            SymbolicQueryTarget.Node()));
-
-        var programPoint = result.ProgramPoints.Single();
-        Assert.That(programPoint.NodeKind, Is.EqualTo("ForStatement"));
-        Assert.That(
-            programPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Has.Some.StartsWith("ir.path.for-initializer"));
-        Assert.That(
-            programPoint.SymbolicFacts.Select(static fact => fact.Text),
-            Does.Contain("index == 0"));
-        Assert.That(programPoint.Facts, Does.Contain("index == 0"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "SymbolicQueryService_ForInitialEntryFactsFlowThroughSymbolicState", "ForInitialEntryStateFacts.cs", "for (var index = 0; index < 10; index++)",
+            StateFlowQueryMode.Node, "ForStatement", ["provenance^ir.path.for-initializer", "text=index == 0", "facts=index == 0"], [], null, null),
+        new(@"
 using System;
 
 public class TestClass
@@ -391,25 +320,9 @@ public class TestClass
 
         return 0;
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "CatchStateFacts.cs");
-        var result = session.AnalyzeLine("return value;");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.catch-entry.exception-not-null"));
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Has.Some.StartsWith("ir.relation"));
-        Assert.That(returnPoint.Facts, Does.Contain("ex != null"));
-        Assert.That(returnPoint.MergedInvariantText, Does.Contain("value > 0"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_LockEntryFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState", "CatchStateFacts.cs", "return value;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.catch-entry.exception-not-null", "provenance^ir.relation", "facts=ex != null", "merged~value > 0"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod(object gate)
@@ -419,21 +332,9 @@ public class TestClass
             return gate.GetHashCode();
         }
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "LockStateFacts.cs");
-        var result = session.AnalyzeLine("return gate.GetHashCode();");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.lock-entry.not-null"));
-        Assert.That(returnPoint.Facts, Does.Contain("gate != null"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_UsingExpressionFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_LockEntryFactsFlowThroughSymbolicState", "LockStateFacts.cs", "return gate.GetHashCode();",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.lock-entry.not-null", "facts=gate != null"], [], null, null),
+        new(@"
 using System;
 
 public class TestClass
@@ -445,21 +346,9 @@ public class TestClass
             return 1;
         }
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "UsingExpressionStateFacts.cs");
-        var result = session.AnalyzeLine("return 1;");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
-        Assert.That(returnPoint.Facts, Does.Contain("value != null"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_UsingExpressionFactsFlowThroughSymbolicState", "UsingExpressionStateFacts.cs", "return 1;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.using-entry.throw-guarded-not-null", "facts=value != null"], [], null, null),
+        new(@"
 using System;
 
 public class TestClass
@@ -471,25 +360,9 @@ public class TestClass
             return resource.GetHashCode();
         }
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "UsingDeclarationStateFacts.cs");
-        var result = session.AnalyzeLine("return resource.GetHashCode();");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.using-entry.declaration-alias"));
-        Assert.That(returnPoint.Facts, Does.Contain("value != null"));
-        Assert.That(returnPoint.Facts, Does.Contain("resource == value"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState", "UsingDeclarationStateFacts.cs", "return resource.GetHashCode();",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.using-entry.throw-guarded-not-null", "provenance=ir.path.using-entry.declaration-alias", "facts=value != null", "facts=resource == value"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -501,22 +374,9 @@ public class TestClass
 
         return 0;
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "ForLoopStateFacts.cs");
-        var result = session.AnalyzeLine("return values[index];");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.for-loop-invariant.lower-bound"));
-        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
-        Assert.That(returnPoint.MergedInvariantText, Does.Contain("index >= 0"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState", "ForLoopStateFacts.cs", "return values[index];",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.for-loop-invariant.lower-bound", "facts=index >= 0", "merged~index >= 0"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -529,21 +389,9 @@ public class TestClass
 
         return 0;
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "WhileLoopStateFacts.cs");
-        var result = session.AnalyzeLine("return values[index];");
-
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.while-loop-invariant.lower-bound"));
-        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
-    }
-
-    [Test]
-    public void QuerySyntaxTreeLine_DoLoopInvariantFactsFlowThroughSymbolicState()
-    {
-        const string source = @"
+}", "QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState", "WhileLoopStateFacts.cs", "return values[index];",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.while-loop-invariant.lower-bound", "facts=index >= 0"], [], null, null),
+        new(@"
 public class TestClass
 {
     public int TestMethod()
@@ -554,15 +402,40 @@ public class TestClass
             return index;
         } while (index < 10);
     }
-}";
-        using var session = new SymbolicSourceQueryTestSession(source, "DoLoopStateFacts.cs");
-        var result = session.AnalyzeLine("return index;");
+}", "QuerySyntaxTreeLine_DoLoopInvariantFactsFlowThroughSymbolicState", "DoLoopStateFacts.cs", "return index;",
+            StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.do-loop-invariant.lower-bound", "facts=index >= 0"], [], null, null),
+    };
 
-        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-        Assert.That(
-            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.do-loop-invariant.lower-bound"));
-        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+    private static IEnumerable<TestCaseData> StateFlowScenarioData()
+    {
+        if (StateFlowScenarios.Length != 11 || StateFlowScenarios.Select(static x => x.Name).Distinct(StringComparer.Ordinal).Count() != 11) throw new InvalidOperationException("State-flow scenario invariants failed.");
+        return StateFlowScenarios.Select(static scenario => new TestCaseData(scenario).SetName(scenario.Name));
+    }
+
+    [TestCaseSource(nameof(StateFlowScenarioData))]
+    public void StateFlowScenariosPreserveAssertions(StateFlowScenario scenario)
+    {
+        SymbolicProgramPointResult point;
+        if (scenario.QueryMode == StateFlowQueryMode.Line)
+        { using var session = new SymbolicSourceQueryTestSession(scenario.Source, scenario.FileName); point = session.AnalyzeLine(scenario.Marker).ProgramPoints.Single(candidate => candidate.NodeKind == scenario.Target); }
+        else
+        {
+            var tree = CSharpSyntaxTree.ParseText(scenario.Source, new CSharpParseOptions(LanguageVersion.Preview), scenario.FileName);
+            var compilation = CSharpCompilation.Create(Path.GetFileNameWithoutExtension(scenario.FileName), [tree], AnalyzerTestHost.GetTrustedPlatformReferences(), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var node = tree.GetRoot().DescendantNodes().Single(candidate => candidate.Kind().ToString() == scenario.Target);
+            point = new SymbolicQueryService().Query(new SymbolicQueryContext(SymbolicSourceInput.FromNode(node, compilation.GetSemanticModel(tree)), SymbolicQueryTarget.Node())).ProgramPoints.Single();
+        }
+        bool Matches(string expectation) => expectation switch
+        {
+            var value when value.StartsWith("kind=", StringComparison.Ordinal) => point.SymbolicFacts.Any(fact => fact.Kind == value[5..]), var value when value.StartsWith("provenance=", StringComparison.Ordinal) => point.SymbolicFacts.Any(fact => fact.Provenance == value[11..]),
+            var value when value.StartsWith("provenance^", StringComparison.Ordinal) => point.SymbolicFacts.Any(fact => fact.Provenance.StartsWith(value[11..], StringComparison.Ordinal)), var value when value.StartsWith("text=", StringComparison.Ordinal) => point.SymbolicFacts.Any(fact => fact.Text == value[5..]),
+            var value when value.StartsWith("facts=", StringComparison.Ordinal) => point.Facts.Contains(value[6..]), var value when value.StartsWith("merged~", StringComparison.Ordinal) => point.MergedInvariantText.Contains(value[7..], StringComparison.Ordinal),
+            _ => throw new InvalidOperationException("Unknown state-flow fact expectation: " + expectation)
+        };
+        foreach (var required in scenario.RequiredFactFragments) Assert.That(Matches(required), Is.True, required);
+        foreach (var forbidden in scenario.ForbiddenFactFragments) Assert.That(Matches(forbidden), Is.False, forbidden);
+        if (scenario.ExpectedProof is { } proof) Assert.That(point.ConditionProofs.Select(static x => x.TruthValue), Does.Contain(proof));
+        if (scenario.ExpectedReachability is { } reachability) Assert.That(point.Reachability, Is.EqualTo(reachability));
     }
 
     [Test]
