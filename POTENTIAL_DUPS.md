@@ -173,13 +173,6 @@ re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixt
 
 ## SharpProof.Test - K-M
 
-### `GlobalState` static class duplicated 7x in `ListPatternSoundnessTests.cs` and `LinqOperationsTests.cs`
-`ListPatternSoundnessTests.cs`: 52,89,128,171,230. `LinqOperationsTests.cs`: 214,263.
-
-### Repeated fixture types inside `LinqOperationsTests.cs`
-`MutableKey : IComparable<MutableKey>` identical at 1032,1082,1132,1203; `ImpureComparer`, `ImpureSequence`,
-`Sequence` each repeated.
-
 ### Identical test methods duplicated between `MathAndLinqTests.cs` and `MathOperationsTests.cs`
 `ComplexNestedExpressions_NoDiagnostic`, `SimpleMathMethod_NoDiagnostic`, `MathConstant_NoDiagnostic`,
 `MathMethodChain_NoDiagnostic` are byte-for-byte identical. `MathOperationsTests` is effectively a subset.

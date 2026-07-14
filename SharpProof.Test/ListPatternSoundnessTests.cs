@@ -49,11 +49,7 @@ public sealed class TestClass
         var test = @"
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence
 {
     public int Length
@@ -86,11 +82,7 @@ public sealed class TestClass
         var test = @"
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence
 {
     public int Length => 2;
@@ -125,11 +117,7 @@ using System.Collections;
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence : IReadOnlyList<int>
 {
     public int Count
@@ -168,11 +156,7 @@ using System.Collections;
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence : IReadOnlyList<int>
 {
     public int Count => 2;
@@ -227,11 +211,7 @@ public sealed class TestClass
         var test = @"
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence
 {
     public int Length => 2;

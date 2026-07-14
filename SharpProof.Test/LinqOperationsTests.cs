@@ -211,11 +211,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class ImpureSequence : IEnumerable<int>
 {
     public IEnumerator<int> GetEnumerator() => new Enumerator();
@@ -260,11 +256,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public static class GlobalState
-{
-    public static int Count;
-}
-
+" + CommonAnalyzerSourceFragments.GlobalState + @"
 public sealed class Sequence : IEnumerable<int>
 {
     public IEnumerator<int> GetEnumerator() => new Enumerator();
@@ -1029,15 +1021,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableKey : IComparable<MutableKey>
-{
-    public int CompareTo(MutableKey other)
-    {
-        Console.WriteLine(""compare"");
-        return 0;
-    }
-}
-
+" + CommonAnalyzerSourceFragments.MutableComparableKey + @"
 public class TestClass
 {
     [EnforcePure]
@@ -1079,15 +1063,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableKey : IComparable<MutableKey>
-{
-    public int CompareTo(MutableKey other)
-    {
-        Console.WriteLine(""compare"");
-        return 0;
-    }
-}
-
+" + CommonAnalyzerSourceFragments.MutableComparableKey + @"
 public class TestClass
 {
     [EnforcePure]
@@ -1129,15 +1105,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableKey : IComparable<MutableKey>
-{
-    public int CompareTo(MutableKey other)
-    {
-        Console.WriteLine(""compare"");
-        return 0;
-    }
-}
-
+" + CommonAnalyzerSourceFragments.MutableComparableKey + @"
 public class TestClass
 {
     [EnforcePure]
@@ -1200,15 +1168,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableKey : IComparable<MutableKey>
-{
-    public int CompareTo(MutableKey other)
-    {
-        Console.WriteLine(""compare"");
-        return 0;
-    }
-}
-
+" + CommonAnalyzerSourceFragments.MutableComparableKey + @"
 public class TestClass
 {
     [EnforcePure]
