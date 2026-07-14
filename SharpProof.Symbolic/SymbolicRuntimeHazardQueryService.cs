@@ -25,66 +25,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazards(
-        string filePath,
-        SmtAnalysisService smtAnalysis,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazards(
-            sourceText,
-            sourcePath,
-            smtAnalysis,
-            references,
-            cancellationToken,
-            options,
-            compilationProfile));
-    }
-
-    public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsLine(
-        string filePath,
-        int line,
-        SmtAnalysisService smtAnalysis,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazardsLine(
-            sourceText,
-            sourcePath,
-            line,
-            smtAnalysis,
-            references,
-            cancellationToken,
-            options,
-            compilationProfile));
-    }
-
-    public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsSpan(
-        string filePath,
-        int spanStart,
-        int spanEnd,
-        SmtAnalysisService smtAnalysis,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazardsSpan(
-            sourceText,
-            sourcePath,
-            spanStart,
-            spanEnd,
-            smtAnalysis,
-            references,
-            cancellationToken,
-            options,
-            compilationProfile));
-    }
-
     public SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
         string sourceText,
         string filePath,
@@ -275,7 +215,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             true);
     }
 
-    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileRuntimeHazardSource(
+    internal static (SyntaxTree SyntaxTree, Compilation Compilation) CompileRuntimeHazardSource(
         string sourceText, string filePath, IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
         SymbolicSourceCompilation.CreateRuntimeHazards(

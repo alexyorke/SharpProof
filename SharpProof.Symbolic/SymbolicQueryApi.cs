@@ -552,39 +552,17 @@ public sealed class SymbolicQueryService
         SymbolicRuntimeHazardQueryOptions hazardOptions,
         CancellationToken cancellationToken)
     {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Line:
-            case SymbolicQueryTargetKind.Point:
-                return _runtimeHazardQueryService.QueryFileRuntimeHazardsLine(
-                    filePath,
-                    target.LineNumber!.Value,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            case SymbolicQueryTargetKind.Span:
-                return _runtimeHazardQueryService.QueryFileRuntimeHazardsSpan(
-                    filePath,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            case SymbolicQueryTargetKind.AllLines:
-                return _runtimeHazardQueryService.QueryFileRuntimeHazards(
-                    filePath,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            default:
-                throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-        }
+        if (!SupportsRuntimeHazardTarget(target.Kind))
+            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
+
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazards(
+            sourceText,
+            sourcePath,
+            compilationProfile,
+            target,
+            options,
+            hazardOptions,
+            cancellationToken));
     }
 
     private SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
@@ -596,42 +574,28 @@ public sealed class SymbolicQueryService
         SymbolicRuntimeHazardQueryOptions hazardOptions,
         CancellationToken cancellationToken)
     {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Line:
-            case SymbolicQueryTargetKind.Point:
-                return _runtimeHazardQueryService.QuerySourceRuntimeHazardsLine(
-                    sourceText,
-                    filePath,
-                    target.LineNumber!.Value,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            case SymbolicQueryTargetKind.Span:
-                return _runtimeHazardQueryService.QuerySourceRuntimeHazardsSpan(
-                    sourceText,
-                    filePath,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            case SymbolicQueryTargetKind.AllLines:
-                return _runtimeHazardQueryService.QuerySourceRuntimeHazards(
-                    sourceText,
-                    filePath,
-                    options.SmtAnalysis!,
-                    options.References,
-                    cancellationToken,
-                    hazardOptions,
-                    compilationProfile);
-            default:
-                throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-        }
+        if (!SupportsRuntimeHazardTarget(target.Kind))
+            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
+
+        var (syntaxTree, compilation) = SymbolicRuntimeHazardQueryService.CompileRuntimeHazardSource(
+            sourceText,
+            filePath,
+            options.References,
+            cancellationToken,
+            compilationProfile);
+        return QuerySyntaxTreeRuntimeHazards(
+            syntaxTree,
+            compilation,
+            target,
+            options,
+            hazardOptions,
+            cancellationToken);
+    }
+
+    private static bool SupportsRuntimeHazardTarget(SymbolicQueryTargetKind kind)
+    {
+        return kind is SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Point or
+            SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.AllLines;
     }
 
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(

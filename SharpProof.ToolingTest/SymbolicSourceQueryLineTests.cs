@@ -577,17 +577,42 @@ public class TestClass
     }
 }";
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicQueryService().QueryRuntimeHazards(
-            new SymbolicQueryContext(
-                SymbolicSourceInput.FromText(source, "HazardInput.cs"),
-                SymbolicQueryTarget.AllLines(),
-                new SymbolicQueryOptions(
-                    AnalyzerTestHost.GetTrustedPlatformReferences(),
-                    smtAnalysis)),
-            new SymbolicRuntimeHazardQueryOptions(
-                kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero }));
+        var service = new SymbolicQueryService();
+        var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences(), smtAnalysis);
+        var hazardOptions = new SymbolicRuntimeHazardQueryOptions(
+            kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero });
+        var targets = new[]
+        {
+            SymbolicQueryTarget.Point(FindLine(source, "return value / 0;")),
+            SymbolicQueryTarget.Line(FindLine(source, "return value / 0;")),
+            SymbolicQueryTarget.Span(
+                FindPosition(source, "return value / 0;"),
+                FindPosition(source, "return value / 0;") + "return value / 0;".Length),
+            SymbolicQueryTarget.AllLines()
+        };
 
-        Assert.That(result.Hazards.Single().Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+        void AssertHazard(SymbolicSourceInput input, SymbolicQueryTarget target)
+        {
+            var result = service.QueryRuntimeHazards(
+                new SymbolicQueryContext(input, target, options), hazardOptions);
+            Assert.That(result.Hazards.Single().Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero),
+                target.Kind.ToString());
+        }
+
+        foreach (var target in targets)
+            AssertHazard(SymbolicSourceInput.FromText(source, "HazardInput.cs"), target);
+
+        var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.HazardQuery." + Guid.NewGuid() + ".cs");
+        try
+        {
+            File.WriteAllText(sourcePath, source);
+            foreach (var target in targets)
+                AssertHazard(SymbolicSourceInput.FromFile(sourcePath), target);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
     }
 
     [Test]
