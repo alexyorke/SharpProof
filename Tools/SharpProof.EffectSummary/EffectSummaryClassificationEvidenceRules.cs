@@ -1,5 +1,8 @@
 internal static class EffectSummaryClassificationEvidenceRules
 {
+    private static readonly string[] CommonFreshResultDisqualifyingEffects =
+        ["writes_static_field", "writes_instance_field", "indirect_call", "virtual_call", "block_memory_write"];
+
     internal static string? GetFreshArrayNote(MethodPurityClassification? classification)
     {
         if (classification == null) return "unclassified";
@@ -61,12 +64,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) &&
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
         {
-            if (summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
-                summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
-                summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal) ||
-                summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
-                summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
-                summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
+            if (HasFreshResultDisqualifyingEffect(summary, "reads_instance_field"))
                 return false;
 
             if (!HasOnlySafeStaticReads(summary)) return false;
@@ -88,12 +86,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                 string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
             return false;
 
-        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
-            summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
-            summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
+        if (HasFreshResultDisqualifyingEffect(summary, "allocates_array"))
             return false;
 
         if (!HasOnlySafeStaticReads(summary)) return false;
@@ -107,20 +100,21 @@ internal static class EffectSummaryClassificationEvidenceRules
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
             return false;
 
-        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("reads_static_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
-            summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
-            summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
+        if (HasFreshResultDisqualifyingEffect(summary,
+                "allocates_array", "reads_instance_field", "reads_static_field"))
             return false;
 
         return summary.Calls.Any(static call =>
             call.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) ||
             call.StartsWith("System.Text.ValueStringBuilder.", StringComparison.Ordinal));
     }
+
+    private static bool HasFreshResultDisqualifyingEffect(
+        MethodEffectSummary summary,
+        params string[] additionalEffects) =>
+        summary.Effects.Any(effect =>
+            CommonFreshResultDisqualifyingEffects.Contains(effect, StringComparer.Ordinal) ||
+            additionalEffects.Contains(effect, StringComparer.Ordinal));
 
     internal static bool HasReturnValueInitializationPattern(MethodEffectSummary? summary)
     {
