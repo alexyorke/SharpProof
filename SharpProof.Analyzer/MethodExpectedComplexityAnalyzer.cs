@@ -203,18 +203,23 @@ internal static class MethodExpectedComplexityAnalyzer
 
     private static ComplexityGrowthClass MapDeclared(DeclaredComplexityKind kind)
     {
+        return GetDeclaredComplexityDescriptor(kind).GrowthClass;
+    }
+
+    private static (ComplexityGrowthClass GrowthClass, string Text) GetDeclaredComplexityDescriptor(
+        DeclaredComplexityKind kind)
+    {
         return kind switch
         {
-            DeclaredComplexityKind.Constant => ComplexityGrowthClass.Constant,
-            DeclaredComplexityKind.Logarithmic => ComplexityGrowthClass.Logarithmic,
-            DeclaredComplexityKind.Linear => ComplexityGrowthClass.Linear,
-            DeclaredComplexityKind.Linearithmic => ComplexityGrowthClass.Linearithmic,
-            DeclaredComplexityKind.Quadratic => ComplexityGrowthClass.Quadratic,
-            DeclaredComplexityKind.Product => ComplexityGrowthClass.Product,
-            DeclaredComplexityKind.Max => ComplexityGrowthClass.Max,
-            // Undefined declared values are rejected upstream as invalid contracts; treat any
-            // stray value as an isolated class so it stays conservatively incomparable.
-            _ => ComplexityGrowthClass.Max
+            DeclaredComplexityKind.Constant => (ComplexityGrowthClass.Constant, "O(1)"),
+            DeclaredComplexityKind.Logarithmic => (ComplexityGrowthClass.Logarithmic, "O(log n)"),
+            DeclaredComplexityKind.Linear => (ComplexityGrowthClass.Linear, "O(n)"),
+            DeclaredComplexityKind.Linearithmic => (ComplexityGrowthClass.Linearithmic, "O(n log n)"),
+            DeclaredComplexityKind.Quadratic => (ComplexityGrowthClass.Quadratic, "O(n^2)"),
+            DeclaredComplexityKind.Product => (ComplexityGrowthClass.Product, "O(n * m)"),
+            DeclaredComplexityKind.Max => (ComplexityGrowthClass.Max, "O(max(n, m))"),
+            // Undefined declared values are rejected upstream. Keep any stray value isolated.
+            _ => (ComplexityGrowthClass.Max, kind.ToString())
         };
     }
 
@@ -316,19 +321,7 @@ internal static class MethodExpectedComplexityAnalyzer
         DeclaredComplexityKind Kind,
         string? TextOverride = null)
     {
-        public string Text =>
-            TextOverride ??
-            Kind switch
-            {
-                DeclaredComplexityKind.Constant => "O(1)",
-                DeclaredComplexityKind.Logarithmic => "O(log n)",
-                DeclaredComplexityKind.Linear => "O(n)",
-                DeclaredComplexityKind.Linearithmic => "O(n log n)",
-                DeclaredComplexityKind.Quadratic => "O(n^2)",
-                DeclaredComplexityKind.Product => "O(n * m)",
-                DeclaredComplexityKind.Max => "O(max(n, m))",
-                _ => Kind.ToString()
-            };
+        public string Text => TextOverride ?? GetDeclaredComplexityDescriptor(Kind).Text;
     }
 
     // Mirrors the integer values of SharpProof.Attributes.ComplexityKind.
