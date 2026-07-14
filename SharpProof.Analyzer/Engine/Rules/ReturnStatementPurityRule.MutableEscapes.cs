@@ -15,49 +15,25 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out ISymbol escapeSymbol,
         out string catalogSource)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+        foreach (var (value, site) in EnumerateReturnedInitializerEscapeValues(
+                     returnedValue,
+                     semanticModel,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (IsOwnedLocalArrayReturn(assignment.Value, currentState, out var localSymbol))
+            if (IsOwnedLocalArrayReturn(value, currentState, out var localSymbol))
             {
-                escapeSyntax = assignment.Value.Syntax;
+                escapeSyntax = value.Syntax;
                 escapeSymbol = localSymbol;
-                catalogSource = "owned_local_array_initializer_escape";
+                catalogSource = "owned_local_array_" + site + "_escape";
                 return true;
             }
 
-            if (IsKnownPureArrayFactoryReturn(assignment.Value, semanticModel.Compilation, out var factoryMethod))
+            if (IsKnownPureArrayFactoryReturn(value, semanticModel.Compilation, out var factoryMethod))
             {
-                escapeSyntax = assignment.Value.Syntax;
+                escapeSyntax = value.Syntax;
                 escapeSymbol = factoryMethod;
-                catalogSource = "array_factory_initializer_escape";
+                catalogSource = "array_factory_" + site + "_escape";
                 return true;
-            }
-        }
-
-        foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel, cancellationToken)) continue;
-
-            foreach (var argument in objectCreation.Arguments)
-            {
-                if (IsOwnedLocalArrayReturn(argument.Value, currentState, out var localSymbol))
-                {
-                    escapeSyntax = argument.Value.Syntax;
-                    escapeSymbol = localSymbol;
-                    catalogSource = "owned_local_array_constructor_escape";
-                    return true;
-                }
-
-                if (IsKnownPureArrayFactoryReturn(argument.Value, semanticModel.Compilation, out var factoryMethod))
-                {
-                    escapeSyntax = argument.Value.Syntax;
-                    escapeSymbol = factoryMethod;
-                    catalogSource = "array_factory_constructor_escape";
-                    return true;
-                }
             }
         }
 
@@ -136,12 +112,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out ISymbol escapeSymbol,
         out string catalogSource)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+        foreach (var (value, site) in EnumerateReturnedInitializerEscapeValues(
+                     returnedValue,
+                     semanticModel,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
             if (TryFindFreshMutableObjectReturnEscape(
-                    assignment.Value,
+                    value,
                     semanticModel,
                     null,
                     cancellationToken,
@@ -149,9 +126,24 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     out escapeSymbol,
                     out _))
             {
-                catalogSource = "fresh_mutable_object_initializer_escape";
+                catalogSource = "fresh_mutable_object_" + site + "_escape";
                 return true;
             }
+        }
+
+        return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
+    }
+
+    private static IEnumerable<(IOperation Value, string Site)> EnumerateReturnedInitializerEscapeValues(
+        IOperation returnedValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return (assignment.Value, "initializer");
         }
 
         foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
@@ -160,21 +152,8 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel, cancellationToken)) continue;
 
             foreach (var argument in objectCreation.Arguments)
-                if (TryFindFreshMutableObjectReturnEscape(
-                        argument.Value,
-                        semanticModel,
-                        null,
-                        cancellationToken,
-                        out escapeSyntax,
-                        out escapeSymbol,
-                        out _))
-                {
-                    catalogSource = "fresh_mutable_object_constructor_escape";
-                    return true;
-                }
+                yield return (argument.Value, "constructor");
         }
-
-        return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
     }
 
     private static bool TryFindFreshMutableObjectReturnEscape(
