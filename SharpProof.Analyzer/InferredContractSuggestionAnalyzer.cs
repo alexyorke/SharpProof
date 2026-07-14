@@ -152,7 +152,7 @@ internal static class InferredContractSuggestionAnalyzer
         var flagExpressions = SymbolicCapabilityFacts.OrderedMasks
             .Where(capability => capability != SymbolicCapabilityFacts.NoneMask && (capabilities & capability) != 0)
             .Select(capability => AttributeNamespace + "SharpProofCapability." +
-                                  SymbolicCapabilityFacts.FormatMask(capability))
+                                  SymbolicCapabilityFacts.GetName(capability))
             .ToArray();
         var argument = flagExpressions.Length == 0
             ? AttributeNamespace + "SharpProofCapability.None"
@@ -163,14 +163,14 @@ internal static class InferredContractSuggestionAnalyzer
                 " | ",
                 SymbolicCapabilityFacts.OrderedMasks
                     .Where(capability => (capabilities & capability) != 0)
-                    .Select(capability => "SharpProofCapability." + SymbolicCapabilityFacts.FormatMask(capability)));
+                    .Select(capability => "SharpProofCapability." + SymbolicCapabilityFacts.GetName(capability)));
         var displaySet = capabilities == SymbolicCapabilityFacts.NoneMask
             ? "no capabilities"
             : "the exact capability set " + string.Join(
                 ", ",
                 SymbolicCapabilityFacts.OrderedMasks
                     .Where(capability => (capabilities & capability) != 0)
-                    .Select(SymbolicCapabilityFacts.FormatMask));
+                    .Select(SymbolicCapabilityFacts.GetName));
 
         Report(
             context,

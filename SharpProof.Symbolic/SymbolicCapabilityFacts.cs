@@ -102,4 +102,9 @@ internal static class SymbolicCapabilityFacts
     {
         return Format((SymbolicCapability)capabilities);
     }
+
+    internal static string GetName(int capability)
+    {
+        return ((SymbolicCapability)capability).ToString();
+    }
 }
