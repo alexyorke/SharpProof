@@ -1,0 +1,9 @@
+{
+  "solution": {
+    "path": "SharpProof.sln",
+    "projects": [
+      "SharpProof.Test\\SharpProof.Test.csproj",
+      "SharpProof.ToolingTest\\SharpProof.ToolingTest.csproj"
+    ]
+  }
+}

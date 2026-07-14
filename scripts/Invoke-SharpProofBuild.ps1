@@ -1,0 +1,80 @@
+[CmdletBinding()]
+param(
+    [Parameter()]
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Release',
+
+    [Parameter()]
+    [switch]$NoRestore,
+
+    [Parameter()]
+    [switch]$WithTests,
+
+    [Parameter()]
+    [switch]$Full,
+
+    [Parameter()]
+    [ValidateRange(0, 1048576)]
+    [int]$MemoryLimitMb = 0,
+
+    [Parameter()]
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Split-Path -Path $PSScriptRoot -Parent
+$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+if ($Full -and $WithTests)
+{
+    throw '-Full and -WithTests cannot be used together.'
+}
+
+$target = if ($Full)
+{
+    'SharpProof.sln'
+}
+elseif ($WithTests)
+{
+    'SharpProof.Dev.Tests.slnf'
+}
+else
+{
+    'SharpProof.Dev.slnf'
+}
+
+$buildArguments = [System.Collections.Generic.List[string]]::new()
+$buildArguments.Add('build')
+$buildArguments.Add($target)
+$buildArguments.Add('--configuration')
+$buildArguments.Add($Configuration)
+$buildArguments.Add('/warnaserror')
+
+if ($NoRestore)
+{
+    $buildArguments.Add('--no-restore')
+}
+
+if (-not $Full)
+{
+    # Package and extension artifacts belong to the full release path. Avoid
+    # generating packages transitively while compiling the developer graph.
+    $buildArguments.Add('-p:GeneratePackageOnBuild=false')
+    $buildArguments.Add('-p:EnableVsixPackaging=false')
+}
+
+Push-Location $repoRoot
+try
+{
+    & $dotnetWrapper `
+        -MemoryLimitMb $MemoryLimitMb `
+        -TimeoutSeconds $TimeoutSeconds `
+        @buildArguments
+    exit $LASTEXITCODE
+}
+finally
+{
+    Pop-Location
+}
