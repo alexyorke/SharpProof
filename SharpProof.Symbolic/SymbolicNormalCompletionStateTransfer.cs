@@ -70,17 +70,10 @@ internal static class SymbolicNormalCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapAwaitedNormalCompletionExpression(expression);
-        if (expression is not InvocationExpressionSyntax invocation ||
-            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
-            return;
-
-        foreach (var argument in invocationOperation.Arguments)
+        foreach (var (invocationOperation, argument, parameter, argumentSyntax) in
+                 EnumerateExplicitTopLevelInvocationArguments(expression, semanticModel, cancellationToken))
         {
-            if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                argument.Parameter is not { IsParams: false } parameter ||
-                argument.Syntax is not ArgumentSyntax argumentSyntax ||
-                !ArgumentRefKindMatches(parameter, argumentSyntax) ||
+            if (!ArgumentRefKindMatches(parameter, argumentSyntax) ||
                 !HasNotNullNormalCompletionPostcondition(parameter, cancellationToken) ||
                 parameter.RefKind != RefKind.None &&
                 !IsUniqueOutputArgumentTarget(
@@ -99,6 +92,19 @@ internal static class SymbolicNormalCompletionStateTransfer
                 "ir.path.normal-completion.parameter-not-null",
                 parameter.RefKind != RefKind.None);
         }
+    }
+
+    private static IEnumerable<(IInvocationOperation Invocation, IArgumentOperation Argument, IParameterSymbol Parameter,
+        ArgumentSyntax Syntax)> EnumerateExplicitTopLevelInvocationArguments(
+        ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
+    {
+        if (UnwrapAwaitedNormalCompletionExpression(expression) is not InvocationExpressionSyntax invocation ||
+            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
+            yield break;
+
+        foreach (var argument in operation.Arguments)
+            if (argument is { ArgumentKind: ArgumentKind.Explicit, Parameter: { IsParams: false } parameter, Syntax: ArgumentSyntax syntax })
+                yield return (operation, argument, parameter, syntax);
     }
 
     private static bool HasNotNullNormalCompletionPostcondition(
@@ -223,17 +229,11 @@ internal static class SymbolicNormalCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapAwaitedNormalCompletionExpression(expression);
-        if (expression is not InvocationExpressionSyntax invocation ||
-            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
-            return;
-
-        foreach (var argument in invocationOperation.Arguments)
+        foreach (var (_, _, parameter, argumentSyntax) in EnumerateExplicitTopLevelInvocationArguments(
+                     expression, semanticModel, cancellationToken))
         {
-            if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+            if (parameter.RefKind != RefKind.None ||
                 !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
-                argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
                 SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(argumentSyntax.Expression, statement, semanticModel,
                     cancellationToken))
