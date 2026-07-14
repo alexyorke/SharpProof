@@ -139,6 +139,25 @@ public sealed class SymbolicCliErrorModelTests
         Assert.That(result.StandardError, Does.Contain("Usage: SharpProof.SymbolicCli"));
     }
 
+    [TestCase("--hazard-kind")]
+    [TestCase("--hazard-status")]
+    [TestCase("--reachability")]
+    [TestCase("--proof-outcome")]
+    public async Task SymbolicCli_NumericUndefinedEnumValue_IsRejected(string option)
+    {
+        var result = await SymbolicCliTestHost.RunAsync(
+            "--source-text",
+            "class C { }",
+            "--all-lines",
+            option,
+            "999");
+
+        Assert.That(result.ExitCode, Is.EqualTo(SymbolicErrorExitCodes.Usage));
+        Assert.That(result.StandardOutput, Is.Empty);
+        Assert.That(result.StandardError, Does.Contain(option));
+        Assert.That(result.StandardError, Does.Contain("[Usage]"));
+    }
+
     private static JsonElement AssertErrorEnvelope(
         (int ExitCode, string StandardOutput, string StandardError) result,
         string expectedCode,

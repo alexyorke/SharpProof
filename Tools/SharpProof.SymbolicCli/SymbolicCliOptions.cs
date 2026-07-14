@@ -1581,32 +1581,20 @@ internal sealed class SymbolicCliOptions
 
     private static DocumentationMode ReadDocumentationMode(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<DocumentationMode>(value, true, out var mode) &&
-            Enum.IsDefined(typeof(DocumentationMode), mode))
-            return mode;
-
-        throw new ArgumentException(optionName + " must be none, parse, or diagnose.");
+        return ReadDefinedEnum<DocumentationMode>(
+            args, ref index, optionName, "must be none, parse, or diagnose.");
     }
 
     private static Platform ReadPlatform(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<Platform>(value, true, out var platform) &&
-            Enum.IsDefined(typeof(Platform), platform))
-            return platform;
-
-        throw new ArgumentException(optionName + " requires a recognized Roslyn platform value.");
+        return ReadDefinedEnum<Platform>(
+            args, ref index, optionName, "requires a recognized Roslyn platform value.");
     }
 
     private static OptimizationLevel ReadOptimizationLevel(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<OptimizationLevel>(value, true, out var optimizationLevel) &&
-            Enum.IsDefined(typeof(OptimizationLevel), optimizationLevel))
-            return optimizationLevel;
-
-        throw new ArgumentException(optionName + " must be debug or release.");
+        return ReadDefinedEnum<OptimizationLevel>(
+            args, ref index, optionName, "must be debug or release.");
     }
 
     private static SmtAnalysisMode ReadSmtMode(string[] args, ref int index, string optionName)
@@ -1627,31 +1615,29 @@ internal sealed class SymbolicCliOptions
 
     private static SymbolicRuntimeHazardKind ReadHazardKind(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicRuntimeHazardKind>(value, true, out var kind)) return kind;
-
-        throw new ArgumentException(optionName + " must be one of: " +
-                                    string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
+        return ReadDefinedEnum<SymbolicRuntimeHazardKind>(
+            args,
+            ref index,
+            optionName,
+            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
     }
 
     private static SymbolicRuntimeHazardStatus ReadHazardStatus(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicRuntimeHazardStatus>(value, true, out var status)) return status;
-
-        throw new ArgumentException(optionName + " must be one of: " +
-                                    string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
+        return ReadDefinedEnum<SymbolicRuntimeHazardStatus>(
+            args,
+            ref index,
+            optionName,
+            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
     }
 
     private static SymbolicCapability ReadCapability(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<SymbolicCapability>(value, true, out var capability) &&
-            Enum.IsDefined(typeof(SymbolicCapability), capability))
-            return capability;
-
-        throw new ArgumentException(optionName + " must be one of: " +
-                                    string.Join(", ", Enum.GetNames<SymbolicCapability>()) + ".");
+        return ReadDefinedEnum<SymbolicCapability>(
+            args,
+            ref index,
+            optionName,
+            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicCapability>()) + ".");
     }
 
     private static SharpProof.Attributes.ComplexityKind ReadComplexityBound(
@@ -1659,29 +1645,37 @@ internal sealed class SymbolicCliOptions
         ref int index,
         string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<SharpProof.Attributes.ComplexityKind>(value, true, out var complexity) &&
-            Enum.IsDefined(typeof(SharpProof.Attributes.ComplexityKind), complexity))
-            return complexity;
-
-        throw new ArgumentException(optionName + " must be one of: " +
-                                    string.Join(", ", Enum.GetNames<SharpProof.Attributes.ComplexityKind>()) + ".");
+        return ReadDefinedEnum<SharpProof.Attributes.ComplexityKind>(
+            args,
+            ref index,
+            optionName,
+            "must be one of: " + string.Join(", ", Enum.GetNames<SharpProof.Attributes.ComplexityKind>()) + ".");
     }
 
     private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicReachability>(value, true, out var reachability)) return reachability;
-
-        throw new ArgumentException(optionName + " must be NotChecked, Unknown, Reachable, or Unreachable.");
+        return ReadDefinedEnum<SymbolicReachability>(
+            args, ref index, optionName, "must be NotChecked, Unknown, Reachable, or Unreachable.");
     }
 
     private static SymbolicTruthValue ReadTruthValue(string[] args, ref int index, string optionName)
     {
-        var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicTruthValue>(value, true, out var truthValue)) return truthValue;
+        return ReadDefinedEnum<SymbolicTruthValue>(
+            args, ref index, optionName, "must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.");
+    }
 
-        throw new ArgumentException(optionName + " must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.");
+    private static TEnum ReadDefinedEnum<TEnum>(
+        string[] args,
+        ref int index,
+        string optionName,
+        string requirement)
+        where TEnum : struct, Enum
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<TEnum>(value, true, out var parsed) && Enum.IsDefined(typeof(TEnum), parsed))
+            return parsed;
+
+        throw new ArgumentException(optionName + " " + requirement);
     }
 
     private static string ReadProgramPointKind(string[] args, ref int index, string optionName)
