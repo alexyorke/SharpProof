@@ -360,6 +360,7 @@ internal sealed record SymbolicCompactQueryScope(
 
 public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 {
+    private readonly SymbolicCompactScopeProjection _projection;
     private readonly SymbolicCompactQueryScope _scope;
 
     private SymbolicCompactQueryResult(
@@ -367,33 +368,16 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         int? lineCount,
         int linesWithProgramPoints,
         int programPointCount,
-        SymbolicCompactInvariantSummary observedInvariant,
-        SymbolicCompactInvariantSummary conservativeInvariant,
-        SymbolicCompactInvariantQueryView invariantQuery,
-        SymbolicReachabilitySummary reachability,
-        SymbolicProgramPointSummary programPointSummary,
-        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+        SymbolicCompactScopeProjection projection,
         IReadOnlyList<SymbolicCompactLineResult> lines,
-        IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicAnalysisTruncationInfo analysisTruncation,
-        SymbolicCompactOutputTruncation truncation)
+        SymbolicAnalysisTruncationInfo analysisTruncation)
     {
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        _projection = projection ?? throw new ArgumentNullException(nameof(projection));
         LineCount = lineCount;
         LinesWithProgramPoints = linesWithProgramPoints;
         ProgramPointCount = programPointCount;
-        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
-        ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        MergedInvariantText = ConservativeInvariant.Text;
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        ProofOutcomes = ProgramPointSummary.ProofOutcomes;
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
         Lines = lines ?? throw new ArgumentNullException(nameof(lines));
-        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
-        SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         AnalysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
         AnalysisSummary = SymbolicCompactAnalysisSummary.From(
             InvariantQuery,
@@ -401,7 +385,6 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             SmtDiagnostics,
             AnalysisTruncation);
         QueryDescriptor = SymbolicCompactSourceQueryDescriptor.FromCompactResult(this);
-        Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
 
     public string Kind => _scope.Kind;
@@ -476,33 +459,33 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
     public int ProgramPointCount { get; }
 
-    public SymbolicCompactInvariantSummary ObservedInvariant { get; }
+    public SymbolicCompactInvariantSummary ObservedInvariant => _projection.ObservedInvariant;
 
-    public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+    public SymbolicCompactInvariantSummary ConservativeInvariant => _projection.ConservativeInvariant;
 
-    public SymbolicCompactInvariantQueryView InvariantQuery { get; }
+    public SymbolicCompactInvariantQueryView InvariantQuery => _projection.InvariantQuery;
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText => ConservativeInvariant.Text;
 
-    public SymbolicReachabilitySummary Reachability { get; }
+    public SymbolicReachabilitySummary Reachability => _projection.Reachability;
 
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
+    public SymbolicProgramPointSummary ProgramPointSummary => _projection.ProgramPointSummary;
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
 
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _projection.ConditionProofs;
 
     public IReadOnlyList<SymbolicCompactLineResult> Lines { get; }
 
-    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => _projection.ProgramPoints;
 
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _projection.SmtDiagnostics;
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
 
-    public SymbolicCompactOutputTruncation Truncation { get; }
+    public SymbolicCompactOutputTruncation Truncation => _projection.Truncation;
 
     public static SymbolicCompactQueryResult FromPoint(
         SymbolicProgramPointResult result,
@@ -531,17 +514,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             null,
             1,
             1,
-            projection.ObservedInvariant,
-            projection.ConservativeInvariant,
-            projection.InvariantQuery,
-            projection.Reachability,
-            projection.ProgramPointSummary,
-            projection.ConditionProofs,
+            projection,
             Array.Empty<SymbolicCompactLineResult>(),
-            projection.ProgramPoints,
-            projection.SmtDiagnostics,
-            result.AnalysisTruncation,
-            projection.Truncation);
+            result.AnalysisTruncation);
     }
 
     internal static SymbolicCompactQueryResult FromLine(
@@ -561,17 +536,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             null,
             result.ProgramPoints.Count == 0 ? 0 : 1,
             result.ProgramPoints.Count,
-            lineResult.ObservedInvariant,
-            lineResult.ConservativeInvariant,
-            lineResult.InvariantQuery,
-            lineResult.Reachability,
-            result.ProgramPointSummary,
-            lineResult.ConditionProofs,
+            lineResult.Projection,
             Array.Empty<SymbolicCompactLineResult>(),
-            lineResult.ProgramPoints,
-            lineResult.SmtDiagnostics,
-            result.AnalysisTruncation,
-            lineResult.Truncation);
+            result.AnalysisTruncation);
     }
 
     internal static SymbolicCompactQueryResult FromSpan(
@@ -600,17 +567,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             null,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,
-            projection.ObservedInvariant,
-            projection.ConservativeInvariant,
-            projection.InvariantQuery,
-            projection.Reachability,
-            projection.ProgramPointSummary,
-            projection.ConditionProofs,
+            projection,
             Array.Empty<SymbolicCompactLineResult>(),
-            projection.ProgramPoints,
-            projection.SmtDiagnostics,
-            result.AnalysisTruncation,
-            projection.Truncation);
+            result.AnalysisTruncation);
     }
 
     internal static SymbolicCompactQueryResult FromFile(
@@ -660,17 +619,9 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             result.LineCount,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,
-            projection.ObservedInvariant,
-            projection.ConservativeInvariant,
-            projection.InvariantQuery,
-            projection.Reachability,
-            projection.ProgramPointSummary,
-            projection.ConditionProofs,
+            projection with { Truncation = truncation },
             lineResults,
-            Array.Empty<SymbolicCompactProgramPointResult>(),
-            projection.SmtDiagnostics,
-            result.AnalysisTruncation,
-            truncation);
+            result.AnalysisTruncation);
     }
 }
 

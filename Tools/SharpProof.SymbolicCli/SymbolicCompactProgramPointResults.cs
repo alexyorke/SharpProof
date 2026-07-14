@@ -13,32 +13,15 @@ namespace SharpProof.Symbolic;
 
 public sealed class SymbolicCompactLineResult
 {
+    private readonly SymbolicCompactScopeProjection _projection;
     private readonly SymbolicLineQueryResult _result;
 
     private SymbolicCompactLineResult(
         SymbolicLineQueryResult result,
-        SymbolicCompactInvariantSummary observedInvariant,
-        SymbolicCompactInvariantSummary conservativeInvariant,
-        SymbolicCompactInvariantQueryView invariantQuery,
-        SymbolicReachabilitySummary reachability,
-        SymbolicProgramPointSummary programPointSummary,
-        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
-        IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicCompactOutputTruncation truncation)
+        SymbolicCompactScopeProjection projection)
     {
         _result = result ?? throw new ArgumentNullException(nameof(result));
-        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
-        ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        MergedInvariantText = ConservativeInvariant.Text;
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        ProofOutcomes = ProgramPointSummary.ProofOutcomes;
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
-        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
-        SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
-        Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
+        _projection = projection ?? throw new ArgumentNullException(nameof(projection));
     }
 
     public string FilePath => _result.FilePath;
@@ -47,27 +30,29 @@ public sealed class SymbolicCompactLineResult
 
     public int ProgramPointCount => _result.ProgramPoints.Count;
 
-    public SymbolicCompactInvariantSummary ObservedInvariant { get; }
+    public SymbolicCompactInvariantSummary ObservedInvariant => _projection.ObservedInvariant;
 
-    public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+    public SymbolicCompactInvariantSummary ConservativeInvariant => _projection.ConservativeInvariant;
 
-    public SymbolicCompactInvariantQueryView InvariantQuery { get; }
+    public SymbolicCompactInvariantQueryView InvariantQuery => _projection.InvariantQuery;
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText => ConservativeInvariant.Text;
 
-    public SymbolicReachabilitySummary Reachability { get; }
+    public SymbolicReachabilitySummary Reachability => _projection.Reachability;
 
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
+    public SymbolicProgramPointSummary ProgramPointSummary => _projection.ProgramPointSummary;
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
 
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _projection.ConditionProofs;
 
-    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => _projection.ProgramPoints;
 
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _projection.SmtDiagnostics;
 
-    public SymbolicCompactOutputTruncation Truncation { get; }
+    public SymbolicCompactOutputTruncation Truncation => _projection.Truncation;
+
+    internal SymbolicCompactScopeProjection Projection => _projection;
 
     internal static SymbolicCompactLineResult FromResult(
         SymbolicLineQueryResult result,
@@ -88,17 +73,7 @@ public sealed class SymbolicCompactLineResult
             options,
             maxProgramPoints);
 
-        return new SymbolicCompactLineResult(
-            result,
-            projection.ObservedInvariant,
-            projection.ConservativeInvariant,
-            projection.InvariantQuery,
-            projection.Reachability,
-            projection.ProgramPointSummary,
-            projection.ConditionProofs,
-            projection.ProgramPoints,
-            projection.SmtDiagnostics,
-            projection.Truncation);
+        return new SymbolicCompactLineResult(result, projection);
     }
 }
 
