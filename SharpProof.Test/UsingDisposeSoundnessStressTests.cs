@@ -6,10 +6,11 @@ namespace SharpProof.Test;
 [Parallelizable(ParallelScope.Children)]
 public class UsingDisposeSoundnessStressTests
 {
-    [Test]
-    public async Task UsingExistingLocalWithImpureDispose_Diagnostic()
+    public sealed record UsingDisposeCase(string Name, string MarkedSource);
+
+    private static readonly UsingDisposeCase[] UsingDisposeCasesPart1 =
     {
-        var test = DisposableTestSources.CommonUsings +
+        new("UsingExistingLocalWithImpureDispose_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.ImpureDisposable + @"
 public sealed class TestClass
 {
@@ -20,15 +21,8 @@ public sealed class TestClass
         {
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UsingNewImpureDisposable_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UsingNewImpureDisposable_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.ImpureDisposable + @"
 public sealed class TestClass
 {
@@ -39,15 +33,8 @@ public sealed class TestClass
         {
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UsingNewPureDisposable_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UsingNewPureDisposable_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -58,15 +45,8 @@ public sealed class TestClass
         {
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UsingVarPureDisposable_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UsingVarPureDisposable_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -75,15 +55,8 @@ public sealed class TestClass
     {
         using var resource = new PureDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UsingFactoryImpure_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UsingFactoryImpure_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -98,15 +71,8 @@ public sealed class TestClass
         _ = DateTime.Now.Millisecond;
         return new PureDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UsingPureResourceImpureBody_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UsingPureResourceImpureBody_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -118,15 +84,8 @@ public sealed class TestClass
             Console.WriteLine(""impure"");
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDoubleDisposeSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDoubleDisposeSameLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -137,15 +96,8 @@ public sealed class TestClass
         resource.Dispose();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAfterReassignment_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAfterReassignment_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -157,15 +109,8 @@ public sealed class TestClass
         resource = new PureDisposable();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitUseAfterDisposeSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitUseAfterDisposeSameLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -177,15 +122,8 @@ public sealed class TestClass
         _ = resource.Use();
         return 1;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitPropertyReadAfterDisposeSameLocal_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ExplicitPropertyReadAfterDisposeSameLocal_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -212,15 +150,8 @@ public sealed class TestClass
         resource.Dispose();
         return resource.Value;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitFieldReadAfterDisposeThroughAlias_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ExplicitFieldReadAfterDisposeThroughAlias_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -244,15 +175,8 @@ public sealed class TestClass
         resource.Dispose();
         return alias.Value;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitUseAfterReassignment_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitUseAfterReassignment_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -266,15 +190,8 @@ public sealed class TestClass
         resource.Dispose();
         return 1;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitReturnUseAfterDisposeSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitReturnUseAfterDisposeSameLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -285,15 +202,8 @@ public sealed class TestClass
         resource.Dispose();
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitReturnUseAfterReassignment_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitReturnUseAfterReassignment_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -307,15 +217,8 @@ public sealed class TestClass
         resource.Dispose();
         return value;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task MissingDisposeForOwnedLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("MissingDisposeForOwnedLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -324,15 +227,8 @@ public sealed class TestClass
     {
         var resource = new PureDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task MissingDisposeForDeconstructedOwnedLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("MissingDisposeForDeconstructedOwnedLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -341,15 +237,66 @@ public sealed class TestClass
     {
         var (resource, count) = (new PureDisposable(), 1);
     }
-}";
+}"),
+    };
 
-        await AssertPurityDiagnosticsAsync(test);
+    private static IEnumerable<TestCaseData> UsingDisposeCaseData()
+    {
+        var cases = UsingDisposeCasesPart1
+            .Concat(UsingDisposeCasesPart2)
+            .Concat(UsingDisposeCasesPart3)
+            .Concat(UsingDisposeCasesPart4)
+            .ToArray();
+
+        if (cases.Length != 62 ||
+            cases.Select(static testCase => testCase.Name)
+                .Distinct(StringComparer.Ordinal).Count() != 62)
+        {
+            throw new InvalidOperationException("Using/dispose case invariants failed.");
+        }
+
+        return cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
     }
 
-    [Test]
-    public async Task DisposeDeconstructedOwnedLocal_NoDiagnostic()
+    [TestCaseSource(nameof(UsingDisposeCaseData))]
+    public async Task UsingDisposeCases(UsingDisposeCase testCase)
     {
-        var test = DisposableTestSources.CommonUsings +
+        await AssertPurityDiagnosticsAsync(testCase.MarkedSource);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly UsingDisposeCase[] UsingDisposeCasesPart2 =
+    {
+        new("DisposeDeconstructedOwnedLocal_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -359,15 +306,8 @@ public sealed class TestClass
         var (resource, count) = (new PureDisposable(), 1);
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task MissingDisposeForDeconstructionAssignedOwnedLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("MissingDisposeForDeconstructionAssignedOwnedLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -377,15 +317,8 @@ public sealed class TestClass
         PureDisposable resource;
         (resource, _) = (new PureDisposable(), 1);
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAsyncSatisfiesOwnedLocalDisposal_NoDiagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("ExplicitDisposeAsyncSatisfiesOwnedLocalDisposal_NoDiagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposable + @"
 public sealed class TestClass
 {
@@ -395,15 +328,8 @@ public sealed class TestClass
         var resource = new PureAsyncDisposable();
         resource.DisposeAsync();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task MissingDisposeForOwnedAsyncLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("MissingDisposeForOwnedAsyncLocal_Diagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposable + @"
 public sealed class TestClass
 {
@@ -412,15 +338,8 @@ public sealed class TestClass
     {
         var resource = new PureAsyncDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDoubleDisposeAsyncSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("ExplicitDoubleDisposeAsyncSameLocal_Diagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposable + @"
 public sealed class TestClass
 {
@@ -431,15 +350,8 @@ public sealed class TestClass
         resource.DisposeAsync();
         resource.DisposeAsync();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitUseAfterDisposeAsyncSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("ExplicitUseAfterDisposeAsyncSameLocal_Diagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -450,15 +362,8 @@ public sealed class TestClass
         resource.DisposeAsync();
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task AwaitUsingDeclarationSatisfiesOwnedAsyncLocalDisposal_NoDiagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("AwaitUsingDeclarationSatisfiesOwnedAsyncLocalDisposal_NoDiagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposable + @"
 public sealed class TestClass
 {
@@ -467,15 +372,8 @@ public sealed class TestClass
     {
         await using var resource = new PureAsyncDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterAwaitUsingStatementSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("UseAfterAwaitUsingStatementSameLocal_Diagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -489,15 +387,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DisposeAfterAwaitUsingStatementSameLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.AsyncUsings +
+}"),
+        new("DisposeAfterAwaitUsingStatementSameLocal_Diagnostic", DisposableTestSources.AsyncUsings +
                    DisposableTestSources.PureAsyncDisposable + @"
 public sealed class TestClass
 {
@@ -511,15 +402,8 @@ public sealed class TestClass
 
         resource.DisposeAsync();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConditionalDisposeOnlyOneBranch_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ConditionalDisposeOnlyOneBranch_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -532,15 +416,8 @@ public sealed class TestClass
             resource.Dispose();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConditionalDisposeBothBranches_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ConditionalDisposeBothBranches_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -557,15 +434,8 @@ public sealed class TestClass
             resource.Dispose();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task SwitchDisposeAllArms_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("SwitchDisposeAllArms_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -583,15 +453,8 @@ public sealed class TestClass
                 break;
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task SwitchDisposeMissingDefault_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("SwitchDisposeMissingDefault_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -606,15 +469,8 @@ public sealed class TestClass
                 break;
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task SwitchReturnOrDisposeAllArms_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("SwitchReturnOrDisposeAllArms_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -631,15 +487,8 @@ public sealed class TestClass
                 return new PureDisposable();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task WhileDisposeOnly_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("WhileDisposeOnly_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -653,15 +502,8 @@ public sealed class TestClass
             break;
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ForDisposeOnly_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ForDisposeOnly_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -675,15 +517,42 @@ public sealed class TestClass
             break;
         }
     }
-}";
+}"),
+    };
 
-        await AssertPurityDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DoWhileDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly UsingDisposeCase[] UsingDisposeCasesPart3 =
     {
-        var test = DisposableTestSources.CommonUsings +
+        new("DoWhileDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -697,15 +566,8 @@ public sealed class TestClass
         }
         while (repeat);
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task FinallyDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("FinallyDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -721,15 +583,8 @@ public sealed class TestClass
             resource.Dispose();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task FinallyDisposeThroughAliasSatisfiesOwnedLocalDisposal_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("FinallyDisposeThroughAliasSatisfiesOwnedLocalDisposal_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -746,15 +601,8 @@ public sealed class TestClass
             alias.Dispose();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TryReturnOwnedLocalWithFinally_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("TryReturnOwnedLocalWithFinally_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -770,15 +618,8 @@ public sealed class TestClass
         {
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterFinallyDispose_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterFinallyDispose_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -796,15 +637,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterConditionalDisposeBothBranches_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterConditionalDisposeBothBranches_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -823,15 +657,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleDisposeAfterConditionalDisposeBothBranches_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("DoubleDisposeAfterConditionalDisposeBothBranches_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -850,15 +677,8 @@ public sealed class TestClass
 
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConditionalDisposeThroughOwnerOrAlias_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ConditionalDisposeThroughOwnerOrAlias_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -876,15 +696,8 @@ public sealed class TestClass
             alias.Dispose();
         }
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -904,15 +717,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleDisposeAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("DoubleDisposeAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -932,15 +738,8 @@ public sealed class TestClass
 
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConditionalReturnOrDispose_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ConditionalReturnOrDispose_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -956,15 +755,8 @@ public sealed class TestClass
         resource.Dispose();
         return new PureDisposable();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConditionalReturnOnlyOneBranch_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ConditionalReturnOnlyOneBranch_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -979,15 +771,8 @@ public sealed class TestClass
 
         return null;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task MissingDisposeForAliasedOwnedLocalAfterOwnerReassignment_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("MissingDisposeForAliasedOwnedLocalAfterOwnerReassignment_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -999,15 +784,8 @@ public sealed class TestClass
         resource = new PureDisposable();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DisposeAliasAfterOwnerReassignment_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("DisposeAliasAfterOwnerReassignment_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1020,15 +798,8 @@ public sealed class TestClass
         alias.Dispose();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAliasAfterAliasDisposeAndOwnerReassignment_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAliasAfterAliasDisposeAndOwnerReassignment_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1043,15 +814,8 @@ public sealed class TestClass
         resource.Dispose();
         return value;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleDisposeAliasAfterOwnerReassignment_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("DoubleDisposeAliasAfterOwnerReassignment_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1065,15 +829,42 @@ public sealed class TestClass
         alias.Dispose();
         resource.Dispose();
     }
-}";
+}"),
+    };
 
-        await AssertPurityDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task UseOldAliasAfterOwnerDisposeAndReassignment_Diagnostic()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private static readonly UsingDisposeCase[] UsingDisposeCasesPart4 =
     {
-        var test = DisposableTestSources.CommonUsings +
+        new("UseOldAliasAfterOwnerDisposeAndReassignment_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1088,15 +879,8 @@ public sealed class TestClass
         resource.Dispose();
         return value;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleDisposeOldAliasAfterOwnerDisposeAndReassignment_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("DoubleDisposeOldAliasAfterOwnerDisposeAndReassignment_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1110,15 +894,8 @@ public sealed class TestClass
         alias.Dispose();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ReturnedOwnedLocalDisposable_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ReturnedOwnedLocalDisposable_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1128,15 +905,8 @@ public sealed class TestClass
         var resource = new PureDisposable();
         return resource;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ReturnedAliasToOwnedLocalDisposable_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ReturnedAliasToOwnedLocalDisposable_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1147,15 +917,8 @@ public sealed class TestClass
         var alias = resource;
         return alias;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ReturnedOldAliasAfterOwnerReassignmentAndNewOwnerDisposed_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ReturnedOldAliasAfterOwnerReassignmentAndNewOwnerDisposed_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1168,15 +931,8 @@ public sealed class TestClass
         resource.Dispose();
         return alias;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ReturnedNewOwnerAfterAliasDisposed_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ReturnedNewOwnerAfterAliasDisposed_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1189,15 +945,8 @@ public sealed class TestClass
         alias.Dispose();
         return resource;
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAliasThenDisposeOriginal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAliasThenDisposeOriginal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1209,15 +958,8 @@ public sealed class TestClass
         alias.Dispose();
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAliasThenUseOriginal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAliasThenUseOriginal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1229,15 +971,8 @@ public sealed class TestClass
         alias.Dispose();
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAliasSatisfiesOwnedLocalDisposal_NoDiagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAliasSatisfiesOwnedLocalDisposal_NoDiagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1248,15 +983,8 @@ public sealed class TestClass
         var alias = resource;
         alias.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterUsingStatementExistingLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterUsingStatementExistingLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1270,15 +998,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAfterUsingStatementExistingLocal_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAfterUsingStatementExistingLocal_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1292,15 +1013,8 @@ public sealed class TestClass
 
         resource.Dispose();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterUsingStatementAlias_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterUsingStatementAlias_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1315,15 +1029,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UseAfterNestedUsingDeclarationAlias_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("UseAfterNestedUsingDeclarationAlias_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposableWithUse + @"
 public sealed class TestClass
 {
@@ -1338,15 +1045,8 @@ public sealed class TestClass
 
         return resource.Use();
     }
-}";
-
-        await AssertPurityDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ExplicitDisposeAfterNestedUsingDeclarationAlias_Diagnostic()
-    {
-        var test = DisposableTestSources.CommonUsings +
+}"),
+        new("ExplicitDisposeAfterNestedUsingDeclarationAlias_Diagnostic", DisposableTestSources.CommonUsings +
                    DisposableTestSources.PureDisposable + @"
 public sealed class TestClass
 {
@@ -1361,10 +1061,34 @@ public sealed class TestClass
 
         resource.Dispose();
     }
-}";
+}"),
+    };
 
-        await AssertPurityDiagnosticsAsync(test);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private static async Task AssertPurityDiagnosticsAsync(string markedSource)
     {
