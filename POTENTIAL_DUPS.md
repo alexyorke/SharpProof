@@ -33,13 +33,7 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 11. **Source-query line/span analysis** - `SharpProof.Symbolic/SymbolicSourceQueryService.cs:57-91,138-180`
     Line and span queries both validate a tree, obtain a semantic model, select nodes, then perform the same `AnalyzeAndProjectNode` materialization. Share node analysis/projection and leave selection and result metadata separate.
 
-12. **Type-fact facade forwarding** - `SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxFacts.cs:283-305`; `SharpProof.Symbolic/SymbolicTypeFacts.cs:92-150`
-    Several runtime-hazard helpers are direct forwarders to `SymbolicTypeFacts`; more similar helpers exist in fact/trigger factories. Prefer direct use of the shared type-facts API except where syntax-specific semantic-model lookup is required.
-
 ## Code fixes, attributes, and test infrastructure
-
-13. **Condition contract attributes** - `SharpProof.Attributes/EnsuresAttribute.cs:5-14`; `SharpProof.Attributes/RequiresAttribute.cs:5-14`
-    These classes are exact copies: usage metadata, string constructor null guard, and `Condition`. A common condition-contract attribute base would own validation and storage; derived attributes keep their distinct usage/meaning.
 
 14. **Code-fix action registration** - `SharpProof.CodeFixes/SharpProofCodeFixProvider.cs:70-164,443-476`
     Several branches repeat target lookup and `CodeAction` registration for remove-misplaced, remove-matching, and add-`[EnforcePure]` fixes. Add narrowly scoped registration helpers, preserving deliberate differences between all-matches and diagnostic-specific removal behavior.
@@ -87,12 +81,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
     External and resolved/reviewed call paths repeat the dynamic-dispatch, impure, conservative-unknown, and pure/freshness decision tree. Extract an `ApplyCalleeClassification` core accepting classification, key, symbol, and optional policy hooks; retain resolved-only fresh-owned-object compatibility outside or as a hook.
 
 ## Final bounded validation (2026-07-14)
-
-27. **Configuration-profile format pairs repeat policy blocks** - `config/profiles/sharpproof-{migration,audit,ci,strict}.editorconfig`; matching `.globalconfig` files; `SharpProof.Test/ConfigurationProfileTests.cs:23-54`
-    For every profile, the editorconfig and globalconfig duplicate roughly 100 C# policy/severity settings; the global format adds only `is_global=true` and a few global-only options. The test already normalizes and requires the policy blocks to match. Generate both formats from one profile source/template and verify generated output to eliminate policy drift.
-
-29. **Project compiler defaults** - `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8`; `SharpProof.Symbolic/SharpProof.Symbolic.csproj:8`; `SharpProof.ProofCore/SharpProof.ProofCore.csproj:6`; and 14-17 project files overall
-    Stable `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` properties are copied across most projects. Place defaults in `Directory.Build.props`, retaining explicit opt-outs where legacy/net472 projects require them.
 
 # Potential Duplicated / Near-Duplicated Code (POTENTIAL_DUPS_2)
 
@@ -157,10 +145,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 **Recommendation:** Factor common scenario sources into shared fragment constants in `SemanticOracleSmtTestBase`.
 
-### Minor: duplicated `Mode` enum fixture
-`public enum Mode { None = 0, Ready = 1 }` recurs in `SemanticOracleAnalyzerSmtTests`, `SemanticOracleSmtTests`,
-`SemanticOracleRuntimeHazardAnalyzerSmtTests`.
-
 ---
 
 ## SharpProof.Test - T-V
@@ -196,11 +180,6 @@ Three captured-escape checks inlined instead of reusing `CheckEscapingAnonymousF
 
 ### 5. Repeated base-type instance-method enumeration - `DisposalMemberClassifier.cs:25-31`, `EnumeratorRuntimeMemberClassifier.cs:133-138`, `DispatchedMemberResolution.cs:35-42,61-68`
 Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Recommendation:** Sibling helper `EnumerateBaseTypeInstanceMethods`.
-
-### 7. Repeated `dynamic_dispatch`/`unknown_external_call` result creation
-`BinaryOperationPurityRule.cs:77-83`, `ConversionPurityRule.cs:27-32`, `DynamicOperationPurityRule.cs:19-22`,
-`ComparerDispatchHelper.cs:160-165`, `ComparerInvocationPurity.DefaultDispatch.cs:12-17`.
-**Recommendation:** Shared `CreateDynamicDispatchResult`/`CreateUnknownExternalCallResult` on `PurityAnalysisEngine`.
 
 ---
 
