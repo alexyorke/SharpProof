@@ -34,11 +34,8 @@ public static partial class CSharpAnalyzerVerifier<TAnalyzer>
         };
 
         test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
-        var globalConfigText = "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n";
-        if (AnalyzerTestHost.HasFileLevelMissingPuritySuppression(source))
-            globalConfigText += "sharpproof_suggest_missing_enforce_pure = false\n";
-
-        test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", globalConfigText));
+        test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig",
+            CSharpVerifierHelper.CreateGlobalConfigText(source)));
 
         test.ExpectedDiagnostics.AddRange(expected);
         return test.RunAsync(CancellationToken.None);
@@ -56,9 +53,7 @@ public static partial class CSharpAnalyzerVerifier<TAnalyzer>
 
         test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
         test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig",
-            "is_global = true\n" +
-            "sharpproof_attribute_stub_namespaces = <global>\n" +
-            "sharpproof_suggest_missing_enforce_pure = false\n"));
+            CSharpVerifierHelper.CreateGlobalConfigText(sources[0].Source, suppressMissingPurity: true)));
         test.ExpectedDiagnostics.AddRange(expected);
         return test.RunAsync(CancellationToken.None);
     }

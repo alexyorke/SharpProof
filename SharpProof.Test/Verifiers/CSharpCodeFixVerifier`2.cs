@@ -152,13 +152,7 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
         ImmutableDictionary<string, string>? analyzerOptions = null)
     {
         test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
-        var globalConfigText = "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n";
-        if (AnalyzerTestHost.HasFileLevelMissingPuritySuppression(source))
-            globalConfigText += "sharpproof_suggest_missing_enforce_pure = false\n";
-        if (analyzerOptions != null)
-            foreach (var option in analyzerOptions.OrderBy(static option => option.Key, StringComparer.Ordinal))
-                globalConfigText += option.Key + " = " + option.Value + "\n";
-
-        test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", globalConfigText));
+        test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig",
+            CSharpVerifierHelper.CreateGlobalConfigText(source, analyzerOptions)));
     }
 }

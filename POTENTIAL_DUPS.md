@@ -50,9 +50,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 14. **Code-fix action registration** - `SharpProof.CodeFixes/SharpProofCodeFixProvider.cs:70-164,443-476`
     Several branches repeat target lookup and `CodeAction` registration for remove-misplaced, remove-matching, and add-`[EnforcePure]` fixes. Add narrowly scoped registration helpers, preserving deliberate differences between all-matches and diagnostic-specific removal behavior.
 
-15. **Verifier setup and diagnostic facade** - `SharpProof.Test/Verifiers/CSharpAnalyzerVerifier\`1+Test.cs:13-31`; `SharpProof.Test/Verifiers/CSharpCodeFixVerifier\`2+Test.cs:15-33`; corresponding verifier files
-    Both test constructors apply identical solution transforms, and both facades expose the same diagnostic overloads. Put compilation options/configuration and diagnostic-result creation in `CSharpVerifierHelper`.
-
 16. **Tooling-test temporary source lifecycle** - `SharpProof.ToolingTest/SymbolicCapabilityQueryTests.cs:24-201`; `SharpProof.ToolingTest/SymbolicComplexityQueryTests.cs:26-208`; `SharpProof.ToolingTest/StandaloneCompilationProfileTests.cs:23-60`
     Tests repeatedly create GUID paths, write source, run in `try/finally`, and delete. A disposable `TemporarySourceFile` fixture would standardize naming and cleanup.
 
@@ -271,18 +268,6 @@ Mixed use of `PurityNotVerifiedRule` vs `PurityNotVerifiedId`. Standardize on on
 ---
 
 ## SharpProof.Test - W-Z + Smt/Verifiers
-
-### Verifiers: duplicated test-class constructor logic
-`Verifiers/CSharpCodeFixVerifier`2+Test.cs:13-34` and `Verifiers/CSharpAnalyzerVerifier`1+Test.cs:11-32`
-byte-for-byte identical constructors (`ReferenceAssemblies = Net.Net80` + same `SolutionTransforms` lambda).
-
-**Recommendation:** `SharpProofVerifierReferences.ConfigureTestDefaults<TTest>(TTest test)` shared helper.
-
-### Verifiers: duplicated global-config + reference setup
-`Verifiers/CSharpCodeFixVerifier`2.cs:149-163` (`AddSharpProofReferences`) vs `Verifiers/CSharpAnalyzerVerifier`1.cs:36-41`
-and `:57-61` (inline, twice). The analyzer verifier re-inlines what the code-fix verifier factored.
-
-**Recommendation:** Single source of truth `AddSharpProofReferences` called from both verifiers.
 
 ### Duplicated `MinimalEnforcePureAttributeSource` stub
 `WhileLoopTests.cs:11-17` (repeated 44,82,114,149) + project-wide (`RecordTests`, `RefFieldsAndScopedRefTests`, `UnsafeCodeTests`).
