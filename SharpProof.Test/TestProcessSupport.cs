@@ -1,7 +1,42 @@
+using System.Diagnostics;
+using System.Text;
+
 namespace SharpProof.Test;
 
 internal static class TestProcessSupport
 {
+    public static ProcessStartInfo CreatePowerShellStartInfo(
+        string workingDirectory,
+        bool redirectStandardInput = false,
+        Encoding? encoding = null)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = FindPowerShellExecutable(),
+            WorkingDirectory = workingDirectory,
+            RedirectStandardInput = redirectStandardInput,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        if (encoding != null)
+        {
+            if (redirectStandardInput) startInfo.StandardInputEncoding = encoding;
+            startInfo.StandardOutputEncoding = encoding;
+            startInfo.StandardErrorEncoding = encoding;
+        }
+
+        startInfo.ArgumentList.Add("-NoLogo");
+        startInfo.ArgumentList.Add("-NoProfile");
+        if (OperatingSystem.IsWindows())
+        {
+            startInfo.ArgumentList.Add("-ExecutionPolicy");
+            startInfo.ArgumentList.Add("Bypass");
+        }
+
+        return startInfo;
+    }
+
     public static string FindPowerShellExecutable()
     {
         var candidates = OperatingSystem.IsWindows()

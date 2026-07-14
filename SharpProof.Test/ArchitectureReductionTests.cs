@@ -8969,22 +8969,7 @@ public sealed class ArchitectureReductionTests
         string repositoryRoot,
         string scriptName)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = TestProcessSupport.FindPowerShellExecutable(),
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        if (OperatingSystem.IsWindows())
-        {
-            startInfo.ArgumentList.Add("-ExecutionPolicy");
-            startInfo.ArgumentList.Add("Bypass");
-        }
+        var startInfo = TestProcessSupport.CreatePowerShellStartInfo(repositoryRoot);
 
         startInfo.ArgumentList.Add("-File");
         startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", scriptName));

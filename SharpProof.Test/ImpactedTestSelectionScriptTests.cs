@@ -762,7 +762,7 @@ public sealed class ImpactedTestSelectionScriptTests
         params string[] changedFiles)
     {
         var repositoryRoot = FindRepositoryRoot();
-        var startInfo = CreatePowerShellStartInfo(repositoryRoot);
+        var startInfo = TestProcessSupport.CreatePowerShellStartInfo(repositoryRoot);
 
         startInfo.ArgumentList.Add("-File");
         startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Invoke-SharpProofImpactedTests.ps1"));
@@ -808,28 +808,6 @@ public sealed class ImpactedTestSelectionScriptTests
 
         Assert.That(error, Is.Empty);
         return output;
-    }
-
-    private static ProcessStartInfo CreatePowerShellStartInfo(string repositoryRoot)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = TestProcessSupport.FindPowerShellExecutable(),
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        if (OperatingSystem.IsWindows())
-        {
-            startInfo.ArgumentList.Add("-ExecutionPolicy");
-            startInfo.ArgumentList.Add("Bypass");
-        }
-
-        return startInfo;
     }
 
     private static string[] GetStringArray(JsonElement root, string propertyName)

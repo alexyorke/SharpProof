@@ -135,30 +135,13 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## SharpProof.Test - E-G
 
-### `Generic*DispatchTests` (lower priority)
-`GenericComparisonDispatchTests`, `GenericEqualityDispatchTests`, `GenericIndexerDispatchTests`
-repeat the same skeleton but exercise genuinely different APIs. Borderline.
-
 ---
 
 ## SharpProof.Test - H-J
 
-### Duplicated PowerShell `ProcessStartInfo` construction
-`ImpactedTestSelectionScriptTests.cs:813-833` (`CreatePowerShellStartInfo`) and
-`ImpactedTestSelectionJsonSession.cs:67-91` (`Start`) both hand-build the PowerShell launch config
-(`FindPowerShellExecutable`, redirect flags, `-NoLogo -NoProfile -ExecutionPolicy Bypass`).
-Repeated again in `ArchitectureReductionTests.cs:8947`.
-
-**Recommendation:** Add `TestProcessSupport.CreatePowerShellStartInfo(workingDirectory)`.
-
 ### Repeated `VerifyCS` type-alias boilerplate (borderline)
 `using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.SharpProofAnalyzer>;`
 re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixture / `GlobalUsings.cs`.
-
-### Base64 encode/decode split across JSON host contract (minor)
-`ImpactedTestSelectionJsonHost.ps1:13-23` (PowerShell) and `ImpactedTestSelectionJsonSession.cs:174-179`
-(C#) are symmetric halves of the same protocol (different languages, can't be literally shared).
-**Recommendation:** Document the encoding contract once.
 
 ---
 
@@ -172,21 +155,9 @@ re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixt
 ### Near-duplicate `PureMethodCallingImpureMethod_Diagnostic`
 `LocalFunctionAndRecursionTests.cs:71-97` and `MethodCallTests.cs:40-68` (same scenario, differ only in helper name/message).
 
-### Per-file assertion helper wrappers re-implemented
-`LinqOperationsTests.cs:1317` (`AssertPurityDiagnosticsAsync`), `MetricsTests.cs:54` (`AssertPurityDiagnosticAsync`)
-wrap the same intent; many files call `VerifyCS.VerifyAnalyzerAsync` directly with inline `WithSpan`/`WithArguments`.
-
-**Recommendation:** Provide a shared base test class / `AnalyzerTestHost` helper taking framework refs + marked source.
-
 ---
 
 ## SharpProof.Test - N-P
-
-### Recurring private `GetDiagnosticsAsync`/`AnalyzeAsync` wrappers over `AnalyzerTestHost`
-`NullableContractVerificationTests.cs:572`, `PropertyContractAliasTests.cs:199`, `ProvenDiagnosticSuppressorTests.cs:335`
-define thin private wrappers with fixed option sets, while many other files call `AnalyzerTestHost.GetDiagnosticsAsync` directly.
-
-**Recommendation:** Add named overloads on `AnalyzerTestHost` (e.g. `GetDiagnosticsWithNullabilityAsync`); keep the suppressor's specialized wrapper.
 
 ---
 

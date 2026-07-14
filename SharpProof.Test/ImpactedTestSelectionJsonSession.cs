@@ -64,26 +64,7 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
     {
         var hostPath = Path.Combine(repositoryRoot, "SharpProof.Test", "ImpactedTestSelectionJsonHost.ps1");
         var selectorPath = Path.Combine(repositoryRoot, "scripts", "Invoke-SharpProofImpactedTests.ps1");
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = TestProcessSupport.FindPowerShellExecutable(),
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            StandardInputEncoding = Utf8NoBom,
-            StandardOutputEncoding = Utf8NoBom,
-            StandardErrorEncoding = Utf8NoBom
-        };
-
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        if (OperatingSystem.IsWindows())
-        {
-            startInfo.ArgumentList.Add("-ExecutionPolicy");
-            startInfo.ArgumentList.Add("Bypass");
-        }
+        var startInfo = TestProcessSupport.CreatePowerShellStartInfo(repositoryRoot, true, Utf8NoBom);
 
         startInfo.ArgumentList.Add("-File");
         startInfo.ArgumentList.Add(hostPath);
