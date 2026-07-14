@@ -42,6 +42,28 @@ public class CSharpSyntaxFactsTests
         Assert.That(binaryKind, Is.EqualTo(SyntaxKind.None));
     }
 
+    [TestCase("++value", 1)]
+    [TestCase("value++", 1)]
+    [TestCase("--value", -1)]
+    [TestCase("value--", -1)]
+    [TestCase("((value++))", 1)]
+    public void TryGetIncrementOrDecrementOperand_ReturnsOperandAndDelta(string text, int expectedDelta)
+    {
+        var expression = SyntaxFactory.ParseExpression(text);
+
+        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
+            expression, out var operand, out var delta), Is.True);
+        Assert.That(operand.ToString(), Is.EqualTo("value"));
+        Assert.That(delta, Is.EqualTo(expectedDelta));
+    }
+
+    [Test]
+    public void TryGetIncrementOrDecrementOperand_RejectsNonMutation()
+    {
+        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
+            SyntaxFactory.ParseExpression("value + 1"), out _, out _), Is.False);
+    }
+
     [Test]
     public void GetContainingExecutionRoot_ExtendedPolicy_SelectsNearestRequestedBoundary()
     {

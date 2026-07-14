@@ -1395,28 +1395,15 @@ internal sealed class SymbolicComplexityService
         {
             direction = StepDirection.None;
             expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+            if (CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out var delta) &&
+                SymbolEquals(semanticModel.GetSymbolInfo(operand, _cancellationToken).Symbol, loopSymbol))
+            {
+                direction = delta > 0 ? StepDirection.Up : StepDirection.Down;
+                return true;
+            }
+
             switch (expression)
             {
-                case PostfixUnaryExpressionSyntax postfix
-                    when (postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
-                          postfix.IsKind(SyntaxKind.PostDecrementExpression)) &&
-                         SymbolEquals(semanticModel.GetSymbolInfo(postfix.Operand, _cancellationToken).Symbol,
-                             loopSymbol):
-                    direction = postfix.IsKind(SyntaxKind.PostIncrementExpression)
-                        ? StepDirection.Up
-                        : StepDirection.Down;
-                    return true;
-
-                case PrefixUnaryExpressionSyntax prefix
-                    when (prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
-                          prefix.IsKind(SyntaxKind.PreDecrementExpression)) &&
-                         SymbolEquals(semanticModel.GetSymbolInfo(prefix.Operand, _cancellationToken).Symbol,
-                             loopSymbol):
-                    direction = prefix.IsKind(SyntaxKind.PreIncrementExpression)
-                        ? StepDirection.Up
-                        : StepDirection.Down;
-                    return true;
-
                 case AssignmentExpressionSyntax assignment
                     when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol,
                         loopSymbol):
@@ -1484,23 +1471,7 @@ internal sealed class SymbolicComplexityService
             foreach (var node in statement.DescendantNodesAndSelf(static candidate =>
                          !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             {
-                var mutatedExpression = node switch
-                {
-                    AssignmentExpressionSyntax assignment => assignment.Left,
-                    PrefixUnaryExpressionSyntax prefix
-                        when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
-                             prefix.IsKind(SyntaxKind.PreDecrementExpression) =>
-                        prefix.Operand,
-                    PostfixUnaryExpressionSyntax postfix
-                        when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
-                             postfix.IsKind(SyntaxKind.PostDecrementExpression) =>
-                        postfix.Operand,
-                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) =>
-                        argument.Expression,
-                    _ => null
-                };
-
-                if (mutatedExpression == null ||
+                if (!SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) ||
                     !AssignmentTargetReferencesSymbol(mutatedExpression, symbol, semanticModel))
                     continue;
 

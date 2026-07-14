@@ -271,12 +271,13 @@ internal static class MethodRequiresAnalyzer
 
     private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation)
     {
-        if (operation.Target.Syntax is not ExpressionSyntax target) return null;
+        if (operation.Target.Syntax is not ExpressionSyntax target ||
+            operation.Syntax is not ExpressionSyntax updateExpression ||
+            !CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(updateExpression, out _, out var delta))
+            return null;
 
-        var isDecrement = operation.Syntax.IsKind(SyntaxKind.PreDecrementExpression) ||
-                          operation.Syntax.IsKind(SyntaxKind.PostDecrementExpression);
         return SyntaxFactory.BinaryExpression(
-            isDecrement ? SyntaxKind.SubtractExpression : SyntaxKind.AddExpression,
+            delta < 0 ? SyntaxKind.SubtractExpression : SyntaxKind.AddExpression,
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
     }

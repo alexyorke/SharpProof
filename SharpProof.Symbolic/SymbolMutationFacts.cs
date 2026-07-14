@@ -27,14 +27,9 @@ internal static class SymbolMutationFacts
         {
             AssignmentExpressionSyntax assignment =>
                 MutatedExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken),
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken),
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken),
+            ExpressionSyntax expression
+                when CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out _) =>
+                ExpressionMatchesSymbol(operand, symbol, semanticModel, cancellationToken),
             ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) =>
                 ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
             _ => false
@@ -43,20 +38,14 @@ internal static class SymbolMutationFacts
 
     internal static bool TryGetMutationTarget(SyntaxNode node, out ExpressionSyntax expression)
     {
+        if (node is ExpressionSyntax mutationExpression &&
+            CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(mutationExpression, out expression, out _))
+            return true;
+
         switch (node)
         {
             case AssignmentExpressionSyntax assignment:
                 expression = assignment.Left;
-                return true;
-            case PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression):
-                expression = prefixUnary.Operand;
-                return true;
-            case PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression):
-                expression = postfixUnary.Operand;
                 return true;
             case ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None):
                 expression = argument.Expression;
@@ -74,23 +63,13 @@ internal static class SymbolMutationFacts
         out ISymbol symbol,
         out int delta)
     {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        var operand = expression switch
+        if (!CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out delta))
         {
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                prefixUnary.Operand,
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                postfixUnary.Operand,
-            _ => null
-        };
+            symbol = null!;
+            return false;
+        }
 
-        var expressionSymbol = operand == null
-            ? null
-            : semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
+        var expressionSymbol = semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
         if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol)
         {
             symbol = null!;
@@ -99,10 +78,6 @@ internal static class SymbolMutationFacts
         }
 
         symbol = expressionSymbol.OriginalDefinition;
-        delta = expression.IsKind(SyntaxKind.PreIncrementExpression) ||
-                expression.IsKind(SyntaxKind.PostIncrementExpression)
-            ? 1
-            : -1;
         return true;
     }
 

@@ -160,6 +160,25 @@ internal static class CSharpSyntaxFacts
         return binaryKind != SyntaxKind.None;
     }
 
+    internal static bool TryGetIncrementOrDecrementOperand(
+        ExpressionSyntax expression,
+        out ExpressionSyntax operand,
+        out int delta)
+    {
+        expression = UnwrapParenthesesAndNullableSuppression(expression);
+        operand = expression switch
+        {
+            PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                                                    prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
+            PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                                                      postfix.IsKind(SyntaxKind.PostDecrementExpression) => postfix.Operand,
+            _ => null!
+        };
+        delta = expression.IsKind(SyntaxKind.PreIncrementExpression) ||
+                expression.IsKind(SyntaxKind.PostIncrementExpression) ? 1 : -1;
+        return operand != null;
+    }
+
     public static bool IsNullLiteral(ExpressionSyntax expression)
     {
         return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
