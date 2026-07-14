@@ -323,31 +323,12 @@ internal static class EffectSummaryCli
 
     private static HashSet<string> LoadShardedProgress(string progressPath, string inputFingerprint)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
-        var root = document.RootElement;
-        if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            schemaVersionElement.GetInt32() != 1)
-            throw new InvalidOperationException(
-                $"Unsupported sharded effect-summary progress schema in '{progressPath}'.");
-
-        var recordedFingerprint = root.TryGetProperty("InputFingerprint", out var fingerprintElement)
-            ? fingerprintElement.GetString()
-            : null;
-        if (!string.Equals(recordedFingerprint, inputFingerprint, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
-
-        var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
-            completedElement.ValueKind == JsonValueKind.Array)
-            foreach (var pathElement in completedElement.EnumerateArray())
-            {
-                var path = pathElement.GetString();
-                if (!string.IsNullOrWhiteSpace(path)) completedOutputPaths.Add(Path.GetFullPath(path));
-            }
-
-        return completedOutputPaths;
+        return LoadCompletedOutputPaths(
+            progressPath,
+            "InputFingerprint",
+            inputFingerprint,
+            $"Unsupported sharded effect-summary progress schema in '{progressPath}'.",
+            $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
     }
 
     private static void SaveShardedProgress(
@@ -370,19 +351,33 @@ internal static class EffectSummaryCli
 
     private static HashSet<string> LoadCompletedArtifactOutputs(string progressPath, string artifactSpecSha256)
     {
+        return LoadCompletedOutputPaths(
+            progressPath,
+            "ArtifactSpecSha256",
+            artifactSpecSha256,
+            $"Unsupported artifact-spec progress schema in '{progressPath}'.",
+            $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
+    }
+
+    private static HashSet<string> LoadCompletedOutputPaths(
+        string progressPath,
+        string fingerprintPropertyName,
+        string expectedFingerprint,
+        string unsupportedSchemaMessage,
+        string fingerprintMismatchMessage)
+    {
         using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
         var root = document.RootElement;
         if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
             schemaVersionElement.ValueKind != JsonValueKind.Number ||
             schemaVersionElement.GetInt32() != 1)
-            throw new InvalidOperationException($"Unsupported artifact-spec progress schema in '{progressPath}'.");
+            throw new InvalidOperationException(unsupportedSchemaMessage);
 
-        var recordedSpecHash = root.TryGetProperty("ArtifactSpecSha256", out var specHashElement)
-            ? specHashElement.GetString()
+        var recordedFingerprint = root.TryGetProperty(fingerprintPropertyName, out var fingerprintElement)
+            ? fingerprintElement.GetString()
             : null;
-        if (!string.Equals(recordedSpecHash, artifactSpecSha256, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
+        if (!string.Equals(recordedFingerprint, expectedFingerprint, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(fingerprintMismatchMessage);
 
         var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
