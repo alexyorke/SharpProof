@@ -5,10 +5,11 @@ namespace SharpProof.Test;
 [TestFixture]
 public class DateTimeTests
 {
-    [Test]
-    public async Task DateTimeToday_Diagnostic()
+    public sealed record DateTimeOperationCase(string Name, string Source);
+
+    private static readonly DateTimeOperationCase[] Cases =
     {
-        var test = @"
+        new("DateTimeToday_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -19,15 +20,8 @@ public class TestClass
     {
         return DateTime.Today;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeNow_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("DateTimeNow_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -38,15 +32,8 @@ public class TestClass
     {
         return DateTime.Now;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeUtcNow_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("DateTimeUtcNow_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -57,15 +44,8 @@ public class TestClass
     {
         return DateTime.UtcNow;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeToString_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("DateTimeToString_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -76,15 +56,8 @@ public class TestClass
     {
         return value.ToString();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeAddTicks_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("DateTimeAddTicks_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -95,10 +68,311 @@ public class TestClass
     {
         return value.AddTicks(1);
     }
-}";
+}"),
+        new("DateTimeConstructorsAndIsLeapYear_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod()
+    {
+        var first = new DateTime(637000000000000000L);
+        var second = new DateTime(2024, 2, 29);
+        return first.Ticks + second.Ticks + (DateTime.IsLeapYear(2024) ? 1 : 0);
     }
+}"),
+        new("DateTimeStaticComparisonHelpers_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(DateTime left, DateTime right)
+    {
+        return DateTime.Compare(left, right) == 0 ||
+            DateTime.Equals(left, right);
+    }
+}"),
+        new("DateTimeEqualsObject_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(DateTime value)
+    {
+        return value.Equals((object)value);
+    }
+}"),
+        new("DateTimeSubtract_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeSpan TestMethod(DateTime left, DateTime right)
+    {
+        return left.Subtract(right);
+    }
+}"),
+        new("DateTimeToBinary_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTime value)
+    {
+        return value.ToBinary();
+    }
+}"),
+        new("DateTimeToFileTime_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToFileTime();
+    }
+}"),
+        new("DateTimeToLocalTime_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToLocalTime();
+    }
+}"),
+        new("DateTimeBinaryRoundTripHelpers_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(DateTime value)
+    {
+        return DateTime.FromBinary(value.ToBinary());
+    }
+}"),
+        new("DateTimeDaysInMonth_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(DateTime value)
+    {
+        return DateTime.DaysInMonth(value.Year, value.Month);
+    }
+}"),
+        new("DateTimeOADateRoundTrip_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double TestMethod(DateTime value)
+    {
+        return DateTime.FromOADate(value.ToOADate()).ToOADate();
+    }
+}"),
+        new("DateTimeDate_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTime value)
+    {
+        return value.Date.Ticks;
+    }
+}"),
+        new("DateTimeOffsetNow_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|SP0002:TestMethod|}()
+    {
+        return DateTimeOffset.Now;
+    }
+}"),
+        new("DateTimeOffsetUtcNow_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|SP0002:TestMethod|}()
+    {
+        return DateTimeOffset.UtcNow;
+    }
+}"),
+        new("DateTimeOffsetToString_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTimeOffset value)
+    {
+        return value.ToString();
+    }
+}"),
+        new("DateTimeOffsetLongAndOffsetConstructor_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod()
+    {
+        var value = new DateTimeOffset(637000000000000000L, TimeSpan.Zero);
+        return value.Ticks + value.UtcTicks;
+    }
+}"),
+        new("DateTimeOffsetToUnixTimeMilliseconds_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTimeOffset value)
+    {
+        return value.ToUnixTimeMilliseconds();
+    }
+}"),
+        new("DateTimeOffsetToUnixTimeSeconds_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTimeOffset value)
+    {
+        return value.ToUnixTimeSeconds();
+    }
+}"),
+        new("DateTimeOffsetFromUnixTimeSeconds_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|SP0002:TestMethod|}(long value)
+    {
+        return DateTimeOffset.FromUnixTimeSeconds(value);
+    }
+}"),
+        new("DateTimeOffsetFromUnixTimeMilliseconds_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|SP0002:TestMethod|}(long value)
+    {
+        return DateTimeOffset.FromUnixTimeMilliseconds(value);
+    }
+}"),
+        new("DateTimeOffsetDeterministicValueProperties_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTimeOffset value)
+    {
+        return value.Ticks +
+            value.UtcTicks +
+            value.Offset.Ticks +
+            value.DateTime.Ticks +
+            value.UtcDateTime.Ticks;
+    }
+}"),
+        new("DateTimeOffsetComponentProperties_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(DateTimeOffset value)
+    {
+        return value.Year +
+            value.Month +
+            value.Day +
+            value.DayOfYear +
+            (int)value.DayOfWeek +
+            value.Hour +
+            value.Minute +
+            value.Second +
+            value.Millisecond;
+    }
+}"),
+        new("DateTimeOffsetStaticComparisonHelpers_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(DateTimeOffset left, DateTimeOffset right)
+    {
+        return DateTimeOffset.Compare(left, right) == 0 ||
+            DateTimeOffset.Equals(left, right);
+    }
+}"),
+    };
+
+    private static IEnumerable<TestCaseData> DateTimeOperationCaseData()
+    {
+        if (Cases.Length != 27 ||
+            Cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 27)
+        {
+            throw new InvalidOperationException("DateTimeTests case invariants failed.");
+        }
+
+        return Cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(DateTimeOperationCaseData))]
+    public async Task DateTimeOperationCaseCases(DateTimeOperationCase testCase)
+    {
+        await VerifyCS.VerifyAnalyzerAsync(testCase.Source);
+    }
+
+
+
+
+
 
     [TestCase("value.Add(offset)")]
     [TestCase("value.AddDays(1)")]
@@ -146,274 +420,19 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task DateTimeConstructorsAndIsLeapYear_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod()
-    {
-        var first = new DateTime(637000000000000000L);
-        var second = new DateTime(2024, 2, 29);
-        return first.Ticks + second.Ticks + (DateTime.IsLeapYear(2024) ? 1 : 0);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeStaticComparisonHelpers_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(DateTime left, DateTime right)
-    {
-        return DateTime.Compare(left, right) == 0 ||
-            DateTime.Equals(left, right);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeEqualsObject_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(DateTime value)
-    {
-        return value.Equals((object)value);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeSubtract_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public TimeSpan TestMethod(DateTime left, DateTime right)
-    {
-        return left.Subtract(right);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeToBinary_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod(DateTime value)
-    {
-        return value.ToBinary();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeToFileTime_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToFileTime();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeToLocalTime_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToLocalTime();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(DateTime value)
-    {
-        return DateTime.FromBinary(value.ToBinary());
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeDaysInMonth_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(DateTime value)
-    {
-        return DateTime.DaysInMonth(value.Year, value.Month);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOADateRoundTrip_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(DateTime value)
-    {
-        return DateTime.FromOADate(value.ToOADate()).ToOADate();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeDate_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod(DateTime value)
-    {
-        return value.Date.Ticks;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetNow_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTimeOffset {|SP0002:TestMethod|}()
-    {
-        return DateTimeOffset.Now;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetUtcNow_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTimeOffset {|SP0002:TestMethod|}()
-    {
-        return DateTimeOffset.UtcNow;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetToString_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTimeOffset value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [Test]
     [TestCase("value.Add(offset)")]
@@ -462,169 +481,11 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task DateTimeOffsetLongAndOffsetConstructor_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod()
-    {
-        var value = new DateTimeOffset(637000000000000000L, TimeSpan.Zero);
-        return value.Ticks + value.UtcTicks;
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeOffsetToUnixTimeMilliseconds_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod(DateTimeOffset value)
-    {
-        return value.ToUnixTimeMilliseconds();
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeOffsetToUnixTimeSeconds_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod(DateTimeOffset value)
-    {
-        return value.ToUnixTimeSeconds();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetFromUnixTimeSeconds_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTimeOffset {|SP0002:TestMethod|}(long value)
-    {
-        return DateTimeOffset.FromUnixTimeSeconds(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetFromUnixTimeMilliseconds_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTimeOffset {|SP0002:TestMethod|}(long value)
-    {
-        return DateTimeOffset.FromUnixTimeMilliseconds(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetDeterministicValueProperties_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod(DateTimeOffset value)
-    {
-        return value.Ticks +
-            value.UtcTicks +
-            value.Offset.Ticks +
-            value.DateTime.Ticks +
-            value.UtcDateTime.Ticks;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetComponentProperties_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(DateTimeOffset value)
-    {
-        return value.Year +
-            value.Month +
-            value.Day +
-            value.DayOfYear +
-            (int)value.DayOfWeek +
-            value.Hour +
-            value.Minute +
-            value.Second +
-            value.Millisecond;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetStaticComparisonHelpers_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(DateTimeOffset left, DateTimeOffset right)
-    {
-        return DateTimeOffset.Compare(left, right) == 0 ||
-            DateTimeOffset.Equals(left, right);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 }

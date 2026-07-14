@@ -5,10 +5,11 @@ namespace SharpProof.Test;
 [TestFixture]
 public class CollectionViewTests
 {
-    [Test]
-    public async Task DictionaryKeys_Diagnostic()
+    public sealed record CollectionViewOperationCase(string Name, string Source);
+
+    private static readonly CollectionViewOperationCase[] Cases =
     {
-        var test = @"
+        new("DictionaryKeys_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -19,15 +20,8 @@ public class TestClass
     {
         return values.Keys;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task DictionaryValues_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("DictionaryValues_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -38,15 +32,8 @@ public class TestClass
     {
         return values.Values;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task SortedDictionaryKeys_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("SortedDictionaryKeys_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -57,15 +44,8 @@ public class TestClass
     {
         return values.Keys;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task SortedDictionaryValues_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("SortedDictionaryValues_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -76,15 +56,8 @@ public class TestClass
     {
         return values.Values;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task IDictionaryKeys_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("IDictionaryKeys_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -95,15 +68,8 @@ public class TestClass
     {
         return values.Keys;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task IDictionaryValues_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("IDictionaryValues_Diagnostic", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -114,15 +80,8 @@ public class TestClass
     {
         return values.Values;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task QueueSynchronized_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("QueueSynchronized_Diagnostic", @"
 using System.Collections;
 using SharpProof.Attributes;
 
@@ -133,15 +92,8 @@ public class TestClass
     {
         return Queue.Synchronized(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayListAdapter_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayListAdapter_Diagnostic", @"
 using System.Collections;
 using SharpProof.Attributes;
 
@@ -152,15 +104,8 @@ public class TestClass
     {
         return ArrayList.Adapter(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ListAsReadOnly_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ListAsReadOnly_Diagnostic", @"
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -172,15 +117,8 @@ public class TestClass
     {
         return values.AsReadOnly();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnly_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnly_Diagnostic", @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -192,15 +130,8 @@ public class TestClass
     {
         return Array.AsReadOnly(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlyFreshLocalArray_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlyFreshLocalArray_NoDiagnostic", @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -213,15 +144,8 @@ public class TestClass
         var values = new[] { 1, 2, 3 };
         return Array.AsReadOnly(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlyArrayEmpty_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlyArrayEmpty_NoDiagnostic", @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -233,15 +157,8 @@ public class TestClass
     {
         return Array.AsReadOnly(Array.Empty<int>());
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ReadOnlyCollectionCtorFreshArray_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("ReadOnlyCollectionCtorFreshArray_NoDiagnostic", @"
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
 
@@ -252,15 +169,8 @@ public class TestClass
     {
         return new ReadOnlyCollection<int>(new[] { 1, 2, 3 });
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ReadOnlyCollectionCtorExistingArray_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ReadOnlyCollectionCtorExistingArray_Diagnostic", @"
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
 
@@ -271,15 +181,8 @@ public class TestClass
     {
         return new ReadOnlyCollection<int>(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ReadOnlyCollectionCtorExistingList_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ReadOnlyCollectionCtorExistingList_Diagnostic", @"
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -291,15 +194,8 @@ public class TestClass
     {
         return new ReadOnlyCollection<int>(values);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlySpan_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlySpan_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -310,15 +206,8 @@ public class TestClass
     {
         return values.AsSpan();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task OwnedArrayAsReadOnlySpan_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("OwnedArrayAsReadOnlySpan_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -330,15 +219,8 @@ public class TestClass
         var values = new[] { 1, 2, 3 };
         return values.AsSpan();
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlySpanViaLocal_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlySpanViaLocal_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -350,15 +232,8 @@ public class TestClass
         var span = values.AsSpan();
         return span;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlySpanSlice_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlySpanSlice_Diagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -369,15 +244,8 @@ public class TestClass
     {
         return values.AsSpan().Slice(1);
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task SpanToReadOnlySpanImplicitConversion_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        new("SpanToReadOnlySpanImplicitConversion_NoDiagnostic", @"
 using System;
 using SharpProof.Attributes;
 
@@ -388,15 +256,8 @@ public class TestClass
     {
         return values;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlyViaLocal_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlyViaLocal_Diagnostic", @"
 using System;
 using System.IO;
 using System.Collections.ObjectModel;
@@ -410,15 +271,8 @@ public class TestClass
         var view = Array.AsReadOnly(values);
         return view;
     }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ArrayAsReadOnlyImpureArraySource_Diagnostic()
-    {
-        var test = @"
+}"),
+        new("ArrayAsReadOnlyImpureArraySource_Diagnostic", @"
 using System;
 using System.IO;
 using System.Collections.ObjectModel;
@@ -431,10 +285,124 @@ public class TestClass
     {
         return Array.AsReadOnly(Directory.GetFiles(path));
     }
-}";
+}"),
+        new("ReadOnlyMemoryCtorCallerOwnedArray_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> {|SP0002:TestMethod|}(int[] values)
+    {
+        return new ReadOnlyMemory<int>(values);
     }
+}"),
+        new("ReadOnlyMemoryCtorOwnedArray_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> TestMethod()
+    {
+        var values = new[] { 1, 2, 3 };
+        return new ReadOnlyMemory<int>(values);
+    }
+}"),
+        new("ReadOnlySpanCtorImpureArraySource_Diagnostic", @"
+using System;
+using System.IO;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlySpan<string> {|SP0002:TestMethod|}(string path)
+    {
+        return new ReadOnlySpan<string>(Directory.GetFiles(path));
+    }
+}"),
+        new("ReadOnlyMemoryViaLocalCallerOwnedArray_Diagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> {|SP0002:TestMethod|}(int[] values)
+    {
+        var memory = new ReadOnlyMemory<int>(values);
+        return memory;
+    }
+}"),
+        new("MemoryToReadOnlyMemoryImplicitConversion_NoDiagnostic", @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> TestMethod(Memory<int> values)
+    {
+        return values;
+    }
+}"),
+        new("CollectionsMarshalAsSpan_Diagnostic", @"
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Span<int> {|SP0002:TestMethod|}(List<int> values)
+    {
+        return CollectionsMarshal.AsSpan(values);
+    }
+}"),
+    };
+
+    private static IEnumerable<TestCaseData> CollectionViewOperationCaseData()
+    {
+        if (Cases.Length != 28 ||
+            Cases.Select(static testCase => testCase.Name).Distinct(StringComparer.Ordinal).Count() != 28)
+        {
+            throw new InvalidOperationException("CollectionViewTests case invariants failed.");
+        }
+
+        return Cases.Select(static testCase => new TestCaseData(testCase).SetName(testCase.Name));
+    }
+
+    [TestCaseSource(nameof(CollectionViewOperationCaseData))]
+    public async Task CollectionViewOperationCaseCases(CollectionViewOperationCase testCase)
+    {
+        await VerifyCS.VerifyAnalyzerAsync(testCase.Source);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [TestCase("Span<int>", "new Span<int>(values)")]
     [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
@@ -481,103 +449,10 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task ReadOnlyMemoryCtorCallerOwnedArray_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public ReadOnlyMemory<int> {|SP0002:TestMethod|}(int[] values)
-    {
-        return new ReadOnlyMemory<int>(values);
-    }
-}";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
-    [Test]
-    public async Task ReadOnlyMemoryCtorOwnedArray_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public ReadOnlyMemory<int> TestMethod()
-    {
-        var values = new[] { 1, 2, 3 };
-        return new ReadOnlyMemory<int>(values);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ReadOnlySpanCtorImpureArraySource_Diagnostic()
-    {
-        var test = @"
-using System;
-using System.IO;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ReadOnlySpan<string> {|SP0002:TestMethod|}(string path)
-    {
-        return new ReadOnlySpan<string>(Directory.GetFiles(path));
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task ReadOnlyMemoryViaLocalCallerOwnedArray_Diagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ReadOnlyMemory<int> {|SP0002:TestMethod|}(int[] values)
-    {
-        var memory = new ReadOnlyMemory<int>(values);
-        return memory;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task MemoryToReadOnlyMemoryImplicitConversion_NoDiagnostic()
-    {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ReadOnlyMemory<int> TestMethod(Memory<int> values)
-    {
-        return values;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 
     [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
     [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
@@ -621,24 +496,4 @@ public class TestClass
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
-    [Test]
-    public async Task CollectionsMarshalAsSpan_Diagnostic()
-    {
-        var test = @"
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Span<int> {|SP0002:TestMethod|}(List<int> values)
-    {
-        return CollectionsMarshal.AsSpan(values);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
 }
