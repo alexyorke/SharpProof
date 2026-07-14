@@ -147,17 +147,7 @@ internal static class ArtifactSpecSymbolSource
             generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) &&
             entriesElement.ValueKind == JsonValueKind.Array)
             foreach (var entryElement in entriesElement.EnumerateArray())
-            {
-                var symbol = GetTrimmedStringProperty(entryElement, "DisplayName");
-                var included = MatchesIncludedPrefix(symbol, inclusionPrefixes);
-                if (!string.IsNullOrWhiteSpace(symbol) &&
-                    included &&
-                    !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
-                    symbols.Add(symbol);
-
-                var canonicalKey = GetTrimmedStringProperty(entryElement, "CanonicalKey");
-                if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
-            }
+                AddSourceSummaryMethod(entryElement, inclusionPrefixes, exclusionPrefixes, symbols, canonicalKeys);
 
         if (symbols.Count == 0 &&
             document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) &&
@@ -169,17 +159,7 @@ internal static class ArtifactSpecSymbolSource
                     continue;
 
                 foreach (var methodElement in methodsElement.EnumerateArray())
-                {
-                    var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
-                    var included = MatchesIncludedPrefix(symbol, inclusionPrefixes);
-                    if (!string.IsNullOrWhiteSpace(symbol) &&
-                        included &&
-                        !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
-                        symbols.Add(symbol);
-
-                    var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
-                    if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
-                }
+                    AddSourceSummaryMethod(methodElement, inclusionPrefixes, exclusionPrefixes, symbols, canonicalKeys);
             }
 
         if (symbols.Count == 0 && inclusionPrefixes.Count == 0)
@@ -188,6 +168,24 @@ internal static class ArtifactSpecSymbolSource
         return new ArtifactSpecSymbolSet(
             symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
             canonicalKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
+    }
+
+    private static void AddSourceSummaryMethod(
+        JsonElement methodElement,
+        IReadOnlyList<string> includedSymbolPrefixes,
+        IReadOnlyList<string> excludedSymbolPrefixes,
+        ISet<string> symbols,
+        ISet<string> canonicalKeys)
+    {
+        var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
+        var included = MatchesIncludedPrefix(symbol, includedSymbolPrefixes);
+        if (!string.IsNullOrWhiteSpace(symbol) &&
+            included &&
+            !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, excludedSymbolPrefixes))
+            symbols.Add(symbol);
+
+        var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
+        if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
     }
 
     private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
