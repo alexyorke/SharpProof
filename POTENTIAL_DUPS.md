@@ -368,12 +368,6 @@ and `:57-61` (inline, twice). The analyzer verifier re-inlines what the code-fix
 
 **Recommendation:** `SharpProofVerifierReferences.MinimalEnforcePureAttributeSource` shared constant.
 
-### Near-identical analyzer test bodies (`XmlTests`, `WebUtilityTests`, `ZeroAllocationContractTests`)
-Each test in `XmlTests.cs`/`WebUtilityTests.cs` follows the same template; `ZeroAllocationContractTests.cs`
-repeats the `[Impure][ZeroAllocations]` scaffold ~15x.
-
-**Recommendation:** Shared source-builder `BuildTestMethodSource(imports, returnType, body)` + `[TestCase]` parameterization.
-
 ---
 
 ## Analyzer Configuration + Rules
