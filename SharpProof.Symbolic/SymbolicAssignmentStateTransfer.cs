@@ -876,18 +876,9 @@ internal static class SymbolicAssignmentStateTransfer
 
         if (valueType == null) return;
 
-        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, targetReference, valueExpression) is
-                { IsExact: true, Value: { } targetLength } &&
-            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
-            { IsExact: true, Value: { } valueLength } &&
-            CanCompareIrTerms(targetLength, valueLength))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetLength,
-                valueLength,
-                valueExpression,
-                provenanceRoot + ".reference-backed-length");
+        AddAssignedBuiltInLengthStateFact(
+            ref state, targetReference, valueType, valueExpression, context,
+            provenanceRoot + ".reference-backed-length");
 
         AddAssignedCollectionCountStateFacts(
             ref state,
@@ -922,6 +913,22 @@ internal static class SymbolicAssignmentStateTransfer
             return;
 
         AddRelationPathFact(ref state, SymbolicRelationOperator.Equal, targetString, valueString,
+            valueExpression, provenance);
+    }
+
+    private static void AddAssignedBuiltInLengthStateFact(
+        ref SymbolicState state, SymbolicTerm targetReference, ITypeSymbol targetType,
+        ExpressionSyntax valueExpression, SymbolicLoweringContext context, string provenance)
+    {
+        if (targetReference.Kind != SmtValueKind.Reference ||
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(targetType, targetReference, valueExpression) is not
+                { IsExact: true, Value: { } targetLength } ||
+            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is not
+                { IsExact: true, Value: { } valueLength } ||
+            !CanCompareIrTerms(targetLength, valueLength))
+            return;
+
+        AddRelationPathFact(ref state, SymbolicRelationOperator.Equal, targetLength, valueLength,
             valueExpression, provenance);
     }
 
@@ -1411,18 +1418,9 @@ internal static class SymbolicAssignmentStateTransfer
                 valueExpression,
                 provenanceRoot + ".assigned-non-null");
 
-        if (targetTerm.Kind == SmtValueKind.Reference &&
-            TryCreateBuiltInLengthTerm(targetTerm, elementType, valueExpression, out var targetLength) &&
-            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
-            { IsExact: true, Value: { } valueLength } &&
-            CanCompareIrTerms(targetLength, valueLength))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetLength,
-                valueLength,
-                valueExpression,
-                provenanceRoot + ".assigned-length");
+        AddAssignedBuiltInLengthStateFact(
+            ref state, targetTerm, elementType, valueExpression, context,
+            provenanceRoot + ".assigned-length");
         AddAssignedArrayDimensionLengthStateFacts(
             ref state,
             targetTerm,
@@ -1855,17 +1853,6 @@ internal static class SymbolicAssignmentStateTransfer
         }
 
         return new SymbolicThrowGuardedValue(false, originalValueExpression, null, true, false);
-    }
-
-    private static bool TryCreateBuiltInLengthTerm(
-        SymbolicTerm receiver,
-        ITypeSymbol? type,
-        SyntaxNode source,
-        out SymbolicTerm term)
-    {
-        var lowering = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(type, receiver, source);
-        term = lowering.Value!;
-        return lowering is { IsExact: true, Value: not null };
     }
 
     internal static bool TryCreateMemberDerivedTerm(
