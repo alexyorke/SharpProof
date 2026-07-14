@@ -139,6 +139,27 @@ internal static class CSharpSyntaxFacts
                block.Statements[0] is ThrowStatementSyntax;
     }
 
+    internal static bool TryGetCompoundAssignmentBinaryKind(SyntaxKind assignmentKind, out SyntaxKind binaryKind)
+    {
+        binaryKind = assignmentKind switch
+        {
+            SyntaxKind.AddAssignmentExpression => SyntaxKind.AddExpression,
+            SyntaxKind.SubtractAssignmentExpression => SyntaxKind.SubtractExpression,
+            SyntaxKind.MultiplyAssignmentExpression => SyntaxKind.MultiplyExpression,
+            SyntaxKind.DivideAssignmentExpression => SyntaxKind.DivideExpression,
+            SyntaxKind.ModuloAssignmentExpression => SyntaxKind.ModuloExpression,
+            SyntaxKind.AndAssignmentExpression => SyntaxKind.BitwiseAndExpression,
+            SyntaxKind.ExclusiveOrAssignmentExpression => SyntaxKind.ExclusiveOrExpression,
+            SyntaxKind.OrAssignmentExpression => SyntaxKind.BitwiseOrExpression,
+            SyntaxKind.LeftShiftAssignmentExpression => SyntaxKind.LeftShiftExpression,
+            SyntaxKind.RightShiftAssignmentExpression => SyntaxKind.RightShiftExpression,
+            SyntaxKind.UnsignedRightShiftAssignmentExpression => SyntaxKind.UnsignedRightShiftExpression,
+            SyntaxKind.CoalesceAssignmentExpression => SyntaxKind.CoalesceExpression,
+            _ => SyntaxKind.None
+        };
+        return binaryKind != SyntaxKind.None;
+    }
+
     public static bool IsNullLiteral(ExpressionSyntax expression)
     {
         return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);

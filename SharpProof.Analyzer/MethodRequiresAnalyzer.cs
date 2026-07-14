@@ -260,7 +260,7 @@ internal static class MethodRequiresAnalyzer
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             operation.Target.Syntax is not ExpressionSyntax target ||
             operation.Value.Syntax is not ExpressionSyntax value ||
-            !TryGetCompoundBinaryKind(assignment.Kind(), out var binaryKind))
+            !CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind))
             return null;
 
         return SyntaxFactory.BinaryExpression(
@@ -279,27 +279,6 @@ internal static class MethodRequiresAnalyzer
             isDecrement ? SyntaxKind.SubtractExpression : SyntaxKind.AddExpression,
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
-    }
-
-    private static bool TryGetCompoundBinaryKind(SyntaxKind assignmentKind, out SyntaxKind binaryKind)
-    {
-        binaryKind = assignmentKind switch
-        {
-            SyntaxKind.AddAssignmentExpression => SyntaxKind.AddExpression,
-            SyntaxKind.SubtractAssignmentExpression => SyntaxKind.SubtractExpression,
-            SyntaxKind.MultiplyAssignmentExpression => SyntaxKind.MultiplyExpression,
-            SyntaxKind.DivideAssignmentExpression => SyntaxKind.DivideExpression,
-            SyntaxKind.ModuloAssignmentExpression => SyntaxKind.ModuloExpression,
-            SyntaxKind.AndAssignmentExpression => SyntaxKind.BitwiseAndExpression,
-            SyntaxKind.ExclusiveOrAssignmentExpression => SyntaxKind.ExclusiveOrExpression,
-            SyntaxKind.OrAssignmentExpression => SyntaxKind.BitwiseOrExpression,
-            SyntaxKind.LeftShiftAssignmentExpression => SyntaxKind.LeftShiftExpression,
-            SyntaxKind.RightShiftAssignmentExpression => SyntaxKind.RightShiftExpression,
-            SyntaxKind.UnsignedRightShiftAssignmentExpression => SyntaxKind.UnsignedRightShiftExpression,
-            SyntaxKind.CoalesceAssignmentExpression => SyntaxKind.CoalesceExpression,
-            _ => SyntaxKind.None
-        };
-        return binaryKind != SyntaxKind.None;
     }
 
     private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference)

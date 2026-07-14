@@ -14,6 +14,34 @@ public class CSharpSyntaxFactsTests
         ExecutionRootPolicy.Initializer |
         ExecutionRootPolicy.GlobalStatement;
 
+    [TestCase(SyntaxKind.AddAssignmentExpression, SyntaxKind.AddExpression)]
+    [TestCase(SyntaxKind.SubtractAssignmentExpression, SyntaxKind.SubtractExpression)]
+    [TestCase(SyntaxKind.MultiplyAssignmentExpression, SyntaxKind.MultiplyExpression)]
+    [TestCase(SyntaxKind.DivideAssignmentExpression, SyntaxKind.DivideExpression)]
+    [TestCase(SyntaxKind.ModuloAssignmentExpression, SyntaxKind.ModuloExpression)]
+    [TestCase(SyntaxKind.AndAssignmentExpression, SyntaxKind.BitwiseAndExpression)]
+    [TestCase(SyntaxKind.ExclusiveOrAssignmentExpression, SyntaxKind.ExclusiveOrExpression)]
+    [TestCase(SyntaxKind.OrAssignmentExpression, SyntaxKind.BitwiseOrExpression)]
+    [TestCase(SyntaxKind.LeftShiftAssignmentExpression, SyntaxKind.LeftShiftExpression)]
+    [TestCase(SyntaxKind.RightShiftAssignmentExpression, SyntaxKind.RightShiftExpression)]
+    [TestCase(SyntaxKind.UnsignedRightShiftAssignmentExpression, SyntaxKind.UnsignedRightShiftExpression)]
+    [TestCase(SyntaxKind.CoalesceAssignmentExpression, SyntaxKind.CoalesceExpression)]
+    public void TryGetCompoundAssignmentBinaryKind_MapsSupportedOperators(
+        SyntaxKind assignmentKind,
+        SyntaxKind expectedBinaryKind)
+    {
+        Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignmentKind, out var binaryKind), Is.True);
+        Assert.That(binaryKind, Is.EqualTo(expectedBinaryKind));
+    }
+
+    [Test]
+    public void TryGetCompoundAssignmentBinaryKind_RejectsSimpleAssignment()
+    {
+        Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(
+            SyntaxKind.SimpleAssignmentExpression, out var binaryKind), Is.False);
+        Assert.That(binaryKind, Is.EqualTo(SyntaxKind.None));
+    }
+
     [Test]
     public void GetContainingExecutionRoot_ExtendedPolicy_SelectsNearestRequestedBoundary()
     {

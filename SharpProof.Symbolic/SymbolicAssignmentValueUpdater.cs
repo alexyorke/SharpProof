@@ -72,7 +72,8 @@ internal static class SymbolicAssignmentValueUpdater
                 OperatorMethod: null
             } operation ||
             !TryGetTargetRange(targetSymbol, out var minimum, out var maximum) ||
-            !TryGetOperator(assignment.Kind(), out var binaryOperator) ||
+            !CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind) ||
+            !SymbolicOperatorLowerer.TryGetBinaryTermOperator(binaryKind, out var binaryOperator) ||
             lowering is not { IsExact: true, Value: { } rightTerm } ||
             rightTerm.Kind != SmtValueKind.Int ||
             SymbolicIrReferenceScanner.ContainsVariableOrMember(previousValue, targetName) ||
@@ -186,30 +187,4 @@ internal static class SymbolicAssignmentValueUpdater
         return SymbolicTypeFacts.TryGetBoundedIntegralRange(targetType, out minimum, out maximum);
     }
 
-    private static bool TryGetOperator(
-        SyntaxKind kind,
-        out SymbolicBinaryTermOperator binaryOperator)
-    {
-        switch (kind)
-        {
-            case SyntaxKind.AddAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Add;
-                return true;
-            case SyntaxKind.SubtractAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Subtract;
-                return true;
-            case SyntaxKind.MultiplyAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Multiply;
-                return true;
-            case SyntaxKind.DivideAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Divide;
-                return true;
-            case SyntaxKind.ModuloAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Remainder;
-                return true;
-            default:
-                binaryOperator = default;
-                return false;
-        }
-    }
 }
