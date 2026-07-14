@@ -315,11 +315,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## SharpProof.Test - T-V
 
-### `PureDisposable`/`ImpureDisposable`/`PureAsyncDisposable` definitions duplicated dozens of times
-`UsingDisposeSoundnessStressTests.cs` re-defines `PureDisposable : IDisposable { [EnforcePure] public void Dispose() { } }` ~53 times; `UsingStatementTests.cs` ~11 times plus `ImpureDisposable` 7x; `UsingTests.cs` 2x.
-
-**Recommendation:** Reusable source-snippet constants (`DisposableSnippets.PureDisposableSource`, etc.) composed into per-test source.
-
 ### Overlapping "using statement with impure disposable" scenarios
 `UsingTests.cs:39-64` and `UsingStatementTests.cs:11-37` are the same test (verbatim `File.OpenRead` + `SP0002` at `(9,17,9,27)`);
 several other `UsingTests`/`UsingStatementTests` scenarios overlap.

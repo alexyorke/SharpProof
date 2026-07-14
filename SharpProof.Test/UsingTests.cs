@@ -25,13 +25,7 @@ public class TestClass
             return 1; // Body is pure
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    // Dispose is implicitly pure (empty body)
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(code);
     }

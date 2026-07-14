@@ -67,4 +67,27 @@ public sealed class PureAsyncDisposable : IAsyncDisposable
     }
 }
 """ + "\n\n";
+
+    internal const string NonSealedPureDisposable = """
+
+
+public class PureDisposable : IDisposable
+{
+    public void Dispose() { }
+}
+""";
+
+    internal const string NonSealedImpureDisposable = """
+
+
+public class ImpureDisposable : IDisposable
+{
+    private int _disposeCount;
+
+    public void Dispose()
+    {
+        _disposeCount++;
+    }
+}
+""";
 }

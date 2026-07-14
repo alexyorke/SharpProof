@@ -52,17 +52,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -251,12 +241,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -301,13 +286,7 @@ public class TestClass
     {
         using var disposable = new PureDisposable(); // Empty Dispose body is accepted here.
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    // Empty Dispose is treated as pure.
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
@@ -331,13 +310,7 @@ public class TestClass
             // Some operation
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    // Empty Dispose is treated as pure.
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -359,12 +332,7 @@ public class TestClass
         {
         }
     }
-}
-
-        public class PureDisposable : IDisposable
-        {
-            public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -386,12 +354,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -413,12 +376,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -441,12 +399,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -468,17 +421,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -500,17 +443,7 @@ public class TestClass
         {
         }
     }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -534,22 +467,8 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable +
+      DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -579,22 +498,8 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable +
+      DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
@@ -619,22 +524,8 @@ public class TestClass
         {
         }
     }
-}
-
-public class PureDisposable : IDisposable
-{
-    public void Dispose() { }
-}
-
-public class ImpureDisposable : IDisposable
-{
-    private int _disposeCount;
-
-    public void Dispose()
-    {
-        _disposeCount++;
-    }
-}";
+}" + DisposableTestSources.NonSealedPureDisposable +
+      DisposableTestSources.NonSealedImpureDisposable;
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
