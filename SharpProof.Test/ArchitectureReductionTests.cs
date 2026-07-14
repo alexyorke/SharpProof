@@ -7241,7 +7241,7 @@ public sealed class ArchitectureReductionTests
 
         var consumerPaths = new[]
         {
-            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicProgramPointFacts.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicStatementStateTransfer.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicSemanticPipeline.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicNullableLowerer.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Analyzer", "MethodEnsuresAnalyzer.cs")
