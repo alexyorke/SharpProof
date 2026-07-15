@@ -322,6 +322,98 @@ public sealed partial class ArchitectureReductionTests
             Shape("SharpProof.Symbolic/SymbolicComplexityService.cs",
                 ["SymbolicLoweringValueFacts.TryGetIntegralConstant"],
                 ["case ulong ulongValue"])
+        ]),
+        new("RuntimeHazardStableNullDereferences_UseTypedIrExceptionPreconditions",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateNullDereferenceTrigger",
+                    "SymbolicExceptionPreconditionKind.NullDereference",
+                    "TryCreateIrRelationalExceptionPreconditionTrigger",
+                    "CreateUnsupportedExceptionPreconditionTrigger(",
+                    "!TryCreateNullDereferenceTrigger(receiver"],
+                ["IsStableIrReferenceSubject", "TryTranslateNullCondition(receiver",
+                    "\"ir.runtime-hazard.null-dereference.formula-fallback\""])
+        ]),
+        new("RuntimeHazardUnboxNull_UsesTypedIrExceptionPrecondition",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateUnboxNullTrigger", "SymbolicExceptionPreconditionKind.UnboxNull",
+                    "ir.runtime-hazard.unbox-null"],
+                ["TryTranslateNullCondition(expression",
+                    "\"ir.runtime-hazard.unbox-null.formula-fallback\""])
+        ]),
+        new("RuntimeHazardStableArgumentNull_UsesTypedIrExceptionPreconditions",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateArgumentNullTrigger", "SymbolicExceptionPreconditionKind.ArgumentNull",
+                    "ir.runtime-hazard.argument-null", "!TryCreateArgumentNullTrigger(expression"],
+                ["IsStableIrReferenceSubject", "TryTranslateNullCondition(expression",
+                    "\"ir.runtime-hazard.argument-null.formula-fallback\""])
+        ]),
+        new("RuntimeHazardNullableValue_UsesTypedIrExceptionPrecondition",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateNullableValueWithoutValueTrigger",
+                    "SymbolicExceptionPreconditionKind.NullableValueWithoutValue",
+                    "SymbolicSemanticPipeline.LowerNullableHasValueTerm",
+                    "CreateUnsupportedExceptionPreconditionTrigger",
+                    "!TryCreateNullableValueWithoutValueTrigger("],
+                ["SymbolicIrLowerer.TryLowerNullableHasValueTerm",
+                    "CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(",
+                    "ir.runtime-hazard.nullable-value.without-value.formula-fallback"])
+        ]),
+        new("RuntimeHazardInvalidReferenceCast_UsesTypedIrTypeTestPrecondition",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateRuntimeReferenceInvalidCastTrigger",
+                    "SymbolicExceptionPreconditionKind.InvalidCast",
+                    "ir.runtime-hazard.invalid-cast.non-null", "new SymbolicTypeTestAtom",
+                    "SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey",
+                    "TryCreateReferenceNullCondition(",
+                    "\"ir.runtime-hazard.reference.non-null.guard\"",
+                    "CreateUnsupportedExceptionPreconditionTrigger"],
+                ["CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula(",
+                    "\"ir.runtime-hazard.invalid-cast.formula-fallback\""]),
+            Shape("SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs", [],
+                ["private static bool TryCreateRuntimeReferenceCastMismatchTrigger"]),
+            Shape("SharpProof.Symbolic/SymbolicRuntimeHazardIrTriggerFactory.cs",
+                ["internal static bool TryCreateExactRuntimeInvalidCastTrigger",
+                    "internal static bool TryCreateRuntimeReferenceInvalidCastTrigger",
+                    "internal static bool TryCreateReferenceNullCondition"],
+                ["private static RuntimeHazardTrigger CreateInvalidCastTypedProjectionTrigger"])
+        ]),
+        new("RuntimeHazardDirectThrow_UsesIrExceptionPreconditionTrigger",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateDirectThrowTrigger", "SymbolicExceptionPreconditionKind.DirectThrow",
+                    "ir.runtime-hazard.direct-throw"]),
+            Shape("SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
+                ["if (!TryCreateDirectThrowTrigger(throwNode, out var directTrigger))",
+                    "TryCreateDirectThrowTrigger(throwNode"],
+                ["new RuntimeHazardTrigger(new Smt"]),
+            Shape("SharpProof.Symbolic/SymbolicRuntimeHazardIrTriggerFactory.cs",
+                ["internal static bool TryCreateDirectThrowTrigger"])
+        ]),
+        new("RuntimeHazardSwitchExpressionNoMatch_PreservesIrExceptionPreconditionWhenLowerable",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateSwitchExpressionNoMatchCandidate",
+                    "CreateUnsupportedExceptionPreconditionTrigger",
+                    "SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch",
+                    "TryCreateSwitchExpressionArmSymbolicCondition",
+                    "ir.runtime-hazard.switch-expression.no-match",
+                    "ExceptionTypes.SwitchExpressionException",
+                    "ExceptionCategories.DefiniteSwitchExpressionNoMatch"])
+        ]),
+        new("RuntimeHazardDynamicNullBinding_UsesTypedIrExceptionPrecondition",
+        [
+            Shape("@runtime-hazard-candidates",
+                ["TryCreateDynamicNullBindingTrigger",
+                    "SymbolicExceptionPreconditionKind.DynamicNullBinding",
+                    "ir.runtime-hazard.dynamic-null-binding",
+                    "TryCreateOptionalReferenceSubject"],
+                ["ir.runtime-hazard.dynamic-null-binding.formula-fallback",
+                    "!TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger)"])
         ])
     ];
 
@@ -346,9 +438,11 @@ public sealed partial class ArchitectureReductionTests
         var repositoryRoot = FindRepositoryRoot();
         foreach (var expectation in scenario.Expectations)
         {
-            var source = ReadFileCached(Path.Combine(
-                repositoryRoot,
-                expectation.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+            var source = expectation.RelativePath == "@runtime-hazard-candidates"
+                ? ReadRuntimeHazardCandidateSources(repositoryRoot)
+                : ReadFileCached(Path.Combine(
+                    repositoryRoot,
+                    expectation.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
             Assert.Multiple(() =>
             {
                 foreach (var required in expectation.Required)
