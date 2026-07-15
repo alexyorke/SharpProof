@@ -387,7 +387,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 acyclic CFG branch transfer | `c5e685d3` | 105,970 | -1,706 |
 | Phase 7 single-survivor completion | `cdc1a701` | 105,987 | -1,689 |
 | Phase 7 all-path CFG completion | `4a51a3e0` | 106,015 | -1,661 |
-| Phase 7 computed CFG updates | `pending` | 106,108 | -1,568 |
+| Phase 7 computed CFG updates | `7f6b45fb` | 106,108 | -1,568 |
 
 ## Validation Ledger
 
@@ -518,7 +518,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 acyclic CFG branch transfer | Commit `c5e685d3` adds typed true/false successor assumptions, an acyclic worklist, guarded canonical joins, and condition-mutation detection. A path-snapshot regression was reproduced in the broader gate; branch-local targets now fall back until capture/version lowering migrates, while post-join queries use the canonical path. Direct collector fixtures pass 8/8; the path/program-point/transfer batch passes 153/153; full MainSmtOracle passes 573/573; Release Symbolic warning-as-error build has zero warnings. The branch scaffold raises production LOC to 105,970, or -1,706 from the rewrite start, and test LOC to 142,590; it must be repaid with the structural branch-transfer deletion. |
 | Phase 7 single-survivor completion | Commit `cdc1a701` retains the guarded state when one acyclic branch completes and only the other reaches a point after the branch. A full-lane probe exposed optimistic first-pass loop states, so every execution root containing a loop now returns typed `Unsupported` before CFG traversal until bounded fixed-point and loop-carried invalidation migrate together. Direct collector fixtures pass 9/9; full MainSmtOracle passes 573/573. Production LOC is 105,987, or -1,689 from the rewrite start; test LOC is 142,612. |
 | Phase 7 all-path CFG completion | Commit `4a51a3e0` records non-regular terminal CFG edges, guarded-merges their states, and applies canonical no-fallthrough completion only when Roslyn marks the target block unreachable. The normalized-state differential matches exactly; direct collector fixtures pass 10/10, the path/program-point/transfer batch passes 157/157, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,015, or -1,661 from the rewrite start; test LOC is 142,635. |
-| Phase 7 computed CFG updates | The pending tranche routes direct increment/decrement and compound assignment operations through `SymbolicAssignmentValueUpdater`, typed computed-update descriptors, and the canonical kernel. Two normalized-state differentials cover increment and compound arithmetic; direct collector fixtures pass 12/12, the path/program-point/transfer batch passes 159/159, and full MainSmtOracle passes 573/573. Production LOC is 106,108, or -1,568 from the rewrite start; test LOC is 142,637. |
+| Phase 7 computed CFG updates | Commit `7f6b45fb` routes direct increment/decrement and compound assignment operations through `SymbolicAssignmentValueUpdater`, typed computed-update descriptors, and the canonical kernel. Two normalized-state differentials cover increment and compound arithmetic; direct collector fixtures pass 12/12, the path/program-point/transfer batch passes 159/159, and full MainSmtOracle passes 573/573. Production LOC is 106,108, or -1,568 from the rewrite start; test LOC is 142,637. |
 
 ## Current Checkpoint
 
