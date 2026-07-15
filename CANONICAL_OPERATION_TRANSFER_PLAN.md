@@ -312,6 +312,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
     prior-assignment provenance, branch-local fact ordering, true/false merge
     ordering, and surviving post-branch paths. Full JSON point/line/span/file
     byte fixtures now match the pre-Phase-7 collector exactly.
+  - [x] Reject branch-local CFG states after any scalar or reference assignment
+    invalidates the active guard; the structural fallback removes that stale
+    condition before proving reachability.
+  - [x] Make the Symbolic mutation query the sole owner of loop-guard dependency
+    invalidation used by Analyzer execution visibility, deleting its parallel
+    assignment/increment/ref-out syntax walk.
   - [x] Delete 745 physical lines of unreachable internal migration surface
     after whole-repository symbol inventory proved that every removed member
     occurs only at its declaration. This includes the unused SMT formula
@@ -474,6 +480,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 CFG evidence and fallback parity | `4429ec43` | 106,517 | -1,159 |
 | Phase 7 centralized explain-schema test | `03e53cbd` | 106,517 | -1,159 |
 | Phase 7 unreachable migration-surface deletion | `c6d76ab9` | 105,867 | -1,809 |
+| Phase 7 mutated branch-local guard fallback | `0310d6ee` | 105,871 | -1,805 |
+| Phase 7 shared loop-guard mutation detection | `dc9bf7bd` | 105,832 | -1,844 |
 
 ## Validation Ledger
 
@@ -625,6 +633,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 CFG evidence and fallback parity | Commit `4429ec43` adds a focused constructor-member-assignment fallback reproduction and locks fact evidence in the direct CFG differential. Unsupported member targets again select the conservative structural collector; assignment provenance, branch-local ordering, true-before-false guarded merging, and post-branch ordering now preserve the exact pre-Phase-7 JSON bytes. Direct collector fixtures pass 20/20, source-query/full-JSON fixtures pass 100/100, and the full Main behavior gate remains at 5,314 passes plus only the documented SP0010 failure and two explicit skips. Production LOC is 106,517, or -1,159 from the rewrite start; test LOC is 142,903. |
 | Phase 7 centralized explain-schema test | Commit `03e53cbd` repairs a pre-existing source-shape assertion that still expected `SchemaVersion` on the concrete explain report after the completed compact-schema centralization moved it to the shared base. Runtime JSON byte fixtures remain unchanged. Full Tooling passes 591/591. Production LOC remains 106,517. |
 | Phase 7 unreachable migration-surface deletion | Commit `c6d76ab9` deletes 745 physical lines across eleven internal files after declaration-only symbol inventory and strict compilation proved the APIs unreachable. The removed surface includes `SmtFormulaFactory`, old formula-based `SymbolicFactFactory` entry points, proof/reachability wrappers, and migrated Analyzer/Symbolic helpers. The Release solution warning-as-error build has zero warnings; full Tooling passes 591/591; the recorded full Main gate remains green apart from the documented SP0010 baseline. Production LOC falls to 105,867, or -1,809 from the rewrite start; test LOC remains 142,903. |
+| Phase 7 mutated branch-local guard fallback | Commit `0310d6ee` reproduces a scalar assignment that invalidates its enclosing `if` guard before a branch-local query target. The CFG collector now returns typed `Unsupported` for that state instead of retaining a contradictory stale guard; the original source-query reachability fixture and 21 direct collector cases pass. Production LOC is 105,871, or -1,805 from the rewrite start; test LOC is 142,917. |
+| Phase 7 shared loop-guard mutation detection | Commit `dc9bf7bd` deletes Analyzer execution visibility's parallel dependency collection and assignment/increment/ref-out walk. It now consumes `SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse`, the same mutation owner used by structural and CFG reachability. Focused loop-visibility fixtures pass 9/9; full MainSmtOracle passes 573/573; the Release Analyzer warning-as-error build has zero warnings. Production LOC falls to 105,832, or -1,844 from the rewrite start; test LOC remains 142,917. |
 
 ## Current Checkpoint
 
@@ -717,8 +727,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   condition transition directly. CFG source queries now preserve conservative
   fallback plus exact fact/evidence ordering, including all full JSON scope
   hashes. Full Tooling passes 591/591 and the Release warning-as-error solution
-  build has zero warnings. Test LOC is 142,903; production LOC is 105,867, or
-  -1,809 from the rewrite start; the remaining scaffold must be repaid by
+  build has zero warnings. Scalar and reference guard mutations at branch-local
+  targets now select typed fallback, and Analyzer loop visibility shares the
+  Symbolic mutation query instead of walking syntax independently. Test LOC is
+  142,917; production LOC is 105,832, or -1,844 from the rewrite start; the
+  remaining scaffold must be repaid by
   deleting reachable structural transfer paths rather than more small wrappers.
 - Next cheapest step: pivot to the largest reachable structural transfer
   consumer whose CFG behavior is already characterized, migrate that vertical
