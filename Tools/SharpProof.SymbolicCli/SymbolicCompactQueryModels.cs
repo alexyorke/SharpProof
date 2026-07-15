@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -337,7 +338,7 @@ internal sealed record SymbolicCompactQueryScope(
     }
 }
 
-public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
+public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
 {
     private readonly SymbolicCompactScopeProjection _projection;
     private readonly SymbolicCompactQueryScope _scope;
@@ -366,13 +367,8 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         QueryDescriptor = SymbolicCompactSourceQueryDescriptor.FromCompactResult(this);
     }
 
-    public string Kind => _scope.Kind;
-
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    [JsonPropertyOrder(-4)]
+    public override string Kind => _scope.Kind;
 
     public string FilePath => _scope.FilePath;
 
@@ -583,7 +579,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
     }
 }
 
-public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
+public sealed class SymbolicInvariantQueryResult : SymbolicSchemaResultBase
 {
     private readonly SymbolicCompactQueryResult _result;
 
@@ -597,13 +593,8 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         Focus = focus ?? throw new ArgumentNullException(nameof(focus));
     }
 
-    public string Kind => "invariantQuery";
-
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    [JsonPropertyOrder(-4)]
+    public override string Kind => "invariantQuery";
 
     public string ScopeKind => _result.Kind;
 

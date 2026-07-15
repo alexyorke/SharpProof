@@ -1,19 +1,23 @@
+using System.Text.Json.Serialization;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public interface ISymbolicCompactResult
+public abstract class SymbolicSchemaResultBase
 {
-    string Kind { get; }
+    public abstract string Kind { get; }
 
-    int SchemaVersion { get; }
+    [JsonPropertyOrder(-3)]
+    public int SchemaVersion => 1;
 
-    int EvidenceSchemaVersion { get; }
+    [JsonPropertyOrder(-2)]
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
 
-    string EvidenceSchemaCompatibility { get; }
+    [JsonPropertyOrder(-1)]
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 }
 
-public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
+public sealed class SymbolicCompactComplexityResult : SymbolicSchemaResultBase
 {
     private readonly SymbolicComplexityResult _result;
 
@@ -22,13 +26,7 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
         _result = result ?? throw new ArgumentNullException(nameof(result));
     }
 
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
-
-    public string Kind => "complexity";
+    public override string Kind => "complexity";
 
     public string FilePath => _result.FilePath;
 
@@ -64,7 +62,7 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
     }
 }
 
-public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
+public sealed class SymbolicCompactCapabilityResult : SymbolicSchemaResultBase
 {
     private readonly SymbolicCapabilityResult _result;
 
@@ -73,13 +71,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
         _result = result ?? throw new ArgumentNullException(nameof(result));
     }
 
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
-
-    public string Kind => "capabilities";
+    public override string Kind => "capabilities";
 
     public string FilePath => _result.FilePath;
 
@@ -144,7 +136,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryOptions
     public int MaxConditions { get; }
 }
 
-public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactResult
+public sealed class SymbolicCompactRuntimeHazardQueryResult : SymbolicSchemaResultBase
 {
     private readonly SymbolicRuntimeHazardQueryResult _result;
 
@@ -170,13 +162,8 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
         SmtDiagnostics = smtDiagnostics;
     }
 
-    public string Kind => "runtimeHazards";
-
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    [JsonPropertyOrder(-4)]
+    public override string Kind => "runtimeHazards";
 
     public string FilePath => _result.FilePath;
 

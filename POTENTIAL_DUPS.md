@@ -109,10 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Repeated `ISymbolicCompactResult` schema-version boilerplate
-Triplet (`SchemaVersion`, `EvidenceSchemaVersion`, `EvidenceSchemaCompatibility`) copy-pasted across `SymbolicCompactDomainResults.cs:25,76,175`, `SymbolicCompactQueryModels.cs:392,644`, `SymbolicCliExplainReport.cs:36`.
-**Recommendation:** `SymbolicCompactResultBase : ISymbolicCompactResult` supplying the triplet by default.
-
 ### Duplicated SMT-diagnostics passthrough property block - `SymbolicCompactInvariantResults.cs:311-325` vs `SymbolicCompactQueryModels.cs:837-851`
 Same 8 members over `_smtDiagnostics`. **Recommendation:** Expose from `SymbolicCompactSmtDiagnostics` / shared projection.
 

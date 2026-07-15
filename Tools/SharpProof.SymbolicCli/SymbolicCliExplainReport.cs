@@ -1,11 +1,12 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-internal sealed class SymbolicCliExplainReport
+internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 {
     private SymbolicCliExplainReport(
         SymbolicCliExplainSource source,
@@ -31,13 +32,8 @@ internal sealed class SymbolicCliExplainReport
         Truncation = truncation;
     }
 
-    public string Kind => "explain";
-
-    public int SchemaVersion => 1;
-
-    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    [JsonPropertyOrder(-4)]
+    public override string Kind => "explain";
 
     public SymbolicCliExplainSource Source { get; }
 

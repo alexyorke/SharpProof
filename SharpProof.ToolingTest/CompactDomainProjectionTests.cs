@@ -98,7 +98,7 @@ public sealed class CompactDomainProjectionTests
                 options))
             .ToCompactResult(new SymbolicCompactRuntimeHazardQueryOptions(maxHazards: 0, maxConditions: 0));
 
-        var compactResults = new ISymbolicCompactResult[]
+        var compactResults = new SymbolicSchemaResultBase[]
         {
             invariant.ToCompactResult(),
             invariant.ToInvariantQueryResult(),
@@ -116,6 +116,13 @@ public sealed class CompactDomainProjectionTests
 
             var root = Serialize(compactResult);
             SymbolicCliTestAssertions.AssertCompactEnvelope(root, compactResult.Kind);
+            var expectedPropertyPrefix = compactResult.Kind is "capabilities" or "complexity"
+                ? new[] { "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility", "kind" }
+                : new[] { "kind", "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility" };
+            Assert.That(
+                root.EnumerateObject().Take(expectedPropertyPrefix.Length).Select(static property => property.Name),
+                Is.EqualTo(expectedPropertyPrefix),
+                compactResult.Kind);
         }
 
         Assert.That(capability.Kind, Is.EqualTo("capabilities"));
@@ -176,7 +183,7 @@ public sealed class CompactDomainProjectionTests
         Assert.That(proof.DisplayKind, Is.EqualTo(condition.DisplayKind));
     }
 
-    private static JsonElement Serialize(ISymbolicCompactResult result)
+    private static JsonElement Serialize(SymbolicSchemaResultBase result)
     {
         var json = JsonSerializer.Serialize(
             result,
