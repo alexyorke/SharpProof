@@ -140,7 +140,7 @@ transfer policy after its slice is complete.
 
 - [x] Migrate boolean branch assumptions and conditional/coalesce flow.
 - [x] Migrate switch statement/expression branch selection and merging.
-- [ ] Migrate loop entry/back-edge/exit transitions and bounded fixed points.
+- [x] Migrate loop entry/back-edge/exit transitions and bounded fixed points.
 - [ ] Migrate try/catch/finally, exceptional completion, and reachability.
 - [ ] Make one merge implementation own fact choices, versions, ownership, and
   conservative truncation.
@@ -233,6 +233,7 @@ transfer policy after its slice is complete.
 | Canonical completed loop exits | `b1d397db` | 107,706 | +30 |
 | Canonical loop body entry | `a3976e31` | 107,645 | -31 |
 | Unified loop initializer inputs | `0a5cfed5` | 107,607 | -69 |
+| Bounded CFG fixed-point owner | `157e70f6` | 107,581 | -95 |
 
 ## Validation Ledger
 
@@ -273,18 +274,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical completed loop exits | Commit `b1d397db` makes the operation kernel own `SymbolicLoopEdgeOperation`, routes guarded while/for/do exits through it, and replaces six loop-kind exit arms with one conditional-loop dispatcher. Normal-condition exits retain the existing inline-assignment lowering. Focused loop-exit/path/kernel tests: 86 passed. Production LOC fell to 107,706, or +30 from the rewrite start. |
 | Phase 3 canonical loop body entry | Commit `a3976e31` replaces the duplicated while/do/for/foreach body-entry switches in the program-point and block walkers with one loop adapter, and routes invariant application through entry/exit loop-edge events. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell below the rewrite start to 107,645, or -31. |
 | Phase 3 unified loop initializer inputs | Commit `0a5cfed5` makes one typed initializer stream own for-loop assignment/declaration discovery, shares bound extraction across for/while/do, and applies initializer-target invalidation as one canonical mutation event. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,607, or -69 from the rewrite start. |
+| Phase 3 bounded CFG fixed point | Commit `157e70f6` encapsulates Analyzer CFG queue membership, entry/exit state maps, revisit merging, finally-continuation propagation, and the bounded iteration budget in one fixed-point owner. Canonical path-state merging remains unchanged. Focused loop/CFG/finally/resource tests: 46 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,581, or -95 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; switch migration is complete, guarded loop exits and
-  loop invariants use canonical edge events, one adapter owns loop body entry,
-  and one stream owns initializer inputs. CFG back-edge/fixed-point work remains.
-- Last confirmed fact: focused loop/program-point/kernel tests pass 167/167,
-  MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
-  matches its 256-pass/one-baseline-failure result after loop-entry migration.
-- Next cheapest step: encapsulate the Analyzer CFG worklist, revisit merge, and
-  iteration budget into one bounded fixed-point owner, preserving finally
-  continuation behavior and canonical path-state merging.
+- State: Phase 2 is gated; switch and loop migration are complete. Canonical
+  edge events own loop invariant entry/exit application, one adapter owns body
+  entry, and one bounded owner handles CFG revisits and convergence.
+- Last confirmed fact: focused loop/CFG/finally/resource tests pass 46/46 and
+  MainSmtAnalyzer passes 487/487 after fixed-point encapsulation; the immediately
+  preceding loop tranche also passed Oracle 573/573 and baseline-matching Flow.
+- Next cheapest step: inventory try/catch/finally completion and reachability
+  paths, then consolidate the first duplicated normal/exceptional completion
+  family behind canonical completion operations.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
