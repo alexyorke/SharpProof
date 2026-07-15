@@ -325,6 +325,7 @@ transfer policy after its slice is complete.
 | Intentional SMT domain fact merges | `3be4f5e8` | 105,716 | -1,960 |
 | Intentional shared catalog namespace | `d49e15ca` | 105,716 | -1,960 |
 | Central compact-result schema metadata | `23992c39` | 105,708 | -1,968 |
+| Central compact SMT diagnostics projection | `2562ff6f` | 105,707 | -1,969 |
 
 ## Validation Ledger
 
@@ -437,6 +438,7 @@ transfer policy after its slice is complete.
 | Phase 6 intentional SMT domain fact merges | Commit `3be4f5e8` removes a net-positive generic-merge candidate. Integer aliases intersect intervals and test `IsContradictory`; strings union exclusions, reconcile exact values, and derive length facts; references detect null-state disagreement; Booleans first transform the alias value by accumulated negation. Their common dictionary lookup/store/remove shell is smaller than a typed callback/result abstraction and contains no shared proof policy. The complete 135-case syntactic-classifier/SMT/proof gate remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 intentional shared catalog namespace | Commit `d49e15ca` removes a folder-name recommendation rather than a duplicate. `Constants.cs` and `BclPurityFallbackHeuristics.cs` are linked into both Analyzer and EffectSummary from one physical source, so no code is duplicated. `Constants` is a shipped type in `SharpProof.Analyzer.Engine`; even after the later API-compatibility constraint was relaxed, moving it to a neutral namespace would only add using and migration churn without changing dependency direction or LOC. Constants and BCL-fallback inventory fixtures pass 234 with the two documented reflection skips. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 central compact-result schema metadata | Commit `23992c39` applies the user's relaxed .NET API constraint by replacing the unused `ISymbolicCompactResult` interface and six repeated schema triplets with `SymbolicSchemaResultBase`. Explicit `JsonPropertyOrder` values preserve the existing schema-first capability/complexity order and kind-first query/hazard/explain order. Compact envelope/order and explain byte fixtures pass 14/14; the Release Symbolic CLI warning-as-error build has zero warnings. Production LOC fell to 105,708, or -1,968 from the rewrite start; tracked test LOC is 142,472 after adding an invariant that locks each compact property prefix. |
+| Phase 6 central compact SMT diagnostics projection | Commit `2562ff6f` makes `SymbolicSmtDiagnosticsProjectionBase` the single owner of eight flattened SMT configuration/counter properties used by analysis and invariant summaries. A primary constructor preserves null validation with net-negative code; explicit order 100-109 keeps each flattened block between its existing surrounding fields. Compact/explain order and SHA-256 fixtures pass 14/14, and the Release CLI warning-as-error build has zero warnings. Production LOC fell to 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
 
 ## Current Checkpoint
 
@@ -476,12 +478,13 @@ transfer policy after its slice is complete.
   explicit because each has different transformation and conflict semantics.
   Shared catalog source retains its Analyzer namespace because moving it adds no
   reduction; subsequent .NET API breaks are allowed. Compact schema metadata now
-  has one base owner while explicit ordering preserves exact JSON output.
-- Last confirmed fact: compact order/byte fixtures pass 14/14 and the Release CLI
-  warning-as-error build has zero warnings. Test LOC is 142,472; production LOC
-  is 105,708, or -1,968 from the rewrite start.
+  has one base owner while explicit ordering preserves exact JSON output. The
+  flattened SMT diagnostic block likewise has one ordered projection owner.
+- Last confirmed fact: compact/explain order and byte fixtures pass 14/14 and the
+  Release CLI warning-as-error build has zero warnings. Test LOC is 142,472;
+  production LOC is 105,707, or -1,969 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, duplicated SMT-diagnostics passthrough properties in
-  compact invariant and query projections.
+  `POTENTIAL_DUPS.md`, per-scope point/line/span/file dispatch in the invariant
+  result adapter.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
