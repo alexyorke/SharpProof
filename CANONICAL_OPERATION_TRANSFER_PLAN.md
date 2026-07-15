@@ -260,6 +260,7 @@ transfer policy after its slice is complete.
 | Canonical purity null state | `787bd5f4` | 106,468 | -1,208 |
 | Canonical owned flow-capture state | `d08c7179` | 106,442 | -1,234 |
 | Canonical purity consumer gate | `50309315` | 106,415 | -1,261 |
+| Superseded nullable interpreter deletion | `92bc2b50` | 106,343 | -1,333 |
 
 ## Validation Ledger
 
@@ -325,19 +326,20 @@ transfer policy after its slice is complete.
 | Phase 5 canonical purity null state | Commit `787bd5f4` removes Analyzer's definitely-null-local set, its independent merge/equality/hash policy, and the bridge that re-injected those values before reachability proofs. Purity null and coalesce queries now read versioned canonical reference-null facts directly. Release test build: zero warnings; focused null, branch, coalesce, and purity tests: 117 passed; MainSmtAnalyzer: 487 passed; the internal characterization fixture remains green after the retired adapter parameter was removed. Production LOC fell to 106,468, or -1,208 from the rewrite start. |
 | Phase 5 canonical owned flow-capture state | Commit `d08c7179` removes the parallel owned-array flow-capture set and derives capture ownership from canonical freshness/ownership facts over the existing synthetic capture term. Canonical path merging now owns all-path retention. Release test build: zero warnings; focused array, collection, lambda, capture, and purity tests: 143 passed; MainSmtAnalyzer: 487 passed. The adjacent local concrete-type map was audited and retained because it stores exact `INamedTypeSymbol` identity while a canonical type-test atom proves assignability, not exact runtime type. Production LOC fell to 106,442, or -1,234 from the rewrite start. |
 | Phase 5 canonical purity consumer gate | Commit `50309315` removes a second disposable-acquisition pass, the now-dead using-declarator classifier, and a resource-specific non-null fact already emitted by canonical assignment lowering. Exact audit finds purity path semantics entering through canonical assignment, lifetime, mutation, branch-assumption, or merge transitions; retained delegate targets, exact Roslyn types, flow-capture results, and capture-source maps are Analyzer metadata rather than competing symbolic transfer. Release test build: zero warnings; focused using, disposal, alias, mutation, and resource tests: 181 passed; MainSmtAnalyzer: 487 passed; MainGeneral: 3,676 passed and the two documented reflection skips. The first Phase 5 item closes at 106,415 production LOC, or -1,261 from the rewrite start. |
+| Phase 5 superseded nullable interpreter deletion | Commit `92bc2b50` deletes the unreferenced exception-site null interpreter that recursively reconstructed cast/default/dominating-if state, plus its now-dead exception syntax helpers and reference-like wrapper. Nullable contract verification already enters through the canonical query service; Roslyn nullable flow remains only a conservative fallback when canonical proof is unknown. Release test build: zero warnings; focused nullable, null-forgiving, reachability, and exception-flow tests: 163 passed. Production LOC fell to 106,343, or -1,333 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 4 are gated. Phase 5 purity migration is complete:
-  symbolic path semantics use canonical transitions, while retained exact-type,
-  delegate, and flow-capture maps contain Analyzer-only metadata.
-- Last confirmed fact: the purity consumer gate passes 181 focused tests,
-  Analyzer 487/487, and MainGeneral 3,676 with two documented skips. Production
-  LOC is 106,415, or -1,261 from the rewrite start; the preceding full Oracle and
-  Flow baselines remain unchanged.
-- Next cheapest step: audit nullable and runtime-type consumers for parallel
-  state reconstruction, beginning with exact receiver/type and nullable-value
-  queries that can read canonical assignment and branch facts.
+- State: Phases 2 through 4 are gated. Phase 5 purity migration is complete;
+  nullable contract proofs use the canonical query boundary, and the dead
+  exception-site null interpreter is deleted. Runtime-type migration remains.
+- Last confirmed fact: the nullable deletion passes 163 focused tests with a
+  zero-warning Release build. Production LOC is 106,343, or -1,333 from the
+  rewrite start; Analyzer remains 487/487 and MainGeneral remains 3,676 with two
+  documented skips.
+- Next cheapest step: replace exception flow's statement-scanning exact-local-
+  type dictionary with canonical assignment/runtime-type state, while retaining
+  exact Roslyn type identity rather than weakening it to assignability.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
