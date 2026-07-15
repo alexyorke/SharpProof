@@ -60,6 +60,36 @@ public partial class DiagnosticEvidenceTests
         "Array.Sort(values, comparison);", null, "MethodInvocationPurityRule", "array_mutation_semantic_rule",
         "System.Array.Sort", true,
         TestName = "Sp0002_ArraySortWithComparison_UsesArrayMutationSemanticRuleSource")]
+    [TestCase("using System.Xml.Linq;", "XDocument", "", "return XDocument.Parse(\"<root />\");",
+        "catalog_hit", "MethodInvocationPurityRule", "xml_linq_semantic_rule",
+        "System.Xml.Linq.XDocument.Parse", true,
+        TestName = "Sp0002_XDocumentParse_UsesXmlLinqSemanticRuleSource")]
+    [TestCase("using System.Xml.Linq;", "string", "XElement element", "return element.Value;",
+        "catalog_hit", "PropertyReferencePurityRule", "xml_linq_semantic_rule",
+        "System.Xml.Linq.XElement.Value", true,
+        TestName = "Sp0002_XElementValue_UsesXmlLinqSemanticRuleSource")]
+    [TestCase("using System.Xml.Linq;", "void", "XNode node", "node.Remove();", "catalog_hit",
+        "MethodInvocationPurityRule", "xml_linq_semantic_rule", "System.Xml.Linq.XNode.Remove", true,
+        TestName = "Sp0002_XNodeRemove_UsesXmlLinqSemanticRuleSource")]
+    [TestCase("using System.IO;", "MemoryStream", "", "return new MemoryStream();", "catalog_hit",
+        "ObjectCreationPurityRule", "io_stream_text_semantic_rule", "System.IO.MemoryStream.MemoryStream", true,
+        TestName = "Sp0002_MemoryStreamConstructor_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System.IO;", "StringReader", "", "return new StringReader(\"text\");", "catalog_hit",
+        "ObjectCreationPurityRule", "io_stream_text_semantic_rule", "System.IO.StringReader.StringReader", true,
+        TestName = "Sp0002_StringReaderConstructor_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System.IO;", "string", "StringReader reader", "return reader.ReadToEnd();", "catalog_hit",
+        null, "io_stream_text_semantic_rule", "System.IO.StringReader.ReadToEnd", true,
+        TestName = "Sp0002_StringReaderReadToEnd_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System.IO;", "StreamReader", "Stream stream", "return new StreamReader(stream);",
+        "catalog_hit", "ObjectCreationPurityRule", "io_stream_text_semantic_rule",
+        "System.IO.StreamReader.StreamReader", true,
+        TestName = "Sp0002_StreamReaderConstructor_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System.IO;", "void", "StreamWriter writer", "writer.WriteLine(\"line\");", "catalog_hit",
+        null, "io_stream_text_semantic_rule", "System.IO.StreamWriter.WriteLine", true,
+        TestName = "Sp0002_StreamWriterWriteLine_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System.IO;", "void", "StringWriter writer", "writer.Write(\"text\");", "catalog_hit",
+        null, "io_stream_text_semantic_rule", "System.IO.StringWriter.Write", true,
+        TestName = "Sp0002_StringWriterWrite_UsesIoStreamTextSemanticRuleSource")]
     public async Task Sp0002_KnownBclSemanticEvidence(
         string usings,
         string returnType,
