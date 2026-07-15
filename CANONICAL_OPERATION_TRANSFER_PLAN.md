@@ -308,6 +308,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Route execution-visibility reference-null proof construction through
     `SymbolicStateFactBuilder.TryCreateReferenceNullCondition` and delete its
     independent reference lowering, relation, and provenance implementation.
+  - [x] Restore CFG source-query evidence parity for unsupported member writes,
+    prior-assignment provenance, branch-local fact ordering, true/false merge
+    ordering, and surviving post-branch paths. Full JSON point/line/span/file
+    byte fixtures now match the pre-Phase-7 collector exactly.
+  - [x] Delete 745 physical lines of unreachable internal migration surface
+    after whole-repository symbol inventory proved that every removed member
+    occurs only at its declaration. This includes the unused SMT formula
+    factory, old formula-based fact builders, and migrated proof/state wrappers.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -463,6 +471,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 dead migrated-helper deletion | `6513fc80` | 106,494 | -1,182 |
 | Phase 7 canonical condition consumer migration | `2a64a44f` | 106,485 | -1,191 |
 | Phase 7 canonical visibility null conditions | `7eb0b0aa` | 106,462 | -1,214 |
+| Phase 7 CFG evidence and fallback parity | `4429ec43` | 106,517 | -1,159 |
+| Phase 7 centralized explain-schema test | `03e53cbd` | 106,517 | -1,159 |
+| Phase 7 unreachable migration-surface deletion | `c6d76ab9` | 105,867 | -1,809 |
 
 ## Validation Ledger
 
@@ -611,6 +622,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 dead migrated-helper deletion | Commit `6513fc80` deletes seven private helpers whose names occur only at their declarations across all tracked C#: stale purity-source text, summary-chain and diagnostic-edge adapters, an unused `as` term path, a negated-condition wrapper, an invocation-argument adapter, and an external-complexity fallback. The Release solution warning-as-error build has zero warnings; focused affected fixtures pass 72/72; MainSmtAnalyzer passes 487/487. Production LOC falls to 106,494, or -1,182 from the rewrite start; test LOC remains 142,855. |
 | Phase 7 canonical condition consumer migration | Commit `2a64a44f` makes `SymbolicReachabilityLowerer.ApplyCondition` the single owner of source-condition lowering, version-aware branch assumptions, and canonical transition application. Symbolic branch completion and Analyzer execution-visibility/purity CFG callers consume its typed transition directly; the duplicate `SymbolicReachabilityService.ApplyBranchFacts` adapter is deleted. The Release solution warning-as-error build has zero warnings; focused branch/visibility/purity fixtures pass 115/115; MainSmtAnalyzer passes 487/487; MainSmtOracle passes 573/573. Production LOC falls to 106,485, or -1,191 from the rewrite start; test LOC remains 142,855. |
 | Phase 7 canonical visibility null conditions | Commit `7eb0b0aa` makes execution-visibility null/non-null proofs consume the shared structural reference-condition builder with their existing provenance. Its independent 27-line reference lowering and relation construction are deleted. The Release Analyzer warning-as-error build has zero warnings; focused visibility/reference/null fixtures pass 213/213; MainSmtAnalyzer passes 487/487. Production LOC falls to 106,462, or -1,214 from the rewrite start; test LOC remains 142,855. |
+| Phase 7 CFG evidence and fallback parity | Commit `4429ec43` adds a focused constructor-member-assignment fallback reproduction and locks fact evidence in the direct CFG differential. Unsupported member targets again select the conservative structural collector; assignment provenance, branch-local ordering, true-before-false guarded merging, and post-branch ordering now preserve the exact pre-Phase-7 JSON bytes. Direct collector fixtures pass 20/20, source-query/full-JSON fixtures pass 100/100, and the full Main behavior gate remains at 5,314 passes plus only the documented SP0010 failure and two explicit skips. Production LOC is 106,517, or -1,159 from the rewrite start; test LOC is 142,903. |
+| Phase 7 centralized explain-schema test | Commit `03e53cbd` repairs a pre-existing source-shape assertion that still expected `SchemaVersion` on the concrete explain report after the completed compact-schema centralization moved it to the shared base. Runtime JSON byte fixtures remain unchanged. Full Tooling passes 591/591. Production LOC remains 106,517. |
+| Phase 7 unreachable migration-surface deletion | Commit `c6d76ab9` deletes 745 physical lines across eleven internal files after declaration-only symbol inventory and strict compilation proved the APIs unreachable. The removed surface includes `SmtFormulaFactory`, old formula-based `SymbolicFactFactory` entry points, proof/reachability wrappers, and migrated Analyzer/Symbolic helpers. The Release solution warning-as-error build has zero warnings; full Tooling passes 591/591; the recorded full Main gate remains green apart from the documented SP0010 baseline. Production LOC falls to 105,867, or -1,809 from the rewrite start; test LOC remains 142,903. |
 
 ## Current Checkpoint
 
@@ -697,15 +711,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   canonical transitions. Stable branch-local source-query targets now use the
   CFG collector; guard-mutating references, guarded post-join projections,
   loop-local targets, and finally-local targets remain conservative fallbacks.
-  The orphaned exception mutation partial and seven migrated private helpers are
-  deleted. Branch completion, execution visibility, and purity CFG now share the
-  canonical condition transition directly, and visibility null proofs share the
-  canonical reference-condition builder. Test LOC is 142,855; production LOC is
-  106,462, or -1,214 from the rewrite start; the 877-line scaffold must be repaid
-  when structural transfer paths are deleted.
-- Next cheapest step: consolidate the three remaining direct reference-null
-  state consumers (exception disposal guard and evaluation-path coalesce/access)
-  behind a typed transition only if it is net-negative; otherwise pivot to the
-  next larger structural consumer deletion.
+  The orphaned exception mutation partial, seven migrated private helpers, and
+  745 physical lines of declaration-only internal migration APIs are deleted.
+  Branch completion, execution visibility, and purity CFG share the canonical
+  condition transition directly. CFG source queries now preserve conservative
+  fallback plus exact fact/evidence ordering, including all full JSON scope
+  hashes. Full Tooling passes 591/591 and the Release warning-as-error solution
+  build has zero warnings. Test LOC is 142,903; production LOC is 105,867, or
+  -1,809 from the rewrite start; the remaining scaffold must be repaid by
+  deleting reachable structural transfer paths rather than more small wrappers.
+- Next cheapest step: pivot to the largest reachable structural transfer
+  consumer whose CFG behavior is already characterized, migrate that vertical
+  slice, and delete its superseded semantic path in the same tranche.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
