@@ -218,6 +218,7 @@ transfer policy after its slice is complete.
 | String and length assignment deletion | `1ac96cbe` | 108,228 | +552 |
 | Purity declaration-state consolidation | `3e853878` | 108,192 | +516 |
 | Single written-local update pass | `88ad23a6` | 108,184 | +508 |
+| Reference assignment postconditions | `7b236a37` | 108,137 | +461 |
 
 ## Validation Ledger
 
@@ -243,17 +244,20 @@ transfer policy after its slice is complete.
 | Phase 2 string and length assignment deletion | Commit `1ac96cbe` gives canonical assignment lowering a Symbolic evidence profile, routes string null/equality and collection lower-bound facts through it, and deletes the redundant string and assigned-length interpreters. Focused transfer/program-point tests: 122 passed; full MainSmtOracle lane: 573 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +552 production LOC. |
 | Phase 2 purity declaration-state consolidation | Commit `3e853878` routes variable declarations through the same concrete-type, owned-array, freshness, null, and canonical assignment updates as ordinary assignments while preserving declaration-only delegate, ref-borrow, and using-resource behavior. Full MainSmtAnalyzer lane: 487 passed; focused ownership/using/alias tests: 111 passed. Total temporary migration scaffolding fell to +516 production LOC. |
 | Phase 2 single written-local update pass | Commit `88ad23a6` replaces three ordered traversals of the same written-local set with one traversal while retaining alias snapshots before version, assignment, ownership, and null-state updates. Full MainSmtAnalyzer lane: 487 passed; focused ownership/using/alias tests: 111 passed. Total temporary migration scaffolding fell to +508 production LOC. |
+| Phase 2 reference assignment postconditions | Commit `7b236a37` moves reference equality, conditional-reference flow, and definite null/non-null facts into canonical assignment lowering and centralizes exact-null classification. The focused reproduction exposed that null-forgiving syntax can lack a direct Roslyn `IOperation`; removing that unnecessary lowerer dependency restored both definite-null diagnostics. Reproductions: 4 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Total temporary migration scaffolding fell to +461 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: assignment, declaration, alias/borrow, invalidation, ownership,
-  resource lifetime, string, and collection lower-bound families share
-  canonical events; purity symbolic facts are now query-only.
-- Last confirmed fact: MainSmtAnalyzer passes 487/487 and the focused
-  ownership/using/alias batch passes 111/111 after combining the written-local
-  state update pipeline into one ordered pass.
-- Next cheapest step: centralize remaining null/reference assignment
-  postconditions in the canonical lowerer and delete their Symbolic wrappers.
+- State: assignment, declaration, reference/null flow, alias/borrow,
+  invalidation, ownership, resource lifetime, string, and collection
+  lower-bound families share canonical events; purity symbolic facts are now
+  query-only.
+- Last confirmed fact: null-forgiving syntax-only assignment reproductions pass
+  4/4, MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487 after
+  deleting the legacy reference/null assignment builders.
+- Next cheapest step: move reference-backed length, count, string-content, and
+  array-dimension postconditions into canonical lowering, then delete their
+  Symbolic assignment builders.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
