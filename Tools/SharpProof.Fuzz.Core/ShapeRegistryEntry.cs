@@ -25,6 +25,10 @@ public sealed record FuzzExpectation(
     ImmutableArray<string> RequiredSp0010Properties,
     ImmutableArray<string> RequiredAnySp0010Properties)
 {
+    public const string ConservativeBucket = "conservative";
+    public const string DefinitelyImpureBucket = "definitely_impure";
+    public const string DefinitelyPureBucket = "definitely_pure";
+
     private static readonly ImmutableArray<string> DefaultSp0002Properties = ImmutableArray.Create(
         SharpProofDiagnostics.ImpurityCategoryProperty,
         SharpProofDiagnostics.ImpurityRuleProperty,
@@ -34,6 +38,17 @@ public sealed record FuzzExpectation(
         SharpProofDiagnostics.ExceptionTypesProperty,
         SharpProofDiagnostics.ExceptionCategoriesProperty,
         SharpProofDiagnostics.ExceptionSourcesProperty);
+
+    public string Bucket =>
+        Sp0002 == Sp0002ExpectationKind.MayEmitConservatively ||
+        Sp0010 == Sp0010ExpectationKind.MayEmitConservatively
+            ? ConservativeBucket
+            : Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
+              Sp0010 is Sp0010ExpectationKind.Ignore or Sp0010ExpectationKind.MustNotEmit
+                ? DefinitelyPureBucket
+                : DefinitelyImpureBucket;
+
+    public bool IsConservative => Bucket == ConservativeBucket;
 
     public static FuzzExpectation DefinitelyPure()
     {

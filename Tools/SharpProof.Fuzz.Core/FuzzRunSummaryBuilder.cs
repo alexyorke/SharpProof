@@ -2,9 +2,6 @@ namespace SharpProof.Tools.Fuzz;
 
 internal sealed class FuzzRunSummaryBuilder
 {
-    private const string ConservativeExpectationBucket = "conservative";
-    private const string DefinitelyImpureExpectationBucket = "definitely_impure";
-    private const string DefinitelyPureExpectationBucket = "definitely_pure";
     private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
     private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
@@ -92,7 +89,7 @@ internal sealed class FuzzRunSummaryBuilder
                 StringComparer.Ordinal);
         var registryExpectationCounts = CreateRegistryExpectationCounts();
         var conservativeRegistryFamilies = FuzzCaseGenerator.RegistryEntries
-            .Where(static entry => IsConservativeExpectation(entry.Expectation))
+            .Where(static entry => entry.Expectation.IsConservative)
             .Select(static entry => entry.Id)
             .OrderBy(family => family, StringComparer.Ordinal)
             .ToImmutableArray();
@@ -134,8 +131,8 @@ internal sealed class FuzzRunSummaryBuilder
             ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             ManifestClassificationCounts = manifestClassificationCounts,
             RegistryExpectationCounts = registryExpectationCounts,
-            DefiniteRegistryFamilyCount = registryExpectationCounts[DefinitelyPureExpectationBucket] +
-                                          registryExpectationCounts[DefinitelyImpureExpectationBucket],
+            DefiniteRegistryFamilyCount = registryExpectationCounts[FuzzExpectation.DefinitelyPureBucket] +
+                                          registryExpectationCounts[FuzzExpectation.DefinitelyImpureBucket],
             ConservativeRegistryFamilyCount = conservativeRegistryFamilies.Length,
             ConservativeRegistryFamilies = conservativeRegistryFamilies,
             GeneratorBackedShapeCount = RoslynShapeManifest.GeneratorBackedShapeIds.Length,
@@ -150,31 +147,15 @@ internal sealed class FuzzRunSummaryBuilder
     {
         var counts = new SortedDictionary<string, int>(StringComparer.Ordinal)
         {
-            [ConservativeExpectationBucket] = 0,
-            [DefinitelyImpureExpectationBucket] = 0,
-            [DefinitelyPureExpectationBucket] = 0
+            [FuzzExpectation.ConservativeBucket] = 0,
+            [FuzzExpectation.DefinitelyImpureBucket] = 0,
+            [FuzzExpectation.DefinitelyPureBucket] = 0
         };
 
         foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-            counts.Increment(GetExpectationBucket(entry.Expectation));
+            counts.Increment(entry.Expectation.Bucket);
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
-    }
-
-    private static string GetExpectationBucket(FuzzExpectation expectation)
-    {
-        if (IsConservativeExpectation(expectation)) return ConservativeExpectationBucket;
-
-        return expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
-               expectation.Sp0010 is Sp0010ExpectationKind.Ignore or Sp0010ExpectationKind.MustNotEmit
-            ? DefinitelyPureExpectationBucket
-            : DefinitelyImpureExpectationBucket;
-    }
-
-    private static bool IsConservativeExpectation(FuzzExpectation expectation)
-    {
-        return expectation.Sp0002 == Sp0002ExpectationKind.MayEmitConservatively ||
-               expectation.Sp0010 == Sp0010ExpectationKind.MayEmitConservatively;
     }
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding)

@@ -113,9 +113,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - Fuzz
 
-### Minor: conservative/expectation classification in two sites - `FuzzRunSummaryBuilder.cs` vs `FuzzExpectation`
-**Recommendation:** `FuzzExpectation.Bucket` property.
-
 ---
 
 ## Tools - Baseline / Corpus / Vsix
