@@ -65,7 +65,7 @@ compression, test deletion, or moving logic into manifests as a reduction.
 
 - [x] Capture the Release solution build and all six test-lane counts/skips at
   the starting commit, recording any pre-existing failures here.
-- [ ] Capture public API snapshots, representative CLI/JSON/SARIF bytes, package
+- [x] Capture public API snapshots, representative CLI/JSON/SARIF bytes, package
   contents, seeded fuzz output, and EffectSummary golden output.
 - [ ] Add a differential harness that compares normalized `SymbolicState`
   instances, support status, unknown/truncation reasons, and provenance.
@@ -175,16 +175,17 @@ compression, test deletion, or moving logic into manifests as a reduction.
 | --- | --- |
 | Rewrite start | Analyzer/Symbolic focused builds previously green; exception-flow focused lane 207/208 with one failure reproduced on the starting commit. |
 | Phase 0 build/test baseline | Release solution build: 0 warnings, 0 errors. MainSmtOracle: 573 passed. MainSmtAnalyzer: 487 passed. MainSmtFlow: 256 passed, 1 failed (the pre-existing SP0010 case). MainSmtCore: 257 passed. MainGeneral: 3,634 passed, 2 skipped. Tooling: 585 passed. Total: 5,792 passed, 1 pre-existing failure, 2 explicit MainGeneral skips. |
+| Phase 0 contract baseline | Public API SHA-256: shipped `98C260C649C51451C3BD5629DAF01CDA02ECE7ACEFF1AAF4D39CA6FCF7867D25`, unshipped `B5AFAC50F77E3069B2F1350E068810320D56166F2A7C52E5317F7D7581EA1D4E`. Archive manifests: combined NuGet 17 entries / `c08d68be02c78efced7a080ffbc8eadfd305b91540925f7fd40160a6c614f7a8`; Symbolic NuGet 13 entries / `cc85e4f0f085bc8fb088ed7e44344807731c80594a5d4ac8f382f1791a745dd3`; VSIX 31 entries / `7b876bbb1137084a1eb28e0d863ea33cfcee7bd48708b68ca2131323d4255976`. Existing byte/schema/golden fixtures for CLI, JSON, compact/invariant projection, fuzz, and EffectSummary: 140 passed, 0 failed, 0 skipped. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: plan committed and the full Release build/test baseline captured; no
-  canonical-kernel production code has been added yet.
-- Last confirmed fact: the Release solution builds with zero warnings and the
-  six lanes pass 5,792 tests, with one pre-existing SP0010 failure and two
-  explicit MainGeneral skips.
-- Next cheapest step: capture public API, CLI/JSON/SARIF, package, fuzz, and
-  EffectSummary contract snapshots, then inventory the simple-assignment slice.
+- State: Release, six-lane, public API, archive, CLI/JSON/SARIF, fuzz, and
+  EffectSummary baselines are captured; no canonical-kernel production code
+  has been added yet.
+- Last confirmed fact: the focused contract/golden fixture batch passes all 140
+  tests and the three shipped archive manifests are recorded above.
+- Next cheapest step: add the normalized-state differential harness, then use
+  it while inventorying the simple-assignment migration slice.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
