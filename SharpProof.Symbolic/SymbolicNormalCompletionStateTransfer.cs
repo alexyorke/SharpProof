@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -27,28 +28,29 @@ internal static class SymbolicNormalCompletionStateTransfer
                 semanticModel,
                 cancellationToken);
 
-        AddTopLevelNotNullParameterNormalCompletionStateFacts(
-            ref state,
+        var frameworkLowering = SymbolicFrameworkPostconditionLowerer.Lower(
             expression,
             statement,
             semanticModel,
             cancellationToken);
-        AddTopLevelKnownGuardNormalCompletionStateFacts(
-            ref state,
-            expression,
-            semanticModel,
-            cancellationToken);
+        if (frameworkLowering is { IsExact: true, Value: { } frameworkPlan })
+            ApplyConditions(
+                ref state,
+                frameworkPlan.BeforeDoesNotReturnIf,
+                expression,
+                "ir.path.normal-completion.framework-before");
         AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(
             ref state,
             expression,
             statement,
             semanticModel,
             cancellationToken);
-        AddTopLevelMemberNotNullNormalCompletionStateFacts(
-            ref state,
-            expression,
-            semanticModel,
-            cancellationToken);
+        if (frameworkLowering is { IsExact: true, Value: { } afterPlan })
+            ApplyConditions(
+                ref state,
+                afterPlan.AfterDoesNotReturnIf,
+                expression,
+                "ir.path.normal-completion.framework-after");
         AddTopLevelArrayCreationNormalCompletionStateFacts(
             ref state,
             expression,
@@ -63,165 +65,6 @@ internal static class SymbolicNormalCompletionStateTransfer
             cancellationToken);
     }
 
-    private static void AddTopLevelNotNullParameterNormalCompletionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var (invocationOperation, argument, parameter, argumentSyntax) in
-                 EnumerateExplicitTopLevelInvocationArguments(expression, semanticModel, cancellationToken))
-        {
-            if (!ArgumentRefKindMatches(parameter, argumentSyntax) ||
-                !HasNotNullNormalCompletionPostcondition(parameter, cancellationToken) ||
-                parameter.RefKind != RefKind.None &&
-                !IsUniqueOutputArgumentTarget(
-                    invocationOperation,
-                    argument,
-                    semanticModel,
-                    cancellationToken))
-                continue;
-
-            AddStableReferenceNonNullStateFact(
-                ref state,
-                argumentSyntax.Expression,
-                statement,
-                semanticModel,
-                cancellationToken,
-                "ir.path.normal-completion.parameter-not-null",
-                parameter.RefKind != RefKind.None);
-        }
-    }
-
-    private static IEnumerable<(IInvocationOperation Invocation, IArgumentOperation Argument, IParameterSymbol Parameter,
-        ArgumentSyntax Syntax)> EnumerateExplicitTopLevelInvocationArguments(
-        ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
-        if (UnwrapAwaitedNormalCompletionExpression(expression) is not InvocationExpressionSyntax invocation ||
-            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
-            yield break;
-
-        foreach (var argument in operation.Arguments)
-            if (argument is { ArgumentKind: ArgumentKind.Explicit, Parameter: { IsParams: false } parameter, Syntax: ArgumentSyntax syntax })
-                yield return (operation, argument, parameter, syntax);
-    }
-
-    private static bool HasNotNullNormalCompletionPostcondition(
-        IParameterSymbol parameter,
-        CancellationToken cancellationToken)
-    {
-        return parameter.RefKind == RefKind.None
-            ? NullableFlowFacts.HasNotNullPostcondition(parameter) ||
-              NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(
-                  parameter,
-                  cancellationToken)
-            : NullableFlowFacts.GetParameterOutputState(parameter) == NullableFlowFactState.NotNull;
-    }
-
-    private static bool ArgumentRefKindMatches(IParameterSymbol parameter, ArgumentSyntax argument)
-    {
-        return parameter.RefKind switch
-        {
-            RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
-            RefKind.Ref => argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword),
-            RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
-            _ => false
-        };
-    }
-
-    private static bool IsUniqueOutputArgumentTarget(
-        IInvocationOperation invocation,
-        IArgumentOperation argument,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (argument.Syntax is not ArgumentSyntax argumentSyntax ||
-            !NullableFlowFacts.TryGetArgumentTargetSymbol(
-                argumentSyntax.Expression,
-                semanticModel,
-                cancellationToken,
-                out var target))
-            return false;
-
-        foreach (var otherArgument in invocation.Arguments)
-        {
-            if (ReferenceEquals(argument, otherArgument) ||
-                otherArgument.Syntax is not ArgumentSyntax otherArgumentSyntax ||
-                !NullableFlowFacts.TryGetArgumentTargetSymbol(
-                    otherArgumentSyntax.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var otherTarget))
-                continue;
-
-            if (SymbolEqualityComparer.Default.Equals(target, otherTarget)) return false;
-        }
-
-        return true;
-    }
-
-    internal static void AddTopLevelMemberNotNullNormalCompletionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = UnwrapAwaitedNormalCompletionExpression(expression);
-        if (expression is not InvocationExpressionSyntax invocation ||
-            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
-            invocationOperation.TargetMethod.IsStatic ||
-            !IsCurrentInstanceInvocation(invocation))
-            return;
-
-        var memberTargets = NullableFlowFacts.GetMemberNotNullTargets(invocationOperation.TargetMethod);
-        foreach (var memberTarget in memberTargets)
-        {
-            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
-                    invocationOperation.TargetMethod.ContainingType,
-                    memberTarget,
-                    out var member) ||
-                !NullableFlowFacts.TryGetMemberType(member, out var type) ||
-                !TryGetValueKind(type, out var kind) ||
-                kind != SmtValueKind.Reference)
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                new SymbolicMemberTerm(
-                    new SymbolicVariableTerm(SymbolicStateValueFacts.ImplicitThisVariableName, SmtValueKind.Reference),
-                    member.Name,
-                    kind),
-                new SymbolicNullTerm(),
-                invocation,
-                "ir.path.normal-completion.member-not-null");
-        }
-    }
-
-    internal static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation)
-    {
-        var invokedExpression = SymbolicProgramPointFacts.UnwrapExpression(invocation.Expression);
-        return invokedExpression is IdentifierNameSyntax ||
-               invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
-    }
-
-    internal static bool TryCreateImplicitThisMemberTerm(ISymbol member, out SymbolicTerm term)
-    {
-        if (!NullableFlowFacts.TryGetMemberType(member, out var type) ||
-            !TryGetValueKind(type, out var kind))
-        {
-            term = null!;
-            return false;
-        }
-
-        term = new SymbolicMemberTerm(
-            new SymbolicVariableTerm(SymbolicStateValueFacts.ImplicitThisVariableName, SmtValueKind.Reference),
-            member.Name,
-            kind);
-        return true;
-    }
-
     private static void AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(
         ref SymbolicState state,
         ExpressionSyntax expression,
@@ -229,7 +72,7 @@ internal static class SymbolicNormalCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var (_, _, parameter, argumentSyntax) in EnumerateExplicitTopLevelInvocationArguments(
+        foreach (var (_, _, parameter, argumentSyntax) in SymbolicFrameworkPostconditionLowerer.EnumerateExplicitInvocationArguments(
                      expression, semanticModel, cancellationToken))
         {
             if (parameter.RefKind != RefKind.None ||
@@ -255,7 +98,7 @@ internal static class SymbolicNormalCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapAwaitedNormalCompletionExpression(expression);
+        expression = SymbolicFrameworkPostconditionLowerer.UnwrapAwaited(expression);
         if (expression is not ArrayCreationExpressionSyntax arrayCreation) return;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -393,14 +236,6 @@ internal static class SymbolicNormalCompletionStateTransfer
         }
     }
 
-    private static ExpressionSyntax UnwrapAwaitedNormalCompletionExpression(ExpressionSyntax expression)
-    {
-        expression = SymbolicProgramPointFacts.UnwrapExpression(expression);
-        return expression is AwaitExpressionSyntax awaitExpression
-            ? SymbolicProgramPointFacts.UnwrapExpression(awaitExpression.Expression)
-            : expression;
-    }
-
     private static bool IsReducedExtensionMethodInvocation(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
@@ -410,22 +245,20 @@ internal static class SymbolicNormalCompletionStateTransfer
                invocationOperation.TargetMethod.ReducedFrom != null;
     }
 
-    private static void AddTopLevelKnownGuardNormalCompletionStateFacts(
+    internal static void ApplyConditions(
         ref SymbolicState state,
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
+        ImmutableArray<SymbolicCondition> conditions,
+        SyntaxNode source,
+        string provenance)
     {
-        expression = UnwrapAwaitedNormalCompletionExpression(expression);
-        if (expression is InvocationExpressionSyntax invocation &&
-            SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
-                invocation,
-                semanticModel,
-                cancellationToken,
-                out _,
-                out _,
-                out var normalCompletionCondition,
-                out _))
-            state = state.AddPathCondition(normalCompletionCondition);
+        if (conditions.IsDefaultOrEmpty)
+            return;
+        var transition = SymbolicOperationTransferKernel.AssumeAll(
+            state,
+            conditions,
+            source.Span,
+            provenance);
+        if (transition.IsExact)
+            state = transition.State;
     }
 }

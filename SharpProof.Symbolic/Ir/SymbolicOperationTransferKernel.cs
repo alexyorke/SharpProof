@@ -164,6 +164,26 @@ internal static class SymbolicOperationTransferKernel
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     }
 
+    internal static SymbolicOperationTransitionResult AssumeAll(
+        SymbolicState state,
+        ImmutableArray<SymbolicCondition> conditions,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance)
+    {
+        if (conditions.IsDefaultOrEmpty)
+            return SymbolicOperationTransitionResult.Exact(
+                state,
+                ImmutableArray<SymbolicLoweringProvenance>.Empty);
+
+        var operations = ImmutableArray.CreateBuilder<SymbolicOperationDescriptor>(conditions.Length);
+        for (var index = 0; index < conditions.Length; index++)
+            operations.Add(new SymbolicBranchAssumptionOperation(
+                conditions[index],
+                true,
+                new SymbolicOperationOrigin(sourceSpan, index, provenance)));
+        return Apply(state, new SymbolicOperationSequence(operations.MoveToImmutable()));
+    }
+
     internal static SymbolicOperationTransitionResult TransitionLoopEdge(
         SymbolicState state,
         SymbolicLoopEdgeKind kind,

@@ -277,6 +277,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Lower for/while/do monotonic initializer bounds into a typed invariant
     plan. Bound discovery, mutation-preservation checks, and prior-initializer
     validation now return conditions; only the loop-edge kernel mutates state.
+  - [x] Lower `[NotNull]`, inferred parameter-not-null, known argument guards,
+    and `[MemberNotNull]` normal-completion semantics into one typed framework
+    postcondition plan. Statement and expression consumers apply its ordered
+    condition groups through the canonical assumption transition.
 - [ ] Migrate source queries, invariant/reachability analysis, exception paths,
   and Analyzer purity CFG consumers in behavior-locked vertical slices.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
@@ -563,6 +567,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed finite-foreach domains | Commit `0ad4ece9` replaces direct finite-domain state mutation with `SymbolicFiniteDomainLowerer`, a typed plan consumed only through canonical loop-edge transitions. Inline arrays and prior-assigned finite arrays are characterized directly. A broader limits probe exposed that the CFG collector did not reproduce structural try-merge and scoped-completion truncation events, so custom analysis limits now conservatively select the structural collector until typed truncation parity migrates. Focused finite-domain/program-point/limit/transfer fixtures pass 139/139; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This migration scaffold raises production LOC to 106,296, or -1,380 from the rewrite start; test LOC rises to 142,831. |
 | Phase 7 canonical finite-element discovery | Commit `b31b8fef` moves array, collection-expression, bounded-element, prior-assignment, referenced-symbol invalidation, and truncation discovery into `SymbolicFiniteDomainLowerer`. `SymbolicOperationLowerer` now consumes the same typed result for finite array postconditions, and the 231-line legacy program-point discovery block is deleted. Focused finite-domain/foreach/program-point/limit/operation/element-access fixtures pass 37/37; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,307, or -1,369 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed loop-bound invariants | Commit `46cf1914` replaces loop-bound discovery's temporary `SymbolicState` construction with `SymbolicLoopInvariantPlan`. For/while/do initializer bounds, strict upper bounds, dependency invalidation, and monotonic-update checks now produce typed conditions; both CFG lowering and structural fallback apply them only through canonical loop-edge transitions. Focused loop/lowerer/program-point/operation fixtures pass 186/186; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,320, or -1,356 from the rewrite start; test LOC remains 142,831. |
+| Phase 7 typed framework postconditions | Commit `pending` introduces `SymbolicFrameworkPostconditionLowerer` as the single owner of parameter-not-null, inferred-not-null, known argument-guard, and member-not-null normal-completion discovery. Statement and expression paths consume ordered typed condition groups through one bulk canonical assumption transition; the legacy direct-state implementations and their shared member helpers are deleted. Focused nullable/program-point/reachability/element/exception fixtures have 293 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,424, or -1,252 from the rewrite start; test LOC remains 142,831. |
 
 ## Current Checkpoint
 
@@ -643,11 +648,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   their destinations. Pattern binding has one typed canonical owner; the
   425-line program-point interpreter is deleted. Finite-element discovery and
   bounded prior-assignment validation now have one typed owner, and the 231-line
-  legacy discovery block is deleted. Test LOC is 142,831; production LOC is
-  106,320, or -1,356 from the rewrite start; the 735-line
+  legacy discovery block is deleted. Framework normal-completion postconditions
+  now have one typed owner and enter state through canonical assumptions. Test
+  LOC is 142,831; production LOC is 106,424, or -1,252 from the rewrite start; the 839-line
   scaffold must be repaid when structural transfer paths are deleted.
-- Next cheapest step: identify framework-postcondition discovery that still
-  mutates state, lower one complete framework family into a typed result, and
-  delete its legacy mutation path after differential parity.
+- Next cheapest step: lower the remaining source-derived normal-completion
+  conditions (`DoesNotReturnIf`, throw guards, array bounds, and dereference
+  success) into typed results, preserving inline-assignment and pattern-binding
+  provenance before deleting their direct-state paths.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

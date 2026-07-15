@@ -32,11 +32,16 @@ internal static class SymbolicExpressionStateTransfer
             expression,
             semanticModel,
             cancellationToken);
-        SymbolicNormalCompletionStateTransfer.AddTopLevelMemberNotNullNormalCompletionStateFacts(
-            ref state,
+        var frameworkLowering = SymbolicFrameworkPostconditionLowerer.LowerMemberNotNull(
             expression,
             semanticModel,
             cancellationToken);
+        if (frameworkLowering is { IsExact: true, Value: { } frameworkPlan })
+            SymbolicNormalCompletionStateTransfer.ApplyConditions(
+                ref state,
+                frameworkPlan.AfterDoesNotReturnIf,
+                expression,
+                "ir.path.expression-completion.member-not-null");
     }
 
     internal static void AddAssignmentExpressionStateFacts(
@@ -106,7 +111,7 @@ internal static class SymbolicExpressionStateTransfer
                          assignment.Left,
                          semanticModel,
                          cancellationToken) &&
-                     SymbolicNormalCompletionStateTransfer.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
+                     SymbolicFrameworkPostconditionLowerer.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
             {
                 var effectiveValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(
                     assignment.Right).EffectiveValueExpression;
