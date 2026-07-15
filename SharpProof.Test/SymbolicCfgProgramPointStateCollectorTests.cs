@@ -12,6 +12,8 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     {
         ("static class C { static int M(int input) { int value = input; return value; } }", "return value"),
         ("static class C { static int M(int input) { int value = 0; value = input + 1; return value; } }", "return value"),
+        ("static class C { static int M() { int value = 0; value++; return value; } }", "return value"),
+        ("static class C { static int M() { int value = 4; value += 2; return value; } }", "return value"),
         ("static class C { static bool M(bool input) { bool value = input; return value; } }", "return value"),
         ("static class C { static string? M(string? input) { string? value = input; return value; } }", "return value")
     };

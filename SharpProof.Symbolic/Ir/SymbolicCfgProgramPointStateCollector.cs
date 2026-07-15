@@ -382,7 +382,101 @@ internal static class SymbolicCfgProgramPointStateCollector
                        "operation-lowering.assignment",
                        out guardInvalidated);
 
-        return false;
+        var increment = operation switch
+        {
+            IExpressionStatementOperation { Operation: IIncrementOrDecrementOperation nested } => nested,
+            IIncrementOrDecrementOperation direct => direct,
+            _ => null
+        };
+        if (increment != null)
+            return TryGetDirectTarget(increment.Target, out var target) &&
+                   increment.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression &&
+                   SymbolicStateValueFacts.TryGetCurrentValue(state, target, out var previousValue) &&
+                   SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement(
+                       previousValue,
+                       increment.Kind == OperationKind.Increment ? 1 : -1,
+                       expression,
+                       semanticModel,
+                       cancellationToken,
+                       target,
+                       out var updatedValue,
+                       out var isChecked) &&
+                   TryApplyComputedUpdate(
+                       ref state,
+                       target,
+                       updatedValue,
+                       expression,
+                       guard,
+                       semanticModel,
+                       cancellationToken,
+                       increment.Kind == OperationKind.Increment
+                           ? SymbolicComputedUpdateKind.Increment
+                           : SymbolicComputedUpdateKind.Decrement,
+                       isChecked,
+                       "operation-lowering.increment",
+                       out guardInvalidated);
+
+        var compound = operation switch
+        {
+            IExpressionStatementOperation { Operation: ICompoundAssignmentOperation nested } => nested,
+            ICompoundAssignmentOperation direct => direct,
+            _ => null
+        };
+        return compound != null &&
+               TryGetDirectTarget(compound.Target, out var compoundTarget) &&
+               compound.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax compoundSyntax &&
+               SymbolicStateValueFacts.TryGetCurrentValue(state, compoundTarget, out var compoundPreviousValue) &&
+               SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment(
+                   compoundPreviousValue,
+                   compoundSyntax,
+                   semanticModel,
+                   cancellationToken,
+                   compoundTarget,
+                   out var compoundValue,
+                   out var compoundIsChecked) &&
+               TryApplyComputedUpdate(
+                   ref state,
+                   compoundTarget,
+                   compoundValue,
+                   compoundSyntax,
+                   guard,
+                   semanticModel,
+                   cancellationToken,
+                   SymbolicComputedUpdateKind.CompoundAssignment,
+                   compoundIsChecked,
+                   "operation-lowering.compound-assignment",
+                   out guardInvalidated);
+    }
+
+    private static bool TryApplyComputedUpdate(
+        ref SymbolicState state,
+        ISymbol target,
+        SymbolicTerm updatedValue,
+        SyntaxNode source,
+        SymbolicCondition? guard,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicComputedUpdateKind updateKind,
+        bool isChecked,
+        string provenance,
+        out bool guardInvalidated)
+    {
+        guardInvalidated = GuardReferencesTarget(guard, target);
+        var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+            state,
+            target,
+            updatedValue,
+            source,
+            semanticModel,
+            cancellationToken,
+            updateKind,
+            isChecked,
+            provenance);
+        if (!transition.IsExact)
+            return false;
+
+        state = transition.State;
+        return true;
     }
 
     private static bool TryApplyAssignment(
@@ -395,10 +489,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         string provenance,
         out bool guardInvalidated)
     {
-        guardInvalidated = guard != null &&
-                           SymbolicIrReferenceScanner.ContainsVariableOrMember(
-                               guard,
-                               SymbolicFactFactory.GetSmtVariableName(target));
+        guardInvalidated = GuardReferencesTarget(guard, target);
         if (value.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression ||
             SymbolMutationFacts.ExpressionReferencesSymbol(
                 expression,
@@ -423,6 +514,12 @@ internal static class SymbolicCfgProgramPointStateCollector
         state = transition.State;
         return true;
     }
+
+    private static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>
+        guard != null &&
+        SymbolicIrReferenceScanner.ContainsVariableOrMember(
+            guard,
+            SymbolicFactFactory.GetSmtVariableName(target));
 
     private static bool TryGetDirectTarget(IOperation operation, out ISymbol target)
     {
