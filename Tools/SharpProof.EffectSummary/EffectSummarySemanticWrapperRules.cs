@@ -892,34 +892,13 @@ internal static class EffectSummarySemanticWrapperRules
     {
         foreach (var argumentEvidence in callSite.ArgumentEvidence)
         {
-            if (string.Equals(argumentEvidence.Type, "System.StringComparison", StringComparison.Ordinal) &&
-                IsDeterministicStringComparisonValue(argumentEvidence.Value))
-                return true;
-
-            if (string.Equals(argumentEvidence.Type, "System.StringComparer", StringComparison.Ordinal) &&
-                IsDeterministicStringComparerValue(argumentEvidence.Value))
+            if (EffectSummaryKnownFrameworkCalls.IsDeterministicStringComparison(
+                    argumentEvidence.Type,
+                    argumentEvidence.Value))
                 return true;
         }
 
         return false;
-    }
-
-    internal static bool IsDeterministicStringComparisonValue(string value)
-    {
-        return value is
-            "System.StringComparison.InvariantCulture" or
-            "System.StringComparison.InvariantCultureIgnoreCase" or
-            "System.StringComparison.Ordinal" or
-            "System.StringComparison.OrdinalIgnoreCase";
-    }
-
-    internal static bool IsDeterministicStringComparerValue(string value)
-    {
-        return value is
-            "System.StringComparer.Ordinal" or
-            "System.StringComparer.OrdinalIgnoreCase" or
-            "System.StringComparer.InvariantCulture" or
-            "System.StringComparer.InvariantCultureIgnoreCase";
     }
 
     internal static bool IsContextSensitiveStringComparisonMethod(string displayName)

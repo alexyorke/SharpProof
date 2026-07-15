@@ -220,16 +220,6 @@ Physically in `Shared` but `namespace SharpProof.Analyzer.Engine`. **Recommendat
 
 ---
 
-## Tools - EffectSummary
-
-### Repeated call-chain key construction & ordering - `EffectSummaryExceptionPropagation.cs:424-429,431-442,444-451,453-464`
-`string.Join(">", chain.Select(identity => identity.ToCanonicalKey()))` written inline 4x. **Recommendation:** `CanonicalCallChain(...)` shared helper.
-
-### Hardcoded `StringComparer` value set duplicated - `EffectSummarySemanticWrapperRules.cs:923-928` vs `EffectSummaryIlAnalyzer.cs:591-635`
-Four deterministic comparer symbols defined twice. **Recommendation:** `KnownStringComparers` helper.
-
----
-
 ## Tools - SymbolicCli
 
 ### Repeated `ISymbolicCompactResult` schema-version boilerplate

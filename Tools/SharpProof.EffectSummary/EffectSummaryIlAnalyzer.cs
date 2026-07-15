@@ -252,7 +252,9 @@ internal static class EffectSummaryIlAnalyzer
             if (string.Equals(signature.ParameterTypes[parameterIndex], "System.StringComparison",
                     StringComparison.Ordinal) &&
                 argumentValue.Int32Constant is int comparisonValue &&
-                TryGetStringComparisonValueName(comparisonValue, out var stringComparisonValueName))
+                EffectSummaryKnownFrameworkCalls.TryGetStringComparisonName(
+                    comparisonValue,
+                    out var stringComparisonValueName))
                 argumentEvidence.Add(new CallSiteArgumentEvidence(
                     "argument",
                     parameterIndex,
@@ -590,53 +592,23 @@ internal static class EffectSummaryIlAnalyzer
 
     internal static bool TryGetKnownStringComparerIdentity(string symbol, out TrackedStackValue trackedValue)
     {
-        trackedValue = symbol switch
-        {
-            "System.StringComparer.get_CurrentCulture()->System.StringComparer" => TrackedStackValue
-                .FromKnownStringComparer("System.StringComparer.CurrentCulture"),
-            "System.StringComparer.get_CurrentCultureIgnoreCase()->System.StringComparer" => TrackedStackValue
-                .FromKnownStringComparer("System.StringComparer.CurrentCultureIgnoreCase"),
-            "System.StringComparer.get_InvariantCulture()->System.StringComparer" => TrackedStackValue
-                .FromKnownStringComparer("System.StringComparer.InvariantCulture"),
-            "System.StringComparer.get_InvariantCultureIgnoreCase()->System.StringComparer" => TrackedStackValue
-                .FromKnownStringComparer("System.StringComparer.InvariantCultureIgnoreCase"),
-            "System.StringComparer.get_Ordinal()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer(
-                "System.StringComparer.Ordinal"),
-            "System.StringComparer.get_OrdinalIgnoreCase()->System.StringComparer" => TrackedStackValue
-                .FromKnownStringComparer("System.StringComparer.OrdinalIgnoreCase"),
-            _ => TrackedStackValue.Unknown
-        };
-
-        return !trackedValue.IsUnknown;
-    }
-
-    internal static bool TryGetStringComparisonValueName(int value, out string name)
-    {
-        if (Enum.IsDefined(typeof(StringComparison), value))
-        {
-            name = $"System.StringComparison.{(StringComparison)value}";
-            return true;
-        }
-
-        name = string.Empty;
-        return false;
+        var found = EffectSummaryKnownFrameworkCalls.TryGetStringComparerName(symbol, out var comparerName);
+        trackedValue = found
+            ? TrackedStackValue.FromKnownStringComparer(comparerName)
+            : TrackedStackValue.Unknown;
+        return found;
     }
 
     internal static bool TryGetStringComparerIdentityFromComparison(int comparisonValue,
         out TrackedStackValue trackedValue)
     {
-        trackedValue = comparisonValue switch
-        {
-            0 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.CurrentCulture"),
-            1 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.CurrentCultureIgnoreCase"),
-            2 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.InvariantCulture"),
-            3 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.InvariantCultureIgnoreCase"),
-            4 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.Ordinal"),
-            5 => TrackedStackValue.FromKnownStringComparer("System.StringComparer.OrdinalIgnoreCase"),
-            _ => TrackedStackValue.Unknown
-        };
-
-        return !trackedValue.IsUnknown;
+        var found = EffectSummaryKnownFrameworkCalls.TryGetStringComparerName(
+            comparisonValue,
+            out var comparerName);
+        trackedValue = found
+            ? TrackedStackValue.FromKnownStringComparer(comparerName)
+            : TrackedStackValue.Unknown;
+        return found;
     }
 
     internal static bool TryGetCallTargetSignature(
