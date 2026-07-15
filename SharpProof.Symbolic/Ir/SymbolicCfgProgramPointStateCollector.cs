@@ -33,12 +33,6 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "loop-local-target");
         if (site.Ancestors().Any(static ancestor => ancestor is FinallyClauseSyntax))
             return Unsupported(site, "finally-local-target");
-        if (HasUnsupportedAssignmentTargetBeforeSite(
-                executionRoot,
-                site,
-                semanticModel,
-                cancellationToken))
-            return Unsupported(site, "assignment-target");
         ControlFlowGraph? graph;
         try
         {
@@ -86,6 +80,8 @@ internal static class SymbolicCfgProgramPointStateCollector
             var foundTarget = false;
             foreach (var operation in block.Operations)
             {
+                if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
+                    continue;
                 if (ContainsSite(operation.Syntax, site))
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
@@ -716,17 +712,24 @@ internal static class SymbolicCfgProgramPointStateCollector
             _ => null
         };
         if (assignment != null)
-            return TryGetDirectTarget(assignment.Target, out var target) &&
-                   TryApplyAssignment(
-                       ref state,
-                       target,
-                       assignment.Value,
-                       guard,
-                       allowGuardedReferenceAssignments,
-                       semanticModel,
-                       cancellationToken,
-                       "ir.path.prior-statement",
-                       out guardInvalidated);
+            return TryGetDirectTarget(assignment.Target, out var target)
+                ? TryApplyAssignment(
+                    ref state,
+                    target,
+                    assignment.Value,
+                    guard,
+                    allowGuardedReferenceAssignments,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.prior-statement",
+                    out guardInvalidated)
+                : TryApplyExplicitTargetAssignment(
+                    ref state,
+                    assignment,
+                    guard,
+                    semanticModel,
+                    cancellationToken,
+                    out guardInvalidated);
 
         var increment = operation switch
         {
@@ -820,7 +823,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 ref state,
                 assignment.Right,
                 statement,
-                includeThrowGuardFacts: false,
+                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is
+                    not (ILocalSymbol or IParameterSymbol),
                 semanticModel,
                 cancellationToken);
 
@@ -901,6 +905,40 @@ internal static class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
+    private static bool TryApplyExplicitTargetAssignment(
+        ref SymbolicState state,
+        ISimpleAssignmentOperation assignment,
+        SymbolicCondition? guard,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out bool guardInvalidated)
+    {
+        guardInvalidated = false;
+        if (guard != null || assignment.Syntax is not AssignmentExpressionSyntax syntax)
+            return false;
+
+        SymbolicStateInvalidator.InvalidateMutationTarget(
+            ref state,
+            syntax.Left,
+            semanticModel,
+            cancellationToken);
+        SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(
+            ref state,
+            syntax,
+            semanticModel,
+            cancellationToken);
+        var transition = SymbolicOperationTransferAdapter.ApplyLowering(
+            state,
+            SymbolicOperationLowerer.LowerExplicitTargetAssignment(
+                syntax,
+                new SymbolicLoweringContext(semanticModel, cancellationToken)));
+        if (!transition.IsExact)
+            return false;
+
+        state = transition.State;
+        return true;
+    }
+
     private static bool RequiresStructuralAssignmentFallback(
         ISymbol target,
         SymbolicCondition? guard,
@@ -935,26 +973,6 @@ internal static class SymbolicCfgProgramPointStateCollector
             _ => null!
         };
         return target != null;
-    }
-
-    private static bool HasUnsupportedAssignmentTargetBeforeSite(
-        SyntaxNode executionRoot,
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot)
-                     .OfType<AssignmentExpressionSyntax>())
-        {
-            if (assignment.SpanStart >= site.SpanStart)
-                continue;
-
-            var target = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-            if (target is not ILocalSymbol and not IParameterSymbol)
-                return true;
-        }
-
-        return false;
     }
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>

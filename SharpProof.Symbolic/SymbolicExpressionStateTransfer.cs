@@ -106,25 +106,13 @@ internal static class SymbolicExpressionStateTransfer
                     cancellationToken,
                     "ir.path.prior-statement",
                     previousAssignedValueTerm);
-            else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-                     SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
-                         assignment.Left,
-                         semanticModel,
-                         cancellationToken) &&
-                     SymbolicFrameworkPostconditionLowerer.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
+            else
             {
-                var effectiveValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(
-                    assignment.Right).EffectiveValueExpression;
                 var transition = SymbolicOperationTransferAdapter.ApplyLowering(
                     state,
                     SymbolicOperationLowerer.LowerExplicitTargetAssignment(
-                        memberTerm,
-                        effectiveValue,
-                        effectiveValue,
-                        new SymbolicLoweringContext(semanticModel, cancellationToken),
-                        "ir.path.prior-statement.member",
-                        "ir.path.prior-statement.member.assigned-value",
-                        includeReferencePostconditions: true));
+                        assignment,
+                        new SymbolicLoweringContext(semanticModel, cancellationToken)));
                 if (transition.IsExact) state = transition.State;
             }
         }
@@ -175,38 +163,6 @@ internal static class SymbolicExpressionStateTransfer
                 isChecked,
                 "ir.path.prior-statement.compound-assignment");
             if (transition.IsExact) state = transition.State;
-        }
-
-        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is
-                ElementAccessExpressionSyntax elementAccess)
-        {
-            var receiverSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-                elementAccess.Expression,
-                semanticModel,
-                cancellationToken);
-            if (!SymbolicAssignmentStateTransfer.ExpressionReferencesAnySymbol(
-                    assignment.Right,
-                    receiverSymbols,
-                    semanticModel,
-                    cancellationToken) &&
-                SymbolicSemanticPipeline.LowerTerm(
-                    elementAccess,
-                    new SymbolicLoweringContext(semanticModel, cancellationToken)) is
-                    { IsExact: true, Value: { } target })
-            {
-                var transition = SymbolicOperationTransferAdapter.ApplyLowering(
-                    state,
-                    SymbolicOperationLowerer.LowerExplicitTargetAssignment(
-                        target,
-                        assignment.Right,
-                        assignment,
-                        new SymbolicLoweringContext(semanticModel, cancellationToken),
-                        "ir.path.prior-statement.element-assignment",
-                        "ir.path.prior-statement.element-assignment",
-                        includeReferencePostconditions: false));
-                if (transition.IsExact) state = transition.State;
-            }
         }
 
         if (containingStatement != null)

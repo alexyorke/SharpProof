@@ -408,12 +408,88 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
-    public void ConstructorPropertyAssignmentBeforeReturn_RemainsConservativeFallback()
+    public void ConstructorPropertyAssignmentBeforeVoidReturn_RemainsConservativeFallback()
     {
         const string source = "sealed class C { string? Value { get; } C() { Value = null; return; } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ConstructorPropertyAssignmentBeforeReturn_RemainsConservativeFallback));
+            nameof(ConstructorPropertyAssignmentBeforeVoidReturn_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [Test]
+    public void CurrentInstanceMemberAssignmentBeforeReturn_MatchesStructuralCollector()
+    {
+        const string source =
+            "sealed class C { int Value; int M() { Value = 7; return Value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CurrentInstanceMemberAssignmentBeforeReturn_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void ElementAssignmentBeforeReturn_MatchesStructuralCollector()
+    {
+        const string source =
+            "static class C { static int M(int[] values) { values[0] = 7; return values[0]; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ElementAssignmentBeforeReturn_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void ExternalMemberAssignment_RemainsConservativeFallback()
+    {
+        const string source =
+            "sealed class C { public int Value; static int M(C instance) { instance.Value = 7; return 0; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExternalMemberAssignment_RemainsConservativeFallback));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(

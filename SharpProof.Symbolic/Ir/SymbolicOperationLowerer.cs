@@ -2050,6 +2050,52 @@ internal static class SymbolicOperationLowerer
     }
 
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerExplicitTargetAssignment(
+        AssignmentExpressionSyntax assignment,
+        SymbolicLoweringContext context)
+    {
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+            return Unsupported(assignment, "ir.path.prior-statement.explicit-target.kind");
+
+        var left = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left);
+        var isMember = SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
+            left,
+            context.SemanticModel,
+            context.CancellationToken);
+        if (!isMember && left is not ElementAccessExpressionSyntax)
+            return Unsupported(assignment, "ir.path.prior-statement.explicit-target.shape");
+
+        if (left is ElementAccessExpressionSyntax element &&
+            SymbolicAssignmentStateTransfer.ExpressionReferencesAnySymbol(
+                assignment.Right,
+                SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                    element.Expression,
+                    context.SemanticModel,
+                    context.CancellationToken),
+                context.SemanticModel,
+                context.CancellationToken))
+            return Unsupported(assignment, "ir.path.prior-statement.explicit-target.element");
+
+        if (SymbolicSemanticPipeline.LowerTerm(left, context) is not
+            { IsExact: true, Value: { } target })
+            return Unsupported(assignment, "ir.path.prior-statement.explicit-target.term");
+
+        var value = isMember
+            ? SymbolicAssignmentStateTransfer.GetThrowGuardedValue(assignment.Right).EffectiveValueExpression
+            : assignment.Right;
+        var provenance = isMember
+            ? "ir.path.prior-statement.member"
+            : "ir.path.prior-statement.element-assignment";
+        return LowerExplicitTargetAssignment(
+            target,
+            value,
+            isMember ? value : assignment,
+            context,
+            provenance,
+            isMember ? provenance + ".assigned-value" : provenance,
+            includeReferencePostconditions: isMember);
+    }
+
+    internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerExplicitTargetAssignment(
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SyntaxNode source,
