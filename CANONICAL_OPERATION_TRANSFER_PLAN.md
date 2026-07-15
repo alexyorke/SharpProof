@@ -298,6 +298,7 @@ transfer policy after its slice is complete.
 | Intentional exception-diagnostic policy finding | `68f26259` | 105,767 | -1,909 |
 | Intentional switch-visibility shape finding | `23ce27b2` | 105,767 | -1,909 |
 | Shared exception-catalog source registration | `a0069b95` | 105,766 | -1,910 |
+| Unified proof path-state encoding | `e5ca3459` | 105,755 | -1,921 |
 
 ## Validation Ledger
 
@@ -384,6 +385,7 @@ transfer policy after its slice is complete.
 | Phase 6 intentional exception-diagnostic policy finding | Commit `68f26259` removes the stale exception-envelope report entry. All four paths already share `AnalyzerDiagnosticProperties.AddBaselineAndExplain` and `AnalyzerDiagnosticReporter.ReportIfNotSuppressed`; their descriptors, evidence keys, additional locations, proof/unknown metadata, and message arguments are distinct policy, and another wrapper would add parameter plumbing without centralizing new semantics. Focused summary, unknown-hazard, reachability, propagation, handling, contract, explain, baseline, and authoring fixtures: 194 passed. Production LOC remains 105,767, or -1,909 from the rewrite start. |
 | Phase 6 intentional switch-visibility shape finding | Commit `23ce27b2` removes the switch proof-pipeline entry. Switch expressions and statements already share `IsSymbolicConditionAlwaysFalseAt`; the residual code performs distinct Roslyn arm/section selection and lowering, while statements alone must preserve reachable constant `goto case/default` targets. A callback abstraction would add code and obscure the soundness exemption. Focused switch, path-fact, reference-reachability, pattern, and exact-dispatch fixtures: 69 passed. Production LOC remains 105,767, or -1,909 from the rewrite start. |
 | Phase 6 shared exception-catalog source registration | Commit `a0069b95` makes one helper own exception-type and optional source-path registration for both source and edge JSON ingestion, preserving ordinal sorting, deduplication, and malformed-entry skips. Source facts and edge facts remain separate because their schemas intentionally differ in call-chain, callee, depth, and source-path semantics. Release Analyzer build: zero warnings; focused catalog validation, exception catalog, propagation, recursion, and handling fixtures: 49 passed. Production LOC is 105,766, or -1,910 from the rewrite start. |
+| Phase 6 unified proof path-state encoding | Commit `e5ca3459` routes `SymbolicFact` through the canonical `SymbolicFactCondition` representation and the single condition path-state encoding pipeline. The fact path preserves its version-rewrite opt-out, exact fact polarity/confidence encoding, contradictory-state bypass, atom-level divisor scan, and conservative failure; the duplicate wrapper and fact divisor overload are deleted. Release Symbolic build: zero warnings; focused invariant, IR, proof-pipeline, program-point, path-sensitive, reachability, SMT-service, expression-atom, and syntactic-classifier fixtures: 435 passed. Production LOC fell to 105,755, or -1,921 from the rewrite start. |
 
 ## Current Checkpoint
 
@@ -392,12 +394,12 @@ transfer policy after its slice is complete.
   `POTENTIAL_DUPS.md` cleanup is in progress; its Requires/Ensures and
   exception-flow diagnostic-envelope findings plus the switch-visibility shape
   finding are removed with evidence, and exception-catalog type/source
-  registration is centralized.
-- Last confirmed fact: Release Analyzer builds have zero warnings and focused
-  catalog validation, exception catalog, propagation, recursion, and handling
-  fixtures pass 49/49. Production LOC is 105,766, or -1,910 from the rewrite
-  start.
-- Next cheapest step: adjudicate the path-state encoding wrapper finding in
-  `SymbolicProofService`, preserving contradictory-state and safe-divisor gates.
+  registration plus proof path-state encoding are centralized.
+- Last confirmed fact: Release Symbolic builds have zero warnings and focused
+  invariant, IR, proof, program-point, path-sensitive, reachability, SMT,
+  expression-atom, and classifier fixtures pass 435/435. Production LOC is
+  105,755, or -1,921 from the rewrite start.
+- Next cheapest step: adjudicate the proof-status projection finding, sharing
+  only mappings whose source semantics and fallback behavior are identical.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
