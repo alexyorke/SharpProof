@@ -82,7 +82,8 @@ internal sealed record SymbolicAssignmentBinding(
     SymbolicTerm Target,
     SymbolicTerm? Source,
     string? Provenance = null,
-    string? EvidenceKey = null);
+    string? EvidenceKey = null,
+    bool PropagateSourceFacts = false);
 
 internal sealed record SymbolicOperationSequence(
     ImmutableArray<SymbolicOperationDescriptor> Operations)

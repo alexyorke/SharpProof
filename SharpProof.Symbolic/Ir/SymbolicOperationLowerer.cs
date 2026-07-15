@@ -82,17 +82,26 @@ internal static class SymbolicOperationLowerer
             var value = target.Kind == SmtValueKind.Bool
                 ? SymbolicSemanticPipeline.LowerBooleanValueTerm(valueExpression, valueContext)
                 : SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext);
-            var suppressValueBinding = postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
-                                       target.Kind == SmtValueKind.Reference;
-            if (!suppressValueBinding &&
-                value is { IsExact: true, Value: { } sourceTerm } &&
+            if (value is { IsExact: true, Value: { } sourceTerm } &&
                 SymbolicStateFactBuilder.CanCompareIrTerms(target, sourceTerm))
+            {
+                var isSymbolicReference =
+                    postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
+                    target.Kind == SmtValueKind.Reference;
                 bindings.Add(new SymbolicAssignmentBinding(
                     SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
                     target,
                     sourceTerm,
-                    bindingProvenance,
-                    evidenceKey));
+                    isSymbolicReference ? provenance + ".assigned-reference" : bindingProvenance,
+                    isSymbolicReference ? null : evidenceKey,
+                    PropagateSourceFacts:
+                        postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
+                        SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression),
+                            valueContext.SemanticModel,
+                            valueContext.CancellationToken,
+                            out _)));
+            }
 
             AddReferenceAssignmentPostconditions(
                 postconditions,

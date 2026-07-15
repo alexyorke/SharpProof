@@ -137,7 +137,7 @@ internal static class SymbolicAssignmentStateTransfer
         }
 
         if (!isSelfReferential)
-            AddAssignedSourceSymbolSnapshotStateFacts(
+            AddAssignedNullableSourceSnapshotStateFacts(
                 ref state,
                 assignedSymbol,
                 effectiveValueExpression,
@@ -279,7 +279,7 @@ internal static class SymbolicAssignmentStateTransfer
             provenanceRoot + ".throw-guard.non-null");
     }
 
-    private static void AddAssignedSourceSymbolSnapshotStateFacts(
+    private static void AddAssignedNullableSourceSnapshotStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
         ExpressionSyntax valueExpression,
@@ -293,11 +293,6 @@ internal static class SymbolicAssignmentStateTransfer
                 out var sourceSymbol) ||
             SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol))
             return;
-
-        if (TryCreateSymbolTerm(sourceSymbol, out var sourceTerm) &&
-            TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
-            CanCompareIrTerms(sourceTerm, targetTerm))
-            AddSubstitutedStateFacts(ref state, sourceTerm, targetTerm);
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         if (SymbolicNullableLowerer.TryCreateSymbolTerms(
@@ -313,43 +308,14 @@ internal static class SymbolicAssignmentStateTransfer
             CanCompareIrTerms(sourceHasValue, targetHasValue) &&
             CanCompareIrTerms(sourceValue, targetValue))
         {
-            AddSubstitutedStateFacts(ref state, sourceHasValue, targetHasValue);
-            AddSubstitutedStateFacts(ref state, sourceValue, targetValue);
-        }
-    }
-
-    private static void AddSubstitutedStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm source,
-        SymbolicTerm target)
-    {
-        if (!CanCompareIrTerms(source, target) ||
-            string.Equals(
-                SymbolicState.CreateProofTermKey(source),
-                SymbolicState.CreateProofTermKey(target),
-                StringComparison.Ordinal))
-            return;
-
-        var existingFacts = state.Facts;
-        var existingConditions = state.PathConditions;
-        foreach (var fact in existingFacts)
-        {
-            var substituted = SymbolicIrSubstitution.ReplaceTerm(fact, source, target);
-            if (!string.Equals(
-                    SymbolicState.CreateProofFactKey(substituted),
-                    SymbolicState.CreateProofFactKey(fact),
-                    StringComparison.Ordinal))
-                state = state.AddFact(substituted);
-        }
-
-        foreach (var condition in existingConditions)
-        {
-            var substituted = SymbolicIrSubstitution.ReplaceTerm(condition, source, target);
-            if (!string.Equals(
-                    SymbolicState.CreateProofConditionKey(substituted),
-                    SymbolicState.CreateProofConditionKey(condition),
-                    StringComparison.Ordinal))
-                state = state.AddPathCondition(substituted);
+            state = SymbolicOperationTransferKernel.PropagateSourceFacts(
+                state,
+                sourceHasValue,
+                targetHasValue);
+            state = SymbolicOperationTransferKernel.PropagateSourceFacts(
+                state,
+                sourceValue,
+                targetValue);
         }
     }
 
@@ -945,7 +911,6 @@ internal static class SymbolicAssignmentStateTransfer
             return;
 
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(targetSymbols.Count);
-        var substitutions = new List<(SymbolicTerm Source, SymbolicTerm Target)>();
         for (var index = 0; index < targetSymbols.Count; index++)
         {
             if (targetSymbols[index] == null ||
@@ -958,8 +923,8 @@ internal static class SymbolicAssignmentStateTransfer
                 SymbolicFactFactory.GetSmtVariableName(targetSymbols[index]!),
                 targetTerm,
                 sourceElementTerm,
-                provenanceRoot + ".assigned-value"));
-            substitutions.Add((sourceElementTerm, targetTerm));
+                provenanceRoot + ".assigned-value",
+                PropagateSourceFacts: true));
         }
 
         if (bindings.Count == 0) return;
@@ -972,8 +937,6 @@ internal static class SymbolicAssignmentStateTransfer
         if (!transition.IsExact) return;
 
         state = transition.State;
-        foreach (var substitution in substitutions)
-            AddSubstitutedStateFacts(ref state, substitution.Source, substitution.Target);
     }
 
     private static void AddSwitchExpressionAssignedValueStateFacts(

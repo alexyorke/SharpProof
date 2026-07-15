@@ -394,6 +394,47 @@ public sealed class SymbolicOperationTransferModelTests
         Assert.That(SymbolicOperationTransferKernel.GetDefinitionVersion(span), Is.EqualTo(expectedVersion));
     }
 
+    [Test]
+    public void TransferKernel_PropagatesRequestedDirectSourceFacts()
+    {
+        var source = new SymbolicVariableTerm("source", SmtValueKind.Int);
+        var target = new SymbolicVariableTerm("target", SmtValueKind.Int);
+        var initial = new SymbolicState(pathConditions: new[]
+        {
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    source,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("source"),
+                "test.source-positive"))
+        });
+        var operation = new SymbolicAssignmentOperation(
+            ImmutableArray.Create(new SymbolicAssignmentBinding(
+                "target",
+                target,
+                source,
+                PropagateSourceFacts: true)),
+            ImmutableArray<SymbolicCondition>.Empty,
+            SymbolicAssignmentOperationKind.Simple,
+            IsChecked: false,
+            new SymbolicOperationOrigin(default, 0, "test.snapshot"));
+
+        var transition = SymbolicOperationTransferKernel.Apply(
+            initial,
+            SymbolicOperationSequence.Single(operation));
+
+        Assert.That(transition.State.PathConditions.Any(condition =>
+            condition is SymbolicFactCondition
+            {
+                Fact.Atom: SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.GreaterThan,
+                    Left: SymbolicVariableTerm { Name: "target" }
+                }
+            }), Is.True);
+    }
+
     [TestCase(0, typeof(SymbolicAliasAtom))]
     [TestCase(1, typeof(SymbolicBorrowAtom))]
     [TestCase(2, typeof(SymbolicBorrowAtom))]

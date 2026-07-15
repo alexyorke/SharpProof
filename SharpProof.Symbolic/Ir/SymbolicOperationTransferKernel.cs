@@ -249,6 +249,43 @@ internal static class SymbolicOperationTransferKernel
         return builder.MoveToImmutable();
     }
 
+    internal static SymbolicState PropagateSourceFacts(
+        SymbolicState state,
+        SymbolicTerm source,
+        SymbolicTerm target)
+    {
+        if (!SymbolicStateFactBuilder.CanCompareIrTerms(source, target) ||
+            string.Equals(
+                SymbolicState.CreateProofTermKey(source),
+                SymbolicState.CreateProofTermKey(target),
+                StringComparison.Ordinal))
+            return state;
+
+        var facts = state.Facts;
+        var conditions = state.PathConditions;
+        foreach (var fact in facts)
+        {
+            var substituted = SymbolicIrSubstitution.ReplaceTerm(fact, source, target);
+            if (!string.Equals(
+                    SymbolicState.CreateProofFactKey(substituted),
+                    SymbolicState.CreateProofFactKey(fact),
+                    StringComparison.Ordinal))
+                state = state.AddFact(substituted);
+        }
+
+        foreach (var condition in conditions)
+        {
+            var substituted = SymbolicIrSubstitution.ReplaceTerm(condition, source, target);
+            if (!string.Equals(
+                    SymbolicState.CreateProofConditionKey(substituted),
+                    SymbolicState.CreateProofConditionKey(condition),
+                    StringComparison.Ordinal))
+                state = state.AddPathCondition(substituted);
+        }
+
+        return state;
+    }
+
     private static bool TryApplyBindings(
         ref SymbolicState state,
         ImmutableArray<SymbolicAssignmentBinding> bindings,
@@ -272,6 +309,8 @@ internal static class SymbolicOperationTransferKernel
                 origin.SourceSpan,
                 null,
                 binding.EvidenceKey)));
+            if (binding.PropagateSourceFacts)
+                state = PropagateSourceFacts(state, binding.Source, binding.Target);
         }
 
         return true;
