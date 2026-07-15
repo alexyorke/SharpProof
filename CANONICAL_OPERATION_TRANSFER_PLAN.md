@@ -124,7 +124,7 @@ transfer policy after its slice is complete.
 
 ## Phase 2 - Assignment, Aliasing, And Lifetime
 
-- [ ] Migrate local declarations and simple assignments; shadow-compare old and
+- [x] Migrate local declarations and simple assignments; shadow-compare old and
   new states, then delete the migrated legacy path.
 - [ ] Migrate compound assignments, increments/decrements, checked arithmetic,
   and coalesce assignment.
@@ -206,6 +206,7 @@ transfer policy after its slice is complete.
 | Canonical operation model | `97bb94e4` | 107,856 | +180 |
 | Simple-assignment shadow path | `4d970e1a` | 108,046 | +370 |
 | Symbolic and Analyzer adapters | `d545c69a` | 108,118 | +442 |
+| Scalar assignment migration | `01a36afd` | 108,209 | +533 |
 
 ## Validation Ledger
 
@@ -219,15 +220,16 @@ transfer policy after its slice is complete.
 | Phase 1 operation model | Commit `97bb94e4` adds typed descriptors for all nine event families and a normalized immutable transition envelope. Focused model tests: 3 passed, 0 failed, 0 skipped. The temporary +180 production LOC is migration scaffolding that must be repaid when legacy transfer paths are deleted. |
 | Phase 1 lowering bridge | Commit `4d970e1a` adds the single `IOperation` front-end and kernel dispatch. Local declaration and simple assignment states shadow-match the legacy path, including previous-value invalidation. Focused model tests: 5 passed, 0 failed, 0 skipped. Total temporary migration scaffolding is +370 production LOC. |
 | Phase 1 adapters and ordering | Commit `d545c69a` adds thin Symbolic and Analyzer adapters. The kernel rejects non-increasing event sequences conservatively and preserves evidence order. Focused model tests: 7 passed, 0 failed, 0 skipped. Total temporary migration scaffolding is +442 production LOC. |
+| Phase 2 scalar assignments | Commit `01a36afd` routes non-self-referential Boolean, integral, and enum declarations/assignments through the canonical kernel in Symbolic and Analyzer. The superseded scalar-equality branches were removed while reference and self-referential policy remains explicit. Focused affected fixtures: 299 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +533 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: Phase 1 foundations are complete: one event model, transition result,
-  `IOperation` front-end, kernel, consumer adapters, and ordering invariant.
-- Last confirmed fact: Symbolic and Analyzer adapters produce identical simple
-  assignment state, and reordered events become conservative `Unsupported`.
-- Next cheapest step: route local declarations and direct simple assignments
-  through the adapters, shadow-compare, then delete their migrated legacy code.
+- State: Phase 1 is complete and the first Phase 2 production slice is routed;
+  scalar declarations/assignments no longer use their old equality branches.
+- Last confirmed fact: 299 focused transfer/invariant/purity tests and all 487
+  MainSmtAnalyzer tests pass after the production routing change.
+- Next cheapest step: migrate compound assignment, increment/decrement, checked
+  arithmetic, and coalesce assignment through typed operation events.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
