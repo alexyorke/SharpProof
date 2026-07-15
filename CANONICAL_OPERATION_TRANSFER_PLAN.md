@@ -319,6 +319,7 @@ transfer policy after its slice is complete.
 | Resolved Dispose-matching finding | `502aa541` | 105,716 | -1,960 |
 | Resolved SMT canonicalization findings | `916d8a17` | 105,716 | -1,960 |
 | Resolved SMT division finding | `e51227f6` | 105,716 | -1,960 |
+| Intentional conditional-value readers | `eb8c6ae2` | 105,716 | -1,960 |
 
 ## Validation Ledger
 
@@ -426,6 +427,7 @@ transfer policy after its slice is complete.
 | Phase 6 resolved Dispose-matching finding | Commit `502aa541` removes a misclassified report item. `IsParameterlessDisposeInvocation` is the sole invocation matcher and is already shared by lifetime transfer and double-dispose diagnostics, including `DisposeAsync`. `IsDisposableResourceType` instead decides whether an object-creation type implements the disposable contracts and has one caller; merging type and invocation classification would conflate distinct Roslyn inputs. The 165-case lifetime/array/object/disposal gate includes explicit sync and async disposal scenarios and remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 resolved SMT canonicalization findings | Commit `916d8a17` removes two stale entries already addressed by `77a625d93`. General aliases and Boolean equivalences call one path-compressing `FindCanonical` over the shared `(Parent, Differs)` representation; the Boolean wrapper preserves accumulated negation through `Differs`. Both union paths also call the single ordinal `SelectCanonical` tie-breaker. Focused syntactic-classifier, SMT-service, ProofCore purity-proof, and expression-atom fixtures pass 135/135. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 resolved SMT division finding | Commit `e51227f6` removes a stale numeric-classifier entry already addressed by `bf2a878e`. `SmtIntegerArithmetic` owns signed floor and ceiling division with `BigInteger.DivRem`; both `long` overloads delegate directly through `BigInteger`, and the syntactic classifier only calls those shared operations. The focused 135-case syntactic/SMT/proof gate covering affine reasoning remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
+| Phase 6 intentional conditional-value readers | Commit `eb8c6ae2` removes a net-positive abstraction candidate. Four typed readers select a known conditional branch before recursing into integer, reference-null, string, or string-length semantics; a generic delegate helper adds more plumbing than it removes. Boolean conditionals are intentionally different: when the condition is unknown they fork both branches under `MaxConditionalBranchEvaluationDepth` and succeed only on agreement, preserving conservative proof behavior. The complete 135-case syntactic-classifier/SMT/proof gate remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 
 ## Current Checkpoint
 
@@ -459,11 +461,13 @@ transfer policy after its slice is complete.
   recognition remains a distinct object-creation eligibility check. General and
   Boolean SMT equivalences already share canonical finding and selection. Long
   floor/ceiling division already delegates to the BigInteger implementation.
-- Last confirmed fact: shared SMT canonicalization and affine division retain a
-  green 135-case syntactic/SMT/proof gate. Test LOC is 142,465; production LOC
-  is 105,716, or -1,960 from the rewrite start.
+  Typed conditional-value readers remain explicit because Boolean unknown-branch
+  evaluation has a distinct bounded-fork contract.
+- Last confirmed fact: all conditional and affine syntactic proof paths retain a
+  green 135-case gate. Test LOC is 142,465; production LOC is 105,716, or -1,960
+  from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, repeated conditional-formula known-value recursion across
-  numeric, reference, string, and Boolean classifier domains.
+  `POTENTIAL_DUPS.md`, repeated string-length interval fact application in the
+  reference/string classifier and the alias-fact merger.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
