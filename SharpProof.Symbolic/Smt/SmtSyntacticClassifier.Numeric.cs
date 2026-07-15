@@ -170,7 +170,7 @@ internal static partial class SmtSyntacticClassifier
 
             if (!TryGetAffineIntegerTerm(left, 0, out var leftTerm) ||
                 !TryGetAffineIntegerTerm(right, 0, out var rightTerm) ||
-                !TrySubtract(leftTerm, rightTerm, out var difference))
+                !SmtAffineIntegerTerm.TrySubtract(leftTerm, rightTerm, out var difference))
                 return false;
 
             return AddAffineIntegerComparisonFact(
@@ -181,7 +181,7 @@ internal static partial class SmtSyntacticClassifier
         }
 
         private bool AddAffineIntegerComparisonFact(
-            AffineIntegerTerm term,
+            SmtAffineIntegerTerm term,
             SmtBinaryOperator op,
             long constant,
             out bool hasContradiction)
@@ -413,11 +413,11 @@ internal static partial class SmtSyntacticClassifier
                     break;
                 case SmtBinaryOperator.GreaterThan:
                 case SmtBinaryOperator.LessThanOrEqual:
-                    value = FloorDiv(adjustedConstant, positiveScale);
+                    value = SmtIntegerArithmetic.FloorDivide(adjustedConstant, positiveScale);
                     break;
                 case SmtBinaryOperator.GreaterThanOrEqual:
                 case SmtBinaryOperator.LessThan:
-                    value = CeilingDiv(adjustedConstant, positiveScale);
+                    value = SmtIntegerArithmetic.CeilingDivide(adjustedConstant, positiveScale);
                     break;
                 default:
                     return false;
@@ -429,270 +429,20 @@ internal static partial class SmtSyntacticClassifier
             return true;
         }
 
-        private static BigInteger FloorDiv(BigInteger dividend, BigInteger positiveDivisor)
-        {
-            var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
-            return remainder != 0 && dividend.Sign < 0
-                ? quotient - BigInteger.One
-                : quotient;
-        }
-
-        private static BigInteger CeilingDiv(BigInteger dividend, BigInteger positiveDivisor)
-        {
-            var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
-            return remainder != 0 && dividend.Sign > 0
-                ? quotient + BigInteger.One
-                : quotient;
-        }
-
         private bool TryGetAffineIntegerTerm(
             SmtFormula formula,
             int depth,
-            out AffineIntegerTerm affine)
+            out SmtAffineIntegerTerm affine)
         {
-            formula = NormalizeAliases(formula);
-            if (depth > MaxAffineExpansionDepth) return TryCreateUnitAffineTerm(formula, out affine);
-
-            switch (formula)
-            {
-                case SmtIntegerConstant constant:
-                    affine = AffineIntegerTerm.Constant(constant.Value);
-                    return true;
-                case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unary
-                    when TryGetAffineIntegerTerm(unary.Operand, depth + 1, out var operand) &&
-                         TryNegate(operand, out affine):
-                    return true;
-                case SmtIntegerBinaryTerm binary:
-                    return TryGetAffineIntegerBinaryTerm(binary, depth, out affine) ||
-                           TryCreateUnitAffineTerm(formula, out affine);
-                default:
-                    return TryCreateUnitAffineTerm(formula, out affine);
-            }
+            return SmtAffineIntegerTerm.TryCreate(
+                formula,
+                MaxAffineExpansionDepth - depth,
+                NormalizeAliases,
+                TryGetKnownInteger,
+                false,
+                static candidate => candidate.Kind == SmtValueKind.Int,
+                out affine);
         }
 
-        private bool TryGetAffineIntegerBinaryTerm(
-            SmtIntegerBinaryTerm binary,
-            int depth,
-            out AffineIntegerTerm affine)
-        {
-            affine = default;
-            if (binary.Operator == SmtIntegerBinaryOperator.Multiply)
-            {
-                if (TryGetKnownInteger(binary.Left, out var leftConstant) &&
-                    TryGetAffineIntegerTerm(binary.Right, depth + 1, out var rightAffine))
-                    return TryScale(rightAffine, leftConstant, out affine);
-
-                if (TryGetKnownInteger(binary.Right, out var rightConstant) &&
-                    TryGetAffineIntegerTerm(binary.Left, depth + 1, out var leftAffine))
-                    return TryScale(leftAffine, rightConstant, out affine);
-
-                return false;
-            }
-
-            if (binary.Operator is not (SmtIntegerBinaryOperator.Add or SmtIntegerBinaryOperator.Subtract) ||
-                !TryGetAffineIntegerTerm(binary.Left, depth + 1, out var left) ||
-                !TryGetAffineIntegerTerm(binary.Right, depth + 1, out var right))
-                return false;
-
-            return binary.Operator == SmtIntegerBinaryOperator.Add
-                ? TryAdd(left, right, out affine)
-                : TrySubtract(left, right, out affine);
-        }
-
-        private static bool TryCreateUnitAffineTerm(SmtFormula formula, out AffineIntegerTerm affine)
-        {
-            if (formula.Kind != SmtValueKind.Int)
-            {
-                affine = default;
-                return false;
-            }
-
-            affine = AffineIntegerTerm.Term(formula);
-            return true;
-        }
-
-        private static bool TryAdd(
-            AffineIntegerTerm left,
-            AffineIntegerTerm right,
-            out AffineIntegerTerm result)
-        {
-            return TryCombine(left, right, false, out result);
-        }
-
-        private static bool TrySubtract(
-            AffineIntegerTerm left,
-            AffineIntegerTerm right,
-            out AffineIntegerTerm result)
-        {
-            return TryCombine(left, right, true, out result);
-        }
-
-        private static bool TryCombine(
-            AffineIntegerTerm left,
-            AffineIntegerTerm right,
-            bool subtractRight,
-            out AffineIntegerTerm result)
-        {
-            result = default;
-            var rightScale = right.Scale;
-            var rightOffset = right.Offset;
-            if (subtractRight &&
-                (!TryNegate(rightScale, out rightScale) ||
-                 !TryNegate(rightOffset, out rightOffset)))
-                return false;
-
-            try
-            {
-                checked
-                {
-                    if (left.BaseTerm == null &&
-                        right.BaseTerm == null)
-                    {
-                        result = AffineIntegerTerm.Constant(left.Offset + rightOffset);
-                        return true;
-                    }
-
-                    if (left.BaseTerm == null)
-                    {
-                        var offset = left.Offset + rightOffset;
-                        result = rightScale == 0
-                            ? AffineIntegerTerm.Constant(offset)
-                            : new AffineIntegerTerm(right.BaseTerm, rightScale, offset);
-                        return true;
-                    }
-
-                    if (right.BaseTerm == null)
-                    {
-                        var offset = left.Offset + rightOffset;
-                        result = left.Scale == 0
-                            ? AffineIntegerTerm.Constant(offset)
-                            : new AffineIntegerTerm(left.BaseTerm, left.Scale, offset);
-                        return true;
-                    }
-
-                    if (!left.BaseTerm.Equals(right.BaseTerm)) return false;
-
-                    var scale = left.Scale + rightScale;
-                    var combinedOffset = left.Offset + rightOffset;
-                    result = scale == 0
-                        ? AffineIntegerTerm.Constant(combinedOffset)
-                        : new AffineIntegerTerm(left.BaseTerm, scale, combinedOffset);
-                    return true;
-                }
-            }
-            catch (OverflowException)
-            {
-                return false;
-            }
-        }
-
-        private static bool TryScale(
-            AffineIntegerTerm value,
-            long scale,
-            out AffineIntegerTerm result)
-        {
-            result = default;
-            try
-            {
-                checked
-                {
-                    var scaledScale = value.Scale * scale;
-                    var scaledOffset = value.Offset * scale;
-                    result = value.BaseTerm == null || scaledScale == 0
-                        ? AffineIntegerTerm.Constant(scaledOffset)
-                        : new AffineIntegerTerm(value.BaseTerm, scaledScale, scaledOffset);
-                    return true;
-                }
-            }
-            catch (OverflowException)
-            {
-                return false;
-            }
-        }
-
-        private static bool TryNegate(AffineIntegerTerm value, out AffineIntegerTerm result)
-        {
-            result = default;
-            if (!TryNegate(value.Scale, out var scale) ||
-                !TryNegate(value.Offset, out var offset))
-                return false;
-
-            result = value.BaseTerm == null || scale == 0
-                ? AffineIntegerTerm.Constant(offset)
-                : new AffineIntegerTerm(value.BaseTerm, scale, offset);
-            return true;
-        }
-
-        private static bool TrySubtract(long left, long right, out long result)
-        {
-            try
-            {
-                checked
-                {
-                    result = left - right;
-                }
-
-                return true;
-            }
-            catch (OverflowException)
-            {
-                result = default;
-                return false;
-            }
-        }
-
-        private static bool TryNegate(long value, out long result)
-        {
-            if (value == long.MinValue)
-            {
-                result = default;
-                return false;
-            }
-
-            result = -value;
-            return true;
-        }
-
-        private static long FloorDiv(long dividend, long positiveDivisor)
-        {
-            var quotient = dividend / positiveDivisor;
-            var remainder = dividend % positiveDivisor;
-            return remainder != 0 && dividend < 0
-                ? quotient - 1
-                : quotient;
-        }
-
-        private static long CeilingDiv(long dividend, long positiveDivisor)
-        {
-            var quotient = dividend / positiveDivisor;
-            var remainder = dividend % positiveDivisor;
-            return remainder != 0 && dividend > 0
-                ? quotient + 1
-                : quotient;
-        }
-
-        private readonly struct AffineIntegerTerm
-        {
-            internal AffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
-            {
-                BaseTerm = scale == 0 ? null : baseTerm;
-                Scale = BaseTerm == null ? 0 : scale;
-                Offset = offset;
-            }
-
-            internal SmtFormula? BaseTerm { get; }
-            internal long Scale { get; }
-            internal long Offset { get; }
-
-            internal static AffineIntegerTerm Constant(long value)
-            {
-                return new AffineIntegerTerm(null, 0, value);
-            }
-
-            internal static AffineIntegerTerm Term(SmtFormula term)
-            {
-                return new AffineIntegerTerm(term, 1, 0);
-            }
-        }
     }
 }

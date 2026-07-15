@@ -157,6 +157,48 @@ public sealed class SmtSyntacticClassifierTests
     }
 
     [Test]
+    public void AffineIntegerTerm_SharedParserPreservesScaleAndOffset()
+    {
+        var value = new SmtVariable("value", SmtValueKind.Int);
+        var formula = new SmtIntegerBinaryTerm(
+            SmtIntegerBinaryOperator.Subtract,
+            new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Multiply,
+                new SmtIntegerConstant(2),
+                value),
+            new SmtIntegerConstant(3));
+
+        static bool ResolveConstant(SmtFormula candidate, out long constant)
+        {
+            if (candidate is SmtIntegerConstant integer)
+            {
+                constant = integer.Value;
+                return true;
+            }
+
+            constant = default;
+            return false;
+        }
+
+        Assert.That(
+            SmtAffineIntegerTerm.TryCreate(
+                formula,
+                8,
+                static candidate => candidate,
+                ResolveConstant,
+                false,
+                static candidate => candidate is SmtVariable { Kind: SmtValueKind.Int },
+                out var affine),
+            Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(affine.BaseTerm, Is.EqualTo(value));
+            Assert.That(affine.Scale, Is.EqualTo(2));
+            Assert.That(affine.Offset, Is.EqualTo(-3));
+        });
+    }
+
+    [Test]
     public void IntegerInterval_IntersectionPreservesBoundsAndExclusions()
     {
         var interval = SmtIntegerInterval.Unbounded

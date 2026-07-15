@@ -337,7 +337,7 @@ internal static partial class SmtSyntacticClassifier
                 !TryGetAffineIntegerTerm(rightFormula, 0, out var right))
                 return false;
 
-            if (TrySubtract(left, right, out var difference))
+            if (SmtAffineIntegerTerm.TrySubtract(left, right, out var difference))
             {
                 if (difference.BaseTerm == null)
                 {
@@ -365,8 +365,8 @@ internal static partial class SmtSyntacticClassifier
         }
 
         private bool TryAddUnitAffineAlias(
-            AffineIntegerTerm left,
-            AffineIntegerTerm right,
+            SmtAffineIntegerTerm left,
+            SmtAffineIntegerTerm right,
             out bool hasContradiction)
         {
             hasContradiction = false;
@@ -388,25 +388,25 @@ internal static partial class SmtSyntacticClassifier
             {
                 alias = right.BaseTerm;
                 baseTerm = left.BaseTerm;
-                if (!TrySubtract(left.Offset, right.Offset, out offset)) return false;
+                if (!SmtIntegerArithmetic.TrySubtract(left.Offset, right.Offset, out offset)) return false;
             }
             else if (rightHasInterval && !leftHasInterval)
             {
                 alias = left.BaseTerm;
                 baseTerm = right.BaseTerm;
-                if (!TrySubtract(right.Offset, left.Offset, out offset)) return false;
+                if (!SmtIntegerArithmetic.TrySubtract(right.Offset, left.Offset, out offset)) return false;
             }
             else if (string.CompareOrdinal(left.BaseTerm.ToString(), right.BaseTerm.ToString()) <= 0)
             {
                 alias = right.BaseTerm;
                 baseTerm = left.BaseTerm;
-                if (!TrySubtract(left.Offset, right.Offset, out offset)) return false;
+                if (!SmtIntegerArithmetic.TrySubtract(left.Offset, right.Offset, out offset)) return false;
             }
             else
             {
                 alias = left.BaseTerm;
                 baseTerm = right.BaseTerm;
-                if (!TrySubtract(right.Offset, left.Offset, out offset)) return false;
+                if (!SmtIntegerArithmetic.TrySubtract(right.Offset, left.Offset, out offset)) return false;
             }
 
             var replacement = CreateOffsetTerm(baseTerm, offset);
@@ -431,7 +431,7 @@ internal static partial class SmtSyntacticClassifier
         }
 
         private static bool TrySolveSingleAffineEquality(
-            AffineIntegerTerm difference,
+            SmtAffineIntegerTerm difference,
             out SmtFormula term,
             out long constant,
             out bool hasContradiction)
@@ -455,7 +455,7 @@ internal static partial class SmtSyntacticClassifier
                 }
 
                 var quotient = difference.Offset / difference.Scale;
-                if (!TryNegate(quotient, out constant)) return false;
+                if (!SmtIntegerArithmetic.TryNegate(quotient, out constant)) return false;
 
                 term = difference.BaseTerm;
                 return true;
@@ -476,7 +476,7 @@ internal static partial class SmtSyntacticClassifier
                     new SmtIntegerConstant(offset));
         }
 
-        private static SmtFormula CreateAffineTerm(AffineIntegerTerm term)
+        private static SmtFormula CreateAffineTerm(SmtAffineIntegerTerm term)
         {
             if (term.BaseTerm == null ||
                 term.Scale == 0)

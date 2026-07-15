@@ -371,136 +371,28 @@ internal sealed class SmtConcreteFactPreprocessor
         out long coefficient,
         out long constant)
     {
-        variable = null;
-        coefficient = 0;
-        constant = 0;
+        bool ResolveConstant(SmtFormula candidate, out long value) =>
+            TryEvaluateInteger(candidate, facts, out value);
 
-        if (TryEvaluateInteger(formula, facts, out var concrete))
+        if (!SmtAffineIntegerTerm.TryCreate(
+                formula,
+                int.MaxValue,
+                static candidate => candidate,
+                ResolveConstant,
+                true,
+                static candidate => candidate is SmtVariable { Kind: SmtValueKind.Int },
+                out var affine))
         {
-            constant = concrete;
-            return true;
-        }
-
-        switch (formula)
-        {
-            case SmtVariable { Kind: SmtValueKind.Int }:
-                variable = formula;
-                coefficient = 1;
-                return true;
-            case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unaryTerm:
-                if (!TryGetAffineTerm(unaryTerm.Operand, facts, out variable, out coefficient, out constant) ||
-                    !TryCheckedNegate(coefficient, out coefficient) ||
-                    !TryCheckedNegate(constant, out constant))
-                    return false;
-
-                return true;
-            case SmtIntegerBinaryTerm binaryTerm:
-                return TryGetAffineTerm(binaryTerm, facts, out variable, out coefficient, out constant);
-            default:
-                return false;
-        }
-    }
-
-    private static bool TryGetAffineTerm(
-        SmtIntegerBinaryTerm term,
-        ConcreteFactContext facts,
-        out SmtFormula? variable,
-        out long coefficient,
-        out long constant)
-    {
-        variable = null;
-        coefficient = 0;
-        constant = 0;
-
-        if (term.Operator is SmtIntegerBinaryOperator.Add or SmtIntegerBinaryOperator.Subtract)
-        {
-            if (!TryGetAffineTerm(term.Left, facts, out var leftVariable, out var leftCoefficient,
-                    out var leftConstant) ||
-                !TryGetAffineTerm(term.Right, facts, out var rightVariable, out var rightCoefficient,
-                    out var rightConstant))
-                return false;
-
-            if (term.Operator == SmtIntegerBinaryOperator.Subtract)
-                if (!TryCheckedNegate(rightCoefficient, out rightCoefficient) ||
-                    !TryCheckedNegate(rightConstant, out rightConstant))
-                    return false;
-
-            if (leftVariable is not null &&
-                rightVariable is not null &&
-                !EqualityComparer<SmtFormula>.Default.Equals(leftVariable, rightVariable))
-                return false;
-
-            variable = leftVariable ?? rightVariable;
-            return TryCheckedAdd(leftCoefficient, rightCoefficient, out coefficient) &&
-                   TryCheckedAdd(leftConstant, rightConstant, out constant);
-        }
-
-        if (term.Operator == SmtIntegerBinaryOperator.Multiply)
-        {
-            if (TryEvaluateInteger(term.Left, facts, out var leftConstant) &&
-                TryGetAffineTerm(term.Right, facts, out variable, out coefficient, out constant))
-                return TryCheckedMultiply(coefficient, leftConstant, out coefficient) &&
-                       TryCheckedMultiply(constant, leftConstant, out constant);
-
-            if (TryEvaluateInteger(term.Right, facts, out var rightConstant) &&
-                TryGetAffineTerm(term.Left, facts, out variable, out coefficient, out constant))
-                return TryCheckedMultiply(coefficient, rightConstant, out coefficient) &&
-                       TryCheckedMultiply(constant, rightConstant, out constant);
-        }
-
-        return false;
-    }
-
-    private static bool TryCheckedAdd(long left, long right, out long value)
-    {
-        return TryCheckedBinary(left, right, static (first, second) => checked(first + second), out value);
-    }
-
-    private static bool TryCheckedSubtract(long left, long right, out long value)
-    {
-        return TryCheckedBinary(left, right, static (first, second) => checked(first - second), out value);
-    }
-
-    private static bool TryCheckedMultiply(long left, long right, out long value)
-    {
-        return TryCheckedBinary(left, right, static (first, second) => checked(first * second), out value);
-    }
-
-    private static bool TryCheckedNegate(long operand, out long value)
-    {
-        return TryCheckedUnary(operand, static item => checked(-item), out value);
-    }
-
-    private static bool TryCheckedBinary(
-        long left,
-        long right,
-        Func<long, long, long> operation,
-        out long value)
-    {
-        try
-        {
-            value = operation(left, right);
-            return true;
-        }
-        catch (OverflowException)
-        {
-            value = default;
+            variable = null;
+            coefficient = 0;
+            constant = 0;
             return false;
         }
-    }
 
-    private static bool TryCheckedUnary(long operand, Func<long, long> operation, out long value)
-    {
-        try
-        {
-            value = operation(operand);
-            return true;
-        }
-        catch (OverflowException)
-        {
-            value = default;
-            return false;
-        }
+        variable = affine.BaseTerm;
+        coefficient = affine.Scale;
+        constant = affine.Offset;
+        return true;
     }
 
     private static bool TryNormalizeIntegerComparisonToConstant(
@@ -668,14 +560,14 @@ internal sealed class SmtConcreteFactPreprocessor
 
                 if (operandUpper.HasValue)
                 {
-                    if (!TryCheckedNegate(operandUpper.Value, out var negatedUpper)) break;
+                    if (!SmtIntegerArithmetic.TryNegate(operandUpper.Value, out var negatedUpper)) break;
 
                     structuralLower = negatedUpper;
                 }
 
                 if (operandLower.HasValue)
                 {
-                    if (!TryCheckedNegate(operandLower.Value, out var negatedLower)) break;
+                    if (!SmtIntegerArithmetic.TryNegate(operandLower.Value, out var negatedLower)) break;
 
                     structuralUpper = negatedLower;
                 }
@@ -727,8 +619,8 @@ internal sealed class SmtConcreteFactPreprocessor
                 !TryGetStringLengthInterval(concat.Right, facts, out var rightLower, out var rightUpper))
                 return false;
 
-            return TryCombineBounds(leftLower, rightLower, TryCheckedAdd, out lower) &&
-                   TryCombineBounds(leftUpper, rightUpper, TryCheckedAdd, out upper);
+            return TryCombineBounds(leftLower, rightLower, SmtIntegerArithmetic.TryAdd, out lower) &&
+                   TryCombineBounds(leftUpper, rightUpper, SmtIntegerArithmetic.TryAdd, out upper);
         }
 
         return value.Kind == SmtValueKind.String;
@@ -749,11 +641,11 @@ internal sealed class SmtConcreteFactPreprocessor
         switch (term.Operator)
         {
             case SmtIntegerBinaryOperator.Add:
-                return TryCombineBounds(leftLower, rightLower, TryCheckedAdd, out lower) &&
-                       TryCombineBounds(leftUpper, rightUpper, TryCheckedAdd, out upper);
+                return TryCombineBounds(leftLower, rightLower, SmtIntegerArithmetic.TryAdd, out lower) &&
+                       TryCombineBounds(leftUpper, rightUpper, SmtIntegerArithmetic.TryAdd, out upper);
             case SmtIntegerBinaryOperator.Subtract:
-                return TryCombineBounds(leftLower, rightUpper, TryCheckedSubtract, out lower) &&
-                       TryCombineBounds(leftUpper, rightLower, TryCheckedSubtract, out upper);
+                return TryCombineBounds(leftLower, rightUpper, SmtIntegerArithmetic.TrySubtract, out lower) &&
+                       TryCombineBounds(leftUpper, rightLower, SmtIntegerArithmetic.TrySubtract, out upper);
             case SmtIntegerBinaryOperator.Multiply:
                 if (TryEvaluateInteger(term.Left, facts, out var leftConstant))
                     return TryScaleBounds(rightLower, rightUpper, leftConstant, out lower, out upper);
@@ -767,7 +659,7 @@ internal sealed class SmtConcreteFactPreprocessor
 
                 lower = 0;
                 if (rightUpper.HasValue &&
-                    TryCheckedAdd(rightUpper.Value, -1, out var remainderUpper))
+                    SmtIntegerArithmetic.TryAdd(rightUpper.Value, -1, out var remainderUpper))
                     upper = remainderUpper;
 
                 return true;
@@ -827,7 +719,7 @@ internal sealed class SmtConcreteFactPreprocessor
         scaled = null;
         if (!bound.HasValue) return true;
 
-        if (!TryCheckedMultiply(bound.Value, multiplier, out var scaledValue)) return false;
+        if (!SmtIntegerArithmetic.TryMultiply(bound.Value, multiplier, out var scaledValue)) return false;
 
         scaled = scaledValue;
         return true;
