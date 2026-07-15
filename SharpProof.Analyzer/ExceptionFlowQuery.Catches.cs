@@ -119,8 +119,4 @@ internal static partial class ExceptionFlowQuery
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
-    private static bool IsRethrow(SyntaxNode throwNode)
-    {
-        return throwNode is ThrowStatementSyntax statement && statement.Expression == null;
-    }
 }

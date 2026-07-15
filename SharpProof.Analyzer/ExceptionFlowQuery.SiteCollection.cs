@@ -33,39 +33,38 @@ internal static partial class ExceptionFlowQuery
             cancellationToken,
             methodSymbol,
             smtAnalysis);
+        var provenRuntimeHazards = CollectProvenRuntimeHazards(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            SymbolicRuntimeHazardKind.DirectThrow,
+            SymbolicRuntimeHazardKind.Rethrow,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicRuntimeHazardKind.DivideByZero,
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
+            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            SymbolicRuntimeHazardKind.UnboxNull,
+            SymbolicRuntimeHazardKind.InvalidCast,
+            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
+            SymbolicRuntimeHazardKind.ArgumentNull,
+            SymbolicRuntimeHazardKind.DynamicNullBinding,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
+            SymbolicRuntimeHazardKind.IndexOutOfRange,
+            SymbolicRuntimeHazardKind.NullDereference).ToArray();
 
-        foreach (var throwNode in ExceptionSiteClassifier.GetThrowNodes(methodNode))
-        {
-            if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken, smtAnalysis)) continue;
-
-            if (IsShadowedByThrowingFinally(throwNode, semanticModel, cancellationToken, smtAnalysis)) continue;
-
-            var isDefinitelyThrowNull = ExceptionSiteClassifier.IsDefinitelyThrowNull(
-                throwNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis);
-            var exceptionType = isDefinitelyThrowNull
-                ? semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException)
-                : ExceptionSiteClassifier.GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
-            if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken,
-                    smtAnalysis)) continue;
-
-            yield return new UncaughtExceptionSiteEntry(
-                throwNode,
-                methodSymbol,
-                new ExceptionCandidate(
-                    exceptionType,
-                    isDefinitelyThrowNull
-                        ? ExceptionTypes.NullReferenceException
-                        : exceptionType?.ToDisplayString(ExceptionTypeDisplayFormat) ?? ExceptionTypes.Unknown,
-                    isDefinitelyThrowNull
-                        ? ExceptionCategories.DefiniteThrowNull
-                        : IsRethrow(throwNode)
-                            ? ExceptionCategories.Rethrow
-                            : ExceptionCategories.DirectThrow,
-                    ExceptionSources.Throw));
-        }
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind is SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
+                     static hazard => hazard.ExceptionType,
+                     static hazard => hazard.Category,
+                     static _ => ExceptionSources.Throw,
+                     siteContext))
+            yield return entry;
 
         foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel,
                      cancellationToken))
@@ -109,27 +108,6 @@ internal static partial class ExceptionFlowQuery
                     calleeDisplay);
             }
         }
-
-        var provenRuntimeHazards = CollectProvenRuntimeHazards(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            SymbolicRuntimeHazardKind.DivideByZero,
-            SymbolicRuntimeHazardKind.NegativeArrayLength,
-            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
-            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-            SymbolicRuntimeHazardKind.UnboxNull,
-            SymbolicRuntimeHazardKind.InvalidCast,
-            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
-            SymbolicRuntimeHazardKind.ArgumentNull,
-            SymbolicRuntimeHazardKind.DynamicNullBinding,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
-            SymbolicRuntimeHazardKind.IndexOutOfRange,
-            SymbolicRuntimeHazardKind.NullDereference).ToArray();
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazards.Where(static hazard =>
