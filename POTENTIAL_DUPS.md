@@ -153,11 +153,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## Analyzer Engine - A-H
 
-### 5. Repeated base-type instance-method enumeration - `DisposalMemberClassifier.cs:25-31`, `EnumeratorRuntimeMemberClassifier.cs:133-138`, `DispatchedMemberResolution.cs:35-42,61-68`
-Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Recommendation:** Sibling helper `EnumerateBaseTypeInstanceMethods`.
-
----
-
 ## Analyzer Engine - I-P
 
 ### Repeated "create term + add fresh-ownership facts" boilerplate - `PurityResourceStateFacts.cs:366,384,407`

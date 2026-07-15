@@ -78,6 +78,14 @@ internal static class TypeHierarchyEnumeration
             yield return current;
     }
 
+    internal static IEnumerable<TSymbol> EnumerateBaseTypeMembers<TSymbol>(
+        ITypeSymbol type,
+        string memberName)
+        where TSymbol : class, ISymbol
+    {
+        return EnumerateBaseTypes(type).SelectMany(current => current.GetMembers(memberName).OfType<TSymbol>());
+    }
+
     internal static bool IsSameOrDerivedFrom(
         ITypeSymbol candidate,
         ITypeSymbol expectedBase,

@@ -30,14 +30,13 @@ internal static class DispatchedMemberResolution
             return receiverType.FindImplementationForInterfaceMember(methodSymbol) as IMethodSymbol;
 
         var rootMethod = GetRootOverriddenMethod(methodSymbol);
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(receiverType))
-            foreach (var member in current.GetMembers(rootMethod.Name))
-                if (member is IMethodSymbol candidate &&
-                    candidate.Parameters.Length == rootMethod.Parameters.Length &&
-                    (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition,
-                         rootMethod.OriginalDefinition) ||
-                     TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(candidate, rootMethod)))
-                    return candidate.OriginalDefinition;
+        foreach (var candidate in TypeHierarchyEnumeration.EnumerateBaseTypeMembers<IMethodSymbol>(
+                     receiverType,
+                     rootMethod.Name))
+            if (candidate.Parameters.Length == rootMethod.Parameters.Length &&
+                (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootMethod.OriginalDefinition) ||
+                 TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(candidate, rootMethod)))
+                return candidate.OriginalDefinition;
 
         return methodSymbol.IsAbstract ? null : methodSymbol.OriginalDefinition;
     }

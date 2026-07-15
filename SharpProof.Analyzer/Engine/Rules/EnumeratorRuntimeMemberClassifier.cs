@@ -130,20 +130,16 @@ internal static class EnumeratorRuntimeMemberClassifier
         string methodName,
         int parameterCount)
     {
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
-            foreach (var method in current
-                         .GetMembers(methodName)
-                         .OfType<IMethodSymbol>()
-                         .Where(method => !method.IsStatic && method.Parameters.Length == parameterCount))
-                yield return method;
+        return TypeHierarchyEnumeration
+            .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
+            .Where(method => !method.IsStatic && method.Parameters.Length == parameterCount);
     }
 
     private static IEnumerable<IMethodSymbol> EnumerateCurrentGetters(ITypeSymbol type)
     {
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
-            foreach (var property in current.GetMembers("Current").OfType<IPropertySymbol>())
-                if (property.GetMethod is { } getter)
-                    yield return getter;
+        foreach (var property in TypeHierarchyEnumeration.EnumerateBaseTypeMembers<IPropertySymbol>(type, "Current"))
+            if (property.GetMethod is { } getter)
+                yield return getter;
     }
 
     private static bool IsGetAsyncEnumeratorPatternMethod(IMethodSymbol method)

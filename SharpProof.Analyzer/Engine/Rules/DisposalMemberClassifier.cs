@@ -22,13 +22,11 @@ internal static class DisposalMemberClassifier
         var methodName = async ? "DisposeAsync" : "Dispose";
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
-            foreach (var method in current
-                         .GetMembers(methodName)
-                         .OfType<IMethodSymbol>()
-                         .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
-                if (seen.Add(method.OriginalDefinition))
-                    yield return method;
+        foreach (var method in TypeHierarchyEnumeration
+                     .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
+                     .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
+            if (seen.Add(method.OriginalDefinition))
+                yield return method;
 
         if (type is not INamedTypeSymbol namedType) yield break;
 
@@ -64,15 +62,10 @@ internal static class DisposalMemberClassifier
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
+        foreach (var candidate in TypeHierarchyEnumeration.EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName))
         {
-            var method = current.GetMembers(methodName)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(candidate =>
-                    !candidate.IsStatic &&
-                    candidate.Parameters.Length == 0 &&
-                    (async || candidate.ReturnsVoid));
-            if (method != null) return method;
+            if (!candidate.IsStatic && candidate.Parameters.Length == 0 && (async || candidate.ReturnsVoid))
+                return candidate;
         }
 
         return null;
