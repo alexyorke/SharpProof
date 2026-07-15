@@ -82,11 +82,11 @@ internal static partial class ExceptionPathStateService
     {
         foreach (var statement in block.Statements)
         {
-            var statementState = GetStatementEntryPathState(
-                pathState,
+            var statementState = SymbolicReachabilityService.CollectPathStateAt(
                 statement,
                 semanticModel,
-                cancellationToken);
+                cancellationToken,
+                pathState);
             if (StatementExitIsProven(statement, statementState, semanticModel, cancellationToken, smtAnalysis))
                 return true;
 
@@ -141,39 +141,6 @@ internal static partial class ExceptionPathStateService
                              smtAnalysis);
 
         return trueExits && falseExits && (trueReachable || falseReachable);
-    }
-
-    private static SymbolicState GetStatementEntryPathState(
-        SymbolicState baseState,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicReachabilityService.CollectPathStateAt(
-            statement,
-            semanticModel,
-            cancellationToken,
-            baseState);
-    }
-
-    private static bool AnyConditionSymbolMutatedInStatement(
-        ExpressionSyntax condition,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var conditionSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-            condition,
-            semanticModel,
-            cancellationToken);
-        if (conditionSymbols.Count == 0) return false;
-
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
-            foreach (var symbol in conditionSymbols)
-                if (SymbolMutationFacts.MutatesSymbol(node, symbol, semanticModel, cancellationToken))
-                    return true;
-
-        return false;
     }
 
 }
