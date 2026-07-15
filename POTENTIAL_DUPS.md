@@ -117,9 +117,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - Baseline / Corpus / Vsix
 
-### Input-to-SARIF resolution + temp-file cleanup duplicated - `SharpProof.Baseline/Program.cs:87-111` vs `SharpProof.CorpusReport/Program.cs:27-56`
-**Recommendation:** `ResolveSarifInputsAsync(IEnumerable<string>, List<string> tempFiles)` in `SharpProof.Tools.Shared`.
-
 ### Duplicated key/comparer for `Id`/`Symbol`/`Path` - `SharpProofBaseline.cs:222-245` vs `:605-663`
 Same `hash = hash*397 ^ ...` for Id/Symbol/Path. **Recommendation:** Reusable `IdentityKey` + comparer; `BaselineKey` composes it.
 
