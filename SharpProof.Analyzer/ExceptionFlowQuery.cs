@@ -6,11 +6,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowQuery
 {
-    private static readonly SymbolDisplayFormat ExceptionTypeDisplayFormat = new(
-        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-
     internal static MethodExceptionQueryResult AnalyzeMethod(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
