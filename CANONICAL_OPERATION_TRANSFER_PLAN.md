@@ -177,13 +177,15 @@ transfer policy after its slice is complete.
 
 ## Phase 6 - Secondary Large Reductions
 
-- [ ] Convert EffectSummary wrapper policy to ordered typed structural rules;
+- [x] Convert EffectSummary wrapper policy to ordered typed structural rules;
   preserve unresolved-external versus resolved-implementation semantics.
   - [x] Replace generated-purity exact/prefix predicate fan-out with ordered
     typed visibility rules while retaining the one structural enumerator
     predicate.
   - [x] Make one typed call-family table own semantic-wrapper exact/prefix
     allowlists and shared call membership.
+  - [x] Match Type and RuntimeType wrapper properties by structural identity,
+    merging the duplicate Boolean/value shape without broadening call sites.
 - [ ] Project CLI full/compact/invariant/explain/SARIF formats directly from the
   canonical query graph while preserving serialized bytes.
 - [ ] Run a bounded primary-constructor conversion over internal data carriers,
@@ -276,6 +278,7 @@ transfer policy after its slice is complete.
 | Residual Analyzer transfer deletion and Phase 5 gate | `93d0289b` | 106,111 | -1,565 |
 | Declarative generated-purity policy | `66115c5c` | 106,003 | -1,673 |
 | Typed semantic-wrapper call policy | `015ebf6e` | 105,996 | -1,680 |
+| Structural Type wrapper policy and EffectSummary gate | `d93a65d8` | 105,995 | -1,681 |
 
 ## Validation Ledger
 
@@ -352,18 +355,20 @@ transfer policy after its slice is complete.
 | Phase 5 residual Analyzer transfer deletion and gate | Commit `93d0289b` routes switch evaluation alias/selection conditions through canonical branch-assumption transitions and makes invalidation descriptors own definition-version updates. Exact mutation search finds no Analyzer live-transfer call to `AddFact`, `AddPathCondition`, `RemoveFacts`, or `WithSymbolVersion`; remaining state construction is limited to contract entry, Ensures snapshots, empty queries, and container defaults. Analyzer runtime-hazard code queries and compatibility-projects canonical descriptors without reconstructing triggers. Release Analyzer build: zero warnings; focused transfer/switch tests: 53 passed; diagnostic/evidence fixtures: 371 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Phase 5 closes at 106,111 production LOC, or -1,565 from the rewrite start. The 17-line increase from the prior checkpoint centralizes correctness-sensitive version ownership and is retained for the later legacy-engine deletions. |
 | Phase 6 declarative generated-purity policy | Commit `66115c5c` replaces 24 one-off generated-purity predicate methods with three ordered visibility rules over exact symbols, prefixes, and the retained immutable-hash-set enumerator predicate. The resolved-summary and unresolved-external entry points remain separate and consume the same table without changing their conservative fallback. Literal inventory accounts for all 153 former `System.*` patterns: 152 live in the table and the remaining containing-type prefix is owned by the structural enumerator predicate. Release EffectSummary build: zero warnings; focused runtime/string/type/cross-assembly/unresolved tests: 12 passed; full Tooling lane: 585 passed. Production LOC fell by 108 lines to 106,003, or -1,673 from the rewrite start. |
 | Phase 6 typed semantic-wrapper call policy | Commit `015ebf6e` moves 70 distinct semantic-wrapper call patterns into one typed family/match-kind table, with composition retained for string-span, allocation, argument-guard, and scratch-buffer policies. Literal parity finds no former call pattern missing. The unresolved-external/resolved-summary entry points are unchanged. Release EffectSummary build: zero warnings; focused wrapper/boundary tests: 12 passed; full Tooling lane: 585 passed. The correctness centralization is also net-negative, bringing production LOC to 105,996, or -1,680 from the rewrite start. |
+| Phase 6 structural Type wrapper policy and gate | Commit `d93a65d8` merges the duplicate Type Boolean/value wrapper classifiers and matches Type/RuntimeType parameterless properties through containing metadata type, method kind, arity, parameters, return type, typed call-site shape, and dynamic-dispatch evidence. The ordered semantic-wrapper table and typed call-family table now own wrapper policy; remaining custom predicates express genuinely distinct field/return/allocation shapes. Focused Type/RuntimeType/MemberInfo/unresolved/cross-assembly tests: 7 passed; full Tooling lane: 585 passed; Release EffectSummary build: zero warnings. The resolved implementation and conservative unresolved-external paths remain separate. Production LOC is 105,995, or -1,681 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 5 are gated. Phase 6 has replaced generated-purity
-  predicate fan-out and semantic-wrapper call allowlists with typed rules;
-  summary-shape predicates remain to migrate.
+- State: Phases 2 through 5 are gated. The first Phase 6 item is complete:
+  EffectSummary wrapper policy is ordered and typed, and Type/RuntimeType
+  wrappers use structural identities while distinct summary shapes remain
+  explicit predicates.
 - Last confirmed fact: the Release EffectSummary build has zero warnings;
   focused wrapper/boundary tests are 12/12 and the Tooling lane is 585/585.
-  Production LOC is 105,996, or -1,680 from the rewrite start.
-- Next cheapest step: replace Type/RuntimeType metadata wrapper switches with
-  structural identity and typed call-site shape rules, then use that compact
-  representation for the remaining equivalent summary-shape predicates.
+  Production LOC is 105,995, or -1,681 from the rewrite start.
+- Next cheapest step: begin the second Phase 6 item by inventorying CLI full,
+  compact, invariant, explain, and SARIF projections against the canonical
+  query graph; migrate the largest byte-equivalent projection family first.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
