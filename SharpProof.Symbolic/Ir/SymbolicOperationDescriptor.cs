@@ -154,9 +154,11 @@ internal sealed record SymbolicLifetimeOperation(
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicHazardOperation(
+    SymbolicRuntimeHazardKind HazardKind,
     SymbolicExceptionPreconditionKind PreconditionKind,
     SymbolicTerm? Subject,
     SymbolicCondition Trigger,
+    SymbolicFactConfidence Confidence,
     string ExceptionType,
     string Category,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);

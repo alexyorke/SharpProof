@@ -1,10 +1,13 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
+using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
+using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -16,6 +19,80 @@ internal enum SymbolicAssignmentPostconditionProfile
 
 internal static class SymbolicOperationLowerer
 {
+    internal static bool TryLowerDivideByZeroHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var (site, divisor, isRemainder) = operation switch
+        {
+            IBinaryOperation binary when binary.OperatorKind is BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder =>
+                (binary.Syntax, binary.RightOperand.Syntax as ExpressionSyntax,
+                    binary.OperatorKind == BinaryOperatorKind.Remainder),
+            ICompoundAssignmentOperation assignment when assignment.OperatorKind is
+                BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder =>
+                (assignment.Syntax, assignment.Value.Syntax as ExpressionSyntax,
+                    assignment.OperatorKind == BinaryOperatorKind.Remainder),
+            _ => (null, null, false)
+        };
+        if (site == null || divisor == null ||
+            !SymbolicTypeFacts.IsThrowingDivideByZeroType(
+                CSharpSyntaxFacts.GetExpressionType(divisor, context.SemanticModel, context.CancellationToken)))
+        {
+            hazard = null!;
+            return false;
+        }
+
+        const string provenance = "ir.runtime-hazard.divide-by-zero";
+        var zero = SymbolicSemanticPipeline.LowerNumericZeroCondition(divisor, context);
+        var confidence = SymbolicFactConfidence.Exact;
+        SymbolicTerm? subject = null;
+        SymbolicCondition trigger;
+        if (zero is { IsExact: true, Value: { } zeroCondition })
+        {
+            trigger = zeroCondition;
+            subject = zeroCondition is SymbolicFactCondition
+                {
+                    Fact.Atom: SymbolicRelationAtom { Left: var left }
+                }
+                ? left
+                : null;
+        }
+        else
+        {
+            confidence = SymbolicFactConfidence.Unsupported;
+            trigger = CreateUnsupportedHazardCondition(site, provenance + ".unsupported");
+        }
+
+        var operationProvenance = confidence == SymbolicFactConfidence.Exact
+            ? provenance
+            : provenance + ".unsupported";
+        hazard = new SymbolicHazardOperation(
+            SymbolicRuntimeHazardKind.DivideByZero,
+            SymbolicExceptionPreconditionKind.DivideByZero,
+            subject,
+            trigger,
+            confidence,
+            ExceptionTypes.DivideByZeroException,
+            isRemainder ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero,
+            new SymbolicOperationOrigin(site.Span, 0, operationProvenance));
+        return true;
+    }
+
+    private static SymbolicCondition CreateUnsupportedHazardCondition(SyntaxNode site, string provenance)
+    {
+        var name = "unsupported_typed_projection#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
+                   "_" + site.Span.End.ToString(CultureInfo.InvariantCulture);
+        return new SymbolicFactCondition(new SymbolicFact(
+            new SymbolicTruthAtom(new SymbolicVariableTerm(name, SmtValueKind.Bool)),
+            true,
+            SymbolicFactConfidence.Exact,
+            provenance + ".trigger",
+            site.Span,
+            null,
+            provenance + ".trigger"));
+    }
+
     internal static SymbolicLoweringResult<SymbolicOperationSequence> Lower(
         IOperation operation,
         SymbolicLoweringContext targetContext,

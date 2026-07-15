@@ -27,63 +27,6 @@ internal static class SymbolicRuntimeHazardIrTriggerFactory
         return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
     }
 
-    internal static bool TryCreateDivideByZeroTrigger(
-        ExpressionSyntax divisor,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardTrigger trigger)
-    {
-        if (TryCreateNumericZeroCondition(
-                divisor,
-                semanticModel,
-                cancellationToken,
-                "ir.runtime-hazard.divide-by-zero.trigger",
-                out var subject,
-                out var zeroCondition) &&
-            TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.DivideByZero,
-                subject,
-                zeroCondition,
-                divisor,
-                "ir.runtime-hazard.divide-by-zero",
-                out trigger))
-            return true;
-
-        trigger = CreateUnsupportedExceptionPreconditionTrigger(
-            divisor,
-            SymbolicExceptionPreconditionKind.DivideByZero,
-            null,
-            "ir.runtime-hazard.divide-by-zero.unsupported");
-        return true;
-    }
-
-    internal static bool TryCreateNumericZeroCondition(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenance,
-        out SymbolicTerm? subject,
-        out SymbolicCondition condition)
-    {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerNumericZeroCondition(expression, context);
-        if (lowering is { IsExact: true, Value: { } zeroCondition })
-        {
-            condition = zeroCondition;
-            subject = zeroCondition is SymbolicFactCondition
-                {
-                    Fact.Atom: SymbolicRelationAtom { Left: var left }
-                }
-                ? left
-                : null;
-            return true;
-        }
-
-        subject = null;
-        condition = null!;
-        return false;
-    }
-
     internal static bool TryCreateIndexOrRangeTrigger(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicRuntimeHazardKind kind,

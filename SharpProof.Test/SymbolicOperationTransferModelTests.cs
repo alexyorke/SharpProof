@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
@@ -13,6 +14,55 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicOperationTransferModelTests
 {
+    [TestCase("/", "definite_divide_by_zero")]
+    [TestCase("%", "definite_modulo_by_zero")]
+    public void DivideHazardLowering_EmitsExactTypedOperation(string op, string expectedCategory)
+    {
+        var source = $"static class C {{ static int M(int divisor) => 10 {op} divisor; }}";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(DivideHazardLowering_EmitsExactTypedOperation));
+        var expression = fixture.Root.DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
+        var operation = fixture.SemanticModel.GetOperation(expression)!;
+
+        var lowered = SymbolicOperationLowerer.TryLowerDivideByZeroHazard(
+            operation,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.HazardKind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+            Assert.That(hazard.PreconditionKind, Is.EqualTo(SymbolicExceptionPreconditionKind.DivideByZero));
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(hazard.Category, Is.EqualTo(expectedCategory));
+            Assert.That(hazard.Origin.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+        });
+    }
+
+    [Test]
+    public void DivideHazardLowering_PreservesUnsupportedTrigger()
+    {
+        const string source = "static class C { static int Divisor() => 1; static int M() => 10 / Divisor(); }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(DivideHazardLowering_PreservesUnsupportedTrigger));
+        var expression = fixture.Root.DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
+        var operation = fixture.SemanticModel.GetOperation(expression)!;
+
+        var lowered = SymbolicOperationLowerer.TryLowerDivideByZeroHazard(
+            operation,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
+            Assert.That(hazard.Subject, Is.Null);
+            Assert.That(hazard.Origin.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero.unsupported"));
+            Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
+        });
+    }
+
     [Test]
     public void OperationDescriptors_KeepTypedPayloadAndEvaluationSequence()
     {

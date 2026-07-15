@@ -220,13 +220,8 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !binaryExpression.IsKind(SyntaxKind.ModuloExpression))
             return false;
 
-        return TryCreateDivideByZeroCandidate(
-            binaryExpression,
-            binaryExpression.Right,
-            binaryExpression.IsKind(SyntaxKind.ModuloExpression),
-            semanticModel,
-            cancellationToken,
-            out candidate);
+        return TryCreateOperationDivideByZeroCandidate(
+            binaryExpression, semanticModel, cancellationToken, out candidate);
     }
 
     internal static bool TryCreateCheckedIntegralOverflowCandidate(
@@ -408,37 +403,26 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
             return false;
 
-        return TryCreateDivideByZeroCandidate(
-            assignment,
-            assignment.Right,
-            assignment.IsKind(SyntaxKind.ModuloAssignmentExpression),
-            semanticModel,
-            cancellationToken,
-            out candidate);
+        return TryCreateOperationDivideByZeroCandidate(
+            assignment, semanticModel, cancellationToken, out candidate);
     }
 
-    internal static bool TryCreateDivideByZeroCandidate(
+    private static bool TryCreateOperationDivideByZeroCandidate(
         SyntaxNode site,
-        ExpressionSyntax divisor,
-        bool isModulo,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var divisorType = CSharpSyntaxFacts.GetExpressionType(divisor, semanticModel, cancellationToken);
-        if (!IsThrowingDivideByZeroType(divisorType) ||
-            !TryCreateDivideByZeroTrigger(divisor, semanticModel, cancellationToken, out var trigger))
+        var operation = semanticModel.GetOperation(site, cancellationToken);
+        if (operation == null ||
+            !SymbolicOperationLowerer.TryLowerDivideByZeroHazard(
+                operation,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            site,
-            SymbolicRuntimeHazardKind.DivideByZero,
-            trigger,
-            ExceptionTypes.DivideByZeroException,
-            isModulo
-                ? ExceptionCategories.DefiniteModuloByZero
-                : ExceptionCategories.DefiniteDivideByZero);
+        candidate = new RuntimeHazardCandidate(site, hazard);
         return true;
     }
 
