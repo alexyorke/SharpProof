@@ -11,38 +11,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionSiteClassifier
 {
-    private static bool IsIntegralOrDecimalZero(object? value)
-    {
-        return SymbolicValueFacts.IsIntegralOrDecimalZero(value);
-    }
-
-    private static bool IsThrowingDivideByZeroExpression(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeInfo.ConvertedType ?? typeInfo.Type);
-    }
-
-    private static bool IsDefinitelyZeroExpression(
-        ExpressionSyntax expression,
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-        return (constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value)) ||
-               ExceptionPathStateService.IsKnownByDominatingIf(
-                   expression,
-                   useNode,
-                   semanticModel,
-                   cancellationToken,
-                   PathFactKind.Zero,
-                   smtAnalysis);
-    }
-
     private static bool IsDefinitelyNullExpression(
         ExpressionSyntax expression,
         SyntaxNode useNode,

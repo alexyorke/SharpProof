@@ -16,25 +16,6 @@ internal static partial class ExceptionSiteClassifier
             .Where(node => node is ThrowStatementSyntax || node is ThrowExpressionSyntax);
     }
 
-    internal static IEnumerable<BinaryExpressionSyntax> GetDefiniteDivideByZeroNodes(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            binaryExpression =>
-                (binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
-                 binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
-                IsThrowingDivideByZeroExpression(binaryExpression.Right, semanticModel, cancellationToken) &&
-                IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken,
-                    smtAnalysis));
-    }
-
     internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
         SyntaxNode methodNode,
         SemanticModel semanticModel,

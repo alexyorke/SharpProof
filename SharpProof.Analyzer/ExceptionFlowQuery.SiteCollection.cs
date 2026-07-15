@@ -110,13 +110,24 @@ internal static partial class ExceptionFlowQuery
             }
         }
 
+        var provenRuntimeHazards = CollectProvenRuntimeHazards(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicRuntimeHazardKind.DivideByZero,
+            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
+            SymbolicRuntimeHazardKind.IndexOutOfRange,
+            SymbolicRuntimeHazardKind.NullDereference).ToArray();
+
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteDivideByZeroNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.DivideByZero),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.DivideByZeroException,
                      ExceptionCategories.DefiniteDivideByZero,
@@ -137,19 +148,6 @@ internal static partial class ExceptionFlowQuery
                          : ExceptionSources.CheckedOperator,
                      siteContext))
             yield return entry;
-
-        var provenRuntimeHazards = CollectProvenRuntimeHazards(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
-            SymbolicRuntimeHazardKind.IndexOutOfRange,
-            SymbolicRuntimeHazardKind.NullDereference).ToArray();
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazards.Where(hazard =>
