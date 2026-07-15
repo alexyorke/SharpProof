@@ -51,18 +51,17 @@ internal static class SymbolicNormalCompletionStateTransfer
                 afterPlan.AfterDoesNotReturnIf,
                 expression,
                 "ir.path.normal-completion.framework-after");
-        AddTopLevelArrayCreationNormalCompletionStateFacts(
-            ref state,
+        var sourceLowering = SymbolicSourceCompletionLowerer.Lower(
             expression,
             statement,
             semanticModel,
             cancellationToken);
-        AddTopLevelDereferenceNormalCompletionStateFacts(
-            ref state,
-            expression,
-            statement,
-            semanticModel,
-            cancellationToken);
+        if (sourceLowering is { IsExact: true, Value: { } sourcePlan })
+            ApplyConditions(
+                ref state,
+                sourcePlan.Conditions,
+                expression,
+                "ir.path.normal-completion.source");
     }
 
     private static void AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(
@@ -91,35 +90,6 @@ internal static class SymbolicNormalCompletionStateTransfer
         }
     }
 
-    private static void AddTopLevelArrayCreationNormalCompletionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = SymbolicFrameworkPostconditionLowerer.UnwrapAwaited(expression);
-        if (expression is not ArrayCreationExpressionSyntax arrayCreation) return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
-        {
-            var lowering = SymbolicSemanticPipeline.LowerTerm(sizeExpression, context);
-            if (SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
-                lowering is not { IsExact: true, Value: { } sizeTerm } ||
-                sizeTerm.Kind != SmtValueKind.Int)
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.GreaterThanOrEqual,
-                sizeTerm,
-                new SymbolicIntegerConstantTerm(0),
-                sizeExpression,
-                "ir.path.normal-completion.array-length.non-negative");
-        }
-    }
-
     private static void AddTopLevelThrowGuardNormalCompletionStateFacts(
         ref SymbolicState state,
         ExpressionSyntax expression,
@@ -134,115 +104,6 @@ internal static class SymbolicNormalCompletionStateTransfer
             semanticModel,
             cancellationToken,
             "ir.path.normal-completion.throw-guarded-not-null");
-    }
-
-    private static void AddTopLevelDereferenceNormalCompletionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = SymbolicProgramPointFacts.UnwrapExpression(expression);
-        if (expression is AwaitExpressionSyntax awaitExpression)
-        {
-            var awaitableExpression = SymbolicProgramPointFacts.UnwrapExpression(awaitExpression.Expression);
-            AddStableReferenceNonNullStateFact(
-                ref state,
-                awaitableExpression,
-                statement,
-                semanticModel,
-                cancellationToken,
-                "ir.path.normal-completion.awaitable-not-null");
-            expression = awaitableExpression;
-        }
-
-        if (expression is ElementAccessExpressionSyntax elementAccess &&
-            !SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(elementAccess, statement, semanticModel, cancellationToken) &&
-            elementAccess.ArgumentList.Arguments.Count == 1)
-        {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is
-                { IsExact: true, Value: { } inRangeCondition })
-                state = state.AddPathCondition(inRangeCondition);
-        }
-
-        if (!TryGetTopLevelDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver)) return;
-
-        AddStableReferenceNonNullStateFact(
-            ref state,
-            receiver,
-            statement,
-            semanticModel,
-            cancellationToken,
-            "ir.path.normal-completion.dereference.receiver-not-null");
-    }
-
-    private static bool AddStableReferenceNonNullStateFact(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenance,
-        bool allowArgumentMutation = false)
-    {
-        if (!NullableFlowFacts.TryGetArgumentTargetSymbol(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out var symbol) ||
-            !allowArgumentMutation &&
-            SymbolicLoopStateTransfer.AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
-            return false;
-
-        if (!TryCreateSymbolTerm(symbol, out var symbolTerm) ||
-            symbolTerm.Kind != SmtValueKind.Reference)
-            return false;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.NotEqual,
-            symbolTerm,
-            new SymbolicNullTerm(),
-            expression,
-            provenance);
-        return true;
-    }
-
-    private static bool TryGetTopLevelDereferenceReceiver(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out ExpressionSyntax receiver)
-    {
-        expression = SymbolicProgramPointFacts.UnwrapExpression(expression);
-        switch (expression)
-        {
-            case InvocationExpressionSyntax invocation
-                when SymbolicProgramPointFacts.UnwrapExpression(invocation.Expression) is MemberAccessExpressionSyntax memberAccess &&
-                     !IsReducedExtensionMethodInvocation(invocation, semanticModel, cancellationToken):
-                receiver = memberAccess.Expression;
-                return true;
-            case MemberAccessExpressionSyntax memberAccess:
-                receiver = memberAccess.Expression;
-                return true;
-            case ElementAccessExpressionSyntax elementAccess:
-                receiver = elementAccess.Expression;
-                return true;
-            default:
-                receiver = null!;
-                return false;
-        }
-    }
-
-    private static bool IsReducedExtensionMethodInvocation(
-        InvocationExpressionSyntax invocation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
-               invocationOperation.TargetMethod.ReducedFrom != null;
     }
 
     internal static void ApplyConditions(
