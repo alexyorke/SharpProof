@@ -190,6 +190,8 @@ transfer policy after its slice is complete.
   canonical query graph while preserving serialized bytes.
   - [x] Delete the object-backed invariant result adapter; compact and invariant
     JSON plus their CI gates now read `SymbolicQueryResult` directly.
+  - [x] Replace the per-scope full JSON class hierarchy with one canonical
+    projection and lock point/line/span/file bytes with SHA-256 fixtures.
 - [ ] Run a bounded primary-constructor conversion over internal data carriers,
   preserving class reference equality where it existed.
 - [ ] Remove remaining stale or resolved `POTENTIAL_DUPS.md` findings.
@@ -282,6 +284,7 @@ transfer policy after its slice is complete.
 | Typed semantic-wrapper call policy | `015ebf6e` | 105,996 | -1,680 |
 | Structural Type wrapper policy and EffectSummary gate | `d93a65d8` | 105,995 | -1,681 |
 | Direct invariant and compact CLI projection | `2368e6f9` | 105,956 | -1,720 |
+| Canonical full JSON CLI projection | `761924e0` | 105,946 | -1,730 |
 
 ## Validation Ledger
 
@@ -360,19 +363,20 @@ transfer policy after its slice is complete.
 | Phase 6 typed semantic-wrapper call policy | Commit `015ebf6e` moves 70 distinct semantic-wrapper call patterns into one typed family/match-kind table, with composition retained for string-span, allocation, argument-guard, and scratch-buffer policies. Literal parity finds no former call pattern missing. The unresolved-external/resolved-summary entry points are unchanged. Release EffectSummary build: zero warnings; focused wrapper/boundary tests: 12 passed; full Tooling lane: 585 passed. The correctness centralization is also net-negative, bringing production LOC to 105,996, or -1,680 from the rewrite start. |
 | Phase 6 structural Type wrapper policy and gate | Commit `d93a65d8` merges the duplicate Type Boolean/value wrapper classifiers and matches Type/RuntimeType parameterless properties through containing metadata type, method kind, arity, parameters, return type, typed call-site shape, and dynamic-dispatch evidence. The ordered semantic-wrapper table and typed call-family table now own wrapper policy; remaining custom predicates express genuinely distinct field/return/allocation shapes. Focused Type/RuntimeType/MemberInfo/unresolved/cross-assembly tests: 7 passed; full Tooling lane: 585 passed; Release EffectSummary build: zero warnings. The resolved implementation and conservative unresolved-external paths remain separate. Production LOC is 105,995, or -1,681 from the rewrite start. |
 | Phase 6 direct invariant and compact CLI projection | Commit `2368e6f9` deletes the object-backed invariant adapter and makes compact/invariant serialization, proof gates, unknown thresholds, and truncation gates consume `SymbolicQueryResult` directly. The serialized result types are unchanged. A stale runtime-hazard characterization was first updated in `de7fda18` to construct the already-canonical descriptor without changing its assertions. Release CLI and Tooling-test builds: zero warnings; direct descriptor characterization: 1 passed; CLI output/gate fixtures: 82 passed. Production LOC fell by 39 lines to 105,956, or -1,720 from the rewrite start. |
+| Phase 6 canonical full JSON CLI projection | Commit `761924e0` replaces the line/span/file inheritance hierarchy and its dispatch adapter with one scope-aware view over `SymbolicQueryResult`; point output remains the canonical program-point object. Four normalized-output SHA-256 fixtures characterize exact full JSON bytes before the migration and pass unchanged afterward. Release CLI build: zero warnings; byte fixtures: 4 passed; broader CLI fixtures: 89 passed. Production LOC fell by 10 lines to 105,946, or -1,730 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 through 5 and the EffectSummary Phase 6 item are gated. The
   CLI projection item is in progress: compact/invariant output and their CI
-  gates consume the canonical query graph without an object-backed adapter.
+  gates consume the canonical query graph without an object-backed adapter,
+  and one scope-aware view owns byte-compatible full JSON projection.
 - Last confirmed fact: Release CLI and Tooling-test builds have zero warnings;
-  the direct descriptor characterization passes 1/1 and CLI output/gate
-  fixtures pass 82/82. Production LOC is 105,956, or -1,720 from the rewrite
-  start.
-- Next cheapest step: replace the per-scope full JSON projection hierarchy with
-  one byte-compatible projection over `SymbolicQueryResult`, then audit explain
-  and SARIF for any remaining parallel query projection.
+  full JSON byte fixtures pass 4/4 and broader CLI fixtures pass 89/89.
+  Production LOC is 105,946, or -1,730 from the rewrite start.
+- Next cheapest step: audit explain and SARIF projection for parallel invariant
+  query shapes, remove any redundant projection, and then close the CLI item
+  with its full Tooling lane.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
