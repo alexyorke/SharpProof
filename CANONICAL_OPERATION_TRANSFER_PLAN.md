@@ -202,7 +202,7 @@ transfer policy after its slice is complete.
   - [x] Convert 18 internal/private Symbolic carriers while excluding public
     contract types and mutable budgets, pools, builders, sessions, and services.
 - [x] Remove remaining stale or resolved `POTENTIAL_DUPS.md` findings.
-- [ ] Run two `colgrep --force-cpu` semantic-search batches; stop secondary work
+- [x] Run two `colgrep --force-cpu` semantic-search batches; stop secondary work
   when each finds fewer than 50 safely removable production lines.
 
 ## Final Gates
@@ -327,6 +327,7 @@ transfer policy after its slice is complete.
 | Central compact-result schema metadata | `23992c39` | 105,708 | -1,968 |
 | Central compact SMT diagnostics projection | `2562ff6f` | 105,707 | -1,969 |
 | Resolved invariant scope-adapter finding | `cee2af96` | 105,707 | -1,969 |
+| Semantic-search residual adapter deletion | `6773fdc0` | 105,585 | -2,091 |
 
 ## Validation Ledger
 
@@ -452,6 +453,7 @@ transfer policy after its slice is complete.
 | Phase 6 central CorpusReport counters | Commit `f37aab29` replaces string and categorized dictionary increment implementations with one constrained generic counter. CorpusReport fixtures pass 12/12. Production LOC fell to 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 intentional SMT semantic dispatch | Commit `30750190` removes a mixed stale/false-positive entry. `SmtFormulaTraversal` already owns child enumeration, mapping, bottom-up rewrite, and rebuilding; alias normalization and syntactic scans consume it. Structural keys must encode node-specific operators/payloads, while Z3 encoding must map each node to distinct solver semantics. A visitor would retain those cases as one method per node and add interface/dispatch plumbing. Traversal, classifier, structural-key, and encoder fixtures pass 183/183. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 duplicate-report completion | Every remaining merged-audit item now has a green implementation or an evidence-backed intentional/stale disposition in this ledger. The empty `POTENTIAL_DUPS.md` scaffolding is deleted. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
+| Phase 6 bounded semantic-search stop gate | Two `colgrep --force-cpu` batches were inspected against production code. Batch 1 found 46 safely removable lines in two generic operation wrappers; commit `6773fdc0` deletes them and keeps the same characterization on the direct lowerer-plus-kernel path, with all 40 operation-transfer model fixtures green. Batch 2 found no >=50-line safe deletion: the catalog hits are required data, option parsing is already registry-driven, and the remaining Analyzer/encoder switches carry distinct policy. Production LOC fell to 105,585, or -2,091 from the rewrite start; tracked test LOC is 142,479. |
 
 ## Current Checkpoint
 
@@ -509,12 +511,15 @@ transfer policy after its slice is complete.
   counts now share one typed increment operation. SMT child traversal and
   rewriting already have one taxonomy; remaining node switches encode genuinely
   operation-specific payload and solver semantics. The exhausted duplicate
-  report is deleted.
-- Last confirmed fact: all merged-audit findings have terminal implementations
-  or evidence-backed dispositions; `POTENTIAL_DUPS.md` has no remaining item.
-  Test LOC is 142,478; production LOC is 105,631, or -2,045 from the rewrite
-  start.
-- Next cheapest step: run the first bounded `colgrep --force-cpu` semantic-search
-  batch and quantify only safely removable production candidates.
+  report is deleted. Two bounded semantic-search batches each found fewer than
+  50 safely removable production lines; their only accepted residual wrappers
+  are deleted, so the plan's secondary-work stop condition is met.
+- Last confirmed fact: all 40 operation-transfer model fixtures pass after the
+  two dead generic wrappers were removed. Test LOC is 142,479; production LOC is
+  105,585, or -2,091 from the rewrite start.
+- Next cheapest step: resolve the incompatible remaining gate: the mandated
+  low-yield stop condition is met, but the 11,000-line production target remains
+  8,909 lines away. Continuing would require relaxing the stop rule or approving
+  feature/policy removal rather than behavior-preserving consolidation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
