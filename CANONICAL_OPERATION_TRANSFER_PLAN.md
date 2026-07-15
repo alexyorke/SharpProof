@@ -170,7 +170,7 @@ transfer policy after its slice is complete.
 - [x] Migrate purity analysis to consume canonical transitions.
 - [x] Migrate nullable and runtime-type analysis to consume canonical state.
 - [x] Migrate exception flow to consume canonical hazards and completion edges.
-- [ ] Centralize Analyzer evidence projection without merging diagnostic policy.
+- [x] Centralize Analyzer evidence projection without merging diagnostic policy.
 - [ ] Remove remaining Analyzer-owned transfer and hazard interpretation.
 - [ ] Gate: Analyzer lane and diagnostic/evidence fixtures are green; record net
   production LOC removed.
@@ -265,6 +265,7 @@ transfer policy after its slice is complete.
 | Canonical exact receiver-type state | `79a54498` | 106,316 | -1,360 |
 | Superseded exception path facts | `d1ff9c86` | 106,251 | -1,425 |
 | Canonical throwing-finally completion | `0e4d3bb5` | 106,173 | -1,503 |
+| Central contract evidence projection | `26cbd9c6` | 106,166 | -1,510 |
 
 ## Validation Ledger
 
@@ -335,6 +336,7 @@ transfer policy after its slice is complete.
 | Phase 5 canonical exact receiver-type state | Commit `79a54498` replaces purity's local and flow-capture concrete-type dictionaries, independent intersections, equality, and hashing with versioned `SymbolicExactRuntimeTypeAtom` facts. Assignment invalidation and canonical state merging now own their lifetime; the post-CFG probe explicitly projects only exact-type metadata instead of retaining a parallel map. The 34-line canonical fact scaffold raises production LOC to 106,316, or -1,360 from the rewrite start, but deletes both competing state stores and enables later Analyzer-state deletion. Release build: zero warnings; exact-dispatch/using/disposal tests: 58 passed; focused CFG regression set: 15 passed; MainSmtAnalyzer: 487 passed. |
 | Phase 5 superseded exception path facts | Commit `d1ff9c86` deletes the unreferenced null/zero dominating-if interpreter and its retired `PathFactKind`, then removes the exception-site wrapper whose `relevantRoot` parameter was ignored. Catch filters and path-sensitive finally checks now call the canonical path-state collector directly. Release test build: zero warnings; focused exception, path, catch-filter, and finally tests: 219 passed, with only the documented baseline SP0010 failure. Production LOC fell to 106,251, or -1,425 from the rewrite start. |
 | Phase 5 canonical throwing-finally completion | Commit `0e4d3bb5` replaces exception flow's recursive block/if exit interpreter with canonical completed-block transfer followed by the shared reachability proof. This preserves path-sensitive one-branch and all-branch exits while deleting 89 lines of duplicate completion policy. Direct finally tests: 17 passed; focused exception/path/catch/finally batch: 219 passed with only baseline SP0010. Production LOC fell to 106,173, or -1,503 from the rewrite start. Exception flow now consumes canonical hazard descriptors, path state, and completion semantics, closing the second Phase 5 item. |
+| Phase 5 central contract evidence projection | Commit `26cbd9c6` makes one typed Requires/Ensures projector own family keys, baseline identity, proof status, structured unknown reason, truncation, and explain metadata while each analyzer retains rule selection, reporting conditions, messages, and evidence-key policy. Inferred-contract and invalid-contract diagnostics now use the same baseline-plus-explain envelope; syntax-tree fallback and trusted-boundary paths remain separate because their identity or explain policy differs. Release Analyzer build: zero warnings; direct envelope and adjacent contract/suggestion tests: 16 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 106,166, or -1,510 from the rewrite start. |
 
 ## Current Checkpoint
 
@@ -343,13 +345,14 @@ transfer policy after its slice is complete.
   nullable contract proofs use the canonical query boundary, and the dead
   exception-site null interpreter is deleted. Exception dispatch shares the
   Symbolic runtime-type resolver, and purity exact local/flow-capture types are
-  versioned canonical facts. The nullable/runtime-type item is complete.
-- Last confirmed fact: exact-dispatch, using, disposal, and CFG-focused tests are
-  green; Analyzer is 487/487. Canonical throwing-finally completion passes 17
-  direct cases and the 219-case exception batch with only baseline SP0010.
-  Production LOC is 106,173, or -1,503 from the rewrite start.
-- Next cheapest step: inventory Analyzer diagnostic/evidence envelopes for one
-  shared projection that preserves each rule's diagnostic policy and serialized
-  evidence properties byte-for-byte.
+  versioned canonical facts. Exception flow and central evidence projection are
+  complete; diagnostic policy remains in its owning analyzers.
+- Last confirmed fact: the Release Analyzer build has zero warnings; direct
+  evidence-envelope and adjacent contract/suggestion tests are 16/16, and
+  MainSmtAnalyzer is 487/487. Production LOC is 106,166, or -1,510 from the
+  rewrite start.
+- Next cheapest step: audit the remaining Analyzer source/CFG adapters for
+  reachable state transfer or hazard interpretation that still competes with
+  canonical operations, then delete the first characterized path.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
