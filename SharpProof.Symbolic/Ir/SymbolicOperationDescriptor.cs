@@ -131,6 +131,7 @@ internal sealed record SymbolicBranchAssumptionOperation(
 
 internal sealed record SymbolicMergeOperation(
     ImmutableArray<SymbolicState> IncomingStates,
+    SyntaxNode Source,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicLoopEdgeOperation(

@@ -56,6 +56,14 @@ internal static class SymbolicOperationTransferKernel
                     state = state.MarkContradictory();
                 continue;
             }
+            if (operation is SymbolicMergeOperation merge)
+            {
+                state = SymbolicStateMerger.MergeCompletionStates(
+                    merge.IncomingStates,
+                    state,
+                    merge.Source);
+                continue;
+            }
 
             return SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -178,6 +186,17 @@ internal static class SymbolicOperationTransferKernel
                 SymbolicCompletionKind.NoFallthrough,
                 null,
                 new SymbolicOperationOrigin(sourceSpan, 0, "operation-transfer.no-fallthrough"))));
+
+    internal static SymbolicOperationTransitionResult Merge(
+        SymbolicState entryState,
+        ImmutableArray<SymbolicState> incomingStates,
+        Microsoft.CodeAnalysis.SyntaxNode source) =>
+        Apply(
+            entryState,
+            SymbolicOperationSequence.Single(new SymbolicMergeOperation(
+                incomingStates,
+                source,
+                new SymbolicOperationOrigin(source.Span, 0, "operation-transfer.completion-merge"))));
 
     private static bool TryApplyAssignment(
         ref SymbolicState state,

@@ -34,6 +34,67 @@ internal static class SymbolicStateMerger
                 new SymbolicNotCondition(guard),
                 value);
 
+    internal static SymbolicState MergeCompletionStates(
+        IReadOnlyList<SymbolicState> states,
+        SymbolicState entryState,
+        Microsoft.CodeAnalysis.SyntaxNode source)
+    {
+        if (states.Count == 1) return states[0];
+
+        var commonFactKeys = new HashSet<string>(
+            states[0].Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        foreach (var branch in states.Skip(1))
+            commonFactKeys.IntersectWith(branch.Facts.Select(SymbolicState.CreateProofFactKey));
+
+        var retainedFacts = entryState.Facts.ToList();
+        var retainedConditions = entryState.PathConditions.ToList();
+        var addedCount = 0;
+        AddLimitedCommonItems(
+            states[0].Facts.Where(fact => commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact))),
+            retainedFacts,
+            entryState.Facts.Select(SymbolicState.CreateProofFactKey),
+            SymbolicState.CreateProofFactKey, source, ref addedCount);
+        AddLimitedCommonItems(
+            MergePathConditionsAcrossAll(states),
+            retainedConditions,
+            entryState.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            SymbolicState.CreateProofConditionKey, source, ref addedCount);
+
+        var commonVersions = states[0].SymbolVersions.Where(pair => states.Skip(1).All(state =>
+            state.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value));
+        return new SymbolicState(
+            retainedFacts,
+            retainedConditions,
+            commonVersions,
+            states.All(static state => state.IsContradictory)).Normalize();
+    }
+
+    private static void AddLimitedCommonItems<T>(
+        IEnumerable<T> candidates,
+        ICollection<T> retained,
+        IEnumerable<string> retainedKeys,
+        Func<T, string> getKey,
+        Microsoft.CodeAnalysis.SyntaxNode source,
+        ref int addedCount)
+    {
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedTryFacts;
+        var keys = new HashSet<string>(retainedKeys, StringComparer.Ordinal);
+        foreach (var candidate in candidates.Where(candidate => keys.Add(getKey(candidate))))
+        {
+            if (addedCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryFactMerge, limit, addedCount + 1, source,
+                    "program_point.try_fact_merge");
+                return;
+            }
+
+            retained.Add(candidate);
+            addedCount++;
+        }
+    }
+
     private static SymbolicCondition Combine(
         SymbolicConditionOperator op,
         IReadOnlyList<SymbolicCondition> conditions)
