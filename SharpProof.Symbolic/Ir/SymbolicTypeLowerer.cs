@@ -108,10 +108,7 @@ internal static class SymbolicTypeLowerer
             return true;
         }
 
-        if (type.TypeKind == TypeKind.Dynamic ||
-            type.IsReferenceType ||
-            SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
-            IsSupportedTupleCarrierType(type))
+        if (SymbolicTypeFacts.IsSymbolicReferenceLikeType(type))
         {
             kind = SmtValueKind.Reference;
             return true;
@@ -127,8 +124,4 @@ internal static class SymbolicTypeLowerer
                SymbolicNumericLowerer.IsBigIntegerType(type);
     }
 
-    private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
-    {
-        return type is INamedTypeSymbol { IsTupleType: true, TupleElements.Length: > 0 };
-    }
 }

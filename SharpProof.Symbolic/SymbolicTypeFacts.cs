@@ -55,6 +55,14 @@ internal static class SymbolicTypeFacts
                IsReferenceType(typeSymbol);
     }
 
+    public static bool IsSymbolicReferenceLikeType(ITypeSymbol? typeSymbol)
+    {
+        return typeSymbol != null &&
+               (IsReferenceLikeType(typeSymbol) ||
+                IsBuiltInSpanOrMemoryType(typeSymbol) ||
+                IsSupportedTupleCarrierType(typeSymbol));
+    }
+
     public static bool IsNullableType(ITypeSymbol? typeSymbol)
     {
         return typeSymbol is INamedTypeSymbol

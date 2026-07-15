@@ -134,9 +134,6 @@ internal static class SymbolicStateFactBuilder
 
     private static bool IsProgramPointReferenceLikeType(ITypeSymbol type)
     {
-        return type.TypeKind == TypeKind.Dynamic ||
-               type.IsReferenceType ||
-               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
-               SymbolicTypeFacts.IsSupportedTupleCarrierType(type);
+        return SymbolicTypeFacts.IsSymbolicReferenceLikeType(type);
     }
 }

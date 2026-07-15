@@ -148,6 +148,11 @@ internal static class SymbolicOperationLowerer
                 valueExpression,
                 valueContext,
                 provenance);
+            conditions.AddRange(LowerSymbolicReferenceBackedPostconditions(
+                target,
+                valueExpression,
+                valueContext,
+                provenance));
             return;
         }
 
@@ -361,6 +366,111 @@ internal static class SymbolicOperationLowerer
             new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetNonNull, falseValueNull)));
     }
 
+    internal static ImmutableArray<SymbolicCondition> LowerSymbolicReferenceBackedPostconditions(
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        string provenance)
+    {
+        if (target.Kind != SmtValueKind.Reference ||
+            NullableFlowFacts.IsDefinitelyNullReferenceValue(
+                valueExpression,
+                context.SemanticModel,
+                context.CancellationToken))
+            return ImmutableArray<SymbolicCondition>.Empty;
+
+        var typeInfo = context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken);
+        var sourceType = typeInfo.Type;
+        var valueType = typeInfo.ConvertedType ?? sourceType;
+        if (sourceType != null &&
+            ShouldUseReferenceBackedSourceType(sourceType, valueType))
+            valueType = sourceType;
+        if (valueType == null) return ImmutableArray<SymbolicCondition>.Empty;
+
+        var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
+        AddEquality(
+            conditions,
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression),
+            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context),
+            valueExpression,
+            provenance + ".reference-backed-length");
+
+        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression) is
+                { IsExact: true, Value: SymbolicCountTerm targetCount } &&
+            GetExactListCreationCount(valueExpression, sourceType ?? valueType) is { } count)
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.Equal,
+                targetCount,
+                new SymbolicIntegerConstantTerm(count),
+                valueExpression,
+                provenance + ".reference-backed-count"));
+
+        if (valueType.SpecialType == SpecialType.System_String)
+            AddEquality(
+                conditions,
+                SymbolicSemanticPipeline.ProjectStringContentTerm(target, valueExpression),
+                SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context),
+                valueExpression,
+                provenance + ".reference-backed-string");
+
+        if (valueType is IArrayTypeSymbol { Rank: > 1 } arrayType)
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+                AddEquality(
+                    conditions,
+                    new SymbolicArrayDimensionLengthTerm(target, dimension),
+                    SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(
+                        valueExpression,
+                        dimension,
+                        context),
+                    valueExpression,
+                    provenance + ".reference-backed-array-length");
+
+        return conditions.ToImmutable();
+    }
+
+    private static bool ShouldUseReferenceBackedSourceType(ITypeSymbol sourceType, ITypeSymbol? convertedType)
+    {
+        return convertedType == null ||
+               !SymbolEqualityComparer.Default.Equals(sourceType, convertedType) &&
+               HasBuiltInLengthShape(sourceType) &&
+               !HasBuiltInLengthShape(convertedType);
+    }
+
+    private static bool HasBuiltInLengthShape(ITypeSymbol? type)
+    {
+        return type?.SpecialType == SpecialType.System_String ||
+               type is IArrayTypeSymbol { Rank: >= 1 };
+    }
+
+    private static int? GetExactListCreationCount(ExpressionSyntax valueExpression, ITypeSymbol? sourceType)
+    {
+        if (sourceType is not INamedTypeSymbol namedType ||
+            !string.Equals(
+                namedType.OriginalDefinition.ToDisplayString(),
+                "System.Collections.Generic.List<T>",
+                StringComparison.Ordinal))
+            return null;
+
+        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
+        return valueExpression switch
+        {
+            ObjectCreationExpressionSyntax creation when creation.ArgumentList?.Arguments.Count is null or 0 =>
+                GetCollectionInitializerCount(creation.Initializer),
+            ImplicitObjectCreationExpressionSyntax creation when creation.ArgumentList.Arguments.Count == 0 =>
+                GetCollectionInitializerCount(creation.Initializer),
+            _ => null
+        };
+    }
+
+    private static int? GetCollectionInitializerCount(InitializerExpressionSyntax? initializer)
+    {
+        return initializer == null
+            ? 0
+            : initializer.IsKind(SyntaxKind.CollectionInitializerExpression)
+                ? initializer.Expressions.Count
+                : null;
+    }
+
     private static void AddEquality(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         SymbolicTerm target,
@@ -378,6 +488,17 @@ internal static class SymbolicOperationLowerer
                 source,
                 provenance,
                 evidenceKey: evidenceKey));
+    }
+
+    private static void AddEquality(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        SymbolicLoweringResult<SymbolicTerm> target,
+        SymbolicLoweringResult<SymbolicTerm> value,
+        ExpressionSyntax source,
+        string provenance)
+    {
+        if (target is { IsExact: true, Value: { } targetTerm })
+            AddEquality(conditions, targetTerm, value, source, provenance);
     }
 
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerComputedUpdate(
@@ -591,7 +712,7 @@ internal static class SymbolicOperationLowerer
             !SymbolicFactFactory.TryGetValueKind(
                 type,
                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-                SymbolicTypeFacts.IsReferenceType,
+                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
                 out var kind))
         {
             term = null!;

@@ -117,7 +117,7 @@ internal static class SymbolicAssignmentStateTransfer
         if (!isSelfReferential &&
             (isAsExpression ||
              assignedType != null &&
-             (SymbolicTypeFacts.IsReferenceType(assignedType) ||
+             (SymbolicTypeFacts.IsSymbolicReferenceLikeType(assignedType) ||
               assignedType.SpecialType == SpecialType.System_Boolean ||
               SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
         {
@@ -201,13 +201,14 @@ internal static class SymbolicAssignmentStateTransfer
             assignedValueTerm,
             effectiveValueExpression,
             provenanceRoot);
-        AddAssignedReferenceBackedStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            context,
-            provenanceRoot);
+        if (isSelfReferential &&
+            TryCreateSymbolTerm(assignedSymbol, out var selfReferenceTarget))
+            foreach (var condition in SymbolicOperationLowerer.LowerSymbolicReferenceBackedPostconditions(
+                         selfReferenceTarget,
+                         effectiveValueExpression,
+                         context,
+                         provenanceRoot))
+                state = state.AddPathCondition(condition);
         AddFiniteArrayElementAssignedValueStateFacts(
             ref state,
             assignedSymbol,
@@ -459,13 +460,12 @@ internal static class SymbolicAssignmentStateTransfer
             semanticModel,
             cancellationToken,
             provenanceRoot + ".member");
-        AddAssignedReferenceBackedStateFacts(
-            ref state,
-            targetTerm,
-            effectiveValueExpression,
-            semanticModel,
-            context,
-            provenanceRoot + ".member");
+        foreach (var condition in SymbolicOperationLowerer.LowerSymbolicReferenceBackedPostconditions(
+                     targetTerm,
+                     effectiveValueExpression,
+                     context,
+                     provenanceRoot + ".member"))
+            state = state.AddPathCondition(condition);
     }
 
     private static void AddFiniteArrayElementAssignedValueStateFacts(
@@ -655,202 +655,6 @@ internal static class SymbolicAssignmentStateTransfer
                 provenance + ".assigned-non-null");
     }
 
-    private static void AddAssignedReferenceBackedStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference)) return;
-
-        AddAssignedReferenceBackedStateFacts(
-            ref state,
-            targetReference,
-            valueExpression,
-            semanticModel,
-            context,
-            provenanceRoot);
-    }
-
-    private static void AddAssignedReferenceBackedStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm targetReference,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        if (targetReference.Kind != SmtValueKind.Reference ||
-            NullableFlowFacts.IsDefinitelyNullReferenceValue(
-                valueExpression,
-                semanticModel,
-                context.CancellationToken))
-            return;
-
-        var valueType = semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
-                        semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type;
-        var sourceType = semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type;
-        if (sourceType != null &&
-            TryCreateReferenceBackedLengthFactsFromSourceType(sourceType, valueType))
-            valueType = sourceType;
-
-        if (valueType == null) return;
-
-        AddAssignedBuiltInLengthStateFact(
-            ref state, targetReference, valueType, valueExpression, context,
-            provenanceRoot + ".reference-backed-length");
-
-        AddAssignedCollectionCountStateFacts(
-            ref state,
-            targetReference,
-            valueExpression,
-            valueType,
-            sourceType,
-            provenanceRoot);
-
-        if (valueType.SpecialType == SpecialType.System_String)
-            AddAssignedStringContentStateFact(
-                ref state, targetReference, valueExpression, context,
-                provenanceRoot + ".reference-backed-string");
-
-        AddAssignedArrayDimensionLengthStateFacts(
-            ref state,
-            targetReference,
-            valueExpression,
-            valueType,
-            context,
-            provenanceRoot + ".reference-backed-array-length");
-    }
-
-    private static void AddAssignedStringContentStateFact(
-        ref SymbolicState state, SymbolicTerm targetReference, ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context, string provenance)
-    {
-        if (SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is not
-                { IsExact: true, Value: { } targetString } ||
-            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is not
-                { IsExact: true, Value: { } valueString })
-            return;
-
-        AddRelationPathFact(ref state, SymbolicRelationOperator.Equal, targetString, valueString,
-            valueExpression, provenance);
-    }
-
-    private static void AddAssignedBuiltInLengthStateFact(
-        ref SymbolicState state, SymbolicTerm targetReference, ITypeSymbol targetType,
-        ExpressionSyntax valueExpression, SymbolicLoweringContext context, string provenance)
-    {
-        if (targetReference.Kind != SmtValueKind.Reference ||
-            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(targetType, targetReference, valueExpression) is not
-                { IsExact: true, Value: { } targetLength } ||
-            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is not
-                { IsExact: true, Value: { } valueLength } ||
-            !CanCompareIrTerms(targetLength, valueLength))
-            return;
-
-        AddRelationPathFact(ref state, SymbolicRelationOperator.Equal, targetLength, valueLength,
-            valueExpression, provenance);
-    }
-
-    private static void AddAssignedCollectionCountStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm targetReference,
-        ExpressionSyntax valueExpression,
-        ITypeSymbol targetType,
-        ITypeSymbol? sourceType,
-        string provenanceRoot)
-    {
-        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(targetType, targetReference, valueExpression) is not
-                { IsExact: true, Value: { } targetCount } ||
-            targetCount is not SymbolicCountTerm ||
-            !TryCreateExactListCreationCountTerm(valueExpression, sourceType ?? targetType, out var valueCount) ||
-            !CanCompareIrTerms(targetCount, valueCount))
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetCount,
-            valueCount,
-            valueExpression,
-            provenanceRoot + ".reference-backed-count");
-    }
-
-    private static bool TryCreateExactListCreationCountTerm(
-        ExpressionSyntax valueExpression,
-        ITypeSymbol? sourceType,
-        out SymbolicTerm countTerm)
-    {
-        countTerm = null!;
-        if (!IsKnownExactCountListType(sourceType)) return false;
-
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        switch (valueExpression)
-        {
-            case ObjectCreationExpressionSyntax objectCreation:
-                return TryCreateExactListObjectCreationCountTerm(
-                    objectCreation.ArgumentList?.Arguments.Count ?? 0,
-                    objectCreation.Initializer,
-                    out countTerm);
-            case ImplicitObjectCreationExpressionSyntax implicitObjectCreation:
-                return TryCreateExactListObjectCreationCountTerm(
-                    implicitObjectCreation.ArgumentList?.Arguments.Count ?? 0,
-                    implicitObjectCreation.Initializer,
-                    out countTerm);
-            default:
-                return false;
-        }
-    }
-
-    private static bool TryCreateExactListObjectCreationCountTerm(
-        int argumentCount,
-        InitializerExpressionSyntax? initializer,
-        out SymbolicTerm countTerm)
-    {
-        countTerm = null!;
-        if (argumentCount != 0) return false;
-
-        if (initializer == null)
-        {
-            countTerm = new SymbolicIntegerConstantTerm(0);
-            return true;
-        }
-
-        if (!initializer.IsKind(SyntaxKind.CollectionInitializerExpression)) return false;
-
-        countTerm = new SymbolicIntegerConstantTerm(initializer.Expressions.Count);
-        return true;
-    }
-
-    private static bool IsKnownExactCountListType(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol namedType &&
-               string.Equals(
-                   namedType.OriginalDefinition.ToDisplayString(),
-                   "System.Collections.Generic.List<T>",
-                   StringComparison.Ordinal);
-    }
-
-    private static bool TryCreateReferenceBackedLengthFactsFromSourceType(
-        ITypeSymbol sourceType,
-        ITypeSymbol? convertedType)
-    {
-        if (convertedType == null) return true;
-
-        if (SymbolEqualityComparer.Default.Equals(sourceType, convertedType)) return false;
-
-        return HasBuiltInLengthShape(sourceType) &&
-               !HasBuiltInLengthShape(convertedType);
-    }
-
-    private static bool HasBuiltInLengthShape(ITypeSymbol? type)
-    {
-        return type?.SpecialType == SpecialType.System_String ||
-               type is IArrayTypeSymbol { Rank: >= 1 };
-    }
-
     private static void AddRemainderAssignedRangeStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
@@ -980,37 +784,6 @@ internal static class SymbolicAssignmentStateTransfer
         };
     }
 
-    private static void AddAssignedArrayDimensionLengthStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm targetReference,
-        ExpressionSyntax valueExpression,
-        ITypeSymbol targetType,
-        SymbolicLoweringContext context,
-        string provenance)
-    {
-        if (targetReference.Kind != SmtValueKind.Reference ||
-            targetType is not IArrayTypeSymbol { Rank: > 1 } arrayType)
-            return;
-
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            var targetDimensionLength = new SymbolicArrayDimensionLengthTerm(targetReference, dimension);
-            var dimensionLowering =
-                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
-            if (dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
-                !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetDimensionLength,
-                valueDimensionLength,
-                valueExpression,
-                provenance);
-        }
-    }
-
     private static void AddTupleElementAssignedValueStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
@@ -1058,9 +831,19 @@ internal static class SymbolicAssignmentStateTransfer
             return;
 
         if (elementType.SpecialType == SpecialType.System_String)
-            AddAssignedStringContentStateFact(
-                ref state, targetTerm, valueExpression, context,
-                provenanceRoot + ".assigned-string");
+        {
+            if (SymbolicSemanticPipeline.ProjectStringContentTerm(targetTerm, valueExpression) is
+                    { IsExact: true, Value: { } targetString } &&
+                SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
+                    { IsExact: true, Value: { } valueString })
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetString,
+                    valueString,
+                    valueExpression,
+                    provenanceRoot + ".assigned-string");
+        }
         else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
                  { IsExact: true, Value: { } valueTerm } &&
                  CanCompareIrTerms(targetTerm, valueTerm))
@@ -1082,16 +865,33 @@ internal static class SymbolicAssignmentStateTransfer
                 valueExpression,
                 provenanceRoot + ".assigned-non-null");
 
-        AddAssignedBuiltInLengthStateFact(
-            ref state, targetTerm, elementType, valueExpression, context,
-            provenanceRoot + ".assigned-length");
-        AddAssignedArrayDimensionLengthStateFacts(
-            ref state,
-            targetTerm,
-            valueExpression,
-            elementType,
-            context,
-            provenanceRoot + ".assigned-dimension-length");
+        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(elementType, targetTerm, valueExpression) is
+                { IsExact: true, Value: { } targetLength } &&
+            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
+                { IsExact: true, Value: { } valueLength } &&
+            CanCompareIrTerms(targetLength, valueLength))
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetLength,
+                valueLength,
+                valueExpression,
+                provenanceRoot + ".assigned-length");
+
+        if (targetTerm.Kind == SmtValueKind.Reference &&
+            elementType is IArrayTypeSymbol { Rank: > 1 } arrayType)
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+                if (SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(
+                        valueExpression,
+                        dimension,
+                        context) is { IsExact: true, Value: { } dimensionLength })
+                    AddRelationPathFact(
+                        ref state,
+                        SymbolicRelationOperator.Equal,
+                        new SymbolicArrayDimensionLengthTerm(targetTerm, dimension),
+                        dimensionLength,
+                        valueExpression,
+                        provenanceRoot + ".assigned-dimension-length");
     }
 
     private static void AddTupleElementSourceSymbolSnapshotStateFacts(
