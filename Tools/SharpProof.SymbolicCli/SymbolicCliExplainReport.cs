@@ -94,7 +94,7 @@ internal sealed class SymbolicCliExplainReport
             maxConditions: itemLimit,
             maxProofs: itemLimit,
             invariantTargets: options.InvariantTargets);
-        var invariant = point.ToCompactResult(compactOptions);
+        var invariant = pointResult.ToCompactResult(compactOptions);
 
         var runtimeHazards = service.QueryRuntimeHazards(
             new SymbolicQueryContext(
