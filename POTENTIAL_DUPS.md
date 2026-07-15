@@ -117,9 +117,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - Baseline / Corpus / Vsix
 
-### Minor: duplicate `Increment` dictionary helper - `SarifCorpusReport.cs:206,211`
-**Recommendation:** Generic `Increment<TKey>`.
-
 ---
 
 ## Cross-project (ProofCore / Attributes / Shared / CodeFixes / Demo / Smoke / samples / scripts)

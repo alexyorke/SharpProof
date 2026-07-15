@@ -175,10 +175,10 @@ public static class SarifCorpusReport
                 IncrementIfPresent(_unknownOperationKinds, operationKind);
 
             if (category != null && symbol != null && CatalogMissCategories.Contains(category))
-                IncrementCategorized(_catalogMisses, category, symbol);
+                Increment(_catalogMisses, (category, symbol));
 
             if (category != null && symbol != null && FalsePositiveCandidateCategories.Contains(category))
-                IncrementCategorized(_falsePositiveCandidates, category, symbol);
+                Increment(_falsePositiveCandidates, (category, symbol));
         }
 
         private static void IncrementIfPresent(Dictionary<string, int> values, string? key)
@@ -186,15 +186,8 @@ public static class SarifCorpusReport
             if (!string.IsNullOrWhiteSpace(key)) Increment(values, key);
         }
 
-        private static void Increment(Dictionary<string, int> values, string key)
+        private static void Increment<TKey>(Dictionary<TKey, int> values, TKey key) where TKey : notnull
         {
-            values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
-        }
-
-        private static void IncrementCategorized(Dictionary<(string Category, string Value), int> values,
-            string category, string value)
-        {
-            var key = (category, value);
             values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
