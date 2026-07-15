@@ -55,11 +55,14 @@ internal static partial class ExecutionVisibility
         if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
             return isNull == expectedNull;
 
-        if (!TryCreateReferenceNullCondition(
+        if (!SymbolicStateFactBuilder.TryCreateReferenceNullCondition(
                 expression,
                 expectedNull,
                 semanticModel,
                 cancellationToken,
+                expectedNull
+                    ? "analyzer.visibility.reference-null"
+                    : "analyzer.visibility.reference-non-null",
                 out var nullStateCondition))
             return false;
 
@@ -117,34 +120,6 @@ internal static partial class ExecutionVisibility
             cancellationToken);
         return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
                expectedStatus;
-    }
-
-    private static bool TryCreateReferenceNullCondition(
-        ExpressionSyntax expression,
-        bool equalToNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition condition)
-    {
-        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } reference })
-        {
-            condition = null!;
-            return false;
-        }
-
-        condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                reference,
-                new SymbolicNullTerm()),
-            expression,
-            equalToNull
-                ? "analyzer.visibility.reference-null"
-                : "analyzer.visibility.reference-non-null"));
-        return true;
     }
 
     private static bool TryGetConstantReferenceNullState(

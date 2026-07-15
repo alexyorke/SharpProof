@@ -305,6 +305,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Route Symbolic branch completion plus Analyzer execution-visibility and
     purity CFG consumers through `SymbolicReachabilityLowerer.ApplyCondition`.
     Delete the duplicate reachability-service lowering and transition adapter.
+  - [x] Route execution-visibility reference-null proof construction through
+    `SymbolicStateFactBuilder.TryCreateReferenceNullCondition` and delete its
+    independent reference lowering, relation, and provenance implementation.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -459,6 +462,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 dead exception mutation path deletion | `190dabe7` | 106,572 | -1,104 |
 | Phase 7 dead migrated-helper deletion | `6513fc80` | 106,494 | -1,182 |
 | Phase 7 canonical condition consumer migration | `2a64a44f` | 106,485 | -1,191 |
+| Phase 7 canonical visibility null conditions | pending | 106,462 | -1,214 |
 
 ## Validation Ledger
 
@@ -606,6 +610,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 dead exception mutation path deletion | Commit `190dabe7` deletes the 90-line `ExceptionPathStateService.MutationTracking` partial after exact symbol inventory found no caller for any of its five private syntax mutation walkers. Exception path state already uses the canonical reachability entry point and shared Requires entry-state builder. MainSmtAnalyzer passes 487/487; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Analyzer warning-as-error build has zero warnings. Production LOC falls to 106,572, or -1,104 from the rewrite start; test LOC remains 142,855. |
 | Phase 7 dead migrated-helper deletion | Commit `6513fc80` deletes seven private helpers whose names occur only at their declarations across all tracked C#: stale purity-source text, summary-chain and diagnostic-edge adapters, an unused `as` term path, a negated-condition wrapper, an invocation-argument adapter, and an external-complexity fallback. The Release solution warning-as-error build has zero warnings; focused affected fixtures pass 72/72; MainSmtAnalyzer passes 487/487. Production LOC falls to 106,494, or -1,182 from the rewrite start; test LOC remains 142,855. |
 | Phase 7 canonical condition consumer migration | Commit `2a64a44f` makes `SymbolicReachabilityLowerer.ApplyCondition` the single owner of source-condition lowering, version-aware branch assumptions, and canonical transition application. Symbolic branch completion and Analyzer execution-visibility/purity CFG callers consume its typed transition directly; the duplicate `SymbolicReachabilityService.ApplyBranchFacts` adapter is deleted. The Release solution warning-as-error build has zero warnings; focused branch/visibility/purity fixtures pass 115/115; MainSmtAnalyzer passes 487/487; MainSmtOracle passes 573/573. Production LOC falls to 106,485, or -1,191 from the rewrite start; test LOC remains 142,855. |
+| Phase 7 canonical visibility null conditions | Pending commit makes execution-visibility null/non-null proofs consume the shared structural reference-condition builder with their existing provenance. Its independent 27-line reference lowering and relation construction are deleted. The Release Analyzer warning-as-error build has zero warnings; focused visibility/reference/null fixtures pass 213/213; MainSmtAnalyzer passes 487/487. Production LOC falls to 106,462, or -1,214 from the rewrite start; test LOC remains 142,855. |
 
 ## Current Checkpoint
 
@@ -694,12 +699,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   loop-local targets, and finally-local targets remain conservative fallbacks.
   The orphaned exception mutation partial and seven migrated private helpers are
   deleted. Branch completion, execution visibility, and purity CFG now share the
-  canonical condition transition directly. Test LOC is 142,855; production LOC
-  is 106,485, or -1,191 from the rewrite start; the 900-line scaffold must be
-  repaid when structural transfer paths are deleted.
-- Next cheapest step: migrate the remaining structural reference-null condition
-  consumers to typed branch transitions, starting with the exception disposal
-  guard and evaluation-path coalesce/conditional-access group, then delete the
-  direct `SymbolicStateFactBuilder` adapter if no caller remains.
+  canonical condition transition directly, and visibility null proofs share the
+  canonical reference-condition builder. Test LOC is 142,855; production LOC is
+  106,462, or -1,214 from the rewrite start; the 877-line scaffold must be repaid
+  when structural transfer paths are deleted.
+- Next cheapest step: consolidate the three remaining direct reference-null
+  state consumers (exception disposal guard and evaluation-path coalesce/access)
+  behind a typed transition only if it is net-negative; otherwise pivot to the
+  next larger structural consumer deletion.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
