@@ -106,32 +106,6 @@ internal static class SymbolicReachabilityService
         return new SymbolicProofService(smtAnalysis).ClassifyHazardTrigger(state, triggerPrecondition);
     }
 
-    internal static SymbolicLoweringResult<SymbolicState> ApplyBranchFacts(
-        SymbolicState state,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
-        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
-            condition,
-            branchWhenTrue,
-            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } branchCondition })
-            return SymbolicLoweringResult<SymbolicState>.Unsupported(lowering.Provenance[0]);
-
-        var transition = SymbolicOperationTransferKernel.Assume(
-            state,
-            branchCondition,
-            assumeTrue: true,
-            condition.Span,
-            "operation-transfer.branch-assumption");
-        return transition.IsExact
-            ? SymbolicLoweringResult<SymbolicState>.Exact(transition.State, lowering.Provenance[0])
-            : SymbolicLoweringResult<SymbolicState>.Unsupported(lowering.Provenance[0]);
-    }
-
     internal static bool IsForInitialEntryConditionAlwaysFalse(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,

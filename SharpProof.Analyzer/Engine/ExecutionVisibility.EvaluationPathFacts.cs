@@ -26,14 +26,14 @@ internal static partial class ExecutionVisibility
                 syntaxNode,
                 semanticModel,
                 cancellationToken) &&
-            SymbolicReachabilityService.ApplyBranchFacts(
+            SymbolicReachabilityLowerer.ApplyCondition(
                 pathState,
                 condition,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                getSymbolVersion) is { IsExact: true, Value: { } branchState })
-            return branchState;
+                getSymbolVersion) is { IsExact: true } transition)
+            return transition.State;
 
         if (ancestor is BinaryExpressionSyntax binaryExpression &&
             binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&

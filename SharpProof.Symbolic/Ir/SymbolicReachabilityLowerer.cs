@@ -47,19 +47,12 @@ internal static class SymbolicReachabilityLowerer
                 out var inlineTransition))
             return inlineTransition;
 
-        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
+        var transition = ApplyCondition(
+            state,
             condition,
             branchWhenTrue,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } exactCondition })
-            return Unsupported(state, condition, "condition");
-
-        var transition = SymbolicOperationTransferKernel.Assume(
-            state,
-            exactCondition,
-            assumeTrue: true,
-            condition.Span,
-            "operation-transfer.branch-assumption");
+            semanticModel,
+            cancellationToken);
         return transition.IsExact
             ? ApplyPatternBinding(
                 transition.State,
@@ -68,6 +61,29 @@ internal static class SymbolicReachabilityLowerer
                 semanticModel,
                 cancellationToken)
             : transition;
+    }
+
+    internal static SymbolicOperationTransitionResult ApplyCondition(
+        SymbolicState state,
+        ExpressionSyntax condition,
+        bool branchWhenTrue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
+            condition,
+            branchWhenTrue,
+            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
+        if (lowering is not { IsExact: true, Value: { } exactCondition })
+            return Unsupported(state, condition, "condition");
+
+        return SymbolicOperationTransferKernel.Assume(
+            state,
+            exactCondition,
+            assumeTrue: true,
+            condition.Span,
+            "operation-transfer.branch-assumption");
     }
 
     private static SymbolicOperationTransitionResult ApplyBoth(

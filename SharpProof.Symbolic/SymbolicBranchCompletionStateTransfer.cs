@@ -140,19 +140,19 @@ internal static class SymbolicBranchCompletionStateTransfer
         CancellationToken cancellationToken,
         out SymbolicState branchState)
     {
-        var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
+        var transition = SymbolicReachabilityLowerer.ApplyCondition(
                 stateBeforeStatement,
                 condition,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken);
-        if (branchLowering is not { IsExact: true, Value: { } loweredBranchState })
+        if (!transition.IsExact)
         {
             branchState = stateBeforeStatement;
             return false;
         }
 
-        branchState = loweredBranchState;
+        branchState = transition.State;
 
         if (branchStatement == null) return true;
 

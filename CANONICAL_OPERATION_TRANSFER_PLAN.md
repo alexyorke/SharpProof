@@ -302,6 +302,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Delete seven orphaned private helpers left behind by completed purity,
     exception-edge, conversion, condition, string-length, and complexity
     migrations. Whole-repository symbol counts prove each has no caller.
+  - [x] Route Symbolic branch completion plus Analyzer execution-visibility and
+    purity CFG consumers through `SymbolicReachabilityLowerer.ApplyCondition`.
+    Delete the duplicate reachability-service lowering and transition adapter.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -455,6 +458,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 stable branch-local query targets | `d92317d9` | 106,652 | -1,024 |
 | Phase 7 dead exception mutation path deletion | `190dabe7` | 106,572 | -1,104 |
 | Phase 7 dead migrated-helper deletion | `6513fc80` | 106,494 | -1,182 |
+| Phase 7 canonical condition consumer migration | pending | 106,485 | -1,191 |
 
 ## Validation Ledger
 
@@ -601,6 +605,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 stable branch-local query targets | Commit `d92317d9` lets the CFG collector return exact branch-local state when the active guard remains stable and permits reference assignments that do not mutate that guard. The original guard-mutating branch-local case, nullable assignment, post-join guarded reference projection, loop-local target, and finally-local target remain explicit conservative fallbacks. Direct normalized-state characterization passes 19/19; broader source-query/program-point fixtures pass 126/126; MainSmtOracle passes 573/573; the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,652, or -1,024 from the rewrite start; test LOC is 142,855. |
 | Phase 7 dead exception mutation path deletion | Commit `190dabe7` deletes the 90-line `ExceptionPathStateService.MutationTracking` partial after exact symbol inventory found no caller for any of its five private syntax mutation walkers. Exception path state already uses the canonical reachability entry point and shared Requires entry-state builder. MainSmtAnalyzer passes 487/487; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Analyzer warning-as-error build has zero warnings. Production LOC falls to 106,572, or -1,104 from the rewrite start; test LOC remains 142,855. |
 | Phase 7 dead migrated-helper deletion | Commit `6513fc80` deletes seven private helpers whose names occur only at their declarations across all tracked C#: stale purity-source text, summary-chain and diagnostic-edge adapters, an unused `as` term path, a negated-condition wrapper, an invocation-argument adapter, and an external-complexity fallback. The Release solution warning-as-error build has zero warnings; focused affected fixtures pass 72/72; MainSmtAnalyzer passes 487/487. Production LOC falls to 106,494, or -1,182 from the rewrite start; test LOC remains 142,855. |
+| Phase 7 canonical condition consumer migration | Pending commit makes `SymbolicReachabilityLowerer.ApplyCondition` the single owner of source-condition lowering, version-aware branch assumptions, and canonical transition application. Symbolic branch completion and Analyzer execution-visibility/purity CFG callers consume its typed transition directly; the duplicate `SymbolicReachabilityService.ApplyBranchFacts` adapter is deleted. The Release solution warning-as-error build has zero warnings; focused branch/visibility/purity fixtures pass 115/115; MainSmtAnalyzer passes 487/487; MainSmtOracle passes 573/573. Production LOC falls to 106,485, or -1,191 from the rewrite start; test LOC remains 142,855. |
 
 ## Current Checkpoint
 
@@ -688,11 +693,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   CFG collector; guard-mutating references, guarded post-join projections,
   loop-local targets, and finally-local targets remain conservative fallbacks.
   The orphaned exception mutation partial and seven migrated private helpers are
-  deleted. Test LOC is 142,855; production LOC is 106,494, or -1,182 from the
-  rewrite start; the 909-line scaffold must be repaid when structural transfer
-  paths are deleted.
-- Next cheapest step: run the same conservative whole-repository reachability
-  audit over private nested types and fields, then return to the first exact
-  exception/purity consumer adapter that can be removed as a complete slice.
+  deleted. Branch completion, execution visibility, and purity CFG now share the
+  canonical condition transition directly. Test LOC is 142,855; production LOC
+  is 106,485, or -1,191 from the rewrite start; the 900-line scaffold must be
+  repaid when structural transfer paths are deleted.
+- Next cheapest step: migrate the remaining structural reference-null condition
+  consumers to typed branch transitions, starting with the exception disposal
+  guard and evaluation-path coalesce/conditional-access group, then delete the
+  direct `SymbolicStateFactBuilder` adapter if no caller remains.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
