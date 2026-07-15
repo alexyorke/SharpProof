@@ -370,6 +370,57 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerIndexConstructionBoundsHazard(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerIndexConstructionArgumentOutOfRangeCondition(
+            expression, context);
+        if (lowering is not { IsExact: true, Value: { } trigger })
+            return NoHazard(out hazard);
+
+        hazard = CreateHazard(
+            expression,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+            null,
+            trigger,
+            ExceptionTypes.ArgumentOutOfRangeException,
+            ExceptionCategories.DefiniteIndexConstructionArgumentOutOfRange,
+            "ir.runtime-hazard.index.constructor-argument-out-of-range");
+        return true;
+    }
+
+    internal static bool TryLowerSlicingBoundsHazard(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax sourceExpression,
+        ExpressionSyntax startExpression,
+        ExpressionSyntax? countExpression,
+        bool oneArgumentUpperBoundIsInclusive,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var inRange = SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
+            sourceExpression,
+            startExpression,
+            countExpression,
+            invocation,
+            context,
+            oneArgumentUpperBoundIsInclusive);
+        hazard = CreateHazard(
+            invocation,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+            null,
+            inRange is { IsExact: true, Value: { } condition } ? new SymbolicNotCondition(condition) : null,
+            ExceptionTypes.ArgumentOutOfRangeException,
+            category,
+            "ir.runtime-hazard.slicing.argument-out-of-range");
+        return true;
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,

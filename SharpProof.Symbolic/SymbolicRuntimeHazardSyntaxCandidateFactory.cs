@@ -23,26 +23,13 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerIndexConstructionArgumentOutOfRangeCondition(
+        if (!SymbolicOperationLowerer.TryLowerIndexConstructionBoundsHazard(
             expression,
-            context);
-        if (lowering is not { IsExact: true, Value: { } condition } ||
-            !TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                null,
-                condition,
-                expression,
-                "ir.runtime-hazard.index.constructor-argument-out-of-range",
-                out var trigger))
+            new SymbolicLoweringContext(semanticModel, cancellationToken),
+            out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            expression,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            trigger,
-            ExceptionTypes.ArgumentOutOfRangeException,
-            ExceptionCategories.DefiniteIndexConstructionArgumentOutOfRange);
+        candidate = new RuntimeHazardCandidate(expression, hazard);
         return true;
     }
 
@@ -871,41 +858,18 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 out var category))
             return false;
 
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
+        if (!SymbolicOperationLowerer.TryLowerSlicingBoundsHazard(
+                invocation,
                 sourceExpression,
                 startExpression,
                 countExpression,
-                invocation,
-                context,
-                oneArgumentUpperBoundIsInclusive) is { IsExact: true, Value: { } inRangeCondition } &&
-            TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                null,
-                new SymbolicNotCondition(inRangeCondition),
-                invocation,
-                "ir.runtime-hazard.slicing.argument-out-of-range",
-                out var irTrigger))
-        {
-            candidate = new RuntimeHazardCandidate(
-                invocation,
-                SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-                irTrigger,
-                ExceptionTypes.ArgumentOutOfRangeException,
-                category);
-            return true;
-        }
+                oneArgumentUpperBoundIsInclusive,
+                category,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
+            return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            CreateUnsupportedExceptionPreconditionTrigger(
-                invocation,
-                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                null,
-                "ir.runtime-hazard.slicing.argument-out-of-range.unsupported"),
-            ExceptionTypes.ArgumentOutOfRangeException,
-            category);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 
