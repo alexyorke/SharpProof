@@ -84,7 +84,8 @@ internal sealed record SymbolicAssignmentBinding(
     string? Provenance = null,
     string? EvidenceKey = null,
     bool PropagateSourceFacts = false,
-    bool DeriveIntegerBounds = false);
+    bool DeriveIntegerBounds = false,
+    bool InvalidateTarget = true);
 
 internal readonly record struct SymbolicTermPropagation(SymbolicTerm Source, SymbolicTerm Target);
 

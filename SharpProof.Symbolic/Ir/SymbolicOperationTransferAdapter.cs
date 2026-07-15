@@ -132,7 +132,7 @@ internal static class SymbolicOperationTransferAdapter
             SymbolicOperationSequence.Single(operation));
     }
 
-    private static SymbolicOperationTransitionResult ApplyLowering(
+    internal static SymbolicOperationTransitionResult ApplyLowering(
         SymbolicState state,
         SymbolicLoweringResult<SymbolicOperationSequence> lowering)
     {

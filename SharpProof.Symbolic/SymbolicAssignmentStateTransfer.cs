@@ -225,43 +225,6 @@ internal static class SymbolicAssignmentStateTransfer
             provenanceRoot + ".throw-guard.non-null");
     }
 
-    internal static void AddAssignedCurrentInstanceMemberStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm targetTerm,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        var effectiveValueExpression = GetThrowGuardedValue(valueExpression).EffectiveValueExpression;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicSemanticPipeline.LowerTerm(effectiveValueExpression, context) is
-            { IsExact: true, Value: { } assignedValueTerm } &&
-            assignedValueTerm.Kind == targetTerm.Kind &&
-            CanCompareIrTerms(targetTerm, assignedValueTerm))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetTerm,
-                assignedValueTerm,
-                effectiveValueExpression,
-                provenanceRoot + ".member.assigned-value");
-
-        AddMemberNonNullStateFact(
-            ref state,
-            targetTerm,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot + ".member");
-        foreach (var condition in SymbolicOperationLowerer.LowerSymbolicReferenceBackedPostconditions(
-                     targetTerm,
-                     effectiveValueExpression,
-                     context,
-                     provenanceRoot + ".member"))
-            state = state.AddPathCondition(condition);
-    }
-
     internal static bool TryCreateSelfReferentialAssignedValueStateTerm(
         SymbolicTerm previousValueTerm,
         ISymbol assignedSymbol,
@@ -289,28 +252,6 @@ internal static class SymbolicAssignmentStateTransfer
 
         updatedValueTerm = updatedValue;
         return true;
-    }
-
-    private static void AddMemberNonNullStateFact(
-        ref SymbolicState state,
-        SymbolicTerm target,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenance)
-    {
-        if (target.Kind == SmtValueKind.Reference &&
-            NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
-                valueExpression,
-                semanticModel,
-                cancellationToken))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                target,
-                new SymbolicNullTerm(),
-                valueExpression,
-                provenance + ".assigned-non-null");
     }
 
     internal static bool TryHandleTupleAssignmentState(
@@ -509,40 +450,6 @@ internal static class SymbolicAssignmentStateTransfer
             state = state.AddPathCondition(armFact);
             addedCount++;
         }
-    }
-
-    internal static void AddElementAssignmentStateFact(
-        ref SymbolicState state,
-        AssignmentExpressionSyntax assignment,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess)
-            return;
-
-        var receiverSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-            elementAccess.Expression,
-            semanticModel,
-            cancellationToken);
-        if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken))
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var targetLowering = SymbolicSemanticPipeline.LowerTerm(elementAccess, context);
-        var valueLowering = SymbolicSemanticPipeline.LowerTerm(assignment.Right, context);
-        if (targetLowering is not { IsExact: true, Value: { } target } ||
-            valueLowering is not { IsExact: true, Value: { } value } ||
-            !CanCompareIrTerms(target, value))
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            target,
-            value,
-            assignment,
-            "ir.path.prior-statement.element-assignment");
     }
 
     internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)

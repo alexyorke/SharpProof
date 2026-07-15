@@ -305,7 +305,8 @@ internal static class SymbolicOperationTransferKernel
                 !SymbolicStateFactBuilder.CanCompareIrTerms(binding.Target, binding.Source))
                 return false;
 
-            state = SymbolicStateValueFacts.RemoveReferences(state, binding.TargetKey);
+            if (binding.InvalidateTarget)
+                state = SymbolicStateValueFacts.RemoveReferences(state, binding.TargetKey);
             state = state.AddPathCondition(new SymbolicFactCondition(new SymbolicFact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,

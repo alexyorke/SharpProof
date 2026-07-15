@@ -936,6 +936,59 @@ internal static class SymbolicOperationLowerer
             new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
     }
 
+    internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerExplicitTargetAssignment(
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        SyntaxNode source,
+        SymbolicLoweringContext context,
+        string provenance,
+        string bindingProvenance,
+        bool includeReferencePostconditions)
+    {
+        var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
+        var postconditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
+        if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
+                { IsExact: true, Value: { } value } &&
+            SymbolicStateFactBuilder.CanCompareIrTerms(target, value))
+            bindings.Add(new SymbolicAssignmentBinding(
+                SymbolicState.CreateProofTermKey(target),
+                target,
+                value,
+                bindingProvenance,
+                InvalidateTarget: false));
+
+        if (includeReferencePostconditions && target.Kind == SmtValueKind.Reference)
+        {
+            if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                    valueExpression,
+                    context.SemanticModel,
+                    context.CancellationToken))
+                postconditions.Add(ExactRelation(
+                    SymbolicRelationOperator.NotEqual,
+                    target,
+                    new SymbolicNullTerm(),
+                    valueExpression,
+                    provenance + ".assigned-non-null"));
+            postconditions.AddRange(LowerSymbolicReferenceBackedPostconditions(
+                target,
+                valueExpression,
+                context,
+                provenance));
+        }
+
+        if (bindings.Count == 0 && postconditions.Count == 0)
+            return Unsupported(source, provenance + ".value");
+
+        return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
+            SymbolicOperationSequence.Single(new SymbolicAssignmentOperation(
+                bindings.ToImmutable(),
+                postconditions.ToImmutable(),
+                SymbolicAssignmentOperationKind.Simple,
+                IsChecked: false,
+                new SymbolicOperationOrigin(source.Span, 0, provenance))),
+            new SymbolicLoweringProvenance("explicit-target-assignment", source.Span, provenance));
+    }
+
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerCoalesceAssignment(
         ISymbol targetSymbol,
         ExpressionSyntax rightExpression,

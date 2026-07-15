@@ -107,13 +107,21 @@ internal static class SymbolicExpressionStateTransfer
                          semanticModel,
                          cancellationToken) &&
                      SymbolicNormalCompletionStateTransfer.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
-                SymbolicAssignmentStateTransfer.AddAssignedCurrentInstanceMemberStateFacts(
-                    ref state,
-                    memberTerm,
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.path.prior-statement");
+            {
+                var effectiveValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(
+                    assignment.Right).EffectiveValueExpression;
+                var transition = SymbolicOperationTransferAdapter.ApplyLowering(
+                    state,
+                    SymbolicOperationLowerer.LowerExplicitTargetAssignment(
+                        memberTerm,
+                        effectiveValue,
+                        effectiveValue,
+                        new SymbolicLoweringContext(semanticModel, cancellationToken),
+                        "ir.path.prior-statement.member",
+                        "ir.path.prior-statement.member.assigned-value",
+                        includeReferencePostconditions: true));
+                if (transition.IsExact) state = transition.State;
+            }
         }
         else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
                  assignedSymbol is ILocalSymbol or IParameterSymbol &&
@@ -164,11 +172,37 @@ internal static class SymbolicExpressionStateTransfer
             if (transition.IsExact) state = transition.State;
         }
 
-        SymbolicAssignmentStateTransfer.AddElementAssignmentStateFact(
-            ref state,
-            assignment,
-            semanticModel,
-            cancellationToken);
+        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is
+                ElementAccessExpressionSyntax elementAccess)
+        {
+            var receiverSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                elementAccess.Expression,
+                semanticModel,
+                cancellationToken);
+            if (!SymbolicAssignmentStateTransfer.ExpressionReferencesAnySymbol(
+                    assignment.Right,
+                    receiverSymbols,
+                    semanticModel,
+                    cancellationToken) &&
+                SymbolicSemanticPipeline.LowerTerm(
+                    elementAccess,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken)) is
+                    { IsExact: true, Value: { } target })
+            {
+                var transition = SymbolicOperationTransferAdapter.ApplyLowering(
+                    state,
+                    SymbolicOperationLowerer.LowerExplicitTargetAssignment(
+                        target,
+                        assignment.Right,
+                        assignment,
+                        new SymbolicLoweringContext(semanticModel, cancellationToken),
+                        "ir.path.prior-statement.element-assignment",
+                        "ir.path.prior-statement.element-assignment",
+                        includeReferencePostconditions: false));
+                if (transition.IsExact) state = transition.State;
+            }
+        }
 
         if (containingStatement != null)
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
