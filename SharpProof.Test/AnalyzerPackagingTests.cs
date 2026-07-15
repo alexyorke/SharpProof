@@ -2278,12 +2278,26 @@ namespace TestNamespace {
     [Test]
     public void NuGetBuildScript_ShouldPackAllPublicPackages()
     {
-        var scriptPath = Path.Combine(FindRepositoryRoot(), "build-nuget.ps1");
-        var source = File.ReadAllText(scriptPath);
+        var repositoryRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(repositoryRoot, "build-nuget.ps1"));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "package-projects.json")));
+        var projects = manifest.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Select(static project => project.GetString())
+            .ToArray();
 
-        Assert.That(source, Does.Contain(@".\SharpProof.Package\SharpProof.Package.csproj"));
-        Assert.That(source, Does.Contain(@".\SharpProof.Attributes\SharpProof.Attributes.csproj"));
-        Assert.That(source, Does.Contain(@".\SharpProof.Symbolic\SharpProof.Symbolic.csproj"));
+        Assert.That(projects, Is.EqualTo(new[]
+        {
+            "SharpProof.Package/SharpProof.Package.csproj",
+            "SharpProof.Attributes/SharpProof.Attributes.csproj",
+            "SharpProof.Symbolic/SharpProof.Symbolic.csproj"
+        }));
+        Assert.That(source, Does.Contain("scripts\\package-projects.json"));
+        Assert.That(File.ReadAllText(Path.Combine(repositoryRoot, ".github", "workflows", "ci.yml")),
+            Does.Contain("scripts/package-projects.json"));
     }
 
     [Test]
@@ -2294,10 +2308,10 @@ namespace TestNamespace {
         var vsixSource = File.ReadAllText(Path.Combine(repositoryRoot, "build-vsix.ps1"));
         var nugetSource = File.ReadAllText(Path.Combine(repositoryRoot, "build-nuget.ps1"));
 
-        Assert.That(buildSource, Does.Contain("Invoke-MSBuildInRepo $msbuildPath"));
-        Assert.That(vsixSource, Does.Contain("Invoke-MSBuildInRepo $msbuild"));
-        Assert.That(buildSource, Does.Contain("Invoke-ProcessUnderJobObject -FilePath $MSBuildPath"));
-        Assert.That(vsixSource, Does.Contain("Invoke-ProcessUnderJobObject -FilePath $MSBuildPath"));
+        Assert.That(buildSource, Does.Contain("$dotnetWrapper"));
+        Assert.That(vsixSource, Does.Contain("$dotnetWrapper"));
+        Assert.That(buildSource, Does.Not.Contain("Find-SharpProofMSBuild"));
+        Assert.That(vsixSource, Does.Not.Contain("Find-SharpProofMSBuild"));
         Assert.That(nugetSource, Does.Contain("Packing NuGet packages to staging directory"));
         Assert.That(
             nugetSource.IndexOf("-o', $stagingDir", StringComparison.Ordinal),

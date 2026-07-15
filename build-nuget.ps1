@@ -8,14 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSCommandPath
-. (Join-Path $repoRoot 'scripts\JobObjectHelpers.ps1')
-
-function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
-	$exitCode = Invoke-ProcessUnderJobObject -FilePath 'dotnet' -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $repoRoot
-	if ($exitCode -ne 0) {
-		throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
-	}
-}
+$dotnetWrapper = Join-Path $repoRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 
 Push-Location $repoRoot
 try {
@@ -32,16 +25,20 @@ try {
 
 	try {
 		Write-Host "Building solution ($Configuration)..." -ForegroundColor Cyan
-		Invoke-DotnetInRepo @('build', '-c', $Configuration)
+		& $dotnetWrapper -DotnetArgs @('build', '-c', $Configuration)
+		if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with exit code $LASTEXITCODE" }
 
 		Write-Host "Packing NuGet packages to staging directory $stagingDir" -ForegroundColor Cyan
-		Invoke-DotnetInRepo @('pack', '.\SharpProof.Package\SharpProof.Package.csproj', '-c', $Configuration, '-o', $stagingDir, '--no-build')
-		Invoke-DotnetInRepo @('pack', '.\SharpProof.Attributes\SharpProof.Attributes.csproj', '-c', $Configuration, '-o', $stagingDir, '--no-build')
-		Invoke-DotnetInRepo @('pack', '.\SharpProof.Symbolic\SharpProof.Symbolic.csproj', '-c', $Configuration, '-o', $stagingDir, '--no-build')
+		$packageProjects = @((Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\package-projects.json') -Raw | ConvertFrom-Json).projects)
+		foreach ($packageProject in $packageProjects) {
+			& $dotnetWrapper -DotnetArgs @(
+				'pack', $packageProject, '-c', $Configuration, '-o', $stagingDir, '--no-build')
+			if ($LASTEXITCODE -ne 0) { throw "dotnet pack failed with exit code $LASTEXITCODE" }
+		}
 
 		$stagedPackages = @(Get-ChildItem -Path $stagingDir -Filter *.nupkg -File | Sort-Object Name)
-		if ($stagedPackages.Count -ne 3) {
-			throw "Expected 3 NuGet packages in $stagingDir, but found $($stagedPackages.Count)."
+		if ($stagedPackages.Count -ne $packageProjects.Count) {
+			throw "Expected $($packageProjects.Count) NuGet packages in $stagingDir, but found $($stagedPackages.Count)."
 		}
 
 		$publishedNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -75,7 +72,8 @@ try {
 		$projPath = Resolve-Path $InstallProject
 		Write-Host "Installing SharpProof package from local source into project: $projPath" -ForegroundColor Cyan
 		# Install the main analyzer package (includes Attributes for NuGet consumption)
-		Invoke-DotnetInRepo @('add', "$projPath", 'package', 'SharpProof', '--source', "$outFull")
+		& $dotnetWrapper -DotnetArgs @('add', "$projPath", 'package', 'SharpProof', '--source', "$outFull")
+		if ($LASTEXITCODE -ne 0) { throw "dotnet add failed with exit code $LASTEXITCODE" }
 	}
 }
 finally {

@@ -44,17 +44,12 @@ public sealed class ScriptProcessOwnershipTests
     public void BuildScriptsDoNotShadowTheConfiguredMemoryLimit()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
-        foreach (var scriptName in new[] { "build.ps1", "build-vsix.ps1" })
+        foreach (var scriptName in new[] { "build.ps1", "build-nuget.ps1", "build-vsix.ps1" })
         {
             var source = File.ReadAllText(Path.Combine(repositoryRoot, scriptName));
-            Assert.That(
-                source,
-                Does.Contain("Invoke-ProcessUnderJobObject"),
-                scriptName);
-            Assert.That(
-                source,
-                Does.Not.Contain("function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb"),
-                scriptName);
+            Assert.That(source, Does.Contain("Invoke-SharpProofDotnet.ps1"), scriptName);
+            Assert.That(source, Does.Not.Contain("Invoke-ProcessUnderJobObject"), scriptName);
+            Assert.That(source, Does.Not.Contain("MSBuild.exe"), scriptName);
         }
     }
 
@@ -69,11 +64,11 @@ public sealed class ScriptProcessOwnershipTests
         Assert.That(source, Does.Contain("--no-restore"));
         Assert.That(source, Does.Contain("--no-build"));
         Assert.That(source, Does.Not.Contain(
-            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.Attributes"));
+            "\"build\", \".\\SharpProof.Attributes"));
         Assert.That(source, Does.Not.Contain(
-            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.Analyzer"));
+            "\"build\", \".\\SharpProof.Analyzer"));
         Assert.That(source, Does.Not.Contain(
-            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.CodeFixes"));
+            "\"build\", \".\\SharpProof.CodeFixes"));
     }
 
     [Test]

@@ -54,10 +54,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Package NuGet packages
+        shell: pwsh
         run: |
-          dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs
-          dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs
-          dotnet pack SharpProof.Symbolic/SharpProof.Symbolic.csproj --configuration Release --no-build --output nupkgs
+          $manifest = Get-Content scripts/package-projects.json -Raw | ConvertFrom-Json
+          foreach ($project in $manifest.projects) {
+            .\scripts\Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Validate NuGet package contents
         shell: pwsh

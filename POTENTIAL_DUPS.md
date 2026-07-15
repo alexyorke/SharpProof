@@ -10,9 +10,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Tooling and build scripts
 
-22. **Build-tool and MSBuild discovery wrappers** - `build.ps1:21-33,69-97,111-113`; `build-nuget.ps1:13-18,38-40`; `build-vsix.ps1:13-38`; `.github/workflows/ci.yml:56-60`
-    Root entry points duplicate Job Object launches, MSBuild discovery, and package-project enumeration. Reuse `scripts/Invoke-SharpProofDotnet.ps1` or a shared helper/pack manifest so local and CI package coverage cannot diverge.
-
 ## Lower-priority follow-ups
 
 - `SharpProof.Symbolic/MethodBodyOperationResolver.cs:14-45` repeats body/expression operation lookup across method-like syntax types; a shared body-node adapter may simplify it.
