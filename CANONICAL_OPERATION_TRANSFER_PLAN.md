@@ -231,6 +231,7 @@ transfer policy after its slice is complete.
 | Canonical switch assignment choices | `63033d31` | 107,829 | +153 |
 | Unified guarded loop break paths | `68417c99` | 107,709 | +33 |
 | Canonical completed loop exits | `b1d397db` | 107,706 | +30 |
+| Canonical loop body entry | `a3976e31` | 107,645 | -31 |
 
 ## Validation Ledger
 
@@ -269,18 +270,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical switch assignment choices | Commit `63033d31` moves switch-expression assignment choices into canonical assignment lowering, reuses the guarded-choice constructor for statement and expression merging, and deletes the legacy assignment-state switch interpreter. Focused switch/state tests: 153 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,829, or +153 from the rewrite start. |
 | Phase 3 guarded loop break paths | Commit `68417c99` replaces separate direct, nested, and continue-before-break interpreters with one structural enclosing-guard and fallthrough collector while retaining mutation checks and conservative rejection. Focused loop-exit/path tests: 63 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,709, or +33 from the rewrite start. |
 | Phase 3 canonical completed loop exits | Commit `b1d397db` makes the operation kernel own `SymbolicLoopEdgeOperation`, routes guarded while/for/do exits through it, and replaces six loop-kind exit arms with one conditional-loop dispatcher. Normal-condition exits retain the existing inline-assignment lowering. Focused loop-exit/path/kernel tests: 86 passed. Production LOC fell to 107,706, or +30 from the rewrite start. |
+| Phase 3 canonical loop body entry | Commit `a3976e31` replaces the duplicated while/do/for/foreach body-entry switches in the program-point and block walkers with one loop adapter, and routes invariant application through entry/exit loop-edge events. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell below the rewrite start to 107,645, or -31. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; switch migration is complete, guarded loop exits now
-  use the canonical loop-edge event, and loop completion has one structural
-  guarded-break path collector. Loop entry/back-edge/fixed-point work remains.
-- Last confirmed fact: focused loop-exit/path/kernel tests pass 86/86; the prior
+- State: Phase 2 is gated; switch migration is complete, guarded loop exits and
+  loop invariants use canonical edge events, and one adapter owns while/do/for/
+  foreach body entry. Back-edge/fixed-point and initializer work remains.
+- Last confirmed fact: focused loop/program-point/kernel tests pass 167/167,
   MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
-  matches its 256-pass/one-baseline-failure result after guarded-break unification.
-- Next cheapest step: centralize while/do/for body-entry condition and invariant
-  construction behind one loop adapter, route its conditions through entry
-  events, and remove duplicated body-entry switches from the two source walkers.
+  matches its 256-pass/one-baseline-failure result after loop-entry migration.
+- Next cheapest step: inventory the remaining loop initializer, invalidation,
+  and back-edge/fixed-point policies, then route the first complete family through
+  canonical operations and delete its source-owned state mutation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
