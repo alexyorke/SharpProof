@@ -581,94 +581,165 @@ internal static class EffectSummarySemanticWrapperRules
             string.Equals(field, "System.Span`1._reference", StringComparison.Ordinal));
     }
 
-    internal static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol)
+    private static readonly SemanticCallRule[] SemanticCallRules =
+    [
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.IsDirectorySeparator(char)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.Slice("),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Empty()"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Item(int)"),
+        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Length()"),
+        Prefix(SemanticCallFamily.StringToReadOnlyCharSpan, "System.MemoryExtensions.AsSpan(string"),
+        Prefix(SemanticCallFamily.StringToReadOnlyCharSpan, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>"),
+        Exact(SemanticCallFamily.StringFromReadOnlyCharSpan, "object.ToString()->string"),
+        Exact(SemanticCallFamily.StringFromReadOnlyCharSpan, "string.get_Length()->int"),
+        Prefix(SemanticCallFamily.StringSliceNormalization, "System.IO.PathInternal.NormalizeDirectorySeparators(string)"),
+        Exact(SemanticCallFamily.StringSliceNormalization, "string.Substring(int, int)->string"),
+        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.IO.PathInternal.IsDirectorySeparator(char)"),
+        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Span`1<char>..ctor("),
+        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Text.ValueStringBuilder..ctor(System.Span`1<char>)"),
+        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Text.ValueStringBuilder.Append(char)"),
+        Exact(SemanticCallFamily.StackLocalCharBuilder, "object.ToString()->string"),
+        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.IsNullOrEmpty(string)->bool"),
+        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.get_Chars(int)->char"),
+        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.get_Length()->int"),
+        Prefix(SemanticCallFamily.ImmutableStringRewrite, "System.IO.PathInternal.IsDirectorySeparator(char)"),
+        Prefix(SemanticCallFamily.ImmutableStringRewrite, "System.MemoryExtensions.AsSpan(string"),
+        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.Concat(System.ReadOnlySpan`1<char>"),
+        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.StartsWith(char)->bool"),
+        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.Substring(int, int)->string"),
+        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.get_Chars(int)->char"),
+        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.get_Length()->int"),
+        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>"),
+        Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToLower(string)->string"),
+        Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToUpper(string)->string"),
+        Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "System.Type.Equals(System.Type)->bool"),
+        Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "System.Type.get_UnderlyingSystemType()->System.Type"),
+        Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "System.Reflection.MemberInfo.GetHashCode()->int"),
+        Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "object.GetHashCode()->int"),
+        Exact(SemanticCallFamily.TypeIdentity, "System.Type.op_Equality(System.Type, System.Type)->bool"),
+        Exact(SemanticCallFamily.StringHash, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int"),
+        Exact(SemanticCallFamily.StringHash, "System.Marvin.get_DefaultSeed()->ulong"),
+        Exact(SemanticCallFamily.StringHash, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1"),
+        Exact(SemanticCallFamily.StringSubstring, "string.InternalSubString(int, int)->string"),
+        Exact(SemanticCallFamily.StringSubstring, "string.ThrowSubstringArgumentOutOfRange(int, int)->void"),
+        Exact(SemanticCallFamily.StringSubstring, "string.get_Length()->int"),
+        Exact(SemanticCallFamily.FreshAllocatedStringCopy, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0"),
+        Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0"),
+        Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0"),
+        Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool"),
+        Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int"),
+        Exact(SemanticCallFamily.CharReplaceString, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void"),
+        Exact(SemanticCallFamily.CharReplaceString, "string.GetRawStringDataAsUInt16()->ref ushort"),
+        Exact(SemanticCallFamily.CharReplaceString, "string.IndexOf(char)->int"),
+        Exact(SemanticCallFamily.CharReplaceString, "string.get_Length()->int"),
+        Exact(SemanticCallFamily.StringLengthCheckedConcat, "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void"),
+        Exact(SemanticCallFamily.StringLengthCheckedConcat, "string.CopyStringContent(string, int, string)->void"),
+        Exact(SemanticCallFamily.StringLengthCheckedConcat, "string.IsNullOrEmpty(string)->bool"),
+        Exact(SemanticCallFamily.StringLengthCheckedConcat, "string.get_Length()->int"),
+        Exact(SemanticCallFamily.StringArrayConcat, "System.ArgumentNullException.ThrowIfNull(object, string)->void"),
+        Exact(SemanticCallFamily.StringArrayConcat, "System.Array.Clone()->object"),
+        Exact(SemanticCallFamily.StringArrayConcat, "string.Concat(string[])->string"),
+        Prefix(SemanticCallFamily.GuardedImmutableStringRewrite, "System.Span`1<char>.Fill("),
+        Exact(SemanticCallFamily.GuardedImmutableStringRewrite, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0"),
+        Exact(SemanticCallFamily.GuardedImmutableStringRewrite, "System.Span`1<char>..ctor(ref !0, int)->void"),
+        Exact(SemanticCallFamily.GuardedImmutableStringRewrite, "string.CopyStringContent(string, int, string)->void"),
+        Exact(SemanticCallFamily.GuardedImmutableStringRewrite, "string.get_Chars(int)->char"),
+        Exact(SemanticCallFamily.GuardedImmutableStringRewrite, "string.get_Length()->int"),
+        Prefix(SemanticCallFamily.IndexedStringReplace, "System.PackedSpanHelpers.CanUsePackedIndexOf("),
+        Prefix(SemanticCallFamily.IndexedStringReplace, "System.PackedSpanHelpers.IndexOf("),
+        Prefix(SemanticCallFamily.IndexedStringReplace, "System.PackedSpanHelpers.get_PackedIndexOfIsSupported()"),
+        Prefix(SemanticCallFamily.IndexedStringReplace, "System.SpanHelpers.IndexOf("),
+        Prefix(SemanticCallFamily.IndexedStringReplace, "System.SpanHelpers.NonPackedIndexOfChar("),
+        Exact(SemanticCallFamily.IndexedStringReplace, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0"),
+        Exact(SemanticCallFamily.IndexedStringReplace, "System.Span`1<int>..ctor(void*, int)->void"),
+        Exact(SemanticCallFamily.IndexedStringReplace, "string.Replace(char, char)->string"),
+        Exact(SemanticCallFamily.IndexedStringReplace, "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string"),
+        Exact(SemanticCallFamily.IndexedStringReplace, "string.get_Chars(int)->char"),
+        Exact(SemanticCallFamily.IndexedStringReplace, "string.get_Length()->int"),
+        Exact(SemanticCallFamily.FastAllocateString, "string.FastAllocateString(int)->string"),
+        Exact(SemanticCallFamily.FastAllocateString, "System.String.FastAllocateString(int)->string"),
+        Exact(SemanticCallFamily.BufferMemmove, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void"),
+        Exact(SemanticCallFamily.BufferMemmove, "System.Buffer.Memmove(ref byte, ref byte, nuint)->void")
+    ];
+
+    [Flags]
+    private enum SemanticCallFamily
     {
-        return callSymbol.StartsWith("System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.Slice(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Empty()", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Item(int)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Length()", StringComparison.Ordinal);
+        ReadOnlyCharSpanSearch = 1 << 0,
+        StringToReadOnlyCharSpan = 1 << 1,
+        StringFromReadOnlyCharSpan = 1 << 2,
+        StringSliceNormalization = 1 << 3,
+        StackLocalCharBuilder = 1 << 4,
+        ImmutableStringRewrite = 1 << 5,
+        InvariantTextInfo = 1 << 6,
+        TypeIdentity = 1 << 7,
+        TypeIdentityAnchor = 1 << 8,
+        StringHash = 1 << 9,
+        StringSubstring = 1 << 10,
+        FreshAllocatedStringCopy = 1 << 11,
+        CharReplaceString = 1 << 12,
+        StringLengthCheckedConcat = 1 << 13,
+        StringArrayConcat = 1 << 14,
+        GuardedImmutableStringRewrite = 1 << 15,
+        IndexedStringReplace = 1 << 16,
+        FastAllocateString = 1 << 17,
+        BufferMemmove = 1 << 18
     }
 
-    internal static bool IsStringToReadOnlyCharSpanWrapperCall(string callSymbol)
+    private readonly record struct SemanticCallRule(
+        SemanticCallFamily Families,
+        string Pattern,
+        bool IsPrefix)
     {
-        return callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("string.op_Implicit(string)->System.ReadOnlySpan`1<char>",
-                   StringComparison.Ordinal);
+        internal bool Matches(string call) => IsPrefix
+            ? call.StartsWith(Pattern, StringComparison.Ordinal)
+            : string.Equals(call, Pattern, StringComparison.Ordinal);
     }
 
-    internal static bool IsStringFromReadOnlyCharSpanWrapperCall(string callSymbol)
-    {
-        return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-               IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-               string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
-    }
+    private static SemanticCallRule Exact(SemanticCallFamily family, string pattern) =>
+        new(family, pattern, false);
 
-    internal static bool IsStringSliceNormalizationWrapperCall(string callSymbol)
-    {
-        return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-               IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-               callSymbol.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.Substring(int, int)->string", StringComparison.Ordinal);
-    }
+    private static SemanticCallRule Prefix(SemanticCallFamily family, string pattern) =>
+        new(family, pattern, true);
 
-    internal static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol)
-    {
-        return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Span`1<char>..ctor(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
-    }
+    private static bool MatchesSemanticCall(string call, SemanticCallFamily family) =>
+        SemanticCallRules.Any(rule => (rule.Families & family) != 0 && rule.Matches(call));
 
-    internal static bool IsImmutableStringRewriteWrapperCall(string callSymbol)
-    {
-        return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("string.StartsWith(char)->bool", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("string.Substring(int, int)->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>",
-                   StringComparison.Ordinal);
-    }
+    internal static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.ReadOnlyCharSpanSearch);
 
-    internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol)
-    {
-        return string.Equals(callSymbol, "System.Globalization.TextInfo.ToLower(string)->string",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string",
-                   StringComparison.Ordinal);
-    }
+    internal static bool IsStringToReadOnlyCharSpanWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringToReadOnlyCharSpan);
+
+    internal static bool IsStringFromReadOnlyCharSpanWrapperCall(string callSymbol) =>
+        IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
+        IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringFromReadOnlyCharSpan);
+
+    internal static bool IsStringSliceNormalizationWrapperCall(string callSymbol) =>
+        IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
+        IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringSliceNormalization);
+
+    internal static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StackLocalCharBuilder);
+
+    internal static bool IsImmutableStringRewriteWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.ImmutableStringRewrite);
+
+    internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.InvariantTextInfo);
 
     internal static bool CallSitesMatch(
         IReadOnlyList<CallSiteSummary> actual,
@@ -733,91 +804,41 @@ internal static class EffectSummarySemanticWrapperRules
             "System.Type.GetHashCode()";
     }
 
-    internal static bool IsTypeIdentityWrapperAnchorCall(string callSymbol)
-    {
-        return callSymbol is
-            "System.Type.Equals(System.Type)->bool" or
-            "System.Type.get_UnderlyingSystemType()->System.Type" or
-            "System.Reflection.MemberInfo.GetHashCode()->int" or
-            "object.GetHashCode()->int";
-    }
+    internal static bool IsTypeIdentityWrapperAnchorCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.TypeIdentityAnchor);
 
-    internal static bool IsTypeIdentityWrapperCall(string callSymbol)
-    {
-        return IsTypeIdentityWrapperAnchorCall(callSymbol) ||
-               callSymbol is "System.Type.op_Equality(System.Type, System.Type)->bool";
-    }
+    internal static bool IsTypeIdentityWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.TypeIdentity);
 
-    internal static bool IsStringHashWrapperCall(string callSymbol)
-    {
-        return callSymbol is
-            "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int" or
-            "System.Marvin.get_DefaultSeed()->ulong" or
-            "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1";
-    }
+    internal static bool IsStringHashWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringHash);
 
-    internal static bool IsStringSubstringWrapperCall(string callSymbol)
-    {
-        return callSymbol is
-            "string.InternalSubString(int, int)->string" or
-            "string.ThrowSubstringArgumentOutOfRange(int, int)->void" or
-            "string.get_Length()->int";
-    }
+    internal static bool IsStringSubstringWrapperCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringSubstring);
 
-    internal static bool IsFreshAllocatedStringCopyCoreCall(string callSymbol)
-    {
-        return IsBufferMemmoveCall(callSymbol) ||
-               IsFastAllocateStringCall(callSymbol) ||
-               callSymbol is "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0";
-    }
+    internal static bool IsFreshAllocatedStringCopyCoreCall(string callSymbol) =>
+        IsBufferMemmoveCall(callSymbol) ||
+        IsFastAllocateStringCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.FreshAllocatedStringCopy);
 
-    internal static bool IsCharReplaceStringWrapperCall(string callSymbol)
-    {
-        return IsBufferMemmoveCall(callSymbol) ||
-               IsFastAllocateStringCall(callSymbol) ||
-               callSymbol is
-                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0" or
-                   "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0" or
-                   "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool" or
-                   "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int" or
-                   "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void" or
-                   "string.GetRawStringDataAsUInt16()->ref ushort" or
-                   "string.IndexOf(char)->int" or
-                   "string.get_Length()->int";
-    }
+    internal static bool IsCharReplaceStringWrapperCall(string callSymbol) =>
+        IsBufferMemmoveCall(callSymbol) ||
+        IsFastAllocateStringCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.CharReplaceString);
 
-    internal static bool IsStringLengthCheckedConcatWrapperCall(string callSymbol)
-    {
-        return IsFastAllocateStringCall(callSymbol) ||
-               callSymbol is
-                   "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void" or
-                   "string.CopyStringContent(string, int, string)->void" or
-                   "string.IsNullOrEmpty(string)->bool" or
-                   "string.get_Length()->int";
-    }
+    internal static bool IsStringLengthCheckedConcatWrapperCall(string callSymbol) =>
+        IsFastAllocateStringCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringLengthCheckedConcat);
 
-    internal static bool IsStringArrayConcatWrapperCall(string callSymbol)
-    {
-        return IsStringLengthCheckedConcatWrapperCall(callSymbol) ||
-               callSymbol is
-                   "System.ArgumentNullException.ThrowIfNull(object, string)->void" or
-                   "System.Array.Clone()->object" or
-                   "string.Concat(string[])->string";
-    }
+    internal static bool IsStringArrayConcatWrapperCall(string callSymbol) =>
+        IsStringLengthCheckedConcatWrapperCall(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringArrayConcat);
 
-    internal static bool IsGuardedImmutableStringRewriteWrapperCall(string callSymbol)
-    {
-        return IsFastAllocateStringCall(callSymbol) ||
-               IsBufferMemmoveCall(callSymbol) ||
-               IsPureArgumentGuardWrapper(callSymbol) ||
-               callSymbol.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal) ||
-               (callSymbol is
-                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0" or
-                   "System.Span`1<char>..ctor(ref !0, int)->void" or
-                   "string.CopyStringContent(string, int, string)->void" or
-                   "string.get_Chars(int)->char" or
-                   "string.get_Length()->int");
-    }
+    internal static bool IsGuardedImmutableStringRewriteWrapperCall(string callSymbol) =>
+        IsFastAllocateStringCall(callSymbol) ||
+        IsBufferMemmoveCall(callSymbol) ||
+        IsPureArgumentGuardWrapper(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.GuardedImmutableStringRewrite);
 
     internal static bool IsLocalScratchIndexBuilderCall(string callSymbol)
     {
@@ -829,38 +850,16 @@ internal static class EffectSummarySemanticWrapperRules
                 callSymbol.Contains(".get_Length()", StringComparison.Ordinal));
     }
 
-    internal static bool IsIndexedStringReplaceWrapperCall(string callSymbol)
-    {
-        return IsLocalScratchIndexBuilderCall(callSymbol) ||
-               IsPureArgumentGuardWrapper(callSymbol) ||
-               callSymbol.StartsWith("System.PackedSpanHelpers.CanUsePackedIndexOf(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.PackedSpanHelpers.IndexOf(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.PackedSpanHelpers.get_PackedIndexOfIsSupported()",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.SpanHelpers.NonPackedIndexOfChar(", StringComparison.Ordinal) ||
-               (callSymbol is
-                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0" or
-                   "System.Span`1<int>..ctor(void*, int)->void" or
-                   "string.Replace(char, char)->string" or
-                   "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string" or
-                   "string.get_Chars(int)->char" or
-                   "string.get_Length()->int");
-    }
+    internal static bool IsIndexedStringReplaceWrapperCall(string callSymbol) =>
+        IsLocalScratchIndexBuilderCall(callSymbol) ||
+        IsPureArgumentGuardWrapper(callSymbol) ||
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.IndexedStringReplace);
 
-    internal static bool IsFastAllocateStringCall(string callSymbol)
-    {
-        return callSymbol is
-            "string.FastAllocateString(int)->string" or
-            "System.String.FastAllocateString(int)->string";
-    }
+    internal static bool IsFastAllocateStringCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.FastAllocateString);
 
-    internal static bool IsBufferMemmoveCall(string callSymbol)
-    {
-        return callSymbol is
-            "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void" or
-            "System.Buffer.Memmove(ref byte, ref byte, nuint)->void";
-    }
+    internal static bool IsBufferMemmoveCall(string callSymbol) =>
+        MatchesSemanticCall(callSymbol, SemanticCallFamily.BufferMemmove);
 
     internal static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
     {
