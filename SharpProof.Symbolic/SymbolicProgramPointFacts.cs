@@ -310,11 +310,10 @@ internal static class SymbolicProgramPointFacts
                         out var armCondition))
                 {
                     state = state.AddPathCondition(armCondition);
-                    AddSwitchBranchPatternBindingStateFacts(
+                    AddPatternBindingStateFacts(
                         ref state,
                         switchExpressionSyntax.GoverningExpression,
                         matchingArm.Pattern,
-                        matchingArm,
                         semanticModel,
                         cancellationToken);
                     AddSwitchBranchGuardStateFacts(
@@ -405,15 +404,9 @@ internal static class SymbolicProgramPointFacts
             condition is not IsPatternExpressionSyntax isPatternExpression)
             return;
 
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(isPatternExpression.Expression, context);
-        if (lowering is not { IsExact: true, Value: { } matchedTerm }) return;
-
-        var typeInfo = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken);
-        TryAddIrPatternBindingStateFacts(
+        AddPatternBindingStateFacts(
             ref state,
-            matchedTerm,
-            typeInfo.ConvertedType ?? typeInfo.Type,
+            isPatternExpression.Expression,
             isPatternExpression.Pattern,
             semanticModel,
             cancellationToken);
@@ -697,11 +690,10 @@ internal static class SymbolicProgramPointFacts
 
         if (section.Labels[0] is not CasePatternSwitchLabelSyntax patternLabel) return;
 
-        AddSwitchBranchPatternBindingStateFacts(
+        AddPatternBindingStateFacts(
             ref state,
             governingExpression,
             patternLabel.Pattern,
-            patternLabel,
             semanticModel,
             cancellationToken);
         AddSwitchBranchGuardStateFacts(
@@ -711,442 +703,37 @@ internal static class SymbolicProgramPointFacts
             cancellationToken);
     }
 
-    private static void AddSwitchBranchPatternBindingStateFacts(
+    private static void AddPatternBindingStateFacts(
         ref SymbolicState state,
         ExpressionSyntax governingExpression,
         PatternSyntax pattern,
-        SyntaxNode sourceNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (TryAddIrSwitchExpressionPatternBindingStateFacts(
-                ref state,
-                governingExpression,
-                pattern,
-                semanticModel,
-                cancellationToken))
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var term = SymbolicSemanticPipeline.LowerTerm(governingExpression, context);
+        var typeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
+        if (term is not { IsExact: true, Value: { } matchedTerm })
             return;
 
-    }
-
-    private static bool TryAddIrSwitchExpressionPatternBindingStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax governingExpression,
-        PatternSyntax pattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(governingExpression, context);
-        if (lowering is not { IsExact: true, Value: { } matchedTerm }) return false;
-
-        var matchedType = semanticModel.GetTypeInfo(governingExpression, cancellationToken).ConvertedType ??
-                          semanticModel.GetTypeInfo(governingExpression, cancellationToken).Type;
-        return TryAddIrPatternBindingStateFacts(
-            ref state,
+        var condition = SymbolicSemanticPipeline.LowerPatternCondition(
             matchedTerm,
-            matchedType,
+            typeInfo.ConvertedType ?? typeInfo.Type,
             pattern,
-            semanticModel,
-            cancellationToken);
+            pattern,
+            context);
+        if (condition is not { IsExact: true, Value: { } exactCondition })
+            return;
+
+        var transition = SymbolicOperationTransferKernel.Assume(
+            state,
+            exactCondition,
+            assumeTrue: true,
+            pattern.Span,
+            "cfg-program-point.pattern-binding");
+        if (transition.IsExact)
+            state = transition.State;
     }
-
-    private static bool TryAddIrPatternBindingStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm matchedTerm,
-        ITypeSymbol? matchedType,
-        PatternSyntax pattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        pattern = UnwrapPattern(pattern);
-        var canonicalContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var canonicalLowering = SymbolicSemanticPipeline.LowerPatternCondition(
-                matchedTerm,
-                matchedType,
-                pattern,
-                pattern,
-                canonicalContext);
-        if (canonicalLowering is { IsExact: true, Value: { } canonicalCondition })
-        {
-            state = state.AddPathCondition(canonicalCondition);
-            if (pattern is RecursivePatternSyntax recursivePattern)
-                TryAddIrRecursivePatternBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    matchedType,
-                    recursivePattern,
-                    semanticModel,
-                    cancellationToken);
-            else if (pattern is ListPatternSyntax listPattern)
-                TryAddIrListPatternBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    matchedType,
-                    listPattern,
-                    semanticModel,
-                    cancellationToken);
-
-            return true;
-        }
-
-        switch (pattern)
-        {
-            case VarPatternSyntax varPattern:
-                return TryAddIrDesignationBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    varPattern.Designation,
-                    varPattern,
-                    semanticModel,
-                    cancellationToken,
-                    false);
-            case DeclarationPatternSyntax declarationPattern:
-                return TryAddIrDesignationBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    declarationPattern.Designation,
-                    declarationPattern,
-                    semanticModel,
-                    cancellationToken,
-                    true);
-            case RelationalPatternSyntax relationalPattern:
-                return TryAddIrRelationalPatternStateFact(
-                    ref state,
-                    matchedTerm,
-                    relationalPattern,
-                    semanticModel,
-                    cancellationToken);
-            case RecursivePatternSyntax recursivePattern
-                :
-                return TryAddIrRecursivePatternBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    matchedType,
-                    recursivePattern,
-                    semanticModel,
-                    cancellationToken);
-            case BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword):
-                return TryAddIrPatternBindingStateFacts(
-                           ref state,
-                           matchedTerm,
-                           matchedType,
-                           binaryPattern.Left,
-                           semanticModel,
-                           cancellationToken) &&
-                       TryAddIrPatternBindingStateFacts(
-                           ref state,
-                           matchedTerm,
-                           matchedType,
-                           binaryPattern.Right,
-                           semanticModel,
-                           cancellationToken);
-            case ListPatternSyntax listPattern:
-                return TryAddIrListPatternBindingStateFacts(
-                    ref state,
-                    matchedTerm,
-                    matchedType,
-                    listPattern,
-                    semanticModel,
-                    cancellationToken);
-            default:
-                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-                var patternLowering = SymbolicSemanticPipeline.LowerPatternCondition(
-                    matchedTerm,
-                    pattern,
-                    pattern,
-                    context);
-                if (patternLowering is not { IsExact: true, Value: { } patternCondition })
-                    return false;
-
-                if (patternCondition is SymbolicFactCondition factCondition)
-                    state = state.AddFact(factCondition.Fact);
-                else
-                    state = state.AddPathCondition(patternCondition);
-
-                return true;
-        }
-    }
-
-    private static bool TryAddIrListPatternBindingStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm matchedTerm,
-        ITypeSymbol? matchedType,
-        ListPatternSyntax listPattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (matchedTerm.Kind != SmtValueKind.Reference ||
-            !SymbolicPatternLowerer.TryGetListPatternShape(
-                matchedTerm,
-                matchedType,
-                out _,
-                out var elementType,
-                out var elementKind))
-            return false;
-
-        var addedAny = false;
-        for (var index = 0; index < listPattern.Patterns.Count; index++)
-        {
-            if (listPattern.Patterns[index] is SlicePatternSyntax) continue;
-
-            if (!CSharpSyntaxFacts.TryGetListPatternElementPosition(
-                    listPattern,
-                    index,
-                    out var elementIndex,
-                    out var fromEnd))
-                continue;
-
-            SymbolicTerm elementIndexTerm;
-            if (fromEnd)
-                elementIndexTerm = new SymbolicBinaryTerm(
-                    SymbolicBinaryTermOperator.Subtract,
-                    new SymbolicLengthTerm(matchedTerm),
-                    new SymbolicIntegerConstantTerm(elementIndex));
-            else
-                elementIndexTerm = new SymbolicIntegerConstantTerm(elementIndex);
-
-            var elementTerm = new SymbolicElementTerm(
-                matchedTerm,
-                elementIndexTerm,
-                elementKind);
-            addedAny |= TryAddIrPatternBindingStateFacts(
-                ref state,
-                elementTerm,
-                elementType,
-                listPattern.Patterns[index],
-                semanticModel,
-                cancellationToken);
-        }
-
-        return addedAny;
-    }
-
-    private static bool TryAddIrRecursivePatternBindingStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm matchedTerm,
-        ITypeSymbol? matchedType,
-        RecursivePatternSyntax recursivePattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var addedBindableFacts = false;
-
-        if (matchedTerm.Kind == SmtValueKind.Reference)
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                matchedTerm,
-                new SymbolicNullTerm(),
-                recursivePattern,
-                "ir.path.switch-pattern-binding.recursive.non-null");
-
-        if (TryAddIrDesignationBindingStateFacts(
-                ref state,
-                matchedTerm,
-                recursivePattern.Designation,
-                recursivePattern,
-                semanticModel,
-                cancellationToken,
-                true))
-            addedBindableFacts = true;
-
-        if (recursivePattern.PositionalPatternClause is { } positionalClause)
-        {
-            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            for (var index = 0; index < positionalClause.Subpatterns.Count; index++)
-            {
-                var subpattern = positionalClause.Subpatterns[index];
-                if (!SymbolicPatternLowerer.TryCreateRecursivePatternPositionalTerm(
-                        matchedTerm,
-                        matchedType,
-                        recursivePattern,
-                        index,
-                        loweringContext,
-                        out var componentTerm,
-                        out var componentType))
-                    continue;
-
-                if (TryAddIrPatternBindingStateFacts(
-                        ref state,
-                        componentTerm,
-                        componentType,
-                        subpattern.Pattern,
-                        semanticModel,
-                        cancellationToken))
-                    addedBindableFacts = true;
-            }
-        }
-
-        if (recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 }) return addedBindableFacts;
-
-        foreach (var subpattern in recursivePattern.PropertyPatternClause.Subpatterns)
-        {
-            if (!TryResolveIrPropertySubpatternTerm(
-                    matchedTerm,
-                    subpattern,
-                    semanticModel,
-                    cancellationToken,
-                    out var memberTerm,
-                    out var memberType))
-                continue;
-
-            if (TryAddIrPatternBindingStateFacts(
-                    ref state,
-                    memberTerm,
-                    memberType,
-                    subpattern.Pattern,
-                    semanticModel,
-                    cancellationToken))
-                addedBindableFacts = true;
-        }
-
-        return addedBindableFacts;
-    }
-
-    private static bool TryAddIrRelationalPatternStateFact(
-        ref SymbolicState state,
-        SymbolicTerm matchedTerm,
-        RelationalPatternSyntax relationalPattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (matchedTerm.Kind != SmtValueKind.Int ||
-            !SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
-                relationalPattern.OperatorToken.Kind(),
-                false,
-                out var relationOperator))
-            return false;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(relationalPattern.Expression, context);
-        if (lowering is not { IsExact: true, Value: { } relationalValue } ||
-            relationalValue.Kind != SmtValueKind.Int)
-            return false;
-
-        AddRelationPathFact(
-            ref state,
-            relationOperator,
-            matchedTerm,
-            relationalValue,
-            relationalPattern,
-            "ir.path.switch-pattern-binding.relational");
-        return true;
-    }
-
-    private static bool TryAddIrDesignationBindingStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm matchedTerm,
-        VariableDesignationSyntax? designation,
-        SyntaxNode source,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        bool addNonNullFact)
-    {
-        if (designation == null) return false;
-
-        if (designation is DiscardDesignationSyntax) return true;
-
-        if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
-            singleVariableDesignation.Identifier.ValueText == "_" ||
-            semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol
-                localSymbol ||
-            !TryCreateSymbolTerm(localSymbol.OriginalDefinition, out var localTerm) ||
-            !CanCompareIrTerms(localTerm, matchedTerm))
-            return false;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            localTerm,
-            matchedTerm,
-            source,
-            "ir.path.switch-pattern-binding.designation");
-
-        if (localTerm.Kind == SmtValueKind.Reference && matchedTerm.Kind == SmtValueKind.Reference)
-        {
-            if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(localSymbol.Type, localTerm, source) is
-                    { IsExact: true, Value: { } localLength } &&
-                SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(localSymbol.Type, matchedTerm, source) is
-                    { IsExact: true, Value: { } matchedLength } &&
-                CanCompareIrTerms(localLength, matchedLength))
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.Equal,
-                    localLength,
-                    matchedLength,
-                    source,
-                    "ir.path.switch-pattern-binding.designation-length");
-
-            if (localSymbol.Type.SpecialType == SpecialType.System_String &&
-                SymbolicSemanticPipeline.ProjectStringContentTerm(localTerm, source) is
-                    { IsExact: true, Value: { } localString } &&
-                SymbolicSemanticPipeline.ProjectStringContentTerm(matchedTerm, source) is
-                    { IsExact: true, Value: { } matchedString })
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.Equal,
-                    localString,
-                    matchedString,
-                    source,
-                    "ir.path.switch-pattern-binding.designation-string");
-        }
-
-        if (addNonNullFact &&
-            localTerm.Kind == SmtValueKind.Reference)
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                localTerm,
-                new SymbolicNullTerm(),
-                source,
-                "ir.path.switch-pattern-binding.non-null");
-
-        return true;
-    }
-
-    private static bool TryResolveIrPropertySubpatternTerm(
-        SymbolicTerm receiver,
-        SubpatternSyntax subpattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicTerm memberTerm,
-        out ITypeSymbol? memberType)
-    {
-        memberTerm = null!;
-        memberType = null;
-
-        if (subpattern.NameColon?.Name is not ExpressionSyntax memberSyntax) return false;
-
-        var memberSymbol = semanticModel.GetSymbolInfo(memberSyntax, cancellationToken).Symbol;
-        var resolvedMemberType = memberSymbol switch
-        {
-            IPropertySymbol propertySymbol => propertySymbol.Type,
-            IFieldSymbol fieldSymbol => fieldSymbol.Type,
-            ILocalSymbol localSymbol => localSymbol.Type,
-            IParameterSymbol parameterSymbol => parameterSymbol.Type,
-            _ => null
-        };
-        if (memberSymbol == null ||
-            resolvedMemberType == null ||
-            !TryGetValueKind(resolvedMemberType, out var memberKind))
-            return false;
-
-        if (memberKind == SmtValueKind.Int &&
-            receiver.Kind == SmtValueKind.Reference &&
-            string.Equals(memberSymbol.Name, "Count", StringComparison.Ordinal))
-        {
-            memberTerm = new SymbolicCountTerm(receiver);
-            memberType = resolvedMemberType;
-            return true;
-        }
-
-        if (!SymbolicAssignmentStateTransfer.TryCreateMemberDerivedTerm(receiver, memberSymbol, memberKind, out memberTerm)) return false;
-
-        memberType = resolvedMemberType;
-        return true;
-    }
-
     private static void AddSwitchBranchGuardStateFacts(
         ref SymbolicState state,
         ExpressionSyntax? guardCondition,

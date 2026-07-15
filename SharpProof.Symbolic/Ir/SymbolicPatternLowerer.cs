@@ -202,20 +202,15 @@ internal static class SymbolicPatternLowerer
             return true;
         }
 
-        if (designation is not SingleVariableDesignationSyntax singleDesignation ||
-            context.SemanticModel.GetDeclaredSymbol(singleDesignation, context.CancellationToken) is not
-                ILocalSymbol local ||
-            !SymbolicTypeLowerer.TryGetValueKind(local.Type, out var localKind) ||
-            !SymbolicOperatorLowerer.CanCompareTerms(value, new SymbolicVariableTerm(context.GetVariableName(local), localKind),
-                SymbolicRelationOperator.Equal))
+        if (!TryLowerVariableDesignationCondition(
+                value,
+                designation,
+                sourceNode,
+                context,
+                includeProjections: false,
+                out var binding))
             return false;
 
-        var binding = SymbolicIrLowerer.CreateRelationCondition(
-            SymbolicRelationOperator.Equal,
-            new SymbolicVariableTerm(context.GetVariableName(local), localKind),
-            value,
-            sourceNode,
-            "ir.pattern.designation");
         if (pattern is DeclarationPatternSyntax { Type.IsVar: false } declaration &&
             TryLowerTypeTestCondition(value, declaration.Type, sourceNode, false, context, out var typeCondition))
             condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, typeCondition, binding);
@@ -224,6 +219,86 @@ internal static class SymbolicPatternLowerer
 
         return true;
     }
+
+    private static bool TryLowerVariableDesignationCondition(
+        SymbolicTerm value,
+        VariableDesignationSyntax? designation,
+        SyntaxNode sourceNode,
+        SymbolicLoweringContext context,
+        bool includeProjections,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (designation is DiscardDesignationSyntax)
+        {
+            condition = new SymbolicConstantCondition(true);
+            return true;
+        }
+        if (designation is not SingleVariableDesignationSyntax singleDesignation ||
+            context.SemanticModel.GetDeclaredSymbol(singleDesignation, context.CancellationToken) is not
+                ILocalSymbol local ||
+            !SymbolicTypeLowerer.TryGetValueKind(local.Type, out var localKind))
+            return false;
+
+        var localTerm = new SymbolicVariableTerm(context.GetVariableName(local), localKind);
+        if (!SymbolicOperatorLowerer.CanCompareTerms(
+                value,
+                localTerm,
+                SymbolicRelationOperator.Equal))
+            return false;
+
+        condition = SymbolicIrLowerer.CreateRelationCondition(
+            SymbolicRelationOperator.Equal,
+            localTerm,
+            value,
+            sourceNode,
+            "ir.pattern.designation");
+        if (includeProjections &&
+            localKind == SmtValueKind.Reference &&
+            value.Kind == SmtValueKind.Reference)
+        {
+            var localLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
+                local.Type,
+                localTerm,
+                sourceNode);
+            var valueLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
+                local.Type,
+                value,
+                sourceNode);
+            if (localLength is { IsExact: true, Value: { } exactLocalLength } &&
+                valueLength is { IsExact: true, Value: { } exactValueLength })
+                condition = And(
+                    condition,
+                    SymbolicIrLowerer.CreateRelationCondition(
+                        SymbolicRelationOperator.Equal,
+                        exactLocalLength,
+                        exactValueLength,
+                        sourceNode,
+                        "ir.pattern.designation-length"));
+
+            if (local.Type.SpecialType == SpecialType.System_String &&
+                SymbolicSemanticPipeline.ProjectStringContentTerm(localTerm, sourceNode) is
+                    { IsExact: true, Value: { } localString } &&
+                SymbolicSemanticPipeline.ProjectStringContentTerm(value, sourceNode) is
+                    { IsExact: true, Value: { } valueString })
+                condition = And(
+                    condition,
+                    SymbolicIrLowerer.CreateRelationCondition(
+                        SymbolicRelationOperator.Equal,
+                        localString,
+                        valueString,
+                        sourceNode,
+                        "ir.pattern.designation-string"));
+
+        }
+
+        return true;
+    }
+
+    private static SymbolicCondition And(
+        SymbolicCondition left,
+        SymbolicCondition right) =>
+        new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
 
     private static bool TryLowerRecursivePatternCondition(
         SymbolicTerm value,
@@ -248,6 +323,21 @@ internal static class SymbolicPatternLowerer
                 new SymbolicNullTerm(),
                 sourceNode,
                 "ir.pattern.recursive.non-null");
+
+        if (recursivePattern.Designation != null)
+        {
+            if (!TryLowerVariableDesignationCondition(
+                    value,
+                    recursivePattern.Designation,
+                    sourceNode,
+                    context,
+                    includeProjections: true,
+                    out var designationCondition))
+                return false;
+            combined = combined == null
+                ? designationCondition
+                : And(combined, designationCondition);
+        }
 
         if (recursivePattern.PropertyPatternClause is { } propertyClause)
         foreach (var subpattern in propertyClause.Subpatterns)
