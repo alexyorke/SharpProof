@@ -441,6 +441,7 @@ transfer policy after its slice is complete.
 | Phase 6 central compact-result schema metadata | Commit `23992c39` applies the user's relaxed .NET API constraint by replacing the unused `ISymbolicCompactResult` interface and six repeated schema triplets with `SymbolicSchemaResultBase`. Explicit `JsonPropertyOrder` values preserve the existing schema-first capability/complexity order and kind-first query/hazard/explain order. Compact envelope/order and explain byte fixtures pass 14/14; the Release Symbolic CLI warning-as-error build has zero warnings. Production LOC fell to 105,708, or -1,968 from the rewrite start; tracked test LOC is 142,472 after adding an invariant that locks each compact property prefix. |
 | Phase 6 central compact SMT diagnostics projection | Commit `2562ff6f` makes `SymbolicSmtDiagnosticsProjectionBase` the single owner of eight flattened SMT configuration/counter properties used by analysis and invariant summaries. A primary constructor preserves null validation with net-negative code; explicit order 100-109 keeps each flattened block between its existing surrounding fields. Compact/explain order and SHA-256 fixtures pass 14/14, and the Release CLI warning-as-error build has zero warnings. Production LOC fell to 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
 | Phase 6 resolved invariant scope-adapter finding | Commit `cee2af96` removes a stale pre-canonical-graph entry. `SymbolicCliInvariantResultAdapter` no longer exists and exact search finds no replacement `TryCreate` scope switch; point, line, span, and file compact/invariant output project directly from `SymbolicQueryResult`. The 14-case compact/explain order and byte gate remains green. Production LOC remains 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
+| Phase 6 intentional compact span projection | The seven nullable span-only properties intentionally guard a flattened JSON compatibility view at its single adapter boundary. An `IsSpanScope` member would add handwritten LOC, preserve the same serialized-string check, and perform no less work because each property is independently read by the serializer. Carrying an extra typed flag through `SymbolicCompactQueryScope` would add constructor and storage code. The existing compact/explain order and byte gate remains the relevant characterization. Production LOC remains 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
 
 ## Current Checkpoint
 
@@ -482,12 +483,14 @@ transfer policy after its slice is complete.
   reduction; subsequent .NET API breaks are allowed. Compact schema metadata now
   has one base owner while explicit ordering preserves exact JSON output. The
   flattened SMT diagnostic block likewise has one ordered projection owner. The
-  old per-scope invariant adapter is gone; output reads the canonical graph.
-- Last confirmed fact: exact search finds no legacy invariant scope adapter, and
-  the compact/explain order and byte gate passes 14/14. Test LOC is 142,472;
+  old per-scope invariant adapter is gone; output reads the canonical graph. The
+  compact span-only getters remain local because caching or carrying a typed
+  span flag adds handwritten code without reducing serialized work.
+- Last confirmed fact: the compact span projection is a single flattened-JSON
+  adapter boundary; the suggested helper is net-positive. Test LOC is 142,472;
   production LOC is 105,707, or -1,969 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, repeated span-scope checks in compact query location
-  projections.
+  `POTENTIAL_DUPS.md`, duplicated capability/complexity identity-column
+  passthroughs.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

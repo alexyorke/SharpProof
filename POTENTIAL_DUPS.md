@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Repeated `string.Equals(Kind,"span",...)` - `SymbolicCompactQueryModels.cs:438-450` (7 properties)
-**Recommendation:** `IsSpanScope` computed once.
-
 ### Duplicated identity-column passthroughs - `SymbolicCompactComplexityResult` vs `SymbolicCompactCapabilityResult`
 Identical 9-member location block + schema triplet. **Recommendation:** Shared base/interface for method-location fields.
 
