@@ -232,9 +232,19 @@ internal static partial class ExecutionVisibility
                 governingExpression,
                 new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion)) is
             { IsExact: true, Value: { } aliasCondition })
-            pathState = pathState.AddPathCondition(aliasCondition);
+            pathState = SymbolicOperationTransferKernel.Assume(
+                pathState,
+                aliasCondition,
+                assumeTrue: true,
+                governingExpression.Span,
+                "analyzer.execution-visibility.switch-alias").State;
 
-        return pathState.AddPathCondition(selectionCondition);
+        return SymbolicOperationTransferKernel.Assume(
+            pathState,
+            selectionCondition,
+            assumeTrue: true,
+            governingExpression.Span,
+            "analyzer.execution-visibility.switch-selection").State;
     }
 
 }

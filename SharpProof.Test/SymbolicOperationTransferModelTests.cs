@@ -659,6 +659,27 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [Test]
+    public void TransferKernel_InvalidationOwnsDefinitionVersionUpdate()
+    {
+        var state = new SymbolicState(
+            new[] { Relation("value@v3", 3) },
+            symbolVersions: new[] { new KeyValuePair<string, int>("value", 3) });
+
+        var result = SymbolicOperationTransferKernel.Invalidate(
+            state,
+            ImmutableArray.Create(new SymbolicInvalidationTarget("value", DefinitionVersion: 8)),
+            default,
+            "test.invalidate-version");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(result.State.Facts, Is.Empty);
+            Assert.That(result.State.SymbolVersions["value"], Is.EqualTo(8));
+        });
+    }
+
     [TestCase(0, 2)]
     [TestCase(17, 36)]
     public void TransferKernel_DefinitionVersionsAreStableEvenValues(int spanStart, int expectedVersion)

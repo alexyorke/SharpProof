@@ -615,9 +615,11 @@ internal partial class PurityAnalysisEngine
             var nextVersion = SymbolicOperationTransferKernel.GetDefinitionVersion(definitionSyntax.Span);
             var pathState = SymbolicOperationTransferKernel.Invalidate(
                     PathState,
-                    ImmutableArray.Create(new SymbolicInvalidationTarget(symbolKey)),
+                    ImmutableArray.Create(new SymbolicInvalidationTarget(
+                        symbolKey,
+                        DefinitionVersion: nextVersion)),
                     definitionSyntax.Span,
-                    "analyzer.version-update").State.WithSymbolVersion(symbolKey, nextVersion);
+                    "analyzer.version-update").State;
             return Copy(pathState: pathState);
         }
 

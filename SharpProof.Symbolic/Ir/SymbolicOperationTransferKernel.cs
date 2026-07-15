@@ -219,9 +219,13 @@ internal static class SymbolicOperationTransferKernel
         SymbolicMutationOperation mutation)
     {
         foreach (var target in mutation.Invalidations)
+        {
             state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
                 ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
                 : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
+            if (target.DefinitionVersion is { } definitionVersion)
+                state = state.WithSymbolVersion(target.Key, definitionVersion);
+        }
         if (!TryApplyBindings(ref state, mutation.Bindings, mutation.Origin)) return false;
         if (mutation.MutationKind != SymbolicMutationOperationKind.CallerVisible) return true;
         if (mutation.Subject == null) return false;

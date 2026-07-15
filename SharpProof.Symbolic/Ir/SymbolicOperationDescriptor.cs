@@ -37,7 +37,8 @@ internal enum SymbolicInvalidationMatchKind
 
 internal readonly record struct SymbolicInvalidationTarget(
     string Key,
-    SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix);
+    SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix,
+    int? DefinitionVersion = null);
 
 internal enum SymbolicLoopEdgeKind
 {
