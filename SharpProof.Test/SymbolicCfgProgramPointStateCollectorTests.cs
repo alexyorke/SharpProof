@@ -79,6 +79,57 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void LocalDeclarationCompletion_MatchesStructuralCollector()
+    {
+        const string source =
+            "static class C { static int M(int[] values) { int value = values[0]; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(LocalDeclarationCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [TestCase(
+        "static class C { static int M() { int first = 1, second = 2; return first + second; } }")]
+    [TestCase(
+        "static class C { static string M(string? input) { string value = input ?? throw new System.Exception(); return value; } }")]
+    public void DeclarationCompletionShapesWithoutParity_RemainConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(DeclarationCompletionShapesWithoutParity_RemainConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [Test]
     public void ConditionalControlFlow_MatchesStructuralCollector()
     {
         const string source = "static class C { static int M(bool condition) { int value = 0; if (condition) value = 1; return value; } }";

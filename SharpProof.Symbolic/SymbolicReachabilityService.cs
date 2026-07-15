@@ -130,7 +130,8 @@ internal static class SymbolicReachabilityService
     {
         if (!includeCurrentStatementCompletionFacts ||
             site is AssignmentExpressionSyntax ||
-            site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax })
+            site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax } or
+                LocalDeclarationStatementSyntax)
         {
             var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
                 site,

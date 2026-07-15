@@ -808,6 +808,17 @@ internal static class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (site is LocalDeclarationStatementSyntax localDeclaration &&
+            (localDeclaration.Declaration.Variables.Count != 1 ||
+             localDeclaration.Declaration.Variables[0] is not { Initializer: not null } declarator ||
+             operation is not ISimpleAssignmentOperation
+             {
+                 IsImplicit: true,
+                 Syntax: VariableDeclaratorSyntax operationDeclarator
+             } ||
+             !ReferenceEquals(declarator, operationDeclarator)))
+            return false;
+
         if (!TryApplyOperation(
                 ref state,
                 operation,
@@ -817,6 +828,15 @@ internal static class SymbolicCfgProgramPointStateCollector
                 cancellationToken,
                 out _))
             return false;
+
+        if (site is LocalDeclarationStatementSyntax completedDeclaration)
+            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+                ref state,
+                completedDeclaration.Declaration.Variables[0].Initializer!.Value,
+                completedDeclaration,
+                false,
+                semanticModel,
+                cancellationToken);
 
         if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
