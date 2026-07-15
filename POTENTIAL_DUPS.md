@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Duplicated SMT-diagnostics passthrough property block - `SymbolicCompactInvariantResults.cs:311-325` vs `SymbolicCompactQueryModels.cs:837-851`
-Same 8 members over `_smtDiagnostics`. **Recommendation:** Expose from `SymbolicCompactSmtDiagnostics` / shared projection.
-
 ### Near-duplicated per-scope dispatch - `SymbolicCliInvariantResultAdapter.TryCreate:46-85`
 Four point/line/span/file `case` blocks structurally identical. **Recommendation:** Generic `Build<T>(...)` / reuse `SelectScope`.
 

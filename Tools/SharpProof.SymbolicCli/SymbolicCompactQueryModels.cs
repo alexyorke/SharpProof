@@ -668,11 +668,10 @@ public sealed class SymbolicInvariantQueryResult : SymbolicSchemaResultBase
     }
 }
 
-public sealed class SymbolicInvariantQuerySummary
+public sealed class SymbolicInvariantQuerySummary : SymbolicSmtDiagnosticsProjectionBase
 {
     private const int MaxSummaryReasons = 16;
     private const int MaxSummaryTargets = 32;
-    private readonly SymbolicCompactSmtDiagnostics _smtDiagnostics;
 
     private SymbolicInvariantQuerySummary(
         int outputMaxFacts,
@@ -697,6 +696,7 @@ public sealed class SymbolicInvariantQuerySummary
         bool reasonsTruncated,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         bool pathConditionBudgetExceeded)
+        : base(smtDiagnostics)
     {
         OutputMaxFacts = outputMaxFacts;
         OutputMaxConditions = outputMaxConditions;
@@ -718,7 +718,6 @@ public sealed class SymbolicInvariantQuerySummary
         ReasonCount = reasonCount;
         Reasons = reasons ?? throw new ArgumentNullException(nameof(reasons));
         ReasonsTruncated = reasonsTruncated;
-        _smtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         PathConditionBudgetExceeded = pathConditionBudgetExceeded;
     }
 
@@ -762,22 +761,7 @@ public sealed class SymbolicInvariantQuerySummary
 
     public bool ReasonsTruncated { get; }
 
-    public bool SmtConfigured => _smtDiagnostics.IsConfigured;
-
-    public bool SmtEnabled => _smtDiagnostics.IsEnabled;
-
-    public int SmtExecutedQueryCount => _smtDiagnostics.ExecutedQueryCount;
-
-    public int SmtCacheEntryCount => _smtDiagnostics.CacheEntryCount;
-
-    public int SmtQueryTimeoutMs => _smtDiagnostics.QueryTimeoutMs;
-
-    public int SmtMethodBudgetMs => _smtDiagnostics.MethodBudgetMs;
-
-    public int SmtMaxPathConditions => _smtDiagnostics.MaxPathConditions;
-
-    public int SmtMaxExpressionNodes => _smtDiagnostics.MaxExpressionNodes;
-
+    [JsonPropertyOrder(108)]
     public bool PathConditionBudgetExceeded { get; }
 
     internal static SymbolicInvariantQuerySummary FromCompactResult(

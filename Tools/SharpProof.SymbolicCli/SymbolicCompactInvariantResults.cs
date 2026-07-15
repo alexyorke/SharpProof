@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -243,22 +244,36 @@ public sealed class SymbolicCompactSmtDiagnostics
     }
 }
 
-public sealed class SymbolicCompactAnalysisSummary
+public abstract class SymbolicSmtDiagnosticsProjectionBase(SymbolicCompactSmtDiagnostics smtDiagnostics)
+{
+    private SymbolicCompactSmtDiagnostics SmtDiagnostics { get; } =
+        smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+
+    [JsonPropertyOrder(100)] public bool SmtConfigured => SmtDiagnostics.IsConfigured;
+    [JsonPropertyOrder(101)] public bool SmtEnabled => SmtDiagnostics.IsEnabled;
+    [JsonPropertyOrder(102)] public int SmtExecutedQueryCount => SmtDiagnostics.ExecutedQueryCount;
+    [JsonPropertyOrder(103)] public int SmtCacheEntryCount => SmtDiagnostics.CacheEntryCount;
+    [JsonPropertyOrder(104)] public int SmtQueryTimeoutMs => SmtDiagnostics.QueryTimeoutMs;
+    [JsonPropertyOrder(105)] public int SmtMethodBudgetMs => SmtDiagnostics.MethodBudgetMs;
+    [JsonPropertyOrder(106)] public int SmtMaxPathConditions => SmtDiagnostics.MaxPathConditions;
+    [JsonPropertyOrder(107)] public int SmtMaxExpressionNodes => SmtDiagnostics.MaxExpressionNodes;
+}
+
+public sealed class SymbolicCompactAnalysisSummary : SymbolicSmtDiagnosticsProjectionBase
 {
     private readonly SymbolicAnalysisTruncationInfo _analysisTruncation;
     private readonly SymbolicCompactInvariantQueryView _invariantQuery;
     private readonly SymbolicProgramPointSummary _programPointSummary;
-    private readonly SymbolicCompactSmtDiagnostics _smtDiagnostics;
 
     private SymbolicCompactAnalysisSummary(
         SymbolicCompactInvariantQueryView invariantQuery,
         SymbolicProgramPointSummary programPointSummary,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         SymbolicAnalysisTruncationInfo analysisTruncation)
+        : base(smtDiagnostics)
     {
         _invariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
         _programPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        _smtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         _analysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
     }
 
@@ -308,24 +323,10 @@ public sealed class SymbolicCompactAnalysisSummary
 
     public int ProofUnknownCount => _programPointSummary.ProofOutcomes.UnknownCount;
 
-    public bool SmtConfigured => _smtDiagnostics.IsConfigured;
-
-    public bool SmtEnabled => _smtDiagnostics.IsEnabled;
-
-    public int SmtExecutedQueryCount => _smtDiagnostics.ExecutedQueryCount;
-
-    public int SmtCacheEntryCount => _smtDiagnostics.CacheEntryCount;
-
-    public int SmtQueryTimeoutMs => _smtDiagnostics.QueryTimeoutMs;
-
-    public int SmtMethodBudgetMs => _smtDiagnostics.MethodBudgetMs;
-
-    public int SmtMaxPathConditions => _smtDiagnostics.MaxPathConditions;
-
-    public int SmtMaxExpressionNodes => _smtDiagnostics.MaxExpressionNodes;
-
+    [JsonPropertyOrder(108)]
     public bool AnalysisTruncated => _analysisTruncation.IsTruncated;
 
+    [JsonPropertyOrder(109)]
     public bool HasUnresolvedAnalysis =>
         ConservativeUnknownCount != 0 ||
         ReachabilityUnknownCount != 0 ||
