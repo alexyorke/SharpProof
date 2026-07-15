@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 
+using SharpProof.ProofCore.Smt;
+
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicOperationTransferKernel
@@ -128,6 +130,9 @@ internal static class SymbolicOperationTransferKernel
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
             state = state.AddPathCondition(postcondition);
+        foreach (var binding in assignment.Bindings)
+            if (binding.DeriveIntegerBounds)
+                AddDerivedIntegerBounds(ref state, binding, assignment.Origin);
         return true;
     }
 
@@ -314,5 +319,131 @@ internal static class SymbolicOperationTransferKernel
         }
 
         return true;
+    }
+
+    private static void AddDerivedIntegerBounds(
+        ref SymbolicState state,
+        SymbolicAssignmentBinding binding,
+        SymbolicOperationOrigin origin)
+    {
+        if (binding.Target.Kind != SmtValueKind.Int || binding.Source is not { Kind: SmtValueKind.Int } source)
+            return;
+
+        if (StateProvesIntegerBound(state, source, strictlyPositive: true))
+            AddIntegerBound(
+                ref state,
+                binding.Target,
+                SymbolicRelationOperator.GreaterThan,
+                new SymbolicIntegerConstantTerm(0),
+                origin,
+                ".assigned-integer.positive");
+        else if (StateProvesIntegerBound(state, source, strictlyPositive: false))
+            AddIntegerBound(
+                ref state,
+                binding.Target,
+                SymbolicRelationOperator.GreaterThanOrEqual,
+                new SymbolicIntegerConstantTerm(0),
+                origin,
+                ".assigned-integer.non-negative");
+
+        if (source is not SymbolicBinaryTerm
+            {
+                Operator: SymbolicBinaryTermOperator.Remainder,
+                Left: { Kind: SmtValueKind.Int } dividend,
+                Right: { Kind: SmtValueKind.Int } divisor
+            } ||
+            !StateProvesIntegerBound(state, dividend, strictlyPositive: false) ||
+            !StateProvesIntegerBound(state, divisor, strictlyPositive: true))
+            return;
+
+        AddIntegerBound(
+            ref state,
+            binding.Target,
+            SymbolicRelationOperator.GreaterThanOrEqual,
+            new SymbolicIntegerConstantTerm(0),
+            origin,
+            ".assigned-remainder.non-negative");
+        AddIntegerBound(
+            ref state,
+            binding.Target,
+            SymbolicRelationOperator.LessThan,
+            divisor,
+            origin,
+            ".assigned-remainder.upper-bound");
+    }
+
+    private static bool StateProvesIntegerBound(
+        SymbolicState state,
+        SymbolicTerm term,
+        bool strictlyPositive)
+    {
+        return state.PathConditions.Any(condition => ConditionProvesIntegerBound(condition, term, strictlyPositive)) ||
+               state.Facts.Any(fact => FactProvesIntegerBound(fact, term, strictlyPositive));
+    }
+
+    private static bool ConditionProvesIntegerBound(
+        SymbolicCondition condition,
+        SymbolicTerm term,
+        bool strictlyPositive)
+    {
+        return condition switch
+        {
+            SymbolicFactCondition fact => FactProvesIntegerBound(fact.Fact, term, strictlyPositive),
+            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary =>
+                ConditionProvesIntegerBound(binary.Left, term, strictlyPositive) ||
+                ConditionProvesIntegerBound(binary.Right, term, strictlyPositive),
+            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary =>
+                ConditionProvesIntegerBound(binary.Left, term, strictlyPositive) &&
+                ConditionProvesIntegerBound(binary.Right, term, strictlyPositive),
+            _ => false
+        };
+    }
+
+    private static bool FactProvesIntegerBound(
+        SymbolicFact fact,
+        SymbolicTerm term,
+        bool strictlyPositive)
+    {
+        if (!fact.Polarity || fact.Atom is not SymbolicRelationAtom relation) return false;
+        return Equals(relation.Left, term) && relation.Right is SymbolicIntegerConstantTerm right
+            ? RelationProvesIntegerBound(relation.Operator, right.Value, strictlyPositive, termOnLeft: true)
+            : Equals(relation.Right, term) && relation.Left is SymbolicIntegerConstantTerm left &&
+              RelationProvesIntegerBound(relation.Operator, left.Value, strictlyPositive, termOnLeft: false);
+    }
+
+    private static bool RelationProvesIntegerBound(
+        SymbolicRelationOperator relation,
+        long constant,
+        bool strictlyPositive,
+        bool termOnLeft)
+    {
+        return (termOnLeft, relation) switch
+        {
+            (true, SymbolicRelationOperator.GreaterThan) => strictlyPositive ? constant >= 0 : constant >= -1,
+            (true, SymbolicRelationOperator.GreaterThanOrEqual) => strictlyPositive ? constant > 0 : constant >= 0,
+            (true, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
+            (false, SymbolicRelationOperator.LessThan) => strictlyPositive ? constant <= 0 : constant <= -1,
+            (false, SymbolicRelationOperator.LessThanOrEqual) => strictlyPositive ? constant < 0 : constant <= 0,
+            (false, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
+            _ => false
+        };
+    }
+
+    private static void AddIntegerBound(
+        ref SymbolicState state,
+        SymbolicTerm left,
+        SymbolicRelationOperator relation,
+        SymbolicTerm right,
+        SymbolicOperationOrigin origin,
+        string provenanceSuffix)
+    {
+        state = state.AddPathCondition(new SymbolicFactCondition(new SymbolicFact(
+            new SymbolicRelationAtom(relation, left, right),
+            true,
+            SymbolicFactConfidence.Exact,
+            origin.Provenance + provenanceSuffix,
+            origin.SourceSpan,
+            null,
+            null)));
     }
 }

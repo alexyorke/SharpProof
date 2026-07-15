@@ -145,22 +145,6 @@ internal static class SymbolicAssignmentStateTransfer
                 semanticModel,
                 cancellationToken);
 
-        SymbolicTerm? assignedValueTerm = null;
-        if (isSelfReferential)
-            assignedValueTerm = selfReferentialValueTerm;
-        else
-        {
-            if (assignedType?.SpecialType == SpecialType.System_Boolean &&
-                SymbolicSemanticPipeline.LowerBooleanValueTerm(effectiveValueExpression, context) is
-                { IsExact: true, Value: { } loweredBooleanValueTerm })
-                assignedValueTerm = loweredBooleanValueTerm;
-
-            if (assignedValueTerm == null &&
-                SymbolicSemanticPipeline.LowerTerm(effectiveValueExpression, context) is
-                { IsExact: true, Value: { } loweredValueTerm })
-                assignedValueTerm = loweredValueTerm;
-        }
-
         if (!isSelfReferential)
             AddSwitchExpressionAssignedValueStateFacts(
                 ref state,
@@ -172,29 +156,25 @@ internal static class SymbolicAssignmentStateTransfer
 
         if (isSelfReferential &&
                  TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
-                 assignedValueTerm != null &&
-                 assignedValueTerm.Kind == targetTerm.Kind &&
-                 CanCompareIrTerms(targetTerm, assignedValueTerm))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetTerm,
-                assignedValueTerm,
+                 selfReferentialValueTerm != null &&
+                 selfReferentialValueTerm.Kind == targetTerm.Kind &&
+                 CanCompareIrTerms(targetTerm, selfReferentialValueTerm))
+        {
+            var transition = SymbolicOperationTransferAdapter.ApplyBindings(
+                state,
+                ImmutableArray.Create(new SymbolicAssignmentBinding(
+                    SymbolicFactFactory.GetSmtVariableName(assignedSymbol),
+                    targetTerm,
+                    selfReferentialValueTerm,
+                    provenanceRoot + ".assigned-value",
+                    DeriveIntegerBounds: true)),
                 effectiveValueExpression,
-                provenanceRoot + ".assigned-value");
+                SymbolicAssignmentOperationKind.Simple,
+                provenanceRoot);
+            if (transition.IsExact)
+                state = transition.State;
+        }
 
-        AddNotNullIfNotNullAssignedStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            context,
-            provenanceRoot);
-        AddAssignedIntegerRangeStateFacts(
-            ref state,
-            assignedSymbol,
-            assignedValueTerm,
-            effectiveValueExpression,
-            provenanceRoot);
         if (isSelfReferential &&
             TryCreateSymbolTerm(assignedSymbol, out var selfReferenceTarget))
             foreach (var condition in SymbolicOperationLowerer.LowerSymbolicReferenceBackedPostconditions(
@@ -203,12 +183,6 @@ internal static class SymbolicAssignmentStateTransfer
                          context,
                          provenanceRoot))
                 state = state.AddPathCondition(condition);
-        AddRemainderAssignedRangeStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            context,
-            provenanceRoot);
 
         if (throwGuardedValue.HasGuard)
             AddThrowGuardedAssignmentCompletionStateFacts(
@@ -336,40 +310,6 @@ internal static class SymbolicAssignmentStateTransfer
             state = state.AddPathCondition(condition);
     }
 
-    private static void AddAssignedIntegerRangeStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        SymbolicTerm? assignedValueTerm,
-        ExpressionSyntax valueExpression,
-        string provenanceRoot)
-    {
-        if (assignedValueTerm is not { Kind: SmtValueKind.Int } valueTerm ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetTerm) ||
-            targetTerm.Kind != SmtValueKind.Int)
-            return;
-
-        if (StateProvesPositiveInteger(state, valueTerm))
-        {
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.GreaterThan,
-                targetTerm,
-                new SymbolicIntegerConstantTerm(0),
-                valueExpression,
-                provenanceRoot + ".assigned-integer.positive");
-            return;
-        }
-
-        if (StateProvesNonNegativeInteger(state, valueTerm))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.GreaterThanOrEqual,
-                targetTerm,
-                new SymbolicIntegerConstantTerm(0),
-                valueExpression,
-                provenanceRoot + ".assigned-integer.non-negative");
-    }
-
     internal static bool TryCreateSelfReferentialAssignedValueStateTerm(
         SymbolicTerm previousValueTerm,
         ISymbol assignedSymbol,
@@ -399,40 +339,6 @@ internal static class SymbolicAssignmentStateTransfer
         return true;
     }
 
-    private static void AddNotNullIfNotNullAssignedStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        if (!TryCreateSymbolTerm(assignedSymbol, out var target) ||
-            target.Kind != SmtValueKind.Reference ||
-            SymbolicSemanticPipeline.LowerNotNullIfNotNullAssignedResultTerm(valueExpression, context) is not
-                { IsExact: true, Value: { Kind: SmtValueKind.Bool } resultNonNull })
-            return;
-
-        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                target,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".not-null-if-not-null.target",
-            assignedSymbol));
-        var targetNonNullTerm = new SymbolicConditionalTerm(
-            targetNonNull,
-            new SymbolicBooleanConstantTerm(true),
-            new SymbolicBooleanConstantTerm(false));
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetNonNullTerm,
-            resultNonNull,
-            valueExpression,
-            provenanceRoot + ".not-null-if-not-null.result");
-    }
-
     private static void AddMemberNonNullStateFact(
         ref SymbolicState state,
         SymbolicTerm target,
@@ -453,135 +359,6 @@ internal static class SymbolicAssignmentStateTransfer
                 new SymbolicNullTerm(),
                 valueExpression,
                 provenance + ".assigned-non-null");
-    }
-
-    private static void AddRemainderAssignedRangeStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        if (valueExpression is not BinaryExpressionSyntax moduloExpression ||
-            !moduloExpression.IsKind(SyntaxKind.ModuloExpression) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetTerm) ||
-            targetTerm.Kind != SmtValueKind.Int)
-            return;
-
-        var dividendLowering = SymbolicSemanticPipeline.LowerTerm(moduloExpression.Left, context);
-        var divisorLowering = SymbolicSemanticPipeline.LowerTerm(moduloExpression.Right, context);
-        if (dividendLowering is not { IsExact: true, Value: { } dividendTerm } ||
-            dividendTerm.Kind != SmtValueKind.Int ||
-            divisorLowering is not { IsExact: true, Value: { } divisorTerm } ||
-            divisorTerm.Kind != SmtValueKind.Int ||
-            !StateProvesNonNegativeInteger(state, dividendTerm) ||
-            !StateProvesPositiveInteger(state, divisorTerm))
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.GreaterThanOrEqual,
-            targetTerm,
-            new SymbolicIntegerConstantTerm(0),
-            valueExpression,
-            provenanceRoot + ".assigned-remainder.non-negative");
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.LessThan,
-            targetTerm,
-            divisorTerm,
-            valueExpression,
-            provenanceRoot + ".assigned-remainder.upper-bound");
-    }
-
-    private static bool StateProvesPositiveInteger(SymbolicState state, SymbolicTerm term)
-    {
-        return StateConditionProvesIntegerRelation(state, term, true);
-    }
-
-    private static bool StateProvesNonNegativeInteger(SymbolicState state, SymbolicTerm term)
-    {
-        return StateConditionProvesIntegerRelation(state, term, false);
-    }
-
-    private static bool StateConditionProvesIntegerRelation(
-        SymbolicState state,
-        SymbolicTerm term,
-        bool requireStrictlyPositive)
-    {
-        if (term.Kind != SmtValueKind.Int) return false;
-
-        return state.PathConditions.Any(condition =>
-                   ConditionProvesIntegerRelation(condition, term, requireStrictlyPositive)) ||
-               state.Facts.Any(fact => FactProvesIntegerRelation(fact, term, requireStrictlyPositive));
-    }
-
-    private static bool ConditionProvesIntegerRelation(
-        SymbolicCondition condition,
-        SymbolicTerm term,
-        bool requireStrictlyPositive)
-    {
-        return condition switch
-        {
-            SymbolicFactCondition factCondition => FactProvesIntegerRelation(factCondition.Fact, term,
-                requireStrictlyPositive),
-            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binaryCondition =>
-                ConditionProvesIntegerRelation(binaryCondition.Left, term, requireStrictlyPositive) ||
-                ConditionProvesIntegerRelation(binaryCondition.Right, term, requireStrictlyPositive),
-            SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binaryCondition =>
-                ConditionProvesIntegerRelation(binaryCondition.Left, term, requireStrictlyPositive) &&
-                ConditionProvesIntegerRelation(binaryCondition.Right, term, requireStrictlyPositive),
-            _ => false
-        };
-    }
-
-    private static bool FactProvesIntegerRelation(
-        SymbolicFact fact,
-        SymbolicTerm term,
-        bool requireStrictlyPositive)
-    {
-        if (!fact.Polarity ||
-            fact.Atom is not SymbolicRelationAtom relation)
-            return false;
-
-        if (Equals(relation.Left, term) &&
-            relation.Right is SymbolicIntegerConstantTerm rightConstant)
-            return RelationProvesIntegerRelation(
-                relation.Operator,
-                rightConstant.Value,
-                requireStrictlyPositive,
-                true);
-
-        if (Equals(relation.Right, term) &&
-            relation.Left is SymbolicIntegerConstantTerm leftConstant)
-            return RelationProvesIntegerRelation(
-                relation.Operator,
-                leftConstant.Value,
-                requireStrictlyPositive,
-                false);
-
-        return false;
-    }
-
-    private static bool RelationProvesIntegerRelation(
-        SymbolicRelationOperator op,
-        long constant,
-        bool requireStrictlyPositive,
-        bool termOnLeft)
-    {
-        return (termOnLeft, op) switch
-        {
-            (true, SymbolicRelationOperator.GreaterThan) => requireStrictlyPositive ? constant >= 0 : constant >= -1,
-            (true, SymbolicRelationOperator.GreaterThanOrEqual) => requireStrictlyPositive
-                ? constant > 0
-                : constant >= 0,
-            (true, SymbolicRelationOperator.Equal) => requireStrictlyPositive ? constant > 0 : constant >= 0,
-            (false, SymbolicRelationOperator.LessThan) => requireStrictlyPositive ? constant <= 0 : constant <= -1,
-            (false, SymbolicRelationOperator.LessThanOrEqual) => requireStrictlyPositive ? constant < 0 : constant <= 0,
-            (false, SymbolicRelationOperator.Equal) => requireStrictlyPositive ? constant > 0 : constant >= 0,
-            _ => false
-        };
     }
 
     internal static bool TryHandleTupleAssignmentState(

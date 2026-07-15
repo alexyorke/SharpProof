@@ -109,7 +109,10 @@ internal static class SymbolicOperationLowerer
                             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression),
                             valueContext.SemanticModel,
                             valueContext.CancellationToken,
-                            out _)));
+                            out _),
+                    DeriveIntegerBounds:
+                        postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
+                        target.Kind == SmtValueKind.Int));
             }
 
             AddReferenceAssignmentPostconditions(
@@ -178,6 +181,7 @@ internal static class SymbolicOperationLowerer
                 provenance);
             AddSymbolicReferenceAssignmentPostconditions(
                 conditions,
+                targetSymbol,
                 target,
                 valueExpression,
                 valueContext,
@@ -381,6 +385,7 @@ internal static class SymbolicOperationLowerer
 
     private static void AddSymbolicReferenceAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SymbolicLoweringContext context,
@@ -419,6 +424,27 @@ internal static class SymbolicOperationLowerer
                 provenance + (nullRelation == SymbolicRelationOperator.Equal
                     ? ".assigned-null"
                     : ".assigned-non-null")));
+
+        if (SymbolicSemanticPipeline.LowerNotNullIfNotNullAssignedResultTerm(valueExpression, context) is
+            { IsExact: true, Value: { Kind: SmtValueKind.Bool } resultNonNull })
+        {
+            var targetNonNull = ExactRelation(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm(),
+                valueExpression,
+                provenance + ".not-null-if-not-null.target",
+                targetSymbol);
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.Equal,
+                new SymbolicConditionalTerm(
+                    targetNonNull,
+                    new SymbolicBooleanConstantTerm(true),
+                    new SymbolicBooleanConstantTerm(false)),
+                resultNonNull,
+                valueExpression,
+                provenance + ".not-null-if-not-null.result"));
+        }
     }
 
     private static void AddConditionalReferencePostconditions(
