@@ -121,18 +121,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Cross-project (ProofCore / Attributes / Shared / CodeFixes / Demo / Smoke / samples / scripts)
 
-### SMT formula node dispatch duplicated across ProofCore and Symbolic (HIGHEST VALUE)
-`SmtFormula` AST defined once (`SharpProof.ProofCore\SmtFormula.cs:44-93`) but every operation re-implements a
-full `switch`/`is` dispatch over all node subtypes:
-- `SharpProof.ProofCore\SmtFormulaTraversal.cs:185-229` (`GetChildren`/`Rebuild`)
-- `SharpProof.ProofCore\Z3FormulaEncoder.cs:108-200` (`Encode`)
-- `SharpProof.Symbolic\Smt\SmtFormulaStructuralKey.cs:12-47` (`Create`)
-- `SharpProof.Symbolic\Smt\SmtSyntacticClassifier.cs:678-695,723-755` (`NormalizeAliases`, normalize)
-- `SharpProof.Symbolic\Smt\SmtSyntacticFormulaOperations.cs:40-150`
-
-Note `SmtFormulaVersionRewriter.cs:70` and `SmtFormulaReferenceScanner.cs:55` already correctly reuse `SmtFormulaTraversal`.
-**Recommendation:** Expose a single shared visitor/transform (`Rewrite(Func<SmtFormula,SmtFormula>)` / `MapChildren` / `ISmtFormulaVisitor<T>.Accept`) on the `SmtFormula` base built on `GetChildren`/`Rebuild`; new node types become a one-line change.
-
 ### `Shared\Constants.cs` / `Shared\BclPurityFallbackHeuristics.cs` use Analyzer namespaces (see Symbolic root)
 Single-source reuse, but placement confusing; move to neutral namespace to avoid re-creation under `SharpProof.Analyzer`.
 
