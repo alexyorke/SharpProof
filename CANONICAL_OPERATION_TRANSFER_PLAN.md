@@ -313,6 +313,7 @@ transfer policy after its slice is complete.
 | Unused exception type display format deletion | `3c3cd2d4` | 105,716 | -1,960 |
 | Intentional compilation host boundaries | `4a8cf2fe` | 105,716 | -1,960 |
 | Intentional analyzer distribution closures | `9455928a` | 105,716 | -1,960 |
+| Resolved ProofCore fixed-point finding | `462c13e9` | 105,716 | -1,960 |
 
 ## Validation Ledger
 
@@ -414,6 +415,7 @@ transfer policy after its slice is complete.
 | Phase 6 unused exception type display format deletion | Commit `3c3cd2d4` removes the stale format-clone finding after exact reference search proved `ExceptionTypeDisplayFormat` had no consumers. The allocation format remains local because it alone controls two serialized allocation evidence fields; extracting a single-use policy would add indirection. Release Analyzer warning-as-error build: zero warnings; allocation, diagnostic-evidence, exception-propagation, and exception-contract fixtures: 431 passed. Production LOC fell to 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 | Phase 6 intentional compilation host boundaries | Commit `4a8cf2fe` removes the compilation-host report item after characterizing the three policies. Symbolic caches by the raw TPA value and falls back to `System.Object`; fuzzing requires TPA, adds the attribute assembly, and de-duplicates paths; analyzer metadata filters existing files and falls back to runtime-directory enumeration. Their only common code is the environment read/split, while a parameterized shared host would add comparable code and merge distinct failure contracts. Symbolic profile/target and metadata identity/source fixtures: 18 passed; standalone profile, fuzz, and source-query fixtures: 118 passed. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 | Phase 6 intentional analyzer distribution closures | Commit `9455928a` removes follow-up finding 23 after mapping all three observable closures. Source consumers use four project references plus an attribute analyzer path; NuGet ships five SharpProof assemblies, managed/native Z3, a locator, and a lib copy; VSIX uses three project references plus ten Visual Studio runtime support assemblies and transitive project output. A common manifest requires per-consumer metadata for nearly every entry, adds LOC, and relocates rather than unifies transport policy. The current Release package content check and all 52 packaging fixture cases pass. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
+| Phase 6 resolved ProofCore fixed-point finding | Commit `462c13e9` removes stale follow-up finding 24. Commit `1f077511` had already introduced `SmtFactFixedPoint.Collect`; Boolean, reference, integer, and string collectors all use its single bounded iteration count, ordered scan, changed flag, and non-success early exit. Exact call inventory finds four collector entry points and no competing loop. Focused ProofCore Z3, purity proof, SMT service, syntactic classifier, and expression-atom fixtures: 268 passed. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 
 ## Current Checkpoint
 
@@ -439,11 +441,11 @@ transfer policy after its slice is complete.
   Symbolic, fuzz, and analyzer compilation hosts remain separate because their
   cache, fallback, filtering, and failure policies differ. Source-consumer,
   NuGet, and VSIX distribution closures remain explicit transport boundaries.
-- Last confirmed fact: the current Release package content check and all 52
-  packaging fixture cases pass. Test LOC is 142,575; production LOC is 105,716,
-  or -1,960 from the rewrite start.
-- Next cheapest step: implement follow-up finding 24 in `POTENTIAL_DUPS.md`, a
-  shared bounded ProofCore fixed-point driver, while preserving non-ready exits,
-  iteration budgets, collector order, and conservative convergence behavior.
+- Last confirmed fact: all four ProofCore fact collectors use the one bounded
+  fixed-point driver and 268 focused proof fixtures pass. Test LOC is 142,575;
+  production LOC is 105,716, or -1,960 from the rewrite start.
+- Next cheapest step: adjudicate the first remaining merged-audit finding in
+  `POTENTIAL_DUPS.md`, duplicated Semantic Oracle source programs, preserving
+  every test name, source program, marker, assertion, and analyzer/query entrypoint.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
