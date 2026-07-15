@@ -421,6 +421,155 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerInvalidCastHazard(
+        CastExpressionSyntax castExpression,
+        ITypeSymbol targetType,
+        bool isUnboxing,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var operand = castExpression.Expression;
+        var operandLowering = SymbolicSemanticPipeline.LowerTerm(operand, context);
+        if (operandLowering is { IsExact: true, Value: SymbolicNullTerm })
+            return NoHazard(out hazard);
+
+        SymbolicTerm? subject = operandLowering is
+            { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference }
+            ? reference
+            : null;
+        SymbolicCondition? trigger = null;
+        var provenance = "ir.runtime-hazard.invalid-cast.unsupported";
+        if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                operand,
+                castExpression,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var exactRuntimeType))
+        {
+            var valid = isUnboxing
+                ? SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType)
+                : SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
+                    exactRuntimeType, targetType, context.SemanticModel.Compilation);
+            if (valid) return NoHazard(out hazard);
+
+            if (subject != null)
+            {
+                trigger = SymbolicIrLowerer.CreateReferenceNullCondition(
+                    subject, false, operand, "ir.runtime-hazard.reference.non-null.guard");
+                provenance = "ir.runtime-hazard.invalid-cast.exact-mismatch";
+            }
+            else
+            {
+                provenance = "ir.runtime-hazard.invalid-cast.exact-mismatch.unsupported";
+            }
+        }
+        else if (!isUnboxing &&
+                 subject != null &&
+                 SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
+        {
+            var nonNull = SymbolicIrLowerer.CreateReferenceNullCondition(
+                subject, false, operand, "ir.runtime-hazard.invalid-cast.non-null");
+            var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTypeTestAtom(subject, typeKey),
+                operand,
+                "ir.runtime-hazard.invalid-cast.type-test"));
+            trigger = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                nonNull,
+                new SymbolicNotCondition(isTargetType));
+            provenance = "ir.runtime-hazard.invalid-cast.mismatch";
+        }
+
+        hazard = CreateHazard(
+            operand,
+            SymbolicRuntimeHazardKind.InvalidCast,
+            SymbolicExceptionPreconditionKind.InvalidCast,
+            subject,
+            trigger,
+            ExceptionTypes.InvalidCastException,
+            ExceptionCategories.DefiniteInvalidCast,
+            provenance.EndsWith(".unsupported", StringComparison.Ordinal)
+                ? provenance.Substring(0, provenance.Length - ".unsupported".Length)
+                : provenance,
+            preserveUnsupportedSubject: provenance.StartsWith(
+                "ir.runtime-hazard.invalid-cast.exact-mismatch",
+                StringComparison.Ordinal));
+        return true;
+    }
+
+    internal static bool TryLowerArrayStoreMismatchHazard(
+        AssignmentExpressionSyntax assignment,
+        ElementAccessExpressionSyntax elementAccess,
+        IArrayTypeSymbol declaredArrayType,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
+        var subject = receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } value }
+            ? value
+            : null;
+        SymbolicCondition? trigger = null;
+        if (declaredArrayType.Rank == 1 &&
+            elementAccess.ArgumentList.Arguments.Count == 1 &&
+            subject != null &&
+            SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is
+                { IsExact: true, Value: { } inRange })
+        {
+            SymbolicCondition? mismatch = null;
+            if (SymbolicSemanticPipeline.LowerTerm(assignment.Right, context) is
+                { IsExact: true, Value: SymbolicNullTerm })
+            {
+                mismatch = new SymbolicConstantCondition(false);
+            }
+            else if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                         elementAccess.Expression,
+                         assignment,
+                         context.SemanticModel,
+                         context.CancellationToken,
+                         out var exactRuntimeArrayType) &&
+                     exactRuntimeArrayType is IArrayTypeSymbol { Rank: 1 } exactArrayType &&
+                     SymbolicTypeFacts.IsReferenceType(exactArrayType.ElementType) &&
+                     SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                         assignment.Right,
+                         assignment,
+                         context.SemanticModel,
+                         context.CancellationToken,
+                         out var exactAssignedType))
+            {
+                mismatch = new SymbolicConstantCondition(
+                    !SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
+                        exactAssignedType,
+                        exactArrayType.ElementType,
+                        context.SemanticModel.Compilation));
+            }
+
+            if (mismatch != null)
+            {
+                var receiverNotNull = SymbolicIrLowerer.CreateReferenceNullCondition(
+                    subject,
+                    false,
+                    elementAccess.Expression,
+                    "ir.runtime-hazard.array-type-mismatch.receiver-not-null");
+                trigger = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    receiverNotNull,
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.And, inRange, mismatch));
+            }
+        }
+
+        hazard = CreateHazard(
+            assignment,
+            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
+            SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
+            subject,
+            trigger,
+            ExceptionTypes.ArrayTypeMismatchException,
+            ExceptionCategories.DefiniteArrayTypeMismatch,
+            "ir.runtime-hazard.array-type-mismatch",
+            preserveUnsupportedSubject: true);
+        return true;
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,
