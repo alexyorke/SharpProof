@@ -263,6 +263,7 @@ transfer policy after its slice is complete.
 | Superseded nullable interpreter deletion | `92bc2b50` | 106,343 | -1,333 |
 | Shared exact runtime-type resolution | `640c1426` | 106,282 | -1,394 |
 | Canonical exact receiver-type state | `79a54498` | 106,316 | -1,360 |
+| Superseded exception path facts | `d1ff9c86` | 106,251 | -1,425 |
 
 ## Validation Ledger
 
@@ -331,6 +332,7 @@ transfer policy after its slice is complete.
 | Phase 5 superseded nullable interpreter deletion | Commit `92bc2b50` deletes the unreferenced exception-site null interpreter that recursively reconstructed cast/default/dominating-if state, plus its now-dead exception syntax helpers and reference-like wrapper. Nullable contract verification already enters through the canonical query service; Roslyn nullable flow remains only a conservative fallback when canonical proof is unknown. Release test build: zero warnings; focused nullable, null-forgiving, reachability, and exception-flow tests: 163 passed. Production LOC fell to 106,343, or -1,333 from the rewrite start. |
 | Phase 5 shared exact runtime-type resolution | Commit `640c1426` routes exception method/property dispatch through `SymbolicRuntimeTypeFacts`, extends that shared resolver with same-type conditional/coalesce merges, and deletes exception flow's independent statement-scanning exact-local dictionary. The strengthened fixture proves a conditional local followed by a same-type coalesce still reaches the exact property implementation. Release test build: zero warnings; focused exact-dispatch and exception-flow tests: 60 passed plus the strengthened focused reproduction; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 106,282, or -1,394 from the rewrite start. |
 | Phase 5 canonical exact receiver-type state | Commit `79a54498` replaces purity's local and flow-capture concrete-type dictionaries, independent intersections, equality, and hashing with versioned `SymbolicExactRuntimeTypeAtom` facts. Assignment invalidation and canonical state merging now own their lifetime; the post-CFG probe explicitly projects only exact-type metadata instead of retaining a parallel map. The 34-line canonical fact scaffold raises production LOC to 106,316, or -1,360 from the rewrite start, but deletes both competing state stores and enables later Analyzer-state deletion. Release build: zero warnings; exact-dispatch/using/disposal tests: 58 passed; focused CFG regression set: 15 passed; MainSmtAnalyzer: 487 passed. |
+| Phase 5 superseded exception path facts | Commit `d1ff9c86` deletes the unreferenced null/zero dominating-if interpreter and its retired `PathFactKind`, then removes the exception-site wrapper whose `relevantRoot` parameter was ignored. Catch filters and path-sensitive finally checks now call the canonical path-state collector directly. Release test build: zero warnings; focused exception, path, catch-filter, and finally tests: 219 passed, with only the documented baseline SP0010 failure. Production LOC fell to 106,251, or -1,425 from the rewrite start. |
 
 ## Current Checkpoint
 
@@ -341,10 +343,11 @@ transfer policy after its slice is complete.
   Symbolic runtime-type resolver, and purity exact local/flow-capture types are
   versioned canonical facts. The nullable/runtime-type item is complete.
 - Last confirmed fact: exact-dispatch, using, disposal, and CFG-focused tests are
-  green; Analyzer is 487/487 and Flow remains 256/257 with only baseline SP0010.
-  Production LOC is 106,316, or -1,360 from the rewrite start.
-- Next cheapest step: audit exception flow's remaining completion-edge and path-
-  state reconstruction against canonical completion/hazard results, deleting
-  the first independently interpreted path with focused parity coverage.
+  green; Analyzer is 487/487. The latest exception-focused batch passes 219
+  cases with only baseline SP0010. Production LOC is 106,251, or -1,425 from
+  the rewrite start.
+- Next cheapest step: compare the path-sensitive throwing-finally block/if exit
+  interpreter with canonical completion state, then replace or retain it based
+  on differential evidence before touching catch/exception ordering policy.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
