@@ -1,29 +1,44 @@
+using System.Text.Json.Serialization;
 using SharpProof.Symbolic;
 
-internal static class SymbolicCliQueryResultAdapter
+internal sealed class SymbolicCliScopedQueryProjection
 {
-    internal static object ToFullJsonResult(SymbolicQueryResult result)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-        return result.Scope.Kind switch
-        {
-            SymbolicQueryScopeKind.File => new SymbolicCliFileQueryProjection(result),
-            SymbolicQueryScopeKind.Line => new SymbolicCliLineQueryProjection(result),
-            SymbolicQueryScopeKind.Span => new SymbolicCliSpanQueryProjection(result),
-            SymbolicQueryScopeKind.Point when result.ProgramPoints.Count != 0 => result.ProgramPoints[0],
-            _ => throw new InvalidOperationException("Symbolic query result has no value for its scope.")
-        };
-    }
-}
-
-internal abstract class SymbolicCliScopedQueryProjection
-{
-    protected SymbolicCliScopedQueryProjection(SymbolicQueryResult result)
+    internal SymbolicCliScopedQueryProjection(SymbolicQueryResult result)
     {
         Result = result ?? throw new ArgumentNullException(nameof(result));
+        Lines = Is(SymbolicQueryScopeKind.File)
+            ? result.Lines.Select(static line => new SymbolicCliScopedQueryProjection(line)).ToArray()
+            : null;
     }
 
-    protected SymbolicQueryResult Result { get; }
+    private SymbolicQueryResult Result { get; }
+    public string FilePath => Result.FilePath;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Line => Is(SymbolicQueryScopeKind.Line) ? Result.Line ?? 0 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SpanStart => Is(SymbolicQueryScopeKind.Span) ? Result.SpanStart ?? 0 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SpanEnd => Is(SymbolicQueryScopeKind.Span) ? Result.SpanEnd ?? 0 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SpanLength => Is(SymbolicQueryScopeKind.Span) ? SpanEnd - SpanStart : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartLine => Is(SymbolicQueryScopeKind.Span) ? Result.Scope.StartLine ?? 1 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartColumn => Is(SymbolicQueryScopeKind.Span) ? Result.Scope.StartColumn ?? 1 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndLine => Is(SymbolicQueryScopeKind.Span) ? Result.Scope.EndLine ?? 1 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndColumn => Is(SymbolicQueryScopeKind.Span) ? Result.Scope.EndColumn ?? 1 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? LineCount => Is(SymbolicQueryScopeKind.File) ? Result.LineCount ?? 0 : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? LinesWithProgramPoints => Result.Scope.Kind is SymbolicQueryScopeKind.Span or SymbolicQueryScopeKind.File
+        ? Result.LinesWithProgramPoints
+        : null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<SymbolicCliScopedQueryProjection>? Lines { get; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? ObservedFacts => Is(SymbolicQueryScopeKind.File) ? Result.ObservedFacts : null;
     public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints => Result.ProgramPoints;
     public int ProgramPointCount => Result.ProgramPointCount;
     public SymbolicAnalysisTruncationInfo AnalysisTruncation => Result.AnalysisTruncation;
@@ -41,41 +56,6 @@ internal abstract class SymbolicCliScopedQueryProjection
     public SymbolicInvariantQueryView InvariantQuery => Result.InvariantQuery;
     public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses => Result.ReachabilityWitnesses;
     public SymbolicInputDomainSummary InputDomainSummary => Result.InputDomainSummary;
-}
 
-internal sealed class SymbolicCliLineQueryProjection : SymbolicCliScopedQueryProjection
-{
-    internal SymbolicCliLineQueryProjection(SymbolicQueryResult result) : base(result) { }
-
-    public string FilePath => Result.FilePath;
-    public int Line => Result.Line ?? 0;
-}
-
-internal sealed class SymbolicCliSpanQueryProjection : SymbolicCliScopedQueryProjection
-{
-    internal SymbolicCliSpanQueryProjection(SymbolicQueryResult result) : base(result) { }
-
-    public string FilePath => Result.FilePath;
-    public int SpanStart => Result.SpanStart ?? 0;
-    public int SpanEnd => Result.SpanEnd ?? 0;
-    public int SpanLength => SpanEnd - SpanStart;
-    public int StartLine => Result.Scope.StartLine ?? 1;
-    public int StartColumn => Result.Scope.StartColumn ?? 1;
-    public int EndLine => Result.Scope.EndLine ?? 1;
-    public int EndColumn => Result.Scope.EndColumn ?? 1;
-    public int LinesWithProgramPoints => Result.LinesWithProgramPoints;
-}
-
-internal sealed class SymbolicCliFileQueryProjection : SymbolicCliScopedQueryProjection
-{
-    internal SymbolicCliFileQueryProjection(SymbolicQueryResult result) : base(result)
-    {
-        Lines = result.Lines.Select(static line => new SymbolicCliLineQueryProjection(line)).ToArray();
-    }
-
-    public string FilePath => Result.FilePath;
-    public int LineCount => Result.LineCount ?? 0;
-    public int LinesWithProgramPoints => Result.LinesWithProgramPoints;
-    public IReadOnlyList<SymbolicCliLineQueryProjection> Lines { get; }
-    public IReadOnlyList<string> ObservedFacts => Result.ObservedFacts;
+    private bool Is(SymbolicQueryScopeKind kind) => Result.Scope.Kind == kind;
 }
