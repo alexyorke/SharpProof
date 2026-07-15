@@ -237,20 +237,12 @@ internal sealed class SymbolicProofService
     {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
 
-        if (state == null) throw new ArgumentNullException(nameof(state));
-
-        if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
-
-        state = NormalizeState(state);
-        if (state.IsContradictory) return SymbolicIrFormulaEncoder.TryEncode(fact, out formula);
-
-        if (!HasSafeIntegerDivisors(fact, state, sourceNode))
-        {
-            formula = null!;
-            return false;
-        }
-
-        return SymbolicIrFormulaEncoder.TryEncode(fact, out formula);
+        return TryEncodeConditionWithPathState(
+            new SymbolicFactCondition(fact),
+            state,
+            sourceNode,
+            false,
+            out formula);
     }
 
     private static bool HasSafeIntegerDivisors(
@@ -267,14 +259,6 @@ internal sealed class SymbolicProofService
         SyntaxNode sourceNode)
     {
         return HasSafeIntegerDivisorsCore(condition, state, sourceNode, StateSafeDivisorStrategy);
-    }
-
-    private static bool HasSafeIntegerDivisors(
-        SymbolicFact fact,
-        SymbolicState state,
-        SyntaxNode sourceNode)
-    {
-        return HasSafeIntegerDivisorsCore(fact.Atom, state, sourceNode, StateSafeDivisorStrategy);
     }
 
     private static bool HasSafeIntegerDivisorsCore<TContext>(

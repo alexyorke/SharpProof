@@ -6,9 +6,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Symbolic and proof core
 
-7. **Path-state encoding wrappers** - `SharpProof.Symbolic/SymbolicProofService.cs:192-253`
-   `TryEncodeConditionWithPathState` and `TryEncodeFactWithPathState` share validation, state normalization, contradictory-state short-circuit, safe-divisor gate, and encoding flow. A private generic core with delegates would keep safety gates aligned.
-
 9. **Proof-status projection** - `SharpProof.Symbolic/SymbolicProgramPointResult.cs:727-736`; `SharpProof.Symbolic/SymbolicQueryFactSummaries.cs:871-880`; `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:579-587`
    Multiple source enums map to `SymbolicProofStatus`, each defaulting to unknown. Centralizing projection avoids inconsistent behavior when source enums evolve.
 
