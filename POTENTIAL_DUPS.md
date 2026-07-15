@@ -102,9 +102,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Symbolic root
 
-### `Shared\Constants.cs` / `Shared\BclPurityFallbackHeuristics.cs` use Analyzer namespaces
-Physically in `Shared` but `namespace SharpProof.Analyzer.Engine`. **Recommendation:** Move to neutral namespace (`SharpProof.Shared.Engine`).
-
 (Checked clean: Attributes defined once; `StructuralMethodIdentity` correctly split; `SmtResourceBudget` reused;
 `IsExternalInit` polyfill single-source in `Shared\Polyfills`.)
 
