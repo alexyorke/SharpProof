@@ -728,37 +728,7 @@ internal sealed class Z3RegexTranslator
             return true;
         }
 
-        if (escaped == 'x')
-        {
-            if (!TryReadFixedHexChar(2, out var hexChar)) return false;
-
-            regex = CreateLiteralRegex(hexChar.ToString());
-            return true;
-        }
-
-        if (escaped == 'u')
-        {
-            if (!TryReadFixedHexChar(4, out var unicodeChar)) return false;
-
-            regex = CreateLiteralRegex(unicodeChar.ToString());
-            return true;
-        }
-
-        if (escaped == 'c')
-        {
-            if (!TryReadControlCharacterEscape(out var controlChar)) return false;
-
-            regex = CreateLiteralRegex(controlChar.ToString());
-            return true;
-        }
-
-        if (escaped == '0')
-        {
-            regex = CreateLiteralRegex(ReadNullPrefixedOctalEscape().ToString());
-            return true;
-        }
-
-        if (!TryGetEscapedLiteralCharacter(escaped, false, out var literal)) return false;
+        if (!TryReadEscapedLiteralCharacter(escaped, false, out var literal)) return false;
 
         regex = CreateLiteralRegex(literal.ToString());
         return true;
@@ -929,37 +899,7 @@ internal sealed class Z3RegexTranslator
             return true;
         }
 
-        if (escaped == 'x')
-        {
-            if (!TryReadFixedHexChar(2, out var hexChar)) return false;
-
-            part = CreateClassCharacterPart(hexChar);
-            return true;
-        }
-
-        if (escaped == 'u')
-        {
-            if (!TryReadFixedHexChar(4, out var unicodeChar)) return false;
-
-            part = CreateClassCharacterPart(unicodeChar);
-            return true;
-        }
-
-        if (escaped == 'c')
-        {
-            if (!TryReadControlCharacterEscape(out var controlChar)) return false;
-
-            part = CreateClassCharacterPart(controlChar);
-            return true;
-        }
-
-        if (escaped == '0')
-        {
-            part = CreateClassCharacterPart(ReadNullPrefixedOctalEscape());
-            return true;
-        }
-
-        if (!TryGetEscapedLiteralCharacter(escaped, true, out var value)) return false;
+        if (!TryReadEscapedLiteralCharacter(escaped, true, out var value)) return false;
 
         part = CreateClassCharacterPart(value);
         return true;
@@ -974,48 +914,27 @@ internal sealed class Z3RegexTranslator
             new[] { new CharacterRange(value, value) });
     }
 
+    private bool TryReadEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value)
+    {
+        switch (escaped)
+        {
+            case 'x': return TryReadFixedHexChar(2, out value);
+            case 'u': return TryReadFixedHexChar(4, out value);
+            case 'c': return TryReadControlCharacterEscape(out value);
+            case '0':
+                value = ReadNullPrefixedOctalEscape();
+                return true;
+            default:
+                return TryGetEscapedLiteralCharacter(escaped, inCharacterClass, out value);
+        }
+    }
+
     private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex)
     {
         regex = default;
-        if (escaped is 'd' or 'D')
+        if (TryGetShorthandCharacterRanges(escaped, out var shorthandRanges))
         {
-            var digitRanges = DecimalDigitRanges.Value;
-            var ranges = escaped == 'd' ? digitRanges : ComplementRanges(digitRanges);
-            if (!TryCreateCharacterRangesRegex(ranges, out var digitRegex))
-            {
-                regex = new RegexClassTranslation(CreateAnyCharRegex(), false, null);
-                return true;
-            }
-
-            regex = new RegexClassTranslation(digitRegex, true, ranges);
-            return true;
-        }
-
-        if (escaped is 's' or 'S')
-        {
-            var whitespaceRanges = WhitespaceRanges.Value;
-            var ranges = escaped == 's' ? whitespaceRanges : ComplementRanges(whitespaceRanges);
-            if (!TryCreateCharacterRangesRegex(ranges, out var whitespaceRegex))
-            {
-                regex = new RegexClassTranslation(CreateAnyCharRegex(), false, null);
-                return true;
-            }
-
-            regex = new RegexClassTranslation(whitespaceRegex, true, ranges);
-            return true;
-        }
-
-        if (escaped is 'w' or 'W')
-        {
-            var wordRanges = WordRanges.Value;
-            var ranges = escaped == 'w' ? wordRanges : ComplementRanges(wordRanges);
-            if (!TryCreateCharacterRangesRegex(ranges, out var wordRegex))
-            {
-                regex = new RegexClassTranslation(CreateAnyCharRegex(), false, null);
-                return true;
-            }
-
-            regex = new RegexClassTranslation(wordRegex, true, ranges);
+            regex = CreateCharacterClassTranslation(shorthandRanges);
             return true;
         }
 
@@ -1030,17 +949,37 @@ internal sealed class Z3RegexTranslator
             }
 
             var ranges = escaped == 'p' ? categoryRanges : ComplementRanges(categoryRanges);
-            if (!TryCreateCharacterRangesRegex(ranges, out var categoryRegex))
-            {
-                regex = new RegexClassTranslation(CreateAnyCharRegex(), false, null);
-                return true;
-            }
-
-            regex = new RegexClassTranslation(categoryRegex, true, ranges);
+            regex = CreateCharacterClassTranslation(ranges);
             return true;
         }
 
         return false;
+    }
+
+    private static bool TryGetShorthandCharacterRanges(char escaped, out CharacterRange[] ranges)
+    {
+        var baseRanges = escaped switch
+        {
+            'd' or 'D' => DecimalDigitRanges.Value,
+            's' or 'S' => WhitespaceRanges.Value,
+            'w' or 'W' => WordRanges.Value,
+            _ => null,
+        };
+        if (baseRanges is null)
+        {
+            ranges = Array.Empty<CharacterRange>();
+            return false;
+        }
+
+        ranges = escaped is 'D' or 'S' or 'W' ? ComplementRanges(baseRanges) : baseRanges;
+        return true;
+    }
+
+    private RegexClassTranslation CreateCharacterClassTranslation(CharacterRange[] ranges)
+    {
+        return TryCreateCharacterRangesRegex(ranges, out var regex)
+            ? new RegexClassTranslation(regex, true, ranges)
+            : new RegexClassTranslation(CreateAnyCharRegex(), false, null);
     }
 
     private ReExpr CreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges)
@@ -1079,15 +1018,7 @@ internal sealed class Z3RegexTranslator
             regex = CreateCharacterRangesRegex(ranges);
             return true;
         }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-        catch (RegexMatchTimeoutException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
         {
             return false;
         }
@@ -1106,15 +1037,7 @@ internal sealed class Z3RegexTranslator
             ranges = GetOrAddRegexCharacterRanges((atomPattern, options));
             return ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
         }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-        catch (RegexMatchTimeoutException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
         {
             return false;
         }
@@ -1160,15 +1083,7 @@ internal sealed class Z3RegexTranslator
         {
             return CreateRegexCharacterRanges(key);
         }
-        catch (ArgumentException)
-        {
-            return Array.Empty<CharacterRange>();
-        }
-        catch (InvalidOperationException)
-        {
-            return Array.Empty<CharacterRange>();
-        }
-        catch (RegexMatchTimeoutException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
         {
             return Array.Empty<CharacterRange>();
         }
@@ -1338,32 +1253,7 @@ internal sealed class Z3RegexTranslator
 
     private void SkipIgnoredPatternTrivia()
     {
-        while (_position < _pattern.Length)
-        {
-            if (TrySkipInlineComment()) continue;
-
-            if (!_ignorePatternWhitespace) return;
-
-            var current = _pattern[_position];
-            if (char.IsWhiteSpace(current))
-            {
-                _position++;
-                continue;
-            }
-
-            if (current == '#')
-            {
-                _position++;
-                while (_position < _pattern.Length &&
-                       _pattern[_position] != '\r' &&
-                       _pattern[_position] != '\n')
-                    _position++;
-
-                continue;
-            }
-
-            return;
-        }
+        SkipIgnoredPatternTrivia(_pattern, ref _position, _ignorePatternWhitespace);
     }
 
     private static void SkipIgnoredPatternTrivia(string pattern, ref int position, bool ignorePatternWhitespace)
@@ -1394,23 +1284,6 @@ internal sealed class Z3RegexTranslator
 
             return;
         }
-    }
-
-    private bool TrySkipInlineComment()
-    {
-        if (_position + 2 >= _pattern.Length ||
-            _pattern[_position] != '(' ||
-            _pattern[_position + 1] != '?' ||
-            _pattern[_position + 2] != '#')
-            return false;
-
-        var end = _position + 3;
-        while (end < _pattern.Length && _pattern[end] != ')') end++;
-
-        if (end >= _pattern.Length) return false;
-
-        _position = end + 1;
-        return true;
     }
 
     private static bool TrySkipInlineComment(string pattern, ref int position)
