@@ -117,6 +117,7 @@ internal static partial class ExceptionFlowQuery
             smtAnalysis,
             SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
             SymbolicRuntimeHazardKind.DivideByZero,
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
             SymbolicRuntimeHazardKind.NegativeStackAllocLength,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
@@ -135,38 +136,21 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteCheckedIntegralOverflowNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.CheckedIntegralOverflow),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      static _ => ExceptionTypes.OverflowException,
                      static _ => ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                     static node => node is CastExpressionSyntax
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is CastExpressionSyntax
                          ? ExceptionSources.CheckedConversion
                          : ExceptionSources.CheckedOperator,
                      siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.CheckedIntegralOverflow &&
-                         ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax),
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.NegativeArrayLength),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.OverflowException,
-                     ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                     ExceptionSources.CheckedOperator))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteNegativeArrayLengthNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
                      siteContext,
                      ExceptionTypes.OverflowException,
                      ExceptionCategories.DefiniteNegativeArrayLength,

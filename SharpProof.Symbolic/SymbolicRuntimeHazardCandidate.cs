@@ -29,18 +29,6 @@ internal readonly struct RuntimeHazardCandidate
 
     public string Category { get; }
 
-    internal bool TryGetExactTriggerCondition(out SymbolicCondition condition)
-    {
-        if (TriggerPrecondition.Confidence == SymbolicFactConfidence.Exact &&
-            TriggerPrecondition.Atom is SymbolicExceptionPreconditionAtom precondition)
-        {
-            condition = precondition.Trigger;
-            return true;
-        }
-
-        condition = null!;
-        return false;
-    }
 }
 
 internal readonly struct RuntimeHazardTrigger

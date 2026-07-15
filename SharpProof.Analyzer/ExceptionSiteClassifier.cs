@@ -16,35 +16,6 @@ internal static partial class ExceptionSiteClassifier
             .Where(node => node is ThrowStatementSyntax || node is ThrowExpressionSyntax);
     }
 
-    internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return GetDefiniteReachableDescendants(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            node => IsDefinitelyCheckedOverflow(node, semanticModel, cancellationToken, smtAnalysis));
-    }
-
-    internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return GetDefiniteReachableDescendants<ArrayCreationExpressionSyntax>(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            arrayCreation =>
-                IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis));
-    }
-
     internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
