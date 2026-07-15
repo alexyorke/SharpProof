@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
@@ -25,7 +26,8 @@ internal static partial class ExceptionFlowQuery
         ExceptionSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
     {
         var siteContext = new ExceptionSiteCollectionContext(
             methodNode,
@@ -33,35 +35,16 @@ internal static partial class ExceptionFlowQuery
             cancellationToken,
             methodSymbol,
             smtAnalysis);
-        var provenRuntimeHazards = CollectProvenRuntimeHazards(
-            methodNode,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            SymbolicRuntimeHazardKind.DirectThrow,
-            SymbolicRuntimeHazardKind.Rethrow,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            SymbolicRuntimeHazardKind.DivideByZero,
-            SymbolicRuntimeHazardKind.NegativeArrayLength,
-            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
-            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-            SymbolicRuntimeHazardKind.UnboxNull,
-            SymbolicRuntimeHazardKind.InvalidCast,
-            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
-            SymbolicRuntimeHazardKind.ArgumentNull,
-            SymbolicRuntimeHazardKind.DynamicNullBinding,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
-            SymbolicRuntimeHazardKind.IndexOutOfRange,
-            SymbolicRuntimeHazardKind.NullDereference).ToArray();
+        var provenRuntimeHazards = runtimeHazards
+            .Where(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Proven)
+            .ToArray();
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazards.Where(static hazard =>
                          hazard.Kind is SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static hazard => hazard.ExceptionType,
-                     static hazard => hazard.Category,
+                     static hazard => hazard.Descriptor.ExceptionType,
+                     static hazard => hazard.Descriptor.Category,
                      static _ => ExceptionSources.Throw,
                      siteContext))
             yield return entry;

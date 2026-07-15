@@ -161,4 +161,17 @@ internal sealed record SymbolicHazardOperation(
     SymbolicFactConfidence Confidence,
     string ExceptionType,
     string Category,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
+    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin)
+{
+    internal SymbolicFact ToPreconditionFact()
+    {
+        return new SymbolicFact(
+            new SymbolicExceptionPreconditionAtom(PreconditionKind, Subject, Trigger),
+            true,
+            Confidence,
+            Origin.Provenance,
+            Origin.SourceSpan,
+            null,
+            Confidence == SymbolicFactConfidence.Unsupported ? Origin.Provenance : null);
+    }
+}

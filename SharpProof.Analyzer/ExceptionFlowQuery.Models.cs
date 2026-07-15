@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
@@ -9,10 +10,13 @@ internal static partial class ExceptionFlowQuery
 {
     internal sealed class MethodExceptionQueryResult(
         ExceptionEvidenceSet exceptionEvidence,
-        ImmutableArray<UncaughtExceptionSiteEntry> siteEntries)
+        ImmutableArray<UncaughtExceptionSiteEntry> siteEntries,
+        ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
     {
         public ExceptionEvidenceSet ExceptionEvidence { get; } = exceptionEvidence;
         public ImmutableArray<UncaughtExceptionSiteEntry> SiteEntries { get; } = siteEntries;
+
+        public ImmutableArray<SymbolicRuntimeHazard> RuntimeHazards { get; } = runtimeHazards;
     }
 
     internal sealed class ExceptionCandidate

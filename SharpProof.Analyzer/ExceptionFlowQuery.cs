@@ -49,6 +49,11 @@ internal static partial class ExceptionFlowQuery
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
+        var runtimeHazards = QueryRuntimeHazards(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
         var siteEntries = CollectUncaughtExceptionSiteEntries(
                 methodNode,
                 semanticModel,
@@ -57,12 +62,13 @@ internal static partial class ExceptionFlowQuery
                 exceptionSummaryCatalog,
                 visitedMethods,
                 smtAnalysis,
-                attributePolicy)
+                attributePolicy,
+                runtimeHazards)
             .ToImmutableArray();
 
         var exceptionEvidence = new ExceptionEvidenceSet();
         foreach (var siteEntry in siteEntries) exceptionEvidence.Add(siteEntry.Exception);
 
-        return new MethodExceptionQueryResult(exceptionEvidence, siteEntries);
+        return new MethodExceptionQueryResult(exceptionEvidence, siteEntries, runtimeHazards);
     }
 }

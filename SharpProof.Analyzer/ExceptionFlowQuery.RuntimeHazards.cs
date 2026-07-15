@@ -16,35 +16,26 @@ internal static partial class ExceptionFlowQuery
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
-            methodNode,
-            semanticModel,
-            smtAnalysis,
-            cancellationToken,
-            new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
-        return result.Hazards
+        return QueryRuntimeHazards(methodNode, semanticModel, cancellationToken, smtAnalysis)
             .Where(static hazard =>
                 hazard.Status is SymbolicRuntimeHazardStatus.Unknown or SymbolicRuntimeHazardStatus.Unsupported)
             .ToImmutableArray();
     }
 
-    private static IEnumerable<SymbolicRuntimeHazard> CollectProvenRuntimeHazards(
+    private static ImmutableArray<SymbolicRuntimeHazard> QueryRuntimeHazards(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis,
-        params SymbolicRuntimeHazardKind[] kinds)
+        SmtAnalysisService smtAnalysis)
     {
-        var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+        return new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
             methodNode,
             semanticModel,
             smtAnalysis,
             cancellationToken,
-            new SymbolicRuntimeHazardQueryOptions(kinds: kinds));
-
-        return result.Hazards.Where(hazard =>
-            kinds.Contains(hazard.Kind) &&
-            hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+            new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true))
+            .Hazards
+            .ToImmutableArray();
     }
 
     private static bool IsAnalyzerOnlySymbolicHazardCategory(string category)

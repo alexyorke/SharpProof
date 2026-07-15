@@ -218,10 +218,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             smtAnalysis,
             cancellationToken,
             initialState: initialState);
-        var triggerPrecondition = candidate.TriggerPrecondition;
-        var triggerCondition = GetTriggerCondition(triggerPrecondition);
-        var exceptionType = candidate.ExceptionType;
-        var category = candidate.Category;
+        var descriptor = candidate.Operation;
+        var triggerPrecondition = descriptor.ToPreconditionFact();
+        var triggerCondition = descriptor.Trigger;
 
         var (status, reason, proofInfo, triggerProof) = ClassifyTriggerCore(
             analysis,
@@ -242,11 +241,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         return new SymbolicRuntimeHazard(
             syntaxTree.FilePath,
-            candidate.Kind,
+            descriptor,
             status,
             reason,
-            exceptionType,
-            category,
             candidate.Site.Kind().ToString(),
             candidate.Site.ToString(),
             candidate.Site.SpanStart,
@@ -303,13 +300,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             position,
             SymbolicWitnessStatus.Unsupported,
             rawProof?.Reason ?? reason);
-    }
-
-    private static SymbolicCondition GetTriggerCondition(SymbolicFact triggerPrecondition)
-    {
-        return triggerPrecondition.Atom is SymbolicExceptionPreconditionAtom precondition
-            ? precondition.Trigger
-            : new SymbolicFactCondition(triggerPrecondition);
     }
 
     internal static (
@@ -440,11 +430,9 @@ public sealed class SymbolicRuntimeHazard
 {
     internal SymbolicRuntimeHazard(
         string filePath,
-        SymbolicRuntimeHazardKind kind,
+        SymbolicHazardOperation descriptor,
         SymbolicRuntimeHazardStatus status,
         string statusReason,
-        string exceptionType,
-        string category,
         string nodeKind,
         string operationText,
         int spanStart,
@@ -467,12 +455,13 @@ public sealed class SymbolicRuntimeHazard
         SymbolicInputWitness? triggerWitness = null,
         SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
+        Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
         FilePath = filePath;
-        Kind = kind;
+        Kind = descriptor.HazardKind;
         Status = status;
         StatusReason = statusReason;
-        ExceptionType = exceptionType;
-        Category = category;
+        ExceptionType = descriptor.ExceptionType;
+        Category = descriptor.Category;
         NodeKind = nodeKind;
         OperationText = operationText;
         SpanStart = spanStart;
@@ -494,7 +483,7 @@ public sealed class SymbolicRuntimeHazard
         ReachabilityReason = reachabilityReason;
         TriggerWitness = triggerWitness ?? SymbolicInputWitnessFactory.Unsupported(
             "runtime_hazard_trigger_witness_unavailable");
-        Proof = CreateProofInfo(status, statusReason, category, triggerCondition, kind, proofInfo);
+        Proof = CreateProofInfo(status, statusReason, Category, triggerCondition, Kind, proofInfo);
         UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
             status,
             StatusReason,
@@ -510,6 +499,8 @@ public sealed class SymbolicRuntimeHazard
     }
 
     public string FilePath { get; }
+
+    internal SymbolicHazardOperation Descriptor { get; }
 
     public SymbolicRuntimeHazardKind Kind { get; }
 

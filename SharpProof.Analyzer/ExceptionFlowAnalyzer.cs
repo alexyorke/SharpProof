@@ -84,14 +84,19 @@ internal static partial class ExceptionFlowAnalyzer
                             attributePolicy));
 
                 if (reportUnknownRuntimeHazards)
-                    unknownRuntimeHazards = context.State.GetOrCreateSymbolicQueryResult(
-                        "unknown-runtime-hazards",
-                        () => new CachedUnknownRuntimeHazards(
-                            ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
-                                context.Node,
-                                context.SemanticModel,
-                                context.CancellationToken,
-                                purityService.SmtAnalysis))).Hazards;
+                    unknownRuntimeHazards = queryResult?.RuntimeHazards
+                        .Where(static hazard =>
+                            hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
+                                SymbolicRuntimeHazardStatus.Unsupported)
+                        .ToImmutableArray() ??
+                        context.State.GetOrCreateSymbolicQueryResult(
+                            "unknown-runtime-hazards",
+                            () => new CachedUnknownRuntimeHazards(
+                                ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
+                                    context.Node,
+                                    context.SemanticModel,
+                                    context.CancellationToken,
+                                    purityService.SmtAnalysis))).Hazards;
             }
 
         AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
