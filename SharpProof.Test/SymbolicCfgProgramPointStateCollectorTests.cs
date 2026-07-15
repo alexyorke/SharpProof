@@ -44,6 +44,7 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expectedState.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expectedState)));
     }
 
     [Test]
@@ -71,6 +72,7 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
     [Test]
@@ -96,6 +98,39 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    private static string CreateEvidenceKey(SymbolicState state) =>
+        string.Join(
+            "\n",
+            state.Facts.Concat(state.PathConditions.SelectMany(EnumerateFacts)).Select(static fact =>
+                string.Join(
+                    "|",
+                    SymbolicState.CreateProofConditionKey(new SymbolicFactCondition(fact)),
+                    fact.Provenance,
+                    fact.SourceSpan.Start,
+                    fact.SourceSpan.Length,
+                    fact.Symbol?.ToDisplayString() ?? string.Empty,
+                    fact.EvidenceKey ?? string.Empty)));
+
+    private static IEnumerable<SymbolicFact> EnumerateFacts(SymbolicCondition condition)
+    {
+        switch (condition)
+        {
+            case SymbolicFactCondition fact:
+                yield return fact.Fact;
+                break;
+            case SymbolicNotCondition not:
+                foreach (var nested in EnumerateFacts(not.Operand))
+                    yield return nested;
+                break;
+            case SymbolicBinaryCondition binary:
+                foreach (var nested in EnumerateFacts(binary.Left))
+                    yield return nested;
+                foreach (var nested in EnumerateFacts(binary.Right))
+                    yield return nested;
+                break;
+        }
     }
 
     [Test]
@@ -163,6 +198,7 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
     [Test]
@@ -321,5 +357,22 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
+    public void ConstructorPropertyAssignmentBeforeReturn_RemainsConservativeFallback()
+    {
+        const string source = "sealed class C { string? Value { get; } C() { Value = null; return; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ConstructorPropertyAssignmentBeforeReturn_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
     }
 }

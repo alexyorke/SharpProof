@@ -32,6 +32,12 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "loop-local-target");
         if (site.Ancestors().Any(static ancestor => ancestor is FinallyClauseSyntax))
             return Unsupported(site, "finally-local-target");
+        if (HasUnsupportedAssignmentTargetBeforeSite(
+                executionRoot,
+                site,
+                semanticModel,
+                cancellationToken))
+            return Unsupported(site, "assignment-target");
         ControlFlowGraph? graph;
         try
         {
@@ -55,7 +61,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         var entryPoint = new CfgTraversalPoint(graph.Blocks[0], null);
         var incoming = new Dictionary<CfgTraversalPoint, List<CfgPathState>>
         {
-            [entryPoint] = new List<CfgPathState> { new(state, null, null, false) }
+            [entryPoint] = new List<CfgPathState> { new(state, null, null, null, false) }
         };
         var queue = new Queue<CfgTraversalPoint>();
         var queued = new HashSet<CfgTraversalPoint> { entryPoint };
@@ -81,10 +87,11 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(operation.Syntax, site))
                 {
+                    var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
-                        targetState = state;
+                        targetState = observedState;
                     else
-                        guardedTargetState = state;
+                        guardedTargetState = observedState;
                     foundTarget = true;
                     break;
                 }
@@ -112,10 +119,11 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(block.BranchValue.Syntax, site))
                 {
+                    var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
-                        targetState = state;
+                        targetState = observedState;
                     else
-                        guardedTargetState = state;
+                        guardedTargetState = observedState;
                     continue;
                 }
             }
@@ -190,7 +198,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                        block,
                        block.ConditionalSuccessor,
                        activeContinuation,
-                       new CfgPathState(conditionalState, path.State, conditionalGuard, false),
+                       new CfgPathState(
+                           conditionalState,
+                           path.State,
+                           conditionalGuard,
+                           conditionalIsTrue,
+                           false),
                        graph,
                        incoming,
                        queue,
@@ -201,7 +214,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                        block,
                        block.FallThroughSuccessor,
                        activeContinuation,
-                       new CfgPathState(fallThroughState, path.State, fallThroughGuard, false),
+                       new CfgPathState(
+                           fallThroughState,
+                           path.State,
+                           fallThroughGuard,
+                           !conditionalIsTrue,
+                           false),
                        graph,
                        incoming,
                        queue,
@@ -461,7 +479,7 @@ internal static class SymbolicCfgProgramPointStateCollector
             state = transition.State;
         }
 
-        backEdgePath = new CfgPathState(state, null, null, false);
+        backEdgePath = new CfgPathState(state, null, null, null, false);
         return true;
     }
 
@@ -579,20 +597,25 @@ internal static class SymbolicCfgProgramPointStateCollector
             paths.All(path => path.Guard != null &&
                               path.Baseline?.NormalizedProofKey == baseline.NormalizedProofKey))
         {
-            var completedStates = paths.Select(static path => path.State).ToArray();
+            var orderedPaths = paths
+                .OrderByDescending(static path => path.GuardWhenTrue == true)
+                .ToArray();
+            var completedStates = orderedPaths.Select(static path => path.State).ToArray();
             var mergeBaseline = SymbolicStateMerger.MergeCommonStates(
                 new SymbolicState(),
                 completedStates);
             if (paths.Any(static path => path.GuardInvalidated))
-                return new CfgPathState(mergeBaseline, null, null, false);
+                return new CfgPathState(mergeBaseline, null, null, null, false);
             return new CfgPathState(
                 SymbolicStateMerger.MergeGuardedStates(
                     mergeBaseline,
-                    paths.Select(path => new SymbolicStateMerger.GuardedState(path.Guard!, path.State)).ToArray(),
+                    orderedPaths.Select(path =>
+                        new SymbolicStateMerger.GuardedState(path.Guard!, path.State)).ToArray(),
                     source,
                     SymbolicAnalysisLimitKind.IfElseFactMerge,
                     SymbolicAnalysisLimitContext.Limits.MaxMergedIfElseFacts,
                     "cfg-program-point.if-merge"),
+                null,
                 null,
                 null,
                 false);
@@ -605,13 +628,27 @@ internal static class SymbolicCfgProgramPointStateCollector
                 source.SpanStart),
             null,
             null,
+            null,
             false);
     }
+
+    private static SymbolicState OrderTargetState(
+        SymbolicState state,
+        CfgPathState path,
+        bool targetIsInsideBranch) =>
+        targetIsInsideBranch && path.Guard != null
+            ? new SymbolicState(
+                state.Facts,
+                new[] { path.Guard }.Concat(state.PathConditions),
+                state.SymbolVersions,
+                state.IsContradictory)
+            : state;
 
     private readonly record struct CfgPathState(
         SymbolicState State,
         SymbolicState? Baseline,
         SymbolicCondition? Guard,
+        bool? GuardWhenTrue,
         bool GuardInvalidated);
 
     private readonly record struct CfgTraversalPoint(
@@ -648,7 +685,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         allowGuardedReferenceAssignments,
                         semanticModel,
                         cancellationToken,
-                        "operation-lowering.declaration",
+                        "ir.path.prior-statement",
                         out var declaratorInvalidatedGuard))
                     return false;
                 guardInvalidated |= declaratorInvalidatedGuard;
@@ -673,7 +710,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                        allowGuardedReferenceAssignments,
                        semanticModel,
                        cancellationToken,
-                       "operation-lowering.assignment",
+                       "ir.path.prior-statement",
                        out guardInvalidated);
 
         var increment = operation switch
@@ -707,7 +744,9 @@ internal static class SymbolicCfgProgramPointStateCollector
                            ? SymbolicComputedUpdateKind.Increment
                            : SymbolicComputedUpdateKind.Decrement,
                        isChecked,
-                       "operation-lowering.increment",
+                       increment.Kind == OperationKind.Increment
+                           ? "ir.path.prior-statement.increment"
+                           : "ir.path.prior-statement.decrement",
                        out guardInvalidated);
 
         var compound = operation switch
@@ -738,7 +777,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                    cancellationToken,
                    SymbolicComputedUpdateKind.CompoundAssignment,
                    compoundIsChecked,
-                   "operation-lowering.compound-assignment",
+                   "ir.path.prior-statement.compound-assignment",
                    out guardInvalidated);
     }
 
@@ -850,6 +889,26 @@ internal static class SymbolicCfgProgramPointStateCollector
             _ => null!
         };
         return target != null;
+    }
+
+    private static bool HasUnsupportedAssignmentTargetBeforeSite(
+        SyntaxNode executionRoot,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot)
+                     .OfType<AssignmentExpressionSyntax>())
+        {
+            if (assignment.SpanStart >= site.SpanStart)
+                continue;
+
+            var target = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+            if (target is not ILocalSymbol and not IParameterSymbol)
+                return true;
+        }
+
+        return false;
     }
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
