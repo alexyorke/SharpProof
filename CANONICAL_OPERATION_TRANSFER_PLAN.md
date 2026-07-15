@@ -317,6 +317,7 @@ transfer policy after its slice is complete.
 | Shared Semantic Oracle source programs | `ba8a19eb` | 105,716 | -1,960 |
 | Resolved ownership-fact boilerplate finding | `38dcab8d` | 105,716 | -1,960 |
 | Resolved Dispose-matching finding | `502aa541` | 105,716 | -1,960 |
+| Resolved SMT canonicalization findings | `916d8a17` | 105,716 | -1,960 |
 
 ## Validation Ledger
 
@@ -422,6 +423,7 @@ transfer policy after its slice is complete.
 | Phase 6 shared Semantic Oracle source programs | Commit `ba8a19eb` replaces the only 12 byte-identical source programs remaining across `SemanticOracleSmtTests` and `SemanticOracleRuntimeHazardAnalyzerSmtTests` with typed constants in `SemanticOracleTestSources`. A Roslyn literal probe found an estimated 152 duplicated source lines before the change and zero cross-fixture literal groups afterward. No test signature, marker, assertion, query entrypoint, or analyzer entrypoint changed; both complete fixtures pass 551/551. The report's claim of broad fixture-level duplication was stale. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC fell to 142,465. |
 | Phase 6 resolved ownership-fact boilerplate finding | Commit `38dcab8d` removes a stale pre-kernel report entry. `AddOwnedLocalArrayFacts`, `AddFreshMutableObjectFacts`, and `AddOwnedDisposableLocalFacts` no longer contain the reported `AddFact` loops or independent path-state rebuilding; all three route acquisition through `PurityOperationTransferAdapter.ApplyLifetime` and the canonical lifetime kernel. Their remaining guards, lifetime kinds, provenance, and evidence keys are distinct analyzer policy, so another forwarding helper would not centralize semantics. Focused lifetime-kernel, array, object, mutation, and disposal fixtures pass 165/165. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 resolved Dispose-matching finding | Commit `502aa541` removes a misclassified report item. `IsParameterlessDisposeInvocation` is the sole invocation matcher and is already shared by lifetime transfer and double-dispose diagnostics, including `DisposeAsync`. `IsDisposableResourceType` instead decides whether an object-creation type implements the disposable contracts and has one caller; merging type and invocation classification would conflate distinct Roslyn inputs. The 165-case lifetime/array/object/disposal gate includes explicit sync and async disposal scenarios and remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
+| Phase 6 resolved SMT canonicalization findings | Commit `916d8a17` removes two stale entries already addressed by `77a625d93`. General aliases and Boolean equivalences call one path-compressing `FindCanonical` over the shared `(Parent, Differs)` representation; the Boolean wrapper preserves accumulated negation through `Differs`. Both union paths also call the single ordinal `SelectCanonical` tie-breaker. Focused syntactic-classifier, SMT-service, ProofCore purity-proof, and expression-atom fixtures pass 135/135. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 
 ## Current Checkpoint
 
@@ -452,12 +454,13 @@ transfer policy after its slice is complete.
   Fresh array, object, and disposable ownership already enters through the
   canonical lifetime adapter; the reported independent fact loops are gone.
   Dispose invocation recognition already has one owner, while disposable-type
-  recognition remains a distinct object-creation eligibility check.
-- Last confirmed fact: the sole parameterless Dispose/DisposeAsync matcher is
-  shared by transfer and diagnostics, and the 165-case lifetime/disposal gate
-  passes. Test LOC is 142,465; production LOC is 105,716, or -1,960 from start.
+  recognition remains a distinct object-creation eligibility check. General and
+  Boolean SMT equivalences already share canonical finding and selection.
+- Last confirmed fact: the shared SMT canonicalization preserves Boolean
+  negation and path compression; its focused 135-case proof gate passes. Test
+  LOC is 142,465; production LOC is 105,716, or -1,960 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, duplicate SMT canonical-finder mechanics in
-  `SmtSyntacticClassifier` and its Boolean partial.
+  `POTENTIAL_DUPS.md`, duplicated `FloorDiv`/`CeilingDiv` implementations for
+  `BigInteger` and `long` in the numeric syntactic classifier.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
