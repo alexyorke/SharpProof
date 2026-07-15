@@ -80,81 +80,192 @@ internal static class EffectSummaryGeneratedPurityRules
         new(["System.Security.Claims.ClaimsPrincipal.IsInRole(string)"], [], ["global_state_read"])
     ];
 
+    private static readonly GeneratedPureRule[] GeneratedPureRules =
+    [
+        new(
+            "none",
+            [
+                "System.Diagnostics.StackFrame.GetMethod()",
+                "System.Object.GetType()",
+                "System.HashCode.ToHashCode()",
+                "System.Index.get_End()",
+                "System.Index.get_Start()",
+                "System.Uri.IsWellFormedUriString(string, System.UriKind)",
+                "System.Uri.UnescapeDataString(string)",
+                "System.Decimal.Negate(decimal)",
+                "System.Decimal.op_UnaryNegation(decimal)",
+                "System.Decimal.Compare(decimal, decimal)",
+                "System.Decimal.ToDouble(decimal)",
+                "System.Buffers.ReadOnlySequence`1.Slice(long)",
+                "System.Collections.Generic.SortedList`2.IndexOfKey(!0)"
+            ],
+            []),
+        new(
+            "internal_only",
+            [
+                "System.Diagnostics.Debug.Assert(bool)",
+                "System.ComponentModel.BrowsableAttribute..ctor(bool)",
+                "System.ComponentModel.DescriptionAttribute..ctor(string)",
+                "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()",
+                "System.Diagnostics.ConditionalAttribute..ctor(string)",
+                "System.Uri.EscapeDataString(string)",
+                "System.String.Clone()",
+                "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler..ctor(int, int)",
+                "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(!!0)",
+                "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(string)",
+                "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendLiteral(string)",
+                "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.ToStringAndClear()",
+                "System.Collections.Immutable.ISecurePooledObjectUser.get_PoolUserId()"
+            ],
+            [
+                "System.String.Contains(",
+                "System.String..ctor(char",
+                "System.String.Split(",
+                "System.String.CompareTo(",
+                "System.String.Join(char, string[]",
+                "System.String.Join(string, string[]",
+                "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>",
+                "System.String.IndexOf(char",
+                "System.IO.Path.GetExtension(",
+                "System.IO.Path.HasExtension(",
+                "System.IO.Path.GetFileName(",
+                "System.IO.Path.GetFileNameWithoutExtension(",
+                "System.IO.Path.GetDirectoryName(",
+                "System.IO.Path.ChangeExtension(",
+                "System.Linq.Expressions.Expression.Parameter(",
+                "System.Linq.Expressions.Expression.Constant(",
+                "System.Linq.Expressions.Expression.Lambda(",
+                "System.Linq.Expressions.Expression.Call(",
+                "System.Linq.Expressions.Expression.Equal(",
+                "System.Linq.Expressions.Expression.NotEqual(",
+                "System.Linq.Expressions.Expression.Add(",
+                "System.Linq.Expressions.Expression.AddChecked(",
+                "System.Linq.Expressions.Expression.Subtract(",
+                "System.Linq.Expressions.Expression.SubtractChecked(",
+                "System.Linq.Expressions.Expression.Multiply(",
+                "System.Linq.Expressions.Expression.MultiplyChecked(",
+                "System.Linq.Expressions.Expression.Divide(",
+                "System.Linq.Expressions.Expression.Modulo(",
+                "System.Linq.Expressions.Expression.AndAlso(",
+                "System.Linq.Expressions.Expression.OrElse(",
+                "System.Linq.Expressions.Expression.GreaterThan(",
+                "System.Linq.Expressions.Expression.GreaterThanOrEqual(",
+                "System.Linq.Expressions.Expression.LessThan(",
+                "System.Linq.Expressions.Expression.LessThanOrEqual(",
+                "System.Collections.Immutable.ImmutableArray.Create",
+                "System.Collections.Immutable.ImmutableArray.CreateRange",
+                "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
+                "System.Collections.Immutable.ImmutableArray`1.Slice(",
+                "System.Collections.Immutable.ImmutableArray`1.AddRange(",
+                "System.Collections.Immutable.ImmutableArray`1.InsertRange(",
+                "System.Collections.Immutable.ImmutableArray`1.RemoveRange(",
+                "System.Guid.ToByteArray(",
+                "System.Guid.ToString(",
+                "System.Net.IPAddress.get_",
+                "System.Collections.Immutable.ImmutableHashSet`1+Enumerator.",
+                "System.Collections.Immutable.SortedInt32KeyNode`1+Enumerator.",
+                "System.Collections.Immutable.AllocFreeConcurrentStack`1.",
+                "System.Collections.Immutable.SecureObjectPool",
+                "System.Collections.Immutable.SecurePooledObject`1."
+            ],
+            IsImmutableHashSetEnumeratorMethod),
+        new(
+            "none",
+            [
+                "System.Array.get_Length()",
+                "System.IO.DirectoryInfo.get_Parent()",
+                "System.IO.FileInfo.get_DirectoryName()",
+                "System.Environment.get_Is64BitOperatingSystem()",
+                "System.Environment.get_Is64BitProcess()",
+                "System.Environment.get_NewLine()",
+                "System.Environment.get_HasShutdownStarted()",
+                "System.Boolean.CompareTo(bool)",
+                "System.Char.GetNumericValue(char)",
+                "System.Char.ToLowerInvariant(char)",
+                "System.Char.ToUpperInvariant(char)",
+                "System.Collections.Generic.Queue`1.ToArray()",
+                "System.Collections.Immutable.ImmutableQueue`1.Clear()",
+                "System.Collections.Immutable.ImmutableStack`1.Clear()",
+                "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty()"
+            ],
+            [
+                "System.Numerics.BitOperations.",
+                "System.BitConverter.To",
+                "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(",
+                "System.Array.Exists(",
+                "System.Array.FindIndex(",
+                "System.Array.TrueForAll(",
+                "System.Array.IndexOf(",
+                "System.Collections.Generic.List`1.Exists(",
+                "System.Collections.Generic.List`1.FindIndex(",
+                "System.Collections.Generic.List`1.TrueForAll(",
+                "System.ArgumentException.ThrowIfNullOrEmpty(",
+                "System.ArgumentException.ThrowIfNullOrWhiteSpace(",
+                "System.ArgumentNullException.ThrowIfNull(",
+                "System.ArgumentOutOfRangeException.ThrowIf",
+                "System.Diagnostics.Contracts.Contract.Requires(",
+                "System.Diagnostics.Contracts.Contract.Ensures(",
+                "System.ArgumentException..ctor(",
+                "System.ArgumentNullException..ctor(",
+                "System.BadImageFormatException..ctor(",
+                "System.DivideByZeroException..ctor(",
+                "System.IO.EndOfStreamException..ctor(",
+                "System.FlagsAttribute..ctor(",
+                "System.FormatException..ctor(",
+                "System.Index..ctor(",
+                "System.InvalidOperationException..ctor(",
+                "System.IO.FileNotFoundException..ctor(",
+                "System.ComponentModel.AddingNewEventArgs..ctor(",
+                "System.ComponentModel.DataAnnotations.ValidationResult..ctor(",
+                "System.NotImplementedException..ctor(",
+                "System.NotSupportedException..ctor(",
+                "System.ObjectDisposedException..ctor(",
+                "System.ObsoleteAttribute..ctor(",
+                "System.OverflowException..ctor(",
+                "System.PlatformNotSupportedException..ctor(",
+                "System.Range..ctor(",
+                "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(",
+                "System.Runtime.CompilerServices.MethodImplAttribute..ctor(",
+                "System.SerializableAttribute..ctor(",
+                "System.UIntPtr..ctor(",
+                "System.Type.get_",
+                "System.RuntimeType.get_",
+                "System.Reflection.MemberInfo.get_",
+                "System.RuntimeTypeHandle.",
+                "System.Runtime.CompilerServices.TypeHandle.",
+                "System.Collections.Immutable.ImmutableList.Create",
+                "System.Collections.Immutable.ImmutableList`1.Add(",
+                "System.Collections.Immutable.ImmutableList`1.AddRange(",
+                "System.Collections.Immutable.ImmutableList`1.Insert(",
+                "System.Collections.Immutable.ImmutableList`1.InsertRange(",
+                "System.Collections.Immutable.ImmutableList`1.Remove(",
+                "System.Collections.Immutable.ImmutableList`1.RemoveAt(",
+                "System.Collections.Immutable.ImmutableList`1.RemoveRange(",
+                "System.Collections.Immutable.ImmutableList`1.Replace(",
+                "System.Collections.Immutable.ImmutableList`1.SetItem(",
+                "System.Collections.Immutable.ImmutableHashSet.Create",
+                "System.Collections.Immutable.ImmutableDictionary.Create",
+                "System.Collections.Immutable.ImmutableHashSet`1.get_Count(",
+                "System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty(",
+                "System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer(",
+                "System.Collections.Immutable.ImmutableStack`1.Push(",
+                "System.Char.Is",
+                "System.Globalization.CompareInfo.Compare("
+            ])
+    ];
+
     internal static bool TryGetKnownGeneratedPureVisibility(string symbol, out string effectVisibilityClassification)
     {
         effectVisibilityClassification = "none";
-
-        if (symbol is
-            "System.Diagnostics.StackFrame.GetMethod()" or
-            "System.Object.GetType()" or
-            "System.HashCode.ToHashCode()" or
-            "System.Index.get_End()" or
-            "System.Index.get_Start()" or
-            "System.Uri.IsWellFormedUriString(string, System.UriKind)" or
-            "System.Uri.UnescapeDataString(string)" or
-            "System.Decimal.Negate(decimal)" or
-            "System.Decimal.op_UnaryNegation(decimal)" or
-            "System.Decimal.Compare(decimal, decimal)" or
-            "System.Decimal.ToDouble(decimal)" or
-            "System.Buffers.ReadOnlySequence`1.Slice(long)")
-            return true;
-
-        if (string.Equals(
-                symbol,
-                "System.Collections.Generic.SortedList`2.IndexOfKey(!0)",
-                StringComparison.Ordinal))
-            return true;
-
-        if (symbol is
-            "System.Diagnostics.Debug.Assert(bool)" or
-            "System.ComponentModel.BrowsableAttribute..ctor(bool)" or
-            "System.ComponentModel.DescriptionAttribute..ctor(string)" or
-            "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()" or
-            "System.Diagnostics.ConditionalAttribute..ctor(string)" or
-            "System.Uri.EscapeDataString(string)")
+        foreach (var rule in GeneratedPureRules)
         {
-            effectVisibilityClassification = "internal_only";
+            if (!rule.Matches(symbol)) continue;
+
+            effectVisibilityClassification = rule.Visibility;
             return true;
         }
 
-        if (IsInternalOnlyGeneratedPure(symbol))
-        {
-            effectVisibilityClassification = "internal_only";
-            return true;
-        }
-
-        return IsCallerVisibleGeneratedPure(symbol);
-    }
-
-    private static bool IsInternalOnlyGeneratedPure(string symbol)
-    {
-        return IsPureGeneratedStringMember(symbol) ||
-               IsPureGeneratedPathHelper(symbol) ||
-               IsPureGeneratedExpressionFactory(symbol) ||
-               IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
-               IsPureGeneratedImmutableArrayMember(symbol) ||
-               IsPureGeneratedValueArrayProjection(symbol) ||
-               IsPureGeneratedDeterministicValueFormatting(symbol) ||
-               IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
-               IsPureGeneratedStableNetworkValue(symbol);
-    }
-
-    private static bool IsCallerVisibleGeneratedPure(string symbol)
-    {
-        return IsPureGeneratedDeterministicNumericHelper(symbol) ||
-               IsPureGeneratedArrayPredicate(symbol) ||
-               IsPureGeneratedListPredicate(symbol) ||
-               IsPureGeneratedArrayRead(symbol) ||
-               IsPureGeneratedArgumentGuard(symbol) ||
-               IsPureGeneratedContractGuard(symbol) ||
-               IsPureGeneratedConstructor(symbol) ||
-               IsPureGeneratedTypeMetadata(symbol) ||
-               IsPureGeneratedImmutableMember(symbol) ||
-               IsPureGeneratedFileSystemMetadataGetter(symbol) ||
-               IsPureGeneratedEnvironmentStableGetter(symbol) ||
-               IsPureGeneratedCharHelper(symbol) ||
-               IsPureGeneratedQueueFreshArray(symbol) ||
-               IsPureGeneratedCultureCompare(symbol);
+        return false;
     }
 
     internal static bool TryGetKnownGeneratedImpureCategories(string symbol, out string[] categories)
@@ -186,269 +297,24 @@ internal static class EffectSummaryGeneratedPurityRules
         }
     }
 
-    internal static bool IsPureGeneratedArrayRead(string symbol)
+    private sealed record GeneratedPureRule(
+        string Visibility,
+        string[] ExactSymbols,
+        string[] SymbolPrefixes,
+        Func<string, bool>? Predicate = null)
     {
-        return symbol.StartsWith("System.Array.IndexOf(", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Array.get_Length()", StringComparison.Ordinal);
+        internal bool Matches(string symbol)
+        {
+            return ExactSymbols.Contains(symbol, StringComparer.Ordinal) ||
+                   SymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal)) ||
+                   Predicate?.Invoke(symbol) == true;
+        }
     }
 
-    internal static bool IsPureGeneratedArgumentGuard(string symbol)
+    private static bool IsImmutableHashSetEnumeratorMethod(string symbol)
     {
-        return symbol.StartsWith("System.ArgumentException.ThrowIfNullOrEmpty(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ArgumentException.ThrowIfNullOrWhiteSpace(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ArgumentNullException.ThrowIfNull(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ArgumentOutOfRangeException.ThrowIf", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedContractGuard(string symbol)
-    {
-        return symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedConstructor(string symbol)
-    {
-        return symbol.StartsWith("System.ArgumentException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ArgumentNullException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.BadImageFormatException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.DivideByZeroException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.EndOfStreamException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.FlagsAttribute..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.FormatException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Index..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.InvalidOperationException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.FileNotFoundException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ComponentModel.AddingNewEventArgs..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ComponentModel.DataAnnotations.ValidationResult..ctor(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.NotImplementedException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.NotSupportedException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ObjectDisposedException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.ObsoleteAttribute..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.OverflowException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.PlatformNotSupportedException..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Range..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Runtime.CompilerServices.MethodImplAttribute..ctor(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.SerializableAttribute..ctor(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.UIntPtr..ctor(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedTypeMetadata(string symbol)
-    {
-        return symbol.StartsWith("System.Type.get_", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.RuntimeType.get_", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Reflection.MemberInfo.get_", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.RuntimeTypeHandle.", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Runtime.CompilerServices.TypeHandle.", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedStringMember(string symbol)
-    {
-        return symbol.StartsWith("System.String.Contains(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String..ctor(char", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String.Split(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String.CompareTo(", StringComparison.Ordinal) ||
-               IsPureGeneratedStringJoin(symbol) ||
-               string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String.IndexOf(char", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedStringJoin(string symbol)
-    {
-        return symbol.StartsWith("System.String.Join(char, string[]", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String.Join(string, string[]", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>",
-                   StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedPathHelper(string symbol)
-    {
-        return symbol.StartsWith("System.IO.Path.GetExtension(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.Path.HasExtension(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.Path.GetFileName(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.Path.GetDirectoryName(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.IO.Path.ChangeExtension(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedExpressionFactory(string symbol)
-    {
-        return symbol.StartsWith("System.Linq.Expressions.Expression.Parameter(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Constant(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Lambda(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Call(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Equal(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.NotEqual(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Add(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.AddChecked(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Subtract(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.SubtractChecked(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Multiply(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.MultiplyChecked(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Divide(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.Modulo(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.AndAlso(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.OrElse(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThan(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThanOrEqual(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.LessThan(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Linq.Expressions.Expression.LessThanOrEqual(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedInterpolatedStringHandlerMember(string symbol)
-    {
-        return string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler..ctor(int, int)",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol,
-                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(!!0)",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol,
-                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(string)",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol,
-                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendLiteral(string)",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol,
-                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.ToStringAndClear()",
-                   StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedImmutableMember(string symbol)
-    {
-        return symbol.StartsWith("System.Collections.Immutable.ImmutableList.Create", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Add(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.AddRange(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Insert(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.InsertRange(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Remove(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveAt(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveRange(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Replace(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.SetItem(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet.Create", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableDictionary.Create", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_Count(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer(",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Collections.Immutable.ImmutableQueue`1.Clear()",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.Clear()",
-                   StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty()",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableStack`1.Push(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedImmutableArrayMember(string symbol)
-    {
-        return symbol.StartsWith("System.Collections.Immutable.ImmutableArray.Create", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray.CreateRange", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray.ToImmutableArray",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.Slice(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.AddRange(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.InsertRange(",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.RemoveRange(",
-                   StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedValueArrayProjection(string symbol)
-    {
-        return symbol.StartsWith("System.Guid.ToByteArray(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedDeterministicValueFormatting(string symbol)
-    {
-        return symbol.StartsWith("System.Guid.ToString(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedDeterministicNumericHelper(string symbol)
-    {
-        return symbol.StartsWith("System.Numerics.BitOperations.", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.BitConverter.To", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(",
-                   StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedFileSystemMetadataGetter(string symbol)
-    {
-        return string.Equals(symbol, "System.IO.DirectoryInfo.get_Parent()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.IO.FileInfo.get_DirectoryName()", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedEnvironmentStableGetter(string symbol)
-    {
-        return symbol is
-            "System.Environment.get_Is64BitOperatingSystem()" or
-            "System.Environment.get_Is64BitProcess()" or
-            "System.Environment.get_NewLine()" or
-            "System.Environment.get_HasShutdownStarted()";
-    }
-
-    internal static bool IsPureGeneratedCharHelper(string symbol)
-    {
-        return symbol is
-                   "System.Boolean.CompareTo(bool)" or
-                   "System.Char.GetNumericValue(char)" or
-                   "System.Char.ToLowerInvariant(char)" or
-                   "System.Char.ToUpperInvariant(char)" ||
-               symbol.StartsWith("System.Char.Is", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedQueueFreshArray(string symbol)
-    {
-        return string.Equals(symbol, "System.Collections.Generic.Queue`1.ToArray()", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedCultureCompare(string symbol)
-    {
-        return symbol.StartsWith("System.Globalization.CompareInfo.Compare(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedStableNetworkValue(string symbol)
-    {
-        return symbol.StartsWith("System.Net.IPAddress.get_", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedImmutableCollectionPoolInfrastructure(string symbol)
-    {
-        return string.Equals(
-                   symbol,
-                   "System.Collections.Immutable.ISecurePooledObjectUser.get_PoolUserId()",
-                   StringComparison.Ordinal) ||
-               (symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1", StringComparison.Ordinal) &&
-                symbol.Contains("GetEnumerator()", StringComparison.Ordinal)) ||
-               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1+Enumerator.",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.SortedInt32KeyNode`1+Enumerator.",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.AllocFreeConcurrentStack`1.",
-                   StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.SecureObjectPool", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Immutable.SecurePooledObject`1.", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedArrayPredicate(string symbol)
-    {
-        return symbol.StartsWith("System.Array.Exists(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Array.FindIndex(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Array.TrueForAll(", StringComparison.Ordinal);
-    }
-
-    internal static bool IsPureGeneratedListPredicate(string symbol)
-    {
-        return symbol.StartsWith("System.Collections.Generic.List`1.Exists(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Generic.List`1.FindIndex(", StringComparison.Ordinal) ||
-               symbol.StartsWith("System.Collections.Generic.List`1.TrueForAll(", StringComparison.Ordinal);
+        return symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1", StringComparison.Ordinal) &&
+               symbol.Contains("GetEnumerator()", StringComparison.Ordinal);
     }
 
     internal static bool IsGeneratedArrayComparerSort(string symbol)
