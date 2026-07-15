@@ -88,11 +88,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## Analyzer Engine - I-P
 
-### Minor: `Dispose` name matching in two places - `PurityResourceStateFacts.Diagnostics.cs:10` vs `PurityResourceStateFacts.cs:467`
-**Recommendation:** Centralize `IsDisposableType` / `IsDisposeMethod`.
-
----
-
 ## Analyzer Engine - Q-Z
 
 ---
