@@ -61,4 +61,16 @@ public sealed class SymbolicLoopTransferLowererTests
 
         Assert.That(result.IsUnsupported, Is.True);
     }
+
+    [Test]
+    public void AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate()
+    {
+        const string source = "static class C { static int M(bool stop) { int value = 0; while (true) { if (stop) break; value++; } return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate));
+        var loop = fixture.Root.DescendantNodes().OfType<WhileStatementSyntax>().Single();
+
+        var result = SymbolicLoopTransferLowerer.Lower(loop, fixture.SemanticModel, CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True);
+    }
 }

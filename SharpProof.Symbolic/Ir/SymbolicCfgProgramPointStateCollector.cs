@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -18,13 +19,14 @@ internal static class SymbolicCfgProgramPointStateCollector
             ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(site, "execution-root");
-        if (CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot).Any(static node =>
-                node is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax or
-                    Microsoft.CodeAnalysis.CSharp.Syntax.DoStatementSyntax or
-                    Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax or
-                    Microsoft.CodeAnalysis.CSharp.Syntax.ForEachStatementSyntax or
-                    Microsoft.CodeAnalysis.CSharp.Syntax.ForEachVariableStatementSyntax))
-            return Unsupported(site, "loop-fixed-point");
+        if (!TryLowerLoopPlans(
+                executionRoot,
+                semanticModel,
+                cancellationToken,
+                out var loopPlans))
+            return Unsupported(site, "loop-lowering");
+        if (loopPlans.Any(plan => plan.Loop.Span.Contains(site.SpanStart)))
+            return Unsupported(site, "loop-local-target");
 
         ControlFlowGraph? graph;
         try
@@ -61,7 +63,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 Microsoft.CodeAnalysis.CSharp.Syntax.ElseClauseSyntax or
                 Microsoft.CodeAnalysis.CSharp.Syntax.SwitchSectionSyntax);
         var iterations = 0;
-        while (queue.Count != 0 && iterations++ < graph.Blocks.Length * 4)
+        var iterationLimit = graph.Blocks.Length * (4 + loopPlans.Count * 2);
+        while (queue.Count != 0 && iterations++ < iterationLimit)
         {
             var block = queue.Dequeue();
             queued.Remove(block.Ordinal);
@@ -118,7 +121,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                     incoming,
                     queue,
                     queued,
-                    completedPaths))
+                    completedPaths,
+                    loopPlans))
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
@@ -144,7 +148,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         IDictionary<int, List<CfgPathState>> incoming,
         Queue<BasicBlock> queue,
         ISet<int> queued,
-        ICollection<CfgPathState> completedPaths)
+        ICollection<CfgPathState> completedPaths,
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
         if (block.ConditionKind != ControlFlowConditionKind.None)
         {
@@ -177,7 +182,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        incoming,
                        queue,
                        queued,
-                       completedPaths) &&
+                       completedPaths,
+                       loopPlans) &&
                    TryPropagate(
                        block,
                        block.FallThroughSuccessor,
@@ -185,7 +191,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        incoming,
                        queue,
                        queued,
-                       completedPaths);
+                       completedPaths,
+                       loopPlans);
         }
 
         return TryPropagate(
@@ -195,7 +202,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    incoming,
                    queue,
                    queued,
-                   completedPaths) &&
+                   completedPaths,
+                   loopPlans) &&
                TryPropagate(
                    block,
                    block.ConditionalSuccessor,
@@ -203,7 +211,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    incoming,
                    queue,
                    queued,
-                   completedPaths);
+                   completedPaths,
+                   loopPlans);
     }
 
     private static bool TryCreateBranchState(
@@ -244,7 +253,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         IDictionary<int, List<CfgPathState>> incoming,
         Queue<BasicBlock> queue,
         ISet<int> queued,
-        ICollection<CfgPathState> completedPaths)
+        ICollection<CfgPathState> completedPaths,
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
         if (branch is { Semantics: not ControlFlowBranchSemantics.Regular })
         {
@@ -255,8 +265,19 @@ internal static class SymbolicCfgProgramPointStateCollector
         }
         if (branch == null || branch.Destination == null)
             return true;
-        if (!branch.FinallyRegions.IsDefaultOrEmpty || branch.Destination.Ordinal <= source.Ordinal)
+        if (!branch.FinallyRegions.IsDefaultOrEmpty)
             return false;
+
+        if (branch.Destination.Ordinal <= source.Ordinal)
+        {
+            if (!TryApplyLoopBackEdge(
+                    source,
+                    branch.Destination,
+                    path,
+                    loopPlans,
+                    out path))
+                return false;
+        }
 
         var destination = branch.Destination;
         if (!incoming.TryGetValue(destination.Ordinal, out var states))
@@ -277,6 +298,78 @@ internal static class SymbolicCfgProgramPointStateCollector
         states.Add(path);
         if (queued.Add(destination.Ordinal))
             queue.Enqueue(destination);
+        return true;
+    }
+
+    private static bool TryApplyLoopBackEdge(
+        BasicBlock source,
+        BasicBlock destination,
+        CfgPathState path,
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans,
+        out CfgPathState backEdgePath)
+    {
+        var plan = loopPlans
+            .Where(candidate =>
+                BlockIsWithinLoop(source, candidate.Loop) &&
+                BlockIsWithinLoop(destination, candidate.Loop))
+            .OrderBy(static candidate => candidate.Loop.Span.Length)
+            .FirstOrDefault();
+        if (plan == null)
+        {
+            backEdgePath = default;
+            return false;
+        }
+
+        var transition = SymbolicOperationTransferKernel.Invalidate(
+            path.State,
+            plan.BackEdgeInvalidations,
+            plan.Loop.Span,
+            "cfg-program-point.loop-back-edge");
+        backEdgePath = transition.IsExact
+            ? new CfgPathState(transition.State, null, null, false)
+            : default;
+        return transition.IsExact;
+    }
+
+    private static bool BlockIsWithinLoop(BasicBlock block, StatementSyntax loop) =>
+        block.Operations.Any(operation => loop.Span.Contains(operation.Syntax.Span)) ||
+        block.BranchValue != null && loop.Span.Contains(block.BranchValue.Syntax.Span);
+
+    private static bool TryLowerLoopPlans(
+        SyntaxNode executionRoot,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IReadOnlyList<SymbolicLoopTransferPlan> plans)
+    {
+        var lowered = new List<SymbolicLoopTransferPlan>();
+        foreach (var loop in CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot)
+                     .OfType<StatementSyntax>()
+                     .Where(static statement => statement is WhileStatementSyntax or
+                         DoStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or
+                         ForEachVariableStatementSyntax))
+        {
+            var result = SymbolicLoopTransferLowerer.Lower(
+                loop,
+                semanticModel,
+                cancellationToken);
+            if (result is not { IsExact: true, Value: { } plan })
+            {
+                plans = Array.Empty<SymbolicLoopTransferPlan>();
+                return false;
+            }
+            if (plan.Loop is not WhileStatementSyntax ||
+                plan.BackEdgeInvalidations.Any(target =>
+                    SymbolicIrReferenceScanner.ContainsVariableOrMember(
+                        plan.EntryCondition,
+                        target.Key)))
+            {
+                plans = Array.Empty<SymbolicLoopTransferPlan>();
+                return false;
+            }
+            lowered.Add(plan);
+        }
+
+        plans = lowered;
         return true;
     }
 

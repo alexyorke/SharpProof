@@ -21,6 +21,9 @@ internal static class SymbolicLoopTransferLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetCondition(loop, out var condition))
             return Unsupported(loop, "loop-kind");
+        if (CSharpSyntaxFacts.DescendantNodesInExecution(loop).Any(static node =>
+                node is BreakStatementSyntax or ContinueStatementSyntax))
+            return Unsupported(loop, "abrupt-completion");
 
         SymbolicCondition entryCondition;
         SymbolicCondition exitCondition;

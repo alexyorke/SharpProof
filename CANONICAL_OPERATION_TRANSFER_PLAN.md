@@ -248,6 +248,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     - [x] Lower while, do, and for entry/exit conditions, loop-body invariants,
       and back-edge invalidation targets into one typed loop transfer plan.
       Foreach remains typed `Unsupported` until finite-domain lowering migrates.
+    - [x] Route mutation-independent while-loop back edges through canonical
+      invalidation and a bounded normalized-state worklist. Loop-local targets,
+      abrupt exits, condition mutations, do/for exits, and foreach remain typed
+      fallbacks until their distinct completion/invariant parity migrates.
 - [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
@@ -392,6 +396,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 all-path CFG completion | `4a51a3e0` | 106,015 | -1,661 |
 | Phase 7 computed CFG updates | `7f6b45fb` | 106,108 | -1,568 |
 | Phase 7 typed loop transfer plan | `341eac5b` | 106,234 | -1,442 |
+| Phase 7 bounded while-loop revisits | pending | 106,324 | -1,352 |
 
 ## Validation Ledger
 
@@ -524,6 +529,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 all-path CFG completion | Commit `4a51a3e0` records non-regular terminal CFG edges, guarded-merges their states, and applies canonical no-fallthrough completion only when Roslyn marks the target block unreachable. The normalized-state differential matches exactly; direct collector fixtures pass 10/10, the path/program-point/transfer batch passes 157/157, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,015, or -1,661 from the rewrite start; test LOC is 142,635. |
 | Phase 7 computed CFG updates | Commit `7f6b45fb` routes direct increment/decrement and compound assignment operations through `SymbolicAssignmentValueUpdater`, typed computed-update descriptors, and the canonical kernel. Two normalized-state differentials cover increment and compound arithmetic; direct collector fixtures pass 12/12, the path/program-point/transfer batch passes 159/159, and full MainSmtOracle passes 573/573. Production LOC is 106,108, or -1,568 from the rewrite start; test LOC is 142,637. |
 | Phase 7 typed loop transfer plan | Commit `341eac5b` lowers while, do, and for entry/exit conditions, structural invariants, and local/parameter back-edge invalidation targets into one typed result. Foreach and unsupported mutation targets remain conservative fallbacks. Focused loop/program-point fixtures pass 153/153 and full MainSmtOracle passes 573/573. Production LOC is 106,234, or -1,442 from the rewrite start; test LOC is 142,691. |
+| Phase 7 bounded while-loop revisits | Pending commit consumes mutation-independent while-loop plans at backward CFG edges, invalidates every loop-carried target before merging, and terminates revisits on normalized state identity under a graph-size budget. Three broader reproductions exposed unsound abrupt-exit handling and two deliberate do/for invariant differences; those shapes now remain typed fallbacks. Focused loop/program-point/transfer fixtures pass 197/197, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,324, or -1,352 from the rewrite start; test LOC is 142,736. |
 
 ## Current Checkpoint
 
@@ -588,19 +594,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
 - Last confirmed fact: all 8,583 lines in the legacy deletion-map family are
   reachable. Commits `1b67e81a` and `c5e685d3` production-route straight-line
   assignment and post-join acyclic branch states through canonical CFG events.
-  Branch-local target queries, back-edges, finally regions, unsupported
-  operations and finally shapes still fall back. Acyclic single-survivor and
-  all-path terminal completion are canonical; loop-containing roots are rejected
-  before traversal. MainSmtOracle passes 573/573 and the warning-as-error
+  Branch-local target queries, finally regions, unsupported operations, and
+  unsupported loop shapes still fall back. Acyclic single-survivor and all-path
+  terminal completion are canonical. MainSmtOracle passes 573/573 and the warning-as-error
   Symbolic build is clean. Computed updater operations now use the same CFG
   transfer path. Typed loop transfer plans now own
   while/do/for conditions, invariants, and local/parameter back-edge
-  invalidations; foreach and unsupported mutation shapes still fall back. Test
-  LOC is 142,691; production LOC is 106,234, or -1,442 from the rewrite start;
-  the 649-line scaffold must be repaid when structural transfer paths are
-  deleted.
-- Next cheapest step: consume typed loop plans at backward CFG edges, invalidate
-  loop-carried values before merging revisits, and require bounded convergence
-  before any loop-derived target state can escape.
+  invalidations; queries after mutation-independent while loops now use bounded canonical CFG
+  revisits. Loop-local targets, abrupt exits, condition-dependent mutations,
+  do/for exits, and foreach remain conservative fallbacks. Test LOC is 142,736;
+  production LOC is 106,324, or -1,352 from the rewrite start; the 739-line
+  scaffold must be repaid when structural transfer paths are deleted.
+- Next cheapest step: migrate do-loop exit invalidation and counted-for lower
+  bounds as separate normalized-parity slices, then route finally continuations.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
