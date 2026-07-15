@@ -22,33 +22,25 @@ public sealed class SymbolicCapabilityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicCapabilities-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
-        {
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "Console.WriteLine").ToString(),
-                "--capabilities",
-                "--json");
+        using var sourceFile = TemporarySourceFile.Create("SymbolicCapabilities-", source);
+        var sourcePath = sourceFile.Path;
 
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            using var document = JsonDocument.Parse(result.StandardOutput);
-            var root = document.RootElement;
-            Assert.That(root.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
-            var site = root.GetProperty("Sites")[0];
-            Assert.That(site.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
-            Assert.That(site.GetProperty("SiteKind").GetString(), Is.EqualTo("invocation"));
-            Assert.That(site.GetProperty("OperationKind").GetString(), Is.EqualTo("Invocation"));
-        }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "Console.WriteLine").ToString(),
+            "--capabilities",
+            "--json");
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        var root = document.RootElement;
+        Assert.That(root.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
+        var site = root.GetProperty("Sites")[0];
+        Assert.That(site.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
+        Assert.That(site.GetProperty("SiteKind").GetString(), Is.EqualTo("invocation"));
+        Assert.That(site.GetProperty("OperationKind").GetString(), Is.EqualTo("Invocation"));
     }
 
     [Test]
@@ -63,35 +55,27 @@ public sealed class SymbolicCapabilityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicCapabilitiesDynamic-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
-        {
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "value.ToString()").ToString(),
-                "--capabilities",
-                "--compact-json");
+        using var sourceFile = TemporarySourceFile.Create("SymbolicCapabilitiesDynamic-", source);
+        var sourcePath = sourceFile.Path;
 
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            using var document = JsonDocument.Parse(result.StandardOutput);
-            var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
-            Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-                Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-            Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-                Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
-            Assert.That(root.GetProperty("hasUnknowns").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("unknownReasons")[0].GetString(), Is.EqualTo("DynamicDispatch"));
-        }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "value.ToString()").ToString(),
+            "--capabilities",
+            "--compact-json");
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        var root = document.RootElement;
+        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
+        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        Assert.That(root.GetProperty("hasUnknowns").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("unknownReasons")[0].GetString(), Is.EqualTo("DynamicDispatch"));
     }
 
     [Test]
@@ -106,26 +90,18 @@ public sealed class SymbolicCapabilityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicCapabilitiesInvalid-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
-        {
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                "--file",
-                sourcePath,
-                "--capabilities",
-                "--all-lines");
+        using var sourceFile = TemporarySourceFile.Create("SymbolicCapabilitiesInvalid-", source);
+        var sourcePath = sourceFile.Path;
 
-            Assert.That(result.ExitCode, Is.EqualTo(64));
-            Assert.That(result.StandardError,
-                Does.Contain("--capabilities supports --line, --line with --column, or --position only."));
-        }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--capabilities",
+            "--all-lines");
+
+        Assert.That(result.ExitCode, Is.EqualTo(64));
+        Assert.That(result.StandardError,
+            Does.Contain("--capabilities supports --line, --line with --column, or --position only."));
     }
 
     [Test]
@@ -141,65 +117,57 @@ public sealed class SymbolicCapabilityQueryTests
                                   public void Dynamic(dynamic value) => value.ToString();
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicCapabilityGates-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
+        using var sourceFile = TemporarySourceFile.Create("SymbolicCapabilityGates-", source);
+        var sourcePath = sourceFile.Path;
+
+        var violation = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "Console.WriteLine").ToString(),
+            "--capabilities",
+            "--compact-json",
+            "--fail-on-capability-violation");
+        Assert.That(violation.ExitCode, Is.EqualTo(1));
+        Assert.That(violation.StandardError, Does.Contain("CI gate failed [capability-violation]"));
+        Assert.That(violation.StandardError, Does.Contain("disallowed=IO, Console"));
+        using (JsonDocument.Parse(violation.StandardOutput))
         {
-            var violation = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "Console.WriteLine").ToString(),
-                "--capabilities",
-                "--compact-json",
-                "--fail-on-capability-violation");
-            Assert.That(violation.ExitCode, Is.EqualTo(1));
-            Assert.That(violation.StandardError, Does.Contain("CI gate failed [capability-violation]"));
-            Assert.That(violation.StandardError, Does.Contain("disallowed=IO, Console"));
-            using (JsonDocument.Parse(violation.StandardOutput))
-            {
-            }
-
-            var allowed = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "Console.WriteLine").ToString(),
-                "--capabilities",
-                "--allowed-capability",
-                "Console",
-                "--fail-on-capability-violation");
-            Assert.That(allowed.ExitCode, Is.Zero, allowed.StandardError);
-
-            var unknown = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "value.ToString").ToString(),
-                "--capabilities",
-                "--fail-on-capability-unknown");
-            Assert.That(unknown.ExitCode, Is.EqualTo(1));
-            Assert.That(unknown.StandardError, Does.Contain("CI gate failed [capability-unknown]"));
-
-            var threshold = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "Console.WriteLine").ToString(),
-                "--capabilities",
-                "--compact-json",
-                "--fail-on-compact-threshold",
-                "capability-sites=0");
-            Assert.That(threshold.ExitCode, Is.EqualTo(1));
-            Assert.That(threshold.StandardError,
-                Does.Contain("CI gate failed [compact-threshold.capability-sites]"));
         }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+
+        var allowed = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "Console.WriteLine").ToString(),
+            "--capabilities",
+            "--allowed-capability",
+            "Console",
+            "--fail-on-capability-violation");
+        Assert.That(allowed.ExitCode, Is.Zero, allowed.StandardError);
+
+        var unknown = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "value.ToString").ToString(),
+            "--capabilities",
+            "--fail-on-capability-unknown");
+        Assert.That(unknown.ExitCode, Is.EqualTo(1));
+        Assert.That(unknown.StandardError, Does.Contain("CI gate failed [capability-unknown]"));
+
+        var threshold = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "Console.WriteLine").ToString(),
+            "--capabilities",
+            "--compact-json",
+            "--fail-on-compact-threshold",
+            "capability-sites=0");
+        Assert.That(threshold.ExitCode, Is.EqualTo(1));
+        Assert.That(threshold.StandardError,
+            Does.Contain("CI gate failed [compact-threshold.capability-sites]"));
     }
 
 }

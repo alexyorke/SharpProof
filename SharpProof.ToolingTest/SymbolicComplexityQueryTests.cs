@@ -24,33 +24,25 @@ public sealed class SymbolicComplexityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicComplexity-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
-        {
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                "3",
-                "--complexity",
-                "--compact-json");
+        using var sourceFile = TemporarySourceFile.Create("SymbolicComplexity-", source);
+        var sourcePath = sourceFile.Path;
 
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            using var document = JsonDocument.Parse(result.StandardOutput);
-            var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
-            Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-                Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-            Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-                Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
-        }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            "3",
+            "--complexity",
+            "--compact-json");
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        var root = document.RootElement;
+        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
+        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
     }
 
     [Test]
@@ -65,26 +57,18 @@ public sealed class SymbolicComplexityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicComplexityInvalid-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
-        {
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                "--file",
-                sourcePath,
-                "--complexity",
-                "--all-lines");
+        using var sourceFile = TemporarySourceFile.Create("SymbolicComplexityInvalid-", source);
+        var sourcePath = sourceFile.Path;
 
-            Assert.That(result.ExitCode, Is.EqualTo(64));
-            Assert.That(result.StandardError,
-                Does.Contain("--complexity supports --line, --line with --column, or --position only."));
-        }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--complexity",
+            "--all-lines");
+
+        Assert.That(result.ExitCode, Is.EqualTo(64));
+        Assert.That(result.StandardError,
+            Does.Contain("--complexity supports --line, --line with --column, or --position only."));
     }
 
     [Test]
@@ -125,88 +109,80 @@ public sealed class SymbolicComplexityQueryTests
                                   }
                               }
                               """;
-        var sourcePath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SymbolicComplexityGates-" + Guid.NewGuid().ToString("N") + ".cs");
-        File.WriteAllText(sourcePath, source);
-        try
+        using var sourceFile = TemporarySourceFile.Create("SymbolicComplexityGates-", source);
+        var sourcePath = sourceFile.Path;
+
+        var exceeded = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "for (var left").ToString(),
+            "--complexity",
+            "--compact-json",
+            "--fail-on-complexity-exceeded",
+            "Linear");
+        Assert.That(exceeded.ExitCode, Is.EqualTo(1));
+        Assert.That(exceeded.StandardError, Does.Contain("CI gate failed [complexity-exceeded]"));
+        using (JsonDocument.Parse(exceeded.StandardOutput))
         {
-            var exceeded = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "for (var left").ToString(),
-                "--complexity",
-                "--compact-json",
-                "--fail-on-complexity-exceeded",
-                "Linear");
-            Assert.That(exceeded.ExitCode, Is.EqualTo(1));
-            Assert.That(exceeded.StandardError, Does.Contain("CI gate failed [complexity-exceeded]"));
-            using (JsonDocument.Parse(exceeded.StandardOutput))
-            {
-            }
-
-            var within = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "for (var left").ToString(),
-                "--complexity",
-                "--fail-on-complexity-exceeded",
-                "Quadratic");
-            Assert.That(within.ExitCode, Is.Zero, within.StandardError);
-
-            var productExceedsConstant = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "public int Product").ToString(),
-                "--complexity",
-                "--fail-on-complexity-exceeded",
-                "Constant");
-            Assert.That(productExceedsConstant.ExitCode, Is.EqualTo(1));
-            Assert.That(productExceedsConstant.StandardError,
-                Does.Contain("CI gate failed [complexity-exceeded]"));
-
-            var maxExceedsConstant = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "public int Max").ToString(),
-                "--complexity",
-                "--fail-on-complexity-exceeded",
-                "Constant");
-            Assert.That(maxExceedsConstant.ExitCode, Is.EqualTo(1));
-            Assert.That(maxExceedsConstant.StandardError,
-                Does.Contain("CI gate failed [complexity-exceeded]"));
-
-            var unknown = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "while (index").ToString(),
-                "--complexity",
-                "--fail-on-complexity-unknown");
-            Assert.That(unknown.ExitCode, Is.EqualTo(1));
-            Assert.That(unknown.StandardError, Does.Contain("CI gate failed [complexity-unknown]"));
-
-            var threshold = await SymbolicCliTestHost.RunAsync(
-                "--file",
-                sourcePath,
-                "--line",
-                FindLine(source, "for (var left").ToString(),
-                "--complexity",
-                "--compact-json",
-                "--fail-on-compact-threshold",
-                "complexity-drivers=0");
-            Assert.That(threshold.ExitCode, Is.EqualTo(1));
-            Assert.That(threshold.StandardError,
-                Does.Contain("CI gate failed [compact-threshold.complexity-drivers]"));
         }
-        finally
-        {
-            File.Delete(sourcePath);
-        }
+
+        var within = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "for (var left").ToString(),
+            "--complexity",
+            "--fail-on-complexity-exceeded",
+            "Quadratic");
+        Assert.That(within.ExitCode, Is.Zero, within.StandardError);
+
+        var productExceedsConstant = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "public int Product").ToString(),
+            "--complexity",
+            "--fail-on-complexity-exceeded",
+            "Constant");
+        Assert.That(productExceedsConstant.ExitCode, Is.EqualTo(1));
+        Assert.That(productExceedsConstant.StandardError,
+            Does.Contain("CI gate failed [complexity-exceeded]"));
+
+        var maxExceedsConstant = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "public int Max").ToString(),
+            "--complexity",
+            "--fail-on-complexity-exceeded",
+            "Constant");
+        Assert.That(maxExceedsConstant.ExitCode, Is.EqualTo(1));
+        Assert.That(maxExceedsConstant.StandardError,
+            Does.Contain("CI gate failed [complexity-exceeded]"));
+
+        var unknown = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "while (index").ToString(),
+            "--complexity",
+            "--fail-on-complexity-unknown");
+        Assert.That(unknown.ExitCode, Is.EqualTo(1));
+        Assert.That(unknown.StandardError, Does.Contain("CI gate failed [complexity-unknown]"));
+
+        var threshold = await SymbolicCliTestHost.RunAsync(
+            "--file",
+            sourcePath,
+            "--line",
+            FindLine(source, "for (var left").ToString(),
+            "--complexity",
+            "--compact-json",
+            "--fail-on-compact-threshold",
+            "complexity-drivers=0");
+        Assert.That(threshold.ExitCode, Is.EqualTo(1));
+        Assert.That(threshold.StandardError,
+            Does.Contain("CI gate failed [compact-threshold.complexity-drivers]"));
     }
 
 }
