@@ -118,6 +118,7 @@ internal static class SymbolicAssignmentStateTransfer
             (isAsExpression ||
              assignedType != null &&
              (SymbolicTypeFacts.IsSymbolicReferenceLikeType(assignedType) ||
+              SymbolicTypeFacts.IsNullableType(assignedType) ||
               assignedType.SpecialType == SpecialType.System_Boolean ||
               SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
         {
@@ -166,14 +167,6 @@ internal static class SymbolicAssignmentStateTransfer
                 effectiveValueExpression,
                 semanticModel,
                 cancellationToken,
-                provenanceRoot);
-
-        if (!isSelfReferential)
-            AddAssignedNullableStateFacts(
-                ref state,
-                assignedSymbol,
-                effectiveValueExpression,
-                context,
                 provenanceRoot);
 
         if (isSelfReferential &&
@@ -306,8 +299,17 @@ internal static class SymbolicAssignmentStateTransfer
             CanCompareIrTerms(sourceTerm, targetTerm))
             AddSubstitutedStateFacts(ref state, sourceTerm, targetTerm);
 
-        if (TryCreateNullableSymbolTerms(sourceSymbol, out var sourceHasValue, out var sourceValue) &&
-            TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue) &&
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicNullableLowerer.TryCreateSymbolTerms(
+                sourceSymbol,
+                context,
+                out var sourceHasValue,
+                out var sourceValue) &&
+            SymbolicNullableLowerer.TryCreateSymbolTerms(
+                assignedSymbol,
+                context,
+                out var targetHasValue,
+                out var targetValue) &&
             CanCompareIrTerms(sourceHasValue, targetHasValue) &&
             CanCompareIrTerms(sourceValue, targetValue))
         {
@@ -349,86 +351,6 @@ internal static class SymbolicAssignmentStateTransfer
                     StringComparison.Ordinal))
                 state = state.AddPathCondition(substituted);
         }
-    }
-
-    private static void AddAssignedNullableStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        if (!TryCreateNullableSymbolTerms(
-                assignedSymbol,
-                out var targetHasValue,
-                out var targetValue))
-            return;
-
-        SymbolicTerm sourceHasValue;
-        SymbolicTerm? sourceValue = null;
-        var hasValueLowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(valueExpression, context);
-        if (hasValueLowering is { IsExact: true, Value: { } nullableHasValue })
-        {
-            sourceHasValue = nullableHasValue;
-            if (SymbolicSemanticPipeline.LowerNullableValueTerm(valueExpression, context) is
-                { IsExact: true, Value: { } nullableValue })
-                sourceValue = nullableValue;
-        }
-        else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
-                 { IsExact: true, Value: { } wrappedValue } &&
-                 wrappedValue.Kind == targetValue.Kind)
-        {
-            sourceHasValue = new SymbolicBooleanConstantTerm(true);
-            sourceValue = wrappedValue;
-        }
-        else
-        {
-            return;
-        }
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetHasValue,
-            sourceHasValue,
-            valueExpression,
-            provenanceRoot + ".nullable.has-value");
-
-        if (sourceValue == null ||
-            !CanCompareIrTerms(targetValue, sourceValue))
-            return;
-
-        var targetHasValueFact = SymbolicFact.Exact(
-            new SymbolicTruthAtom(targetHasValue),
-            valueExpression,
-            provenanceRoot + ".nullable.value-present",
-            assignedSymbol);
-        var targetValueFact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, targetValue, sourceValue),
-            valueExpression,
-            provenanceRoot + ".nullable.value",
-            assignedSymbol);
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(new SymbolicFactCondition(targetHasValueFact)),
-            new SymbolicFactCondition(targetValueFact)));
-    }
-
-    internal static bool TryCreateNullableSymbolTerms(
-        ISymbol symbol,
-        out SymbolicTerm hasValue,
-        out SymbolicTerm value)
-    {
-        hasValue = null!;
-        value = null!;
-        if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out var underlyingType) ||
-            !TryGetValueKind(underlyingType, out var valueKind))
-            return false;
-
-        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol);
-        hasValue = new SymbolicNullableHasValueTerm(symbolName);
-        value = new SymbolicNullableValueTerm(symbolName, valueKind);
-        return true;
     }
 
     internal static void AddAssignedCurrentInstanceMemberStateFacts(
@@ -1277,11 +1199,6 @@ internal static class SymbolicAssignmentStateTransfer
 
         output = new SymbolicMemberTerm(receiver, memberSymbol.Name, kind);
         return true;
-    }
-
-    private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
-    {
-        return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
     }
 
     internal static bool ExpressionReferencesAnySymbol(

@@ -165,6 +165,73 @@ public sealed class SymbolicOperationTransferModelTests
     }
 
     [Test]
+    public void SymbolicNullableAssignment_MatchesLegacyValueParts()
+    {
+        const string source = "static class C { static void M() { int? value = 5; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SymbolicNullableAssignment_MatchesLegacyValueParts));
+        var declarator = fixture.Root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>()
+            .Single();
+        var valueExpression = declarator.Initializer!.Value;
+        var targetSymbol = fixture.SemanticModel.GetDeclaredSymbol(declarator)!;
+        var symbolName = SymbolicFactFactory.GetSmtVariableName(targetSymbol);
+        var targetHasValue = new SymbolicNullableHasValueTerm(symbolName);
+        var targetValue = new SymbolicNullableValueTerm(symbolName, SmtValueKind.Int);
+        const string provenance = "test.nullable-assignment";
+        var expected = new SymbolicState(pathConditions: new SymbolicCondition[]
+        {
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    targetHasValue,
+                    new SymbolicBooleanConstantTerm(true)),
+                valueExpression,
+                provenance + ".nullable.has-value")),
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicTruthAtom(targetHasValue),
+                    valueExpression,
+                    provenance + ".nullable.value-present",
+                    targetSymbol))),
+                new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(
+                        SymbolicRelationOperator.Equal,
+                        targetValue,
+                        new SymbolicIntegerConstantTerm(5)),
+                    valueExpression,
+                    provenance + ".nullable.value",
+                    targetSymbol)))
+        });
+
+        var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            new SymbolicState(),
+            targetSymbol,
+            valueExpression,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            provenance: provenance,
+            postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
+
+        SymbolicStateDifferentialHarness.AssertEquivalent(
+            SymbolicStateDifferentialHarness.Capture(
+                expected,
+                transition.Support,
+                transition.UnknownReason,
+                transition.Provenance,
+                transition.Truncation),
+            SymbolicStateDifferentialHarness.Capture(
+                transition.State,
+                transition.Support,
+                transition.UnknownReason,
+                transition.Provenance,
+                transition.Truncation),
+            "nullable assignment");
+    }
+
+    [Test]
     public void TransitionResult_NormalizesStateAndCanonicalizesTruncation()
     {
         var source = SyntaxFactory.ParseExpression("value");

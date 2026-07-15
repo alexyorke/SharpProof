@@ -8,6 +8,30 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicNullableLowerer
 {
+    internal static bool TryCreateSymbolTerms(
+        ISymbol symbol,
+        SymbolicLoweringContext context,
+        out SymbolicTerm hasValue,
+        out SymbolicTerm value)
+    {
+        hasValue = null!;
+        value = null!;
+        if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(
+                SymbolicFactFactory.GetTrackedSymbolType(symbol),
+                out var underlyingType) ||
+            !SymbolicFactFactory.TryGetValueKind(
+                underlyingType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
+                out var valueKind))
+            return false;
+
+        var symbolName = context.GetVariableName(symbol);
+        hasValue = new SymbolicNullableHasValueTerm(symbolName);
+        value = new SymbolicNullableValueTerm(symbolName, valueKind);
+        return true;
+    }
+
     internal static bool TryLowerCoalesceAssignmentTerm(
         AssignmentExpressionSyntax assignment,
         SymbolicLoweringContext context,

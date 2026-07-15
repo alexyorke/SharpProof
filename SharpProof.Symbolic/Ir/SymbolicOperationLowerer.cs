@@ -63,46 +63,54 @@ internal static class SymbolicOperationLowerer
         SymbolicAssignmentPostconditionProfile postconditionProfile =
             SymbolicAssignmentPostconditionProfile.Analyzer)
     {
-        if (!TryCreateSymbolTerm(targetSymbol, targetContext, out var target) ||
-            source is not ExpressionSyntax valueExpression)
+        if (source is not ExpressionSyntax valueExpression)
             return Unsupported(source, provenance + ".target");
 
-        var value = target.Kind switch
-        {
-            SmtValueKind.Bool => SymbolicSemanticPipeline.LowerBooleanValueTerm(valueExpression, valueContext),
-            SmtValueKind.Reference => SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext),
-            _ => SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext)
-        };
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
-        var suppressValueBinding = postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
-                                   target.Kind == SmtValueKind.Reference;
-        if (!suppressValueBinding &&
-            value is { IsExact: true, Value: { } sourceTerm } &&
-            SymbolicStateFactBuilder.CanCompareIrTerms(target, sourceTerm))
-            bindings.Add(new SymbolicAssignmentBinding(
-                SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
-                target,
-                sourceTerm,
-                bindingProvenance,
-                evidenceKey));
-
         var postconditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
-        AddReferenceAssignmentPostconditions(
-            postconditions,
-            targetSymbol,
-            target,
-            valueExpression,
-            valueContext,
-            provenance,
-            postconditionProfile);
-        var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
-            targetSymbol,
-            valueExpression,
-            valueContext,
-            targetContext.GetSymbolVersion,
-            asExpressionProvenanceRoot ?? "ir.as");
-        if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
-            postconditions.AddRange(asExpressionState.PathConditions);
+        if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
+            AddSymbolicNullableAssignmentPostconditions(
+                postconditions,
+                targetSymbol,
+                valueExpression,
+                targetContext,
+                valueContext,
+                provenance);
+
+        if (TryCreateSymbolTerm(targetSymbol, targetContext, out var target))
+        {
+            var value = target.Kind == SmtValueKind.Bool
+                ? SymbolicSemanticPipeline.LowerBooleanValueTerm(valueExpression, valueContext)
+                : SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext);
+            var suppressValueBinding = postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
+                                       target.Kind == SmtValueKind.Reference;
+            if (!suppressValueBinding &&
+                value is { IsExact: true, Value: { } sourceTerm } &&
+                SymbolicStateFactBuilder.CanCompareIrTerms(target, sourceTerm))
+                bindings.Add(new SymbolicAssignmentBinding(
+                    SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
+                    target,
+                    sourceTerm,
+                    bindingProvenance,
+                    evidenceKey));
+
+            AddReferenceAssignmentPostconditions(
+                postconditions,
+                targetSymbol,
+                target,
+                valueExpression,
+                valueContext,
+                provenance,
+                postconditionProfile);
+            var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
+                targetSymbol,
+                valueExpression,
+                valueContext,
+                targetContext.GetSymbolVersion,
+                asExpressionProvenanceRoot ?? "ir.as");
+            if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
+                postconditions.AddRange(asExpressionState.PathConditions);
+        }
         if (bindings.Count == 0 && postconditions.Count == 0)
             return Unsupported(source, provenance + ".value");
 
@@ -206,6 +214,69 @@ internal static class SymbolicOperationLowerer
                 SymbolicConditionOperator.And,
                 new SymbolicNotCondition(targetNonNull),
                 new SymbolicNotCondition(valueNonNull))));
+    }
+
+    private static void AddSymbolicNullableAssignmentPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext targetContext,
+        SymbolicLoweringContext valueContext,
+        string provenance)
+    {
+        if (!SymbolicNullableLowerer.TryCreateSymbolTerms(
+                targetSymbol,
+                targetContext,
+                out var targetHasValue,
+                out var targetValue))
+            return;
+
+        SymbolicTerm sourceHasValue;
+        SymbolicTerm? sourceValue = null;
+        if (SymbolicSemanticPipeline.LowerNullableHasValueTerm(valueExpression, valueContext) is
+            { IsExact: true, Value: { } nullableHasValue })
+        {
+            sourceHasValue = nullableHasValue;
+            if (SymbolicSemanticPipeline.LowerNullableValueTerm(valueExpression, valueContext) is
+                { IsExact: true, Value: { } nullableValue })
+                sourceValue = nullableValue;
+        }
+        else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext) is
+                 { IsExact: true, Value: { } wrappedValue } &&
+                 wrappedValue.Kind == targetValue.Kind)
+        {
+            sourceHasValue = new SymbolicBooleanConstantTerm(true);
+            sourceValue = wrappedValue;
+        }
+        else
+        {
+            return;
+        }
+
+        conditions.Add(ExactRelation(
+            SymbolicRelationOperator.Equal,
+            targetHasValue,
+            sourceHasValue,
+            valueExpression,
+            provenance + ".nullable.has-value"));
+        if (sourceValue == null ||
+            !SymbolicStateFactBuilder.CanCompareIrTerms(targetValue, sourceValue))
+            return;
+
+        conditions.Add(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicNotCondition(ExactTruth(
+                targetHasValue,
+                valueExpression,
+                provenance + ".nullable.value-present",
+                targetSymbol)),
+            ExactRelation(
+                SymbolicRelationOperator.Equal,
+                targetValue,
+                sourceValue,
+                valueExpression,
+                provenance + ".nullable.value",
+                targetSymbol)));
     }
 
     private static void AddSymbolicStringAssignmentPostconditions(
@@ -561,7 +632,7 @@ internal static class SymbolicOperationLowerer
         SymbolicCondition postcondition;
         if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(rightExpression) is ThrowExpressionSyntax)
         {
-            if (SymbolicAssignmentStateTransfer.TryCreateNullableSymbolTerms(targetSymbol, out var hasValue, out _))
+            if (SymbolicNullableLowerer.TryCreateSymbolTerms(targetSymbol, context, out var hasValue, out _))
                 postcondition = ExactTruth(hasValue, rightExpression, provenance + ".throw-completion-has-value", targetSymbol);
             else if (TryCreateSymbolTerm(targetSymbol, context, out var reference) &&
                      reference.Kind == SmtValueKind.Reference)
@@ -575,8 +646,9 @@ internal static class SymbolicOperationLowerer
             else
                 return Unsupported(rightExpression, provenance + ".target");
         }
-        else if (SymbolicAssignmentStateTransfer.TryCreateNullableSymbolTerms(
+        else if (SymbolicNullableLowerer.TryCreateSymbolTerms(
                      targetSymbol,
+                     context,
                      out var targetHasValue,
                      out var targetValue))
         {
