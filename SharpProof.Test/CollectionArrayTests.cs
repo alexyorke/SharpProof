@@ -298,6 +298,26 @@ public class TestClass
     }
 
     [Test]
+    public async Task ConditionalFreshOrExternalArrayThenMutated_Diagnostic()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(bool useFresh, int[] external)
+    {
+        var array = useFresh ? new int[1] : external;
+        array[0] = 42;
+        return array[0];
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task FreshLocalArrayAssignmentWithImpureIndex_Diagnostic()
     {
         var test = @"

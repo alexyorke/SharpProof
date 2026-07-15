@@ -175,6 +175,8 @@ internal static partial class PurityAssignmentStateTransfer
 
         else if (operationToTrack is IFlowCaptureOperation flowCaptureOperation)
         {
+            nextState = nextState.ResetFlowCaptureFacts(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
+
             if (TryResolveTrackedSymbol(flowCaptureOperation.Value, currentState) is ISymbol capturedSymbol)
                 nextState = nextState.WithFlowCaptureSymbol(flowCaptureOperation.Id, capturedSymbol);
 
@@ -195,8 +197,6 @@ internal static partial class PurityAssignmentStateTransfer
                     currentState,
                     context.SemanticModel.Compilation))
                 nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
-            else
-                nextState = nextState.WithoutOwnedArrayFlowCapture(flowCaptureOperation.Id);
         }
 
         else if (operationToTrack is IVariableDeclarationGroupOperation groupOperation)

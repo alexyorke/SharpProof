@@ -480,23 +480,21 @@ internal partial class PurityAnalysisEngine
             return Copy(flowCaptureSymbols: FlowCaptureSymbols.SetItem(id, symbol));
         }
 
-        public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id)
+        public PurityAnalysisState ResetFlowCaptureFacts(CaptureId id, SyntaxNode source)
         {
-            return WithOwnedArrayFlowCapture(id, null);
+            var term = CreateFlowCaptureReferenceTerm(id);
+            return Copy(pathState: SymbolicOperationTransferKernel.Invalidate(
+                PathState,
+                ImmutableArray.Create(new SymbolicInvalidationTarget(term.Name)),
+                source.Span,
+                "analyzer.flow-capture.assignment").State);
         }
 
-        public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode? source)
+        public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode source)
         {
             if (IsOwnedArrayFlowCapture(id)) return this;
 
             return Copy(pathState: AddOwnedArrayFlowCaptureFacts(PathState, id, source));
-        }
-
-        public PurityAnalysisState WithoutOwnedArrayFlowCapture(CaptureId id)
-        {
-            if (!IsOwnedArrayFlowCapture(id)) return this;
-
-            return Copy(pathState: RemoveOwnedArrayFlowCaptureFacts(PathState, id));
         }
 
         public bool IsOwnedArrayFlowCapture(CaptureId id)
@@ -505,11 +503,11 @@ internal partial class PurityAnalysisEngine
             return PathState.Facts.Any(fact => IsOwnedArrayFlowCaptureFact(fact, term));
         }
 
-        private static SymbolicState AddOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id,
-            SyntaxNode? source)
+        private static SymbolicState AddOwnedArrayFlowCaptureFacts(
+            SymbolicState pathState,
+            CaptureId id,
+            SyntaxNode source)
         {
-            if (source == null) return pathState;
-
             var term = CreateFlowCaptureReferenceTerm(id);
             return SymbolicOperationTransferKernel.TransitionLifetime(
                 pathState,
@@ -520,18 +518,7 @@ internal partial class PurityAnalysisEngine
                 evidenceKey: "evidence.owned-array-flow-capture").State;
         }
 
-        private static SymbolicState RemoveOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id)
-        {
-            var term = CreateFlowCaptureReferenceTerm(id);
-            var facts = pathState.Facts
-                .Where(fact => !IsOwnedArrayFlowCaptureFact(fact, term))
-                .ToArray();
-            return facts.Length == pathState.Facts.Length
-                ? pathState
-                : new SymbolicState(facts, pathState.PathConditions);
-        }
-
-        private static SymbolicTerm CreateFlowCaptureReferenceTerm(CaptureId id)
+        private static SymbolicVariableTerm CreateFlowCaptureReferenceTerm(CaptureId id)
         {
             return new SymbolicVariableTerm(
                 "flowCapture#" + id.GetHashCode().ToString(CultureInfo.InvariantCulture),
