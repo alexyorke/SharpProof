@@ -448,6 +448,7 @@ transfer policy after its slice is complete.
 | Phase 6 central Fuzz source imports | Commit `ef00c012` replaces fifteen independently emitted import blocks with one ordered LF-based `BuildUsings` source helper while retaining each generated program's exact namespace list. Fuzz and Roslyn-shape fixtures pass 27/27. Production LOC fell to 105,684, or -1,992 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 central Fuzz expectation classification | Commit `e695517d` moves conservative/definitely-pure/definitely-impure classification onto `FuzzExpectation`; summary counts and conservative-family selection now consume the same typed policy. The independent test oracle remains separate. Fuzz and Roslyn-shape fixtures pass 27/27. Production LOC fell to 105,680, or -1,996 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 resolved SARIF materialization finding | Commit `62d6cf59` removes a stale entry: Baseline and CorpusReport already call the single `DotnetSarifBuildRunner.MaterializeAsync`, whose disposable result owns all temporary paths. Baseline, corpus, and process-ownership fixtures pass 28/28. Production LOC remains 105,680, or -1,996 from the rewrite start; tracked test LOC remains 142,478. |
+| Phase 6 central baseline identity equality | Commit `b06476c8` replaces two custom comparer classes with one `BaselineIdentityKey` that owns ordinal ID/symbol and case-insensitive normalized-path equality. Full baseline keys compose it and use generated equality for normalized optional fields. A case-variant path characterization is green; Baseline workflow fixtures pass 7/7. Production LOC fell to 105,637, or -2,039 from the rewrite start; tracked test LOC remains 142,478. |
 
 ## Current Checkpoint
 
@@ -500,11 +501,12 @@ transfer policy after its slice is complete.
   LF-stable source builder. Fuzz expectation buckets now have one domain-model
   owner while their independent test oracle remains intact. Baseline and corpus
   SARIF materialization and temporary cleanup already share one disposable
-  implementation.
-- Last confirmed fact: baseline, corpus, and process-ownership fixtures pass
-  28/28. Test LOC is 142,478; production LOC is 105,680, or -1,996 from the
-  rewrite start.
+  implementation. Baseline bucket and full-key identity now share one normalized
+  value with case-insensitive path equality.
+- Last confirmed fact: Baseline workflow fixtures pass 7/7, including a
+  case-variant path match. Test LOC is 142,478; production LOC is 105,637, or
+  -2,039 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, duplicated baseline identity key/comparer mechanics.
+  `POTENTIAL_DUPS.md`, duplicate CorpusReport dictionary increment helpers.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
