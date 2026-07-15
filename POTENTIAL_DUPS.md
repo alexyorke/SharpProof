@@ -4,9 +4,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Analyzer
 
-1. **Per-tree configuration readers** - `SharpProof.Analyzer/AnalyzerConfiguration.cs:127-281`
-   Eight option readers repeat the same `GetOptions`, parser, fallback, and non-cancellation exception handling. Consider a generic `TryGetTreeOption<T>` that owns retrieval and fallback while each option supplies its parser.
-
 2. **Requires/ensures diagnostic construction** - `SharpProof.Analyzer/MethodEnsuresAnalyzer.cs:570-655`; `SharpProof.Analyzer/MethodRequiresAnalyzer.cs:356-429`
    Both construct contract properties, baseline/proof evidence, additional locations, and `Diagnostic.Create`. A parameterized condition-diagnostic helper or profile could centralize the envelope while retaining contract-specific keys and messages.
 
