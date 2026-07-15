@@ -334,10 +334,31 @@ internal static class SymbolicCfgProgramPointStateCollector
             plan.BackEdgeInvalidations,
             plan.Loop.Span,
             "cfg-program-point.loop-back-edge");
-        backEdgePath = transition.IsExact
-            ? new CfgPathState(transition.State, null, null, false)
-            : default;
-        return transition.IsExact;
+        if (!transition.IsExact)
+        {
+            backEdgePath = default;
+            return false;
+        }
+
+        var state = transition.State;
+        foreach (var invariant in plan.Invariants)
+        {
+            transition = SymbolicOperationTransferKernel.TransitionLoopEdge(
+                state,
+                SymbolicLoopEdgeKind.BackEdge,
+                invariant,
+                plan.Loop.Span,
+                "cfg-program-point.loop-invariant");
+            if (!transition.IsExact)
+            {
+                backEdgePath = default;
+                return false;
+            }
+            state = transition.State;
+        }
+
+        backEdgePath = new CfgPathState(state, null, null, false);
+        return true;
     }
 
     private static bool TryApplyLoopExit(
@@ -348,8 +369,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         out CfgPathState exitPath)
     {
         var plan = loopPlans
-            .Where(candidate => candidate.Loop is DoStatementSyntax &&
-                BlockIsWithinLoop(source, candidate.Loop) &&
+            .Where(candidate => BlockIsWithinLoop(source, candidate.Loop) &&
                 !BlockIsWithinLoop(destination, candidate.Loop))
             .OrderBy(static candidate => candidate.Loop.Span.Length)
             .FirstOrDefault();
@@ -359,15 +379,40 @@ internal static class SymbolicCfgProgramPointStateCollector
             return true;
         }
 
-        var transition = SymbolicOperationTransferKernel.Invalidate(
-            path.State,
-            plan.BackEdgeInvalidations,
-            plan.Loop.Span,
-            "cfg-program-point.loop-exit");
-        exitPath = transition.IsExact
-            ? path with { State = transition.State }
-            : default;
-        return transition.IsExact;
+        var state = path.State;
+        if (plan.Loop is DoStatementSyntax)
+        {
+            var invalidation = SymbolicOperationTransferKernel.Invalidate(
+                state,
+                plan.BackEdgeInvalidations,
+                plan.Loop.Span,
+                "cfg-program-point.loop-exit");
+            if (!invalidation.IsExact)
+            {
+                exitPath = default;
+                return false;
+            }
+            state = invalidation.State;
+        }
+
+        foreach (var invariant in plan.Invariants)
+        {
+            var transition = SymbolicOperationTransferKernel.TransitionLoopEdge(
+                state,
+                SymbolicLoopEdgeKind.Exit,
+                invariant,
+                plan.Loop.Span,
+                "cfg-program-point.loop-invariant");
+            if (!transition.IsExact)
+            {
+                exitPath = default;
+                return false;
+            }
+            state = transition.State;
+        }
+
+        exitPath = path with { State = state };
+        return true;
     }
 
     private static bool BlockIsWithinLoop(BasicBlock block, StatementSyntax loop) =>
@@ -396,8 +441,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 plans = Array.Empty<SymbolicLoopTransferPlan>();
                 return false;
             }
-            if (plan.Loop is not (WhileStatementSyntax or DoStatementSyntax) ||
-                plan.BackEdgeInvalidations.Any(target =>
+            if (plan.Loop is not (WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax) ||
+                plan.Loop is not ForStatementSyntax && plan.BackEdgeInvalidations.Any(target =>
                     SymbolicIrReferenceScanner.ContainsVariableOrMember(
                         plan.EntryCondition,
                         target.Key)))
@@ -621,6 +666,12 @@ internal static class SymbolicCfgProgramPointStateCollector
         string provenance,
         out bool guardInvalidated)
     {
+        if (RequiresStructuralAssignmentFallback(target, guard))
+        {
+            guardInvalidated = false;
+            return false;
+        }
+
         guardInvalidated = GuardReferencesTarget(guard, target);
         if (value.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression ||
             SymbolMutationFacts.ExpressionReferencesSymbol(
@@ -645,6 +696,21 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         state = transition.State;
         return true;
+    }
+
+    private static bool RequiresStructuralAssignmentFallback(
+        ISymbol target,
+        SymbolicCondition? guard)
+    {
+        var type = target switch
+        {
+            ILocalSymbol local => local.Type,
+            IParameterSymbol parameter => parameter.Type,
+            _ => null
+        };
+        return type is INamedTypeSymbol
+                   { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } ||
+               guard != null && type?.IsReferenceType == true;
     }
 
     private static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>

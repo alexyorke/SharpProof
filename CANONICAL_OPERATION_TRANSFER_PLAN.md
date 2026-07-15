@@ -255,6 +255,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
     - [x] Route mutation-independent do-loop revisits and guaranteed-body exit
       invalidation through the same worklist. Counted-for lower bounds remain a
       separate fallback rather than weakening normalized-state parity.
+    - [x] Route counted-for revisits after reapplying typed monotonic invariants
+      on back and exit edges. Nullable reassignment and guarded reference
+      projection remain fallback shapes until their state parity migrates.
 - [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
@@ -401,6 +404,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed loop transfer plan | `341eac5b` | 106,234 | -1,442 |
 | Phase 7 bounded while-loop revisits | `21ebedb1` | 106,324 | -1,352 |
 | Phase 7 bounded do-loop revisits | `f0a1f91d` | 106,361 | -1,315 |
+| Phase 7 bounded counted-for revisits | pending | 106,421 | -1,255 |
 
 ## Validation Ledger
 
@@ -535,6 +539,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed loop transfer plan | Commit `341eac5b` lowers while, do, and for entry/exit conditions, structural invariants, and local/parameter back-edge invalidation targets into one typed result. Foreach and unsupported mutation targets remain conservative fallbacks. Focused loop/program-point fixtures pass 153/153 and full MainSmtOracle passes 573/573. Production LOC is 106,234, or -1,442 from the rewrite start; test LOC is 142,691. |
 | Phase 7 bounded while-loop revisits | Commit `21ebedb1` consumes mutation-independent while-loop plans at backward CFG edges, invalidates every loop-carried target before merging, and terminates revisits on normalized state identity under a graph-size budget. Three broader reproductions exposed unsound abrupt-exit handling and two deliberate do/for invariant differences; those shapes now remain typed fallbacks. Focused loop/program-point/transfer fixtures pass 197/197, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,324, or -1,352 from the rewrite start; test LOC is 142,736. |
 | Phase 7 bounded do-loop revisits | Commit `f0a1f91d` routes mutation-independent do-loop back edges through the bounded worklist and invalidates loop-carried targets on the guaranteed-body exit edge, matching the structural collector's deliberately conservative state. Focused loop/program-point/transfer fixtures pass 197/197 and full MainSmtOracle passes 573/573. Production LOC is 106,361, or -1,315 from the rewrite start; test LOC is 142,756. |
+| Phase 7 bounded counted-for revisits | Pending commit reapplies typed monotonic initializer invariants after loop-carried invalidation and on exit, then routes counted-for back edges through the bounded worklist. The full Flow lane exposed two earlier acyclic parity leaks; nullable reassignment and guarded reference projection now return typed fallback, restoring the recorded 256-pass/1-baseline-failure result. Focused loop/program-point/transfer fixtures pass 199/199, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,421, or -1,255 from the rewrite start; test LOC is 142,780. |
 
 ## Current Checkpoint
 
@@ -606,12 +611,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   transfer path. Typed loop transfer plans now own
   while/do/for conditions, invariants, and local/parameter back-edge
   invalidations; queries after mutation-independent while and do loops now use
-  bounded canonical CFG revisits. Loop-local targets, abrupt exits,
-  condition-dependent mutations, counted-for exits, and foreach remain
-  conservative fallbacks. Test LOC is 142,756; production LOC is 106,361, or
-  -1,315 from the rewrite start; the 776-line
+  bounded canonical CFG revisits; counted-for loops additionally retain their
+  typed monotonic initializer invariants. Loop-local targets, abrupt exits,
+  condition-dependent while/do mutations, nullable reassignment, guarded
+  reference projection, and foreach remain conservative fallbacks. Test LOC is
+  142,780; production LOC is 106,421, or -1,255 from the rewrite start; the 836-line
   scaffold must be repaid when structural transfer paths are deleted.
-- Next cheapest step: migrate counted-for lower bounds as a typed invariant
-  subset, then route finally continuations.
+- Next cheapest step: route finally continuations through typed completion
+  paths without allowing a pre-finally state to escape.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

@@ -204,19 +204,29 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
     }
 
-    [TestCase(
-        "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value = index; return value; } }")]
-    public void AdditionalLoopShapes_RemainFallbackUntilExitParityMigrates(string source)
+    [Test]
+    public void ForLoopAfterState_MatchesStructuralCollector()
     {
-        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AdditionalLoopShapes_RemainFallbackUntilExitParityMigrates));
+        const string source = "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value = index; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ForLoopAfterState_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
 
-        Assert.That(result.IsUnsupported, Is.True);
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
     }
 
     [Test]
@@ -242,5 +252,22 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [TestCase(
+        "static class C { static int M(int? input) { int? value = null; value = input; return value.Value; } }")]
+    [TestCase(
+        "static class C { static int M(bool flag) { var values = new int[1]; if (flag) values = new int[2]; return values[1]; } }")]
+    public void AssignmentShapesWithoutStateParity_RemainConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AssignmentShapesWithoutStateParity_RemainConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True);
     }
 }
