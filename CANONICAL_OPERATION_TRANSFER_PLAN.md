@@ -155,7 +155,7 @@ transfer policy after its slice is complete.
 - [x] Emit null, nullable-value, and dynamic-binding preconditions. Disposal
   remains a canonical lifetime transition: arbitrary member use has no sound
   universal `ObjectDisposedException` precondition.
-- [ ] Emit indexing, range, collection-cardinality, and array preconditions.
+- [x] Emit indexing, range, collection-cardinality, and array preconditions.
 - [ ] Emit cast, switch-no-match, argument, direct-throw, and framework-model
   preconditions.
 - [ ] Migrate query, suppressor, and exception-flow consumers to the canonical
@@ -249,6 +249,7 @@ transfer policy after its slice is complete.
 | Canonical null-family hazards | `d15a43af` | 107,158 | -518 |
 | Canonical relational bounds hazards | `c91a10ed` | 107,096 | -580 |
 | Canonical indexing hazards | `1562e72f` | 107,017 | -659 |
+| Canonical slicing bounds hazards | `2b86726f` | 107,029 | -647 |
 
 ## Validation Ledger
 
@@ -303,20 +304,20 @@ transfer policy after its slice is complete.
 | Phase 4 canonical null-family hazards | Commit `d15a43af` lowers null dereference, argument-null, unbox-null, nullable-value, and dynamic-null binding preconditions into typed hazard operations, including the loop-carried nullable special case, and deletes the six dedicated legacy trigger builders. Disposal remains canonical lifetime state because arbitrary use after disposal does not universally throw `ObjectDisposedException`; existing SP0002 disposal evidence tests characterize that boundary. Direct and focused hazard/evidence tests: 259 passed; post-consolidation focused hazard tests: 255 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,158, or -518 from the rewrite start; the six-line bridge cost must be repaid when the remaining candidate adapters are deleted. |
 | Phase 4 canonical relational bounds hazards | Commit `c91a10ed` lowers negative array/stackalloc lengths and collection cardinality into typed operations, preserves conservative mixed-dimension unsupported aggregates and their exact subject, and deletes the dedicated relational trigger builders plus the legacy aggregate trigger API. Focused descriptor, hazard, exception, and authoring tests: 259 passed. Production LOC fell by 62 lines to 107,096, or -580 from the rewrite start. |
 | Phase 4 canonical indexing hazards | Commit `1562e72f` lowers built-in element access, safe `Math.Abs` modulo indexes, multidimensional array access, and `Array.GetValue` bounds through canonical hazard operations and deletes four legacy index trigger builders. Focused descriptor, semantic-oracle, exception, authoring, and unknown-hazard tests: 259 passed. Production LOC fell by 79 lines to 107,017, or -659 from the rewrite start. |
+| Phase 4 canonical slicing bounds hazards | Commit `2b86726f` moves slicing and `Index` construction argument-range semantics into canonical hazard operations. Together with the relational and indexing slices, all indexing, range, collection-cardinality, negative-length, and array-bounds preconditions now have typed operation owners; array-store mismatch remains correctly grouped with the following cast/type-compatibility family. Focused tests: 259 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The completed bounds batch is net -67 lines from its 107,096 checkpoint; production LOC is 107,029, or -647 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. Phase 4 arithmetic, null-family, negative
-  length, collection-cardinality, element access, and `Array.GetValue` hazards
-  emit typed operations. Slicing/index-construction and array-store mismatch
-  preconditions remain on legacy trigger paths.
-- Last confirmed fact: indexing migration passes 259 focused tests and removes
-  79 production lines. Production LOC is 107,017, or -659 from the rewrite
-  start; the preceding full lanes remain Oracle 573/573, Analyzer 487/487, and
-  Flow 256 plus only the documented SP0010 baseline failure.
-- Next cheapest step: migrate slicing and index-construction argument-range
-  preconditions, then adjudicate array-store mismatch against the following
-  cast/type family before closing the bounds item.
+- State: Phases 2 and 3 are gated. The first three Phase 4 items are complete;
+  arithmetic, null-family, and all bounds/cardinality hazards emit typed
+  operations. Cast/type compatibility, switch, direct-throw, and remaining
+  framework-model preconditions still use legacy trigger paths.
+- Last confirmed fact: the completed bounds batch passes 259 focused tests,
+  Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented SP0010
+  baseline failure. Production LOC is 107,029, or -647 from the rewrite start.
+- Next cheapest step: migrate invalid cast, unbox/type mismatch, array-store
+  mismatch, switch-no-match, and direct-throw preconditions in deletion-sized
+  groups, starting with the shared runtime-type compatibility lowering.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
