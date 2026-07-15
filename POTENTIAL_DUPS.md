@@ -100,12 +100,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Symbolic Smt
 
-### Duplicated canonical-finder (union-find with path compression) - `SmtSyntacticClassifier.cs:588-596` vs `SmtSyntacticClassifier.Boolean.cs:484-498`
-`FindCanonical` and `FindBooleanCanonical` identical except the carried `isNegated` flag. **Recommendation:** One generic canonical-finder.
-
-### Duplicated "pick canonical by lexicographic ToString" - `SmtSyntacticClassifier.cs:573` vs `SmtSyntacticClassifier.Boolean.cs:476-478`
-Identical tie-break snippet. **Recommendation:** `SelectCanonical(SmtFormula a, SmtFormula b)`.
-
 ### Duplicated FloorDiv / CeilingDiv - `SmtSyntacticClassifier.Numeric.cs:552-566` (BigInteger) vs `:776-792` (long)
 **Recommendation:** Implement `long` versions by delegating to BigInteger overloads.
 
