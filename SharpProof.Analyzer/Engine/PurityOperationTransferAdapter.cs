@@ -25,4 +25,28 @@ internal static class PurityOperationTransferAdapter
             ? state
             : state.WithPathState(transition.State);
     }
+
+    internal static PurityAnalysisState ApplyAssignment(
+        PurityAnalysisState state,
+        ISymbol targetSymbol,
+        IOperation valueOperation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        PurityAnalysisState valueState,
+        out SymbolicOperationTransitionResult transition)
+    {
+        transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            state.PathState,
+            targetSymbol,
+            valueOperation,
+            valueOperation.Syntax,
+            semanticModel,
+            cancellationToken,
+            state.GetSmtSymbolVersion,
+            valueState.GetSmtSymbolVersion,
+            provenance: "analyzer.assignment");
+        return transition.IsUnsupported
+            ? state
+            : state.WithPathState(transition.State);
+    }
 }

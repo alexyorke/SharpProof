@@ -111,6 +111,24 @@ internal static class SymbolicAssignmentStateTransfer
 
         var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!isSelfReferential &&
+            assignedType != null &&
+            (assignedType.SpecialType == SpecialType.System_Boolean ||
+             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType)) &&
+            semanticModel.GetOperation(effectiveValueExpression, cancellationToken) is { } valueOperation)
+        {
+            var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+                state,
+                assignedSymbol,
+                valueOperation,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenance: provenanceRoot);
+            if (transition.IsExact)
+                state = transition.State;
+        }
+
         if (!isSelfReferential)
             AddAssignedSourceSymbolSnapshotStateFacts(
                 ref state,
@@ -184,7 +202,8 @@ internal static class SymbolicAssignmentStateTransfer
                 effectiveValueExpression,
                 context,
                 provenanceRoot);
-        else if (TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
+        else if (isSelfReferential &&
+                 TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
                  assignedValueTerm != null &&
                  assignedValueTerm.Kind == targetTerm.Kind &&
                  CanCompareIrTerms(targetTerm, assignedValueTerm))

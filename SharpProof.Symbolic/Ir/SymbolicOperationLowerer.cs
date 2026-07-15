@@ -44,7 +44,7 @@ internal static class SymbolicOperationLowerer
         };
     }
 
-    private static SymbolicLoweringResult<SymbolicOperationSequence> LowerSimpleAssignment(
+    internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerSimpleAssignment(
         ISymbol targetSymbol,
         IOperation valueOperation,
         SyntaxNode source,

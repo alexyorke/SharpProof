@@ -40,4 +40,42 @@ internal static class SymbolicOperationTransferAdapter
                 : lowering.UnknownReason,
             lowering.Provenance);
     }
+
+    internal static SymbolicOperationTransitionResult ApplyAssignment(
+        SymbolicState state,
+        ISymbol targetSymbol,
+        IOperation valueOperation,
+        SyntaxNode source,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        Func<ISymbol, int>? getTargetVersion = null,
+        Func<ISymbol, int>? getValueVersion = null,
+        int sequence = 0,
+        string provenance = "operation-lowering.assignment")
+    {
+        var targetContext = new SymbolicLoweringContext(
+            semanticModel,
+            cancellationToken,
+            getTargetVersion);
+        var valueContext = new SymbolicLoweringContext(
+            semanticModel,
+            cancellationToken,
+            getValueVersion);
+        var lowering = SymbolicOperationLowerer.LowerSimpleAssignment(
+            targetSymbol,
+            valueOperation,
+            source,
+            targetContext,
+            valueContext,
+            sequence,
+            provenance);
+        return lowering is { IsExact: true, Value: { } operations }
+            ? SymbolicOperationTransferKernel.Apply(state, operations)
+            : SymbolicOperationTransitionResult.Unsupported(
+                state,
+                lowering.UnknownReason == SymbolicUnknownReason.None
+                    ? SymbolicUnknownReason.UnsupportedIrEncoding
+                    : lowering.UnknownReason,
+                lowering.Provenance);
+    }
 }

@@ -20,7 +20,8 @@ internal static class SymbolicTrackedAssignmentStateTransfer
         cancellationToken.ThrowIfCancellationRequested();
         var targetContext = new SymbolicLoweringContext(semanticModel, cancellationToken, getTargetVersion);
         var valueContext = new SymbolicLoweringContext(semanticModel, cancellationToken, getValueVersion);
-        if (TryCreateSymbolTerm(targetSymbol, targetContext, out var target))
+        if (TryCreateSymbolTerm(targetSymbol, targetContext, out var target) && target.Kind == SmtValueKind.Reference)
+        {
             AddEquality(
                 ref state,
                 target,
@@ -29,9 +30,6 @@ internal static class SymbolicTrackedAssignmentStateTransfer
                 SymbolicSemanticPipeline.LowerTerm,
                 provenanceRoot,
                 provenanceRoot + ".value");
-
-        if (TryCreateSymbolTerm(targetSymbol, targetContext, out target) && target.Kind == SmtValueKind.Reference)
-        {
             AddEquality(
                 ref state,
                 new SymbolicLengthTerm(target),

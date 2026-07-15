@@ -304,6 +304,21 @@ internal static class PuritySymbolicStateFacts
             valueOperation,
             valueState);
         if (valueOperation?.Syntax is not ExpressionSyntax valueExpression) return nextState;
+        var trackedType = SymbolicFactFactory.GetTrackedSymbolType(targetSymbol);
+        if (trackedType != null &&
+            (trackedType.SpecialType == SpecialType.System_Boolean ||
+             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(trackedType)))
+        {
+            nextState = PurityOperationTransferAdapter.ApplyAssignment(
+                nextState,
+                targetSymbol,
+                valueOperation,
+                semanticModel,
+                cancellationToken,
+                valueState,
+                out _);
+        }
+
         var pathState = nextState.PathState;
         SymbolicTrackedAssignmentStateTransfer.AddFacts(
             ref pathState,
