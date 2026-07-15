@@ -211,6 +211,7 @@ transfer policy after its slice is complete.
 | Tuple/deconstruction migration | `611b4e17` | 108,393 | +717 |
 | Alias and invalidation migration | `fc40894c` | 108,501 | +825 |
 | Ownership lifetime migration | `cf2fa67c` | 108,401 | +725 |
+| Tracked assignment deletion | `6fc4e26f` | 108,321 | +645 |
 
 ## Validation Ledger
 
@@ -229,6 +230,7 @@ transfer policy after its slice is complete.
 | Phase 2 tuple/deconstruction | Commit `611b4e17` gives Symbolic and Analyzer one nested target/pairing plan, removes both independent target walkers, and routes tuple-local equalities as one ordered binding batch. It also restores legacy provenance/evidence fields on canonical scalar bindings. Focused tuple/program-point/transfer/invariant tests: 119 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +717 production LOC. |
 | Phase 2 alias and invalidation | Commit `fc40894c` makes mutation events own variable-prefix and member-path invalidation, centralizes idempotent definition-version calculation, and routes Analyzer reference aliases and ref-local shared/mutable borrows through lifetime events. Focused ref/out, alias, mutation, version, and program-point tests: 35 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +825 production LOC. |
 | Phase 2 ownership lifetime | Commit `cf2fa67c` routes fresh ownership, disposable acquisition, return, disposal, release, flow-capture ownership, preserved-alias lifetime, and caller-visible mutation facts through canonical events. The superseded 127-line ownership fact factory was deleted. Focused symbolic IR, resource, disposal, using, return, alias, and transfer tests: 221 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +725 production LOC. |
+| Phase 2 tracked assignment deletion | Commit `6fc4e26f` folds reference, length, collection, string, null-equivalence, and `as` postconditions into canonical assignment lowering and deletes the 168-line legacy tracked-assignment interpreter. A disposal-alias ordering regression was reproduced and fixed by applying alias evidence after target invalidation. Focused assignment/program-point/alias/resource tests: 140 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +645 production LOC. |
 
 ## Current Checkpoint
 
@@ -236,7 +238,7 @@ transfer policy after its slice is complete.
 - State: assignment, alias/borrow, invalidation, ownership, and resource lifetime
   families now share canonical events or their common ordered plans.
 - Last confirmed fact: all 487 MainSmtAnalyzer tests pass after deleting the old
-  ownership fact factory and routing resource transitions through the kernel.
+  tracked-assignment interpreter and preserving post-invalidation alias ordering.
 - Next cheapest step: delete superseded assignment and Analyzer purity-state
   implementations, retaining only source/evidence adapters.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
