@@ -247,6 +247,7 @@ transfer policy after its slice is complete.
 | Canonical divide/remainder hazards | `56ebdb15` | 107,497 | -179 |
 | Canonical checked-overflow hazards | `eda4b912` | 107,152 | -524 |
 | Canonical null-family hazards | `d15a43af` | 107,158 | -518 |
+| Canonical relational bounds hazards | `c91a10ed` | 107,096 | -580 |
 
 ## Validation Ledger
 
@@ -299,19 +300,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical divide/remainder hazards | Commit `56ebdb15` lowers binary and compound divide/remainder operations into typed `SymbolicHazardOperation` descriptors, preserves exact and unsupported confidence/provenance, projects candidates from the descriptor, and deletes the dedicated syntax trigger builder. Direct descriptor plus arithmetic hazard/evidence tests: 143 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Reusable hazard-operation scaffolding temporarily raises production LOC to 107,497, or -179 from the rewrite start, and must be repaid by checked-overflow and conversion deletions. |
 | Phase 4 canonical checked-overflow hazards | Commit `eda4b912` lowers checked binary, signed-division, unary, increment/decrement, compound-assignment, and explicit numeric-conversion overflow into typed hazard operations and deletes the parallel syntax candidate, operator/range, trigger, and fallback builders. Focused operation/exception/authoring tests: 148 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 345 net production lines, bringing production LOC to 107,152, or -524 from the rewrite start, and completes the first Phase 4 item. |
 | Phase 4 canonical null-family hazards | Commit `d15a43af` lowers null dereference, argument-null, unbox-null, nullable-value, and dynamic-null binding preconditions into typed hazard operations, including the loop-carried nullable special case, and deletes the six dedicated legacy trigger builders. Disposal remains canonical lifetime state because arbitrary use after disposal does not universally throw `ObjectDisposedException`; existing SP0002 disposal evidence tests characterize that boundary. Direct and focused hazard/evidence tests: 259 passed; post-consolidation focused hazard tests: 255 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,158, or -518 from the rewrite start; the six-line bridge cost must be repaid when the remaining candidate adapters are deleted. |
+| Phase 4 canonical relational bounds hazards | Commit `c91a10ed` lowers negative array/stackalloc lengths and collection cardinality into typed operations, preserves conservative mixed-dimension unsupported aggregates and their exact subject, and deletes the dedicated relational trigger builders plus the legacy aggregate trigger API. Focused descriptor, hazard, exception, and authoring tests: 259 passed. Production LOC fell by 62 lines to 107,096, or -580 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. Phase 4 arithmetic, conversion, null,
-  nullable-value, and dynamic-binding hazards emit typed operations. Disposal
-  remains on the already canonical lifetime/evidence path.
-- Last confirmed fact: the null-family migration passes 255 focused hazard
-  tests, Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented
-  SP0010 baseline failure. Production LOC is 107,158, or -518 from the start.
-- Next cheapest step: inventory indexing, range, collection-cardinality, and
-  array candidate/trigger entry points; migrate the largest structurally shared
-  bounds-precondition family first while preserving ordering and unsupported
-  outcomes.
+- State: Phases 2 and 3 are gated. Phase 4 arithmetic, null-family, negative
+  length, and collection-cardinality hazards emit typed operations. Disposal
+  remains on the canonical lifetime/evidence path; indexing and array bounds
+  still use legacy triggers.
+- Last confirmed fact: relational bounds migration passes 259 focused tests and
+  removes 62 production lines. Production LOC is 107,096, or -580 from the
+  rewrite start; the preceding full lanes remain Oracle 573/573, Analyzer
+  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
+- Next cheapest step: migrate element access and `Array.GetValue` bounds through
+  one canonical indexing operation lowerer, then delete the four legacy index
+  trigger builders while preserving safe-modulo and multidimensional handling.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
