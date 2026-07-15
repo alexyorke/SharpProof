@@ -466,71 +466,18 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (foreachStatement is not ForEachStatementSyntax forEachStatement ||
-            semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken) is not ILocalSymbol iterationSymbol ||
-            !TryCreateSymbolTerm(iterationSymbol.OriginalDefinition, out var iterationTerm))
+        var lowering = SymbolicFiniteDomainLowerer.LowerForeachDomain(
+            expressionSyntax,
+            foreachStatement,
+            semanticModel,
+            cancellationToken);
+        if (lowering is not { IsExact: true, Value: { } plan })
             return;
 
-        if (!SymbolicProgramPointFacts.TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions) &&
-            !SymbolicProgramPointFacts.TryGetPriorAssignedFiniteElementExpressions(
-                expressionSyntax,
-                foreachStatement,
-                semanticModel,
-                cancellationToken,
-                out elementExpressions))
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        SymbolicCondition? finiteDomain = null;
-        var allReferenceElementsDefinitelyNonNull =
-            SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
-        foreach (var elementExpression in elementExpressions)
-        {
-            if (SymbolMutationFacts.ExpressionReferencesSymbol(
-                    elementExpression,
-                    iterationSymbol.OriginalDefinition,
-                    semanticModel,
-                    cancellationToken))
-                return;
-
-            var lowering = SymbolicSemanticPipeline.LowerTerm(elementExpression, context);
-            if (lowering is { IsExact: true, Value: { } elementTerm } &&
-                CanCompareIrTerms(iterationTerm, elementTerm))
-            {
-                var elementCondition = (SymbolicCondition)new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, iterationTerm, elementTerm),
-                    elementExpression,
-                    "ir.path.foreach-entry.finite-domain"));
-                finiteDomain = finiteDomain == null
-                    ? elementCondition
-                    : new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.Or,
-                        finiteDomain,
-                        elementCondition);
-            }
-            else if (!allReferenceElementsDefinitelyNonNull)
-            {
-                return;
-            }
-
-            allReferenceElementsDefinitelyNonNull =
-                allReferenceElementsDefinitelyNonNull &&
-                NullableFlowFacts.IsDefinitelyNotNullReferenceValue(elementExpression, semanticModel, cancellationToken);
-        }
-
-        if (finiteDomain != null)
+        foreach (var condition in plan.Conditions)
             state = SymbolicOperationTransferKernel.TransitionLoopEdge(
-                state, SymbolicLoopEdgeKind.Entry, finiteDomain, foreachStatement.Span,
+                state, SymbolicLoopEdgeKind.Entry, condition, foreachStatement.Span,
                 "ir.path.foreach-entry.finite-domain").State;
-
-        if (allReferenceElementsDefinitelyNonNull && iterationTerm.Kind == SmtValueKind.Reference)
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                iterationTerm,
-                new SymbolicNullTerm(),
-                foreachStatement,
-                "ir.path.foreach-entry.finite-domain-not-null");
     }
 
     internal static void AddThrowGuardedExpressionStateFacts(

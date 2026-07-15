@@ -20,6 +20,8 @@ internal static class SymbolicCfgProgramPointStateCollector
             ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(site, "execution-root");
+        if (!UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
+            return Unsupported(site, "analysis-limits");
         if (!TryLowerLoopPlans(
                 executionRoot,
                 semanticModel,
@@ -844,6 +846,22 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
+
+    private static bool UsesDefaultAnalysisLimits(SymbolicAnalysisLimits limits)
+    {
+        var defaults = SymbolicAnalysisLimits.Default;
+        return limits.MaxMergedIfElseFacts == defaults.MaxMergedIfElseFacts &&
+               limits.MaxMergedSwitchFacts == defaults.MaxMergedSwitchFacts &&
+               limits.MaxMergedTryFacts == defaults.MaxMergedTryFacts &&
+               limits.MaxTryCompletionBranches == defaults.MaxTryCompletionBranches &&
+               limits.MaxFiniteForeachElementFacts == defaults.MaxFiniteForeachElementFacts &&
+               limits.MaxScopedBlockCompletionStatements == defaults.MaxScopedBlockCompletionStatements &&
+               limits.MaxStructuralNullStateDepth == defaults.MaxStructuralNullStateDepth &&
+               limits.MaxMergedPathConditions == defaults.MaxMergedPathConditions &&
+               limits.MaxMergeableFactsPerTargetPerState == defaults.MaxMergeableFactsPerTargetPerState &&
+               limits.MaxFactChoiceCombinationsPerTarget == defaults.MaxFactChoiceCombinationsPerTarget &&
+               limits.MaxGuardFactsPerTargetPerState == defaults.MaxGuardFactsPerTargetPerState;
+    }
 
     private static SymbolicLoweringResult<SymbolicState> Exact(
         SymbolicState state,

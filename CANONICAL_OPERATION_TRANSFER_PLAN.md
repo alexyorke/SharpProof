@@ -268,6 +268,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
     interpreter with one canonical pattern condition and branch-assumption
     transition. Recursive designation projection congruence now belongs to
     `SymbolicPatternLowerer`, shared by every consumer.
+  - [x] Lower finite `foreach` entry facts into a typed domain plan and apply
+    them only through canonical loop-edge transitions. Custom analysis limits
+    conservatively retain the structural collector until CFG truncation events
+    have exact parity; finite-element source discovery is the next legacy owner
+    to migrate.
 - [ ] Migrate source queries, invariant/reachability analysis, exception paths,
   and Analyzer purity CFG consumers in behavior-locked vertical slices.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
@@ -551,6 +556,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 bounded counted-for revisits | Commit `f596da0c` reapplies typed monotonic initializer invariants after loop-carried invalidation and on exit, then routes counted-for back edges through the bounded worklist. The full Flow lane exposed two earlier acyclic parity leaks; nullable reassignment and guarded reference projection now return typed fallback, restoring the recorded 256-pass/1-baseline-failure result. Focused loop/program-point/transfer fixtures pass 199/199, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,421, or -1,255 from the rewrite start; test LOC is 142,780. |
 | Phase 7 typed finally continuations | Commit `98747716` replaces the block-only queue key with a block-plus-continuation point, executes every saved finally region before its original destination, and distinguishes structured-finally completion from overriding abrupt completion. Finally-local targets remain fallback. Focused loop/program-point/transfer/finally fixtures pass 217/217, full MainSmtOracle passes 573/573, MainSmtFlow is at its recorded 256-pass/1-baseline-failure result, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,528, or -1,148 from the rewrite start; test LOC is 142,802. |
 | Phase 7 canonical pattern binding | Commit `c4adcade` deletes the program-point recursive, property, positional, list-element, relational, and designation interpreter and consumes the one typed `SymbolicPatternLowerer` condition through a canonical branch-assumption transition. A full-lane reproduction found recursive outer-designation projection congruence missing from the canonical owner; it now emits binding plus length/string projection equality without changing reassignment invalidation for ordinary declaration patterns. Focused pattern/list/property/program-point fixtures pass 178/178; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,237, or -1,439 from the rewrite start; test LOC remains 142,802. |
+| Phase 7 typed finite-foreach domains | Commit `pending` replaces direct finite-domain state mutation with `SymbolicFiniteDomainLowerer`, a typed plan consumed only through canonical loop-edge transitions. Inline arrays and prior-assigned finite arrays are characterized directly. A broader limits probe exposed that the CFG collector did not reproduce structural try-merge and scoped-completion truncation events, so custom analysis limits now conservatively select the structural collector until typed truncation parity migrates. Focused finite-domain/program-point/limit/transfer fixtures pass 139/139; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This migration scaffold raises production LOC to 106,296, or -1,380 from the rewrite start; test LOC rises to 142,831. |
 
 ## Current Checkpoint
 
@@ -625,13 +631,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   bounded canonical CFG revisits; counted-for loops additionally retain their
   typed monotonic initializer invariants. Loop-local targets, abrupt exits,
   condition-dependent while/do mutations, nullable reassignment, guarded
-  reference projection, finally-local targets, and foreach remain conservative
-  fallbacks. Finally regions now run through typed saved continuations before
+  reference projection and finally-local targets remain conservative fallbacks.
+  Finite foreach entry domains now lower to typed conditions and enter state only
+  through the canonical loop-edge transition. Finally regions run through typed saved continuations before
   their destinations. Pattern binding has one typed canonical owner; the
-  425-line program-point interpreter is deleted. Test LOC is 142,802; production
-  LOC is 106,237, or -1,439 from the rewrite start; the 652-line
+  425-line program-point interpreter is deleted. Test LOC is 142,831; production
+  LOC is 106,296, or -1,380 from the rewrite start; the 711-line
   scaffold must be repaid when structural transfer paths are deleted.
-- Next cheapest step: move finite-domain foreach discovery behind a typed
-  lowering result and delete its direct state mutation.
+- Next cheapest step: move finite-element and prior-assignment source discovery
+  out of `SymbolicProgramPointFacts` into the typed finite-domain owner, migrate
+  the remaining operation-lowering caller, and delete the legacy helpers.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
