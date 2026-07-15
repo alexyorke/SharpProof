@@ -1,0 +1,117 @@
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using NUnit.Framework;
+using SharpProof.ProofCore.Smt;
+using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
+
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class SymbolicOperationTransferModelTests
+{
+    [Test]
+    public void OperationDescriptors_KeepTypedPayloadAndEvaluationSequence()
+    {
+        var target = new SymbolicVariableTerm("target", SmtValueKind.Int);
+        var source = new SymbolicIntegerConstantTerm(42);
+        var origin = new SymbolicOperationOrigin(new TextSpan(10, 5), 3, "test.assignment");
+        SymbolicOperationDescriptor descriptor = new SymbolicAssignmentOperation(
+            ImmutableArray.Create(new SymbolicAssignmentBinding(target, source)),
+            SymbolicAssignmentOperationKind.Simple,
+            IsChecked: false,
+            origin);
+
+        var assignment = descriptor as SymbolicAssignmentOperation;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment, Is.Not.Null);
+            Assert.That(assignment!.Bindings.Single().Target, Is.SameAs(target));
+            Assert.That(assignment.Bindings.Single().Source, Is.SameAs(source));
+            Assert.That(assignment.AssignmentKind, Is.EqualTo(SymbolicAssignmentOperationKind.Simple));
+            Assert.That(assignment.Origin.Sequence, Is.EqualTo(3));
+            Assert.That(assignment.Origin.SourceSpan, Is.EqualTo(new TextSpan(10, 5)));
+            Assert.That(assignment.Origin.Provenance, Is.EqualTo("test.assignment"));
+        });
+    }
+
+    [Test]
+    public void TransitionResult_NormalizesStateAndCanonicalizesTruncation()
+    {
+        var source = SyntaxFactory.ParseExpression("value");
+        var value = new SymbolicVariableTerm("value", SmtValueKind.Int);
+        var fact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.GreaterThanOrEqual,
+                value,
+                new SymbolicIntegerConstantTerm(0)),
+            source,
+            "test.fact");
+        var state = new SymbolicState(new[] { fact, fact });
+        var provenance = new SymbolicLoweringProvenance("transfer", new TextSpan(0, 5), "simple");
+        var firstLimit = new SymbolicAnalysisTruncationEvent(
+            SymbolicAnalysisLimitKind.SwitchFactMerge,
+            4,
+            6,
+            "test.switch",
+            8);
+        var secondLimit = new SymbolicAnalysisTruncationEvent(
+            SymbolicAnalysisLimitKind.IfElseFactMerge,
+            2,
+            3,
+            "test.if",
+            4);
+
+        var result = SymbolicOperationTransitionResult.Exact(
+            state,
+            new[] { provenance },
+            new SymbolicAnalysisTruncationInfo(new[] { firstLimit, secondLimit }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+            Assert.That(result.State.Facts, Has.Length.EqualTo(1));
+            Assert.That(result.Provenance, Is.EqualTo(new[] { provenance }));
+            Assert.That(result.Truncation.Events.Select(static item => item.Kind), Is.EqualTo(new[]
+            {
+                SymbolicAnalysisLimitKind.IfElseFactMerge,
+                SymbolicAnalysisLimitKind.SwitchFactMerge
+            }));
+        });
+    }
+
+    [Test]
+    public void UnsupportedTransition_RetainsConservativeStateAndReason()
+    {
+        var state = new SymbolicState(symbolVersions: new[]
+        {
+            new KeyValuePair<string, int>("value", 2)
+        });
+        var provenance = new SymbolicLoweringProvenance(
+            "operation-transfer",
+            new TextSpan(1, 2),
+            "unsupported");
+
+        var result = SymbolicOperationTransitionResult.Unsupported(
+            state,
+            SymbolicUnknownReason.UnsupportedIrEncoding,
+            new[] { provenance });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsUnsupported, Is.True);
+            Assert.That(result.State.NormalizedProofKey, Is.EqualTo(state.NormalizedProofKey));
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(result.Truncation, Is.SameAs(SymbolicAnalysisTruncationInfo.None));
+        });
+        Assert.That(
+            () => SymbolicOperationTransitionResult.Unsupported(
+                state,
+                SymbolicUnknownReason.None,
+                new[] { provenance }),
+            Throws.ArgumentException);
+    }
+}
