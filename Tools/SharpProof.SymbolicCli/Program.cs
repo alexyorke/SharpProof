@@ -70,8 +70,10 @@ try
 
     if (options.InvariantJson)
     {
-        var invariantResult = SymbolicCliInvariantResultAdapter.Create(result)
-            .ToInvariantQueryResult(options.CreateCompactOptions());
+        if (result is not SymbolicQueryResult queryResult)
+            throw new InvalidOperationException("Unexpected invariant query result type.");
+
+        var invariantResult = queryResult.ToInvariantQueryResult(options.CreateCompactOptions());
         Console.WriteLine(JsonSerializer.Serialize(
             invariantResult,
             SymbolicCliOutputPolicy.CompactJsonOptions));
@@ -79,8 +81,8 @@ try
     else if (options.CompactJson)
     {
         object compactResult;
-        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
-            compactResult = invariant.ToCompactResult(options.CreateCompactOptions());
+        if (result is SymbolicQueryResult queryResult)
+            compactResult = queryResult.ToCompactResult(options.CreateCompactOptions());
         else
             compactResult = result switch
         {

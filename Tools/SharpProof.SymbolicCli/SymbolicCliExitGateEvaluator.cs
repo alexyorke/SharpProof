@@ -54,10 +54,10 @@ internal static class SymbolicCliExitGateEvaluator
         ICollection<SymbolicCliExitGateFailure> failures)
     {
         if (!options.FailOnUnprovenImplies ||
-            !SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
+            result is not SymbolicQueryResult queryResult)
             return;
 
-        var outcomes = invariant.ProofOutcomes;
+        var outcomes = queryResult.ProgramPointSummary.ProofOutcomes;
         var unprovenCount = outcomes.TotalCount - outcomes.ProvenTrueCount;
         if (outcomes.TotalCount != 0 && unprovenCount == 0) return;
 
@@ -133,13 +133,13 @@ internal static class SymbolicCliExitGateEvaluator
         ICollection<SymbolicCliExitGateFailure> failures)
     {
         if (!options.MaximumConservativeUnknowns.HasValue ||
-            !SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant) ||
-            invariant.ConservativeUnknownCount <= options.MaximumConservativeUnknowns.Value)
+            result is not SymbolicQueryResult queryResult ||
+            queryResult.InvariantQuery.UnknownFactCount <= options.MaximumConservativeUnknowns.Value)
             return;
 
         failures.Add(new SymbolicCliExitGateFailure(
             "conservative-unknowns",
-            "actual=" + invariant.ConservativeUnknownCount.ToString(CultureInfo.InvariantCulture) +
+            "actual=" + queryResult.InvariantQuery.UnknownFactCount.ToString(CultureInfo.InvariantCulture) +
             "; maximum=" + options.MaximumConservativeUnknowns.Value.ToString(CultureInfo.InvariantCulture) + "."));
     }
 
@@ -151,9 +151,9 @@ internal static class SymbolicCliExitGateEvaluator
         if (!options.FailOnCompactTruncation) return;
 
         var isTruncated = options.InvariantJson
-            ? SymbolicCliInvariantResultAdapter.Create(result)
-                .ToInvariantQueryResult(options.CreateCompactOptions())
-                .QuerySummary.HasTruncatedOutput
+            ? result is SymbolicQueryResult queryResult
+                ? queryResult.ToInvariantQueryResult(options.CreateCompactOptions()).QuerySummary.HasTruncatedOutput
+                : throw new InvalidOperationException("Unexpected invariant query result type.")
             : IsCompactResultTruncated(result, options);
         if (!isTruncated) return;
 
@@ -181,13 +181,13 @@ internal static class SymbolicCliExitGateEvaluator
 
     private static int GetCompactMetric(object result, string metric)
     {
-        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
+        if (result is SymbolicQueryResult queryResult)
             return metric switch
             {
-                "program-points" => invariant.ProgramPointCount,
-                "conservative-unknowns" => invariant.ConservativeUnknownCount,
-                "proof-unknowns" => invariant.ProofOutcomes.UnknownCount,
-                "reachability-unknowns" => invariant.ReachabilityUnknownCount,
+                "program-points" => queryResult.ProgramPointCount,
+                "conservative-unknowns" => queryResult.InvariantQuery.UnknownFactCount,
+                "proof-unknowns" => queryResult.ProgramPointSummary.ProofOutcomes.UnknownCount,
+                "reachability-unknowns" => queryResult.Reachability.UnknownCount,
                 _ => throw new InvalidOperationException("Unsupported invariant compact threshold metric: " + metric)
             };
 
@@ -208,8 +208,8 @@ internal static class SymbolicCliExitGateEvaluator
 
     private static bool IsCompactResultTruncated(object result, SymbolicCliOptions options)
     {
-        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
-            return invariant.IsCompactTruncated(options.CreateCompactOptions());
+        if (result is SymbolicQueryResult queryResult)
+            return queryResult.ToCompactResult(options.CreateCompactOptions()).Truncation.IsTruncated;
 
         return result switch
         {
