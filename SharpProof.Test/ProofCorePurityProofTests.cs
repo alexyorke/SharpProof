@@ -41,6 +41,26 @@ internal class ProofCorePurityProofTests
     }
 
     [Test]
+    public void FormulaTraversal_MapChildren_PreservesNodeMetadata()
+    {
+        var root = new SmtRegexMatchFormula(
+            new SmtVariable("old", SmtValueKind.String),
+            "a+",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        var mapped = (SmtRegexMatchFormula)SmtFormulaTraversal.MapChildren(
+            root,
+            static _ => new SmtVariable("new", SmtValueKind.String));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mapped.Value, Is.EqualTo(new SmtVariable("new", SmtValueKind.String)));
+            Assert.That(mapped.Pattern, Is.EqualTo(root.Pattern));
+            Assert.That(mapped.Options, Is.EqualTo(root.Options));
+        });
+    }
+
+    [Test]
     public void PurityProof_FalseImpurityCondition_IsProvablyPure()
     {
         using var search = new PurityProofSearch();

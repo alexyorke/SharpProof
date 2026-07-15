@@ -669,24 +669,16 @@ internal static partial class SmtSyntacticClassifier
 
             if (!visiting.Add(formula)) return formula;
 
-            var normalized = formula switch
+            var normalized = SmtFormulaTraversal.MapChildren(
+                formula,
+                child => NormalizeAliases(child, visiting));
+            if (normalized is SmtConditionalFormula conditional)
             {
-                SmtUnaryFormula unary => NormalizeUnaryFormula(unary, visiting),
-                SmtBinaryFormula binary => NormalizeBinaryFormula(binary, visiting),
-                SmtIntegerUnaryTerm unary => NormalizeIntegerUnaryTerm(unary, visiting),
-                SmtIntegerBinaryTerm binary => NormalizeIntegerBinaryTerm(binary, visiting),
-                SmtOpaqueIntegerBinaryTerm binary => NormalizeOpaqueIntegerBinaryTerm(binary, visiting),
-                SmtStringLengthTerm stringLength => NormalizeStringLengthTerm(stringLength, visiting),
-                SmtStringConcatTerm stringConcat => NormalizeStringConcatTerm(stringConcat, visiting),
-                SmtStringContainsFormula stringContains => NormalizeStringContainsFormula(stringContains, visiting),
-                SmtStringStartsWithFormula stringStartsWith => NormalizeStringStartsWithFormula(stringStartsWith,
-                    visiting),
-                SmtStringEndsWithFormula stringEndsWith => NormalizeStringEndsWithFormula(stringEndsWith, visiting),
-                SmtRegexMatchFormula regexMatch => NormalizeRegexMatchFormula(regexMatch, visiting),
-                SmtRuntimeTypeTestFormula runtimeTypeTest => NormalizeRuntimeTypeTestFormula(runtimeTypeTest, visiting),
-                SmtConditionalFormula conditional => NormalizeConditionalFormula(conditional, visiting),
-                _ => formula
-            };
+                if (TryEvaluateBoolean(conditional.Condition, out var conditionValue))
+                    normalized = conditionValue ? conditional.WhenTrue : conditional.WhenFalse;
+                else if (conditional.WhenTrue.Equals(conditional.WhenFalse))
+                    normalized = conditional.WhenTrue;
+            }
 
             visiting.Remove(formula);
             var normalizedCanonical = FindCanonical(normalized);
@@ -712,131 +704,6 @@ internal static partial class SmtSyntacticClassifier
                 _remaining--;
                 return true;
             }
-        }
-
-        private SmtFormula NormalizeUnaryFormula(SmtUnaryFormula formula, HashSet<SmtFormula> visiting)
-        {
-            var operand = NormalizeAliases(formula.Operand, visiting);
-            return operand.Equals(formula.Operand)
-                ? formula
-                : new SmtUnaryFormula(formula.Operator, operand);
-        }
-
-        private SmtFormula NormalizeBinaryFormula(SmtBinaryFormula formula, HashSet<SmtFormula> visiting)
-        {
-            var left = NormalizeAliases(formula.Left, visiting);
-            var right = NormalizeAliases(formula.Right, visiting);
-            return left.Equals(formula.Left) && right.Equals(formula.Right)
-                ? formula
-                : new SmtBinaryFormula(formula.Operator, left, right);
-        }
-
-        private SmtFormula NormalizeIntegerUnaryTerm(SmtIntegerUnaryTerm formula, HashSet<SmtFormula> visiting)
-        {
-            var operand = NormalizeAliases(formula.Operand, visiting);
-            return operand.Equals(formula.Operand)
-                ? formula
-                : new SmtIntegerUnaryTerm(formula.Operator, operand);
-        }
-
-        private SmtFormula NormalizeIntegerBinaryTerm(SmtIntegerBinaryTerm formula, HashSet<SmtFormula> visiting)
-        {
-            var left = NormalizeAliases(formula.Left, visiting);
-            var right = NormalizeAliases(formula.Right, visiting);
-            return left.Equals(formula.Left) && right.Equals(formula.Right)
-                ? formula
-                : new SmtIntegerBinaryTerm(formula.Operator, left, right);
-        }
-
-        private SmtFormula NormalizeOpaqueIntegerBinaryTerm(
-            SmtOpaqueIntegerBinaryTerm formula,
-            HashSet<SmtFormula> visiting)
-        {
-            var left = NormalizeAliases(formula.Left, visiting);
-            var right = NormalizeAliases(formula.Right, visiting);
-            return left.Equals(formula.Left) && right.Equals(formula.Right)
-                ? formula
-                : new SmtOpaqueIntegerBinaryTerm(formula.Operator, left, right);
-        }
-
-        private SmtFormula NormalizeStringLengthTerm(SmtStringLengthTerm formula, HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            return value.Equals(formula.Value)
-                ? formula
-                : new SmtStringLengthTerm(value);
-        }
-
-        private SmtFormula NormalizeStringConcatTerm(SmtStringConcatTerm formula, HashSet<SmtFormula> visiting)
-        {
-            var left = NormalizeAliases(formula.Left, visiting);
-            var right = NormalizeAliases(formula.Right, visiting);
-            return left.Equals(formula.Left) && right.Equals(formula.Right)
-                ? formula
-                : new SmtStringConcatTerm(left, right);
-        }
-
-        private SmtFormula NormalizeStringContainsFormula(SmtStringContainsFormula formula,
-            HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            var search = NormalizeAliases(formula.Search, visiting);
-            return value.Equals(formula.Value) && search.Equals(formula.Search)
-                ? formula
-                : new SmtStringContainsFormula(value, search);
-        }
-
-        private SmtFormula NormalizeStringStartsWithFormula(SmtStringStartsWithFormula formula,
-            HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            var prefix = NormalizeAliases(formula.Prefix, visiting);
-            return value.Equals(formula.Value) && prefix.Equals(formula.Prefix)
-                ? formula
-                : new SmtStringStartsWithFormula(value, prefix);
-        }
-
-        private SmtFormula NormalizeStringEndsWithFormula(SmtStringEndsWithFormula formula,
-            HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            var suffix = NormalizeAliases(formula.Suffix, visiting);
-            return value.Equals(formula.Value) && suffix.Equals(formula.Suffix)
-                ? formula
-                : new SmtStringEndsWithFormula(value, suffix);
-        }
-
-        private SmtFormula NormalizeRegexMatchFormula(SmtRegexMatchFormula formula, HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            return value.Equals(formula.Value)
-                ? formula
-                : new SmtRegexMatchFormula(value, formula.Pattern, formula.Options);
-        }
-
-        private SmtFormula NormalizeRuntimeTypeTestFormula(SmtRuntimeTypeTestFormula formula,
-            HashSet<SmtFormula> visiting)
-        {
-            var value = NormalizeAliases(formula.Value, visiting);
-            return value.Equals(formula.Value)
-                ? formula
-                : new SmtRuntimeTypeTestFormula(value, formula.TypeKey);
-        }
-
-        private SmtFormula NormalizeConditionalFormula(SmtConditionalFormula formula, HashSet<SmtFormula> visiting)
-        {
-            var condition = NormalizeAliases(formula.Condition, visiting);
-            var whenTrue = NormalizeAliases(formula.WhenTrue, visiting);
-            var whenFalse = NormalizeAliases(formula.WhenFalse, visiting);
-            if (TryEvaluateBoolean(condition, out var conditionValue)) return conditionValue ? whenTrue : whenFalse;
-
-            if (whenTrue.Equals(whenFalse)) return whenTrue;
-
-            return condition.Equals(formula.Condition) &&
-                   whenTrue.Equals(formula.WhenTrue) &&
-                   whenFalse.Equals(formula.WhenFalse)
-                ? formula
-                : new SmtConditionalFormula(condition, whenTrue, whenFalse, formula.ResultKind);
         }
 
         private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate)
