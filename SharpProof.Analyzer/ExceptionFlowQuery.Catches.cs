@@ -106,9 +106,8 @@ internal static partial class ExceptionFlowQuery
         var constantValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
         if (constantValue.HasValue && constantValue.Value is bool booleanValue) return booleanValue;
 
-        var pathState = ExceptionPathStateService.CollectExceptionSitePathState(
+        var pathState = ExceptionPathStateService.CollectPathStateForUse(
             exceptionSite,
-            filterExpression,
             semanticModel,
             cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerCondition(

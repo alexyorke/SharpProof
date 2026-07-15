@@ -774,9 +774,4 @@ internal static partial class ExceptionFlowAnalyzer
         public ExpressionSyntax ResourceExpression { get; }
     }
 
-    internal enum PathFactKind
-    {
-        Zero,
-        Null
-    }
 }

@@ -43,11 +43,7 @@ internal static partial class ExceptionPathStateService
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathState = CollectExceptionSitePathState(
-            site,
-            finallyBlock,
-            semanticModel,
-            cancellationToken);
+        var pathState = CollectPathStateForUse(site, semanticModel, cancellationToken);
         if (!IsPathStateReachable(pathState, smtAnalysis)) return false;
         return BlockExitIsProven(finallyBlock, pathState, semanticModel, cancellationToken, smtAnalysis);
     }

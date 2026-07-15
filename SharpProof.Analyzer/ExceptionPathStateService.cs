@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
@@ -11,27 +10,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionPathStateService
 {
-    internal static bool IsKnownByDominatingIf(
-        ExpressionSyntax expression,
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        PathFactKind factKind,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (!TryCreatePathFactCondition(
-                expression,
-                factKind,
-                semanticModel,
-                cancellationToken,
-                out var factCondition))
-            return false;
-
-        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, factCondition, smtAnalysis)
-                   .Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
-
     internal static SymbolicState CollectPathStateForUse(
         SyntaxNode useNode,
         SemanticModel semanticModel,
@@ -80,15 +58,6 @@ internal static partial class ExceptionPathStateService
         return IsPathStateReachable(pathState, smtAnalysis);
     }
 
-    internal static SymbolicState CollectExceptionSitePathState(
-        SyntaxNode exceptionSite,
-        SyntaxNode? relevantRoot,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return CollectPathStateForUse(exceptionSite, semanticModel, cancellationToken);
-    }
-
     private static bool IsPathStateReachable(
         SymbolicState pathState,
         SmtAnalysisService smtAnalysis)
@@ -97,33 +66,4 @@ internal static partial class ExceptionPathStateService
                SymbolicProofStatus.Unreachable;
     }
 
-    private static bool TryCreatePathFactCondition(
-        ExpressionSyntax expression,
-        PathFactKind factKind,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition condition)
-    {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (factKind == PathFactKind.Zero)
-        {
-            var zero = SymbolicSemanticPipeline.LowerNumericZeroCondition(expression, context);
-            if (zero is { IsExact: true, Value: { } zeroCondition })
-            {
-                condition = zeroCondition;
-                return true;
-            }
-
-            condition = null!;
-            return false;
-        }
-
-        return SymbolicStateFactBuilder.TryCreateReferenceNullCondition(
-            expression,
-            true,
-            semanticModel,
-            cancellationToken,
-            "analyzer.exception-flow.null",
-            out condition);
-    }
 }
