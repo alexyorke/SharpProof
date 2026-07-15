@@ -256,6 +256,7 @@ transfer policy after its slice is complete.
 | Canonical exception-flow throw consumer | `fe51dd22` | 106,607 | -1,069 |
 | Canonical hazard descriptor consumers | `a1b56f96` | 106,583 | -1,093 |
 | Residual hazard trigger deletion and Phase 4 gate | `07d5b309` | 106,546 | -1,130 |
+| Canonical owned-array purity state | `8d74d8fd` | 106,525 | -1,151 |
 
 ## Validation Ledger
 
@@ -317,20 +318,18 @@ transfer policy after its slice is complete.
 | Phase 4 canonical exception-flow throw consumer | Commit `fe51dd22` replaces exception flow's independent throw/rethrow/null discovery and classification with canonical proven runtime hazards while preserving its position before callee entries and the shared catch/finally/reachability filters. The now-unused throw classifier and rethrow helpers were deleted. Focused exception, semantic-oracle, and unknown-hazard tests: 189 passed. Production LOC fell by 51 lines to 106,607, or -1,069 from the rewrite start. |
 | Phase 4 canonical hazard descriptor consumers | Commit `a1b56f96` retains each `SymbolicHazardOperation` through query classification, derives the public compatibility projection from that descriptor, and shares one per-method hazard query between exception summaries and unknown diagnostics. Exception flow reads direct-throw identity from the descriptor; the suppressor already consumes the same canonical query service and required no parallel classifier. Release test build: zero warnings; focused exception, hazard, unknown-diagnostic, authoring, and suppressor tests: 234 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 106,583, or -1,093 from the rewrite start. |
 | Phase 4 residual trigger deletion and gate | Commit `07d5b309` deletes the final known-guard wrapper and unused fact-trigger projection, and moves loop-carried nullable descriptor construction behind `SymbolicOperationLowerer`. Exact search finds `SymbolicHazardOperation` construction only in that lowerer; the remaining syntax candidate code discovers source/`IOperation` shapes and spans but delegates trigger semantics to canonical lowering. Release test build: zero warnings; focused descriptor, hazard, unknown, authoring, exception, and suppressor tests: 290 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Phase 4 closes at 106,546 production LOC, or -1,130 from the rewrite start. |
+| Phase 5 canonical owned-array purity state | Commit `8d74d8fd` removes Analyzer's parallel owned-local-array symbol set and derives the policy query from exact canonical ownership facts emitted by the lifetime transition. Reassignment, `ref`/`out`, branch merge, capture, mutation, and return behavior remains versioned by `SymbolicState`. Release test build: zero warnings; focused array, assignment, merge, ref, capture, and return tests: 170 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 106,525, or -1,151 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 4 are gated. Every runtime-hazard family is lowered
-  once into a typed operation; query, suppressor, exception flow, and unknown
-  diagnostics consume that canonical result. No parallel trigger constructor
-  remains.
-- Last confirmed fact: the Phase 4 gate passes 290 focused tests; the full lanes
-  remain Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented
-  SP0010 baseline failure. Production LOC is 106,546, or -1,130 from the rewrite
-  start.
-- Next cheapest step: inventory purity transfer call sites that still mutate
-  Analyzer-owned state after a canonical assignment, lifetime, branch, or merge
-  transition, then remove the first independently testable duplicate mutation.
+- State: Phases 2 through 4 are gated. Phase 5 is underway: purity owned-array
+  policy now reads canonical ownership facts instead of a parallel Analyzer set.
+- Last confirmed fact: the owned-array slice passes 170 focused tests and the
+  full Analyzer lane at 487/487. Production LOC is 106,525, or -1,151 from the
+  rewrite start; the preceding full Oracle and Flow baselines remain unchanged.
+- Next cheapest step: determine whether the parallel definitely-null-local set
+  can likewise be replaced by exact canonical null facts without changing flow-
+  capture or concrete-receiver policy.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
