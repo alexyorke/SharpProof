@@ -118,9 +118,9 @@ transfer policy after its slice is complete.
   The initial bridge supports local declarations and direct simple assignments;
   unsupported operation shapes remain explicit and later slices extend the same
   front-end instead of adding another interpreter.
-- [ ] Add adapters from `SymbolicState` and Analyzer purity state into the kernel
+- [x] Add adapters from `SymbolicState` and Analyzer purity state into the kernel
   without duplicating transfer policy.
-- [ ] Add invariants for deterministic event ordering and byte-stable evidence.
+- [x] Add invariants for deterministic event ordering and byte-stable evidence.
 
 ## Phase 2 - Assignment, Aliasing, And Lifetime
 
@@ -205,6 +205,7 @@ transfer policy after its slice is complete.
 | Rewrite start | `eb484cdc` | 107,676 | 0 |
 | Canonical operation model | `97bb94e4` | 107,856 | +180 |
 | Simple-assignment shadow path | `4d970e1a` | 108,046 | +370 |
+| Symbolic and Analyzer adapters | `d545c69a` | 108,118 | +442 |
 
 ## Validation Ledger
 
@@ -217,16 +218,16 @@ transfer policy after its slice is complete.
 | Phase 0 deletion map | Exact production references for the state-transfer, runtime-hazard, purity-state, and exception-path owners were enumerated. Every owner now has a migration slice, retained-adapter boundary, and behavior gate in the table above. |
 | Phase 1 operation model | Commit `97bb94e4` adds typed descriptors for all nine event families and a normalized immutable transition envelope. Focused model tests: 3 passed, 0 failed, 0 skipped. The temporary +180 production LOC is migration scaffolding that must be repaid when legacy transfer paths are deleted. |
 | Phase 1 lowering bridge | Commit `4d970e1a` adds the single `IOperation` front-end and kernel dispatch. Local declaration and simple assignment states shadow-match the legacy path, including previous-value invalidation. Focused model tests: 5 passed, 0 failed, 0 skipped. Total temporary migration scaffolding is +370 production LOC. |
+| Phase 1 adapters and ordering | Commit `d545c69a` adds thin Symbolic and Analyzer adapters. The kernel rejects non-increasing event sequences conservatively and preserves evidence order. Focused model tests: 7 passed, 0 failed, 0 skipped. Total temporary migration scaffolding is +442 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: the canonical model, transition envelope, single `IOperation` lowering
-  front-end, and first assignment kernel handler are committed; production
-  behavior still uses legacy transfer paths.
-- Last confirmed fact: local declarations and simple assignments shadow-match
-  the legacy normalized state in five focused model tests.
-- Next cheapest step: add Symbolic and Analyzer adapters plus deterministic
-  event/evidence ordering, then route the narrow simple-assignment slice.
+- State: Phase 1 foundations are complete: one event model, transition result,
+  `IOperation` front-end, kernel, consumer adapters, and ordering invariant.
+- Last confirmed fact: Symbolic and Analyzer adapters produce identical simple
+  assignment state, and reordered events become conservative `Unsupported`.
+- Next cheapest step: route local declarations and direct simple assignments
+  through the adapters, shadow-compare, then delete their migrated legacy code.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
