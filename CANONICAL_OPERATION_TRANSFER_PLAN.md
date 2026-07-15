@@ -234,6 +234,7 @@ transfer policy after its slice is complete.
 | Canonical loop body entry | `a3976e31` | 107,645 | -31 |
 | Unified loop initializer inputs | `0a5cfed5` | 107,607 | -69 |
 | Bounded CFG fixed-point owner | `157e70f6` | 107,581 | -95 |
+| Finally path scaffolding deletion | `8d29fc19` | 107,552 | -124 |
 
 ## Validation Ledger
 
@@ -275,18 +276,18 @@ transfer policy after its slice is complete.
 | Phase 3 canonical loop body entry | Commit `a3976e31` replaces the duplicated while/do/for/foreach body-entry switches in the program-point and block walkers with one loop adapter, and routes invariant application through entry/exit loop-edge events. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell below the rewrite start to 107,645, or -31. |
 | Phase 3 unified loop initializer inputs | Commit `0a5cfed5` makes one typed initializer stream own for-loop assignment/declaration discovery, shares bound extraction across for/while/do, and applies initializer-target invalidation as one canonical mutation event. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,607, or -69 from the rewrite start. |
 | Phase 3 bounded CFG fixed point | Commit `157e70f6` encapsulates Analyzer CFG queue membership, entry/exit state maps, revisit merging, finally-continuation propagation, and the bounded iteration budget in one fixed-point owner. Canonical path-state merging remains unchanged. Focused loop/CFG/finally/resource tests: 46 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,581, or -95 from the rewrite start. |
+| Phase 3 finally path cleanup | Commit `8d29fc19` removes an unused condition-mutation interpreter and a one-call statement-state wrapper from path-sensitive throwing-finally proof while preserving the canonical reachability query. Focused exception/finally tests: 136 passed. Production LOC fell to 107,552, or -124 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; switch and loop migration are complete. Canonical
-  edge events own loop invariant entry/exit application, one adapter owns body
-  entry, and one bounded owner handles CFG revisits and convergence.
-- Last confirmed fact: focused loop/CFG/finally/resource tests pass 46/46 and
-  MainSmtAnalyzer passes 487/487 after fixed-point encapsulation; the immediately
-  preceding loop tranche also passed Oracle 573/573 and baseline-matching Flow.
-- Next cheapest step: inventory try/catch/finally completion and reachability
-  paths, then consolidate the first duplicated normal/exceptional completion
-  family behind canonical completion operations.
+- State: Phase 2 is gated; switch and loop migration are complete. Try/catch/
+  finally inventory is active, and dead path-sensitive finally scaffolding has
+  been removed. Canonical completion and try-state merging remain to migrate.
+- Last confirmed fact: focused exception/finally tests pass 136/136 after the
+  cleanup; the preceding loop fixed-point tranche passed Analyzer 487/487.
+- Next cheapest step: make canonical completion operations own contradictory
+  normal-flow termination, route branch/loop/try/finally exits through them, and
+  delete the remaining direct contradictory-state constructors.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
