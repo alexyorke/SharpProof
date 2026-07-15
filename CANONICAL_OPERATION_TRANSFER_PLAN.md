@@ -232,6 +232,7 @@ transfer policy after its slice is complete.
 | Unified guarded loop break paths | `68417c99` | 107,709 | +33 |
 | Canonical completed loop exits | `b1d397db` | 107,706 | +30 |
 | Canonical loop body entry | `a3976e31` | 107,645 | -31 |
+| Unified loop initializer inputs | `0a5cfed5` | 107,607 | -69 |
 
 ## Validation Ledger
 
@@ -271,18 +272,19 @@ transfer policy after its slice is complete.
 | Phase 3 guarded loop break paths | Commit `68417c99` replaces separate direct, nested, and continue-before-break interpreters with one structural enclosing-guard and fallthrough collector while retaining mutation checks and conservative rejection. Focused loop-exit/path tests: 63 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,709, or +33 from the rewrite start. |
 | Phase 3 canonical completed loop exits | Commit `b1d397db` makes the operation kernel own `SymbolicLoopEdgeOperation`, routes guarded while/for/do exits through it, and replaces six loop-kind exit arms with one conditional-loop dispatcher. Normal-condition exits retain the existing inline-assignment lowering. Focused loop-exit/path/kernel tests: 86 passed. Production LOC fell to 107,706, or +30 from the rewrite start. |
 | Phase 3 canonical loop body entry | Commit `a3976e31` replaces the duplicated while/do/for/foreach body-entry switches in the program-point and block walkers with one loop adapter, and routes invariant application through entry/exit loop-edge events. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell below the rewrite start to 107,645, or -31. |
+| Phase 3 unified loop initializer inputs | Commit `0a5cfed5` makes one typed initializer stream own for-loop assignment/declaration discovery, shares bound extraction across for/while/do, and applies initializer-target invalidation as one canonical mutation event. Focused loop/program-point/kernel tests: 167 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,607, or -69 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phase 2 is gated; switch migration is complete, guarded loop exits and
-  loop invariants use canonical edge events, and one adapter owns while/do/for/
-  foreach body entry. Back-edge/fixed-point and initializer work remains.
+  loop invariants use canonical edge events, one adapter owns loop body entry,
+  and one stream owns initializer inputs. CFG back-edge/fixed-point work remains.
 - Last confirmed fact: focused loop/program-point/kernel tests pass 167/167,
   MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
   matches its 256-pass/one-baseline-failure result after loop-entry migration.
-- Next cheapest step: inventory the remaining loop initializer, invalidation,
-  and back-edge/fixed-point policies, then route the first complete family through
-  canonical operations and delete its source-owned state mutation.
+- Next cheapest step: encapsulate the Analyzer CFG worklist, revisit merge, and
+  iteration budget into one bounded fixed-point owner, preserving finally
+  continuation behavior and canonical path-state merging.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
