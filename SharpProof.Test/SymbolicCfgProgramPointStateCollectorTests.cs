@@ -149,6 +149,23 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void BranchLocalTargetWithScalarGuardMutation_RemainsConservativeFallback()
+    {
+        const string source = "static class C { static int M(int value) { if (value < 0) { value = 0; return value; } return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(BranchLocalTargetWithScalarGuardMutation_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().First();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [Test]
     public void BranchLocalTargetWithoutGuardMutation_MatchesStructuralCollector()
     {
         const string source = "static class C { static string? M(string? value) { if (value is null) { var copy = value; return copy; } return value; } }";

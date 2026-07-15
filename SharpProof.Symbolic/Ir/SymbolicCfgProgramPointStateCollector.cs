@@ -87,6 +87,8 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(operation.Syntax, site))
                 {
+                    if (targetIsInsideBranch && currentPath.GuardInvalidated)
+                        return Unsupported(site, "branch-guard-mutation");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
                         targetState = observedState;
@@ -119,6 +121,8 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(block.BranchValue.Syntax, site))
                 {
+                    if (targetIsInsideBranch && currentPath.GuardInvalidated)
+                        return Unsupported(site, "branch-guard-mutation");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
                         targetState = observedState;
