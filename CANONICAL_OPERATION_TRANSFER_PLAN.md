@@ -312,6 +312,7 @@ transfer policy after its slice is complete.
 | Unshipped legacy package script deletion | `c58f50e7` | 105,720 | -1,956 |
 | Unused exception type display format deletion | `3c3cd2d4` | 105,716 | -1,960 |
 | Intentional compilation host boundaries | `4a8cf2fe` | 105,716 | -1,960 |
+| Intentional analyzer distribution closures | `9455928a` | 105,716 | -1,960 |
 
 ## Validation Ledger
 
@@ -412,6 +413,7 @@ transfer policy after its slice is complete.
 | Phase 6 unshipped legacy package script deletion | Commit `c58f50e7` deletes 557 lines of dead packages.config install/uninstall scripts. The package project and every repository consumer omit them, while CI and `AnalyzerPackagingTests` explicitly forbid both `tools/*` entries, so sharing them would have introduced a new payload rather than consolidating live behavior. The Release package build succeeds with zero warnings and the direct package-content fixture passes. The full packaging fixture exposed one stale assertion from the earlier package-manifest migration; separate commit `ac9421e4` now validates the manifest plus wrapper loop, and all 52 fixture cases pass. Production LOC remains 105,720, or -1,956 from the rewrite start; tracked test LOC is 142,575. |
 | Phase 6 unused exception type display format deletion | Commit `3c3cd2d4` removes the stale format-clone finding after exact reference search proved `ExceptionTypeDisplayFormat` had no consumers. The allocation format remains local because it alone controls two serialized allocation evidence fields; extracting a single-use policy would add indirection. Release Analyzer warning-as-error build: zero warnings; allocation, diagnostic-evidence, exception-propagation, and exception-contract fixtures: 431 passed. Production LOC fell to 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 | Phase 6 intentional compilation host boundaries | Commit `4a8cf2fe` removes the compilation-host report item after characterizing the three policies. Symbolic caches by the raw TPA value and falls back to `System.Object`; fuzzing requires TPA, adds the attribute assembly, and de-duplicates paths; analyzer metadata filters existing files and falls back to runtime-directory enumeration. Their only common code is the environment read/split, while a parameterized shared host would add comparable code and merge distinct failure contracts. Symbolic profile/target and metadata identity/source fixtures: 18 passed; standalone profile, fuzz, and source-query fixtures: 118 passed. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
+| Phase 6 intentional analyzer distribution closures | Commit `9455928a` removes follow-up finding 23 after mapping all three observable closures. Source consumers use four project references plus an attribute analyzer path; NuGet ships five SharpProof assemblies, managed/native Z3, a locator, and a lib copy; VSIX uses three project references plus ten Visual Studio runtime support assemblies and transitive project output. A common manifest requires per-consumer metadata for nearly every entry, adds LOC, and relocates rather than unifies transport policy. The current Release package content check and all 52 packaging fixture cases pass. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 
 ## Current Checkpoint
 
@@ -435,12 +437,13 @@ transfer policy after its slice is complete.
   install/uninstall scripts are deleted; CI continues to forbid those payloads.
   The unused exception type-display format is deleted rather than abstracted.
   Symbolic, fuzz, and analyzer compilation hosts remain separate because their
-  cache, fallback, filtering, and failure policies differ.
-- Last confirmed fact: 136 focused compilation-profile, fuzz, metadata, and
-  source-query fixtures pass. Test LOC is 142,575; production LOC is 105,716,
+  cache, fallback, filtering, and failure policies differ. Source-consumer,
+  NuGet, and VSIX distribution closures remain explicit transport boundaries.
+- Last confirmed fact: the current Release package content check and all 52
+  packaging fixture cases pass. Test LOC is 142,575; production LOC is 105,716,
   or -1,960 from the rewrite start.
-- Next cheapest step: adjudicate follow-up finding 23 in `POTENTIAL_DUPS.md`, the
-  analyzer distribution closure across consumer props, NuGet, and VSIX, while
-  preserving each artifact's exact metadata and payload contents.
+- Next cheapest step: implement follow-up finding 24 in `POTENTIAL_DUPS.md`, a
+  shared bounded ProofCore fixed-point driver, while preserving non-ready exits,
+  iteration budgets, collector order, and conservative convergence behavior.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
