@@ -228,12 +228,6 @@ internal static partial class PurityAssignmentStateTransfer
                             initializerValue,
                             context.SemanticModel,
                             context.CancellationToken);
-                        if (!PurityResourceStateFacts.IsUsingResourceDeclarator(declarator))
-                            nextState = PurityResourceStateFacts.AddOwnedDisposableLocalFacts(
-                                nextState,
-                                declaredSymbol,
-                                initializerValue,
-                                context.SemanticModel.Compilation);
                     }
         }
 

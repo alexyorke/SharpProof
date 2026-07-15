@@ -1,7 +1,5 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic.Ir;
 using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
@@ -311,7 +309,7 @@ internal static partial class PurityResourceStateFacts
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
         if (HasReleasedResourceFact(term, nextState)) return nextState;
 
-        nextState = PurityOperationTransferAdapter.ApplyLifetime(
+        return PurityOperationTransferAdapter.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.AcquireDisposable,
@@ -319,17 +317,6 @@ internal static partial class PurityResourceStateFacts
             "analyzer.resource.acquire",
             localSymbol,
             "evidence.resource.acquire");
-        var pathState = nextState.PathState.AddFact(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                term,
-                new SymbolicNullTerm()),
-            valueOperation.Syntax,
-            "analyzer.resource.acquire.not-null",
-            localSymbol,
-            "evidence.resource.acquire.not-null"));
-
-        return nextState.WithPathState(pathState);
     }
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
@@ -360,17 +347,5 @@ internal static partial class PurityResourceStateFacts
         return type.AllInterfaces.Any(static interfaceType =>
             interfaceType.SpecialType == SpecialType.System_IDisposable ||
             interfaceType.ToDisplayString() == "System.IAsyncDisposable");
-    }
-
-    internal static bool IsUsingResourceDeclarator(IVariableDeclaratorOperation declarator)
-    {
-        foreach (var ancestor in declarator.Syntax.AncestorsAndSelf())
-        {
-            if (ancestor is UsingStatementSyntax) return true;
-
-            if (ancestor is LocalDeclarationStatementSyntax { UsingKeyword.RawKind: not 0 }) return true;
-        }
-
-        return false;
     }
 }
