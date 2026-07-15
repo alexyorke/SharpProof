@@ -229,6 +229,7 @@ transfer policy after its slice is complete.
 | Canonical branch assumptions | `d68de6ab` | 107,939 | +263 |
 | Shared guarded branch merging | `2f83046d` | 107,831 | +155 |
 | Canonical switch assignment choices | `63033d31` | 107,829 | +153 |
+| Unified guarded loop break paths | `68417c99` | 107,709 | +33 |
 
 ## Validation Ledger
 
@@ -265,18 +266,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical branch assumptions | Commit `d68de6ab` routes generic Boolean and reference-null assumptions through `SymbolicBranchAssumptionOperation`, replaces branch-state lowering with one condition result, and removes the redundant null-feasibility probes from coalesce and conditional-access analysis. Focused CFG/null/path/operation tests: 105 passed; Release solution build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,939, or +263 from the rewrite start. |
 | Phase 3 shared guarded branch merging | Commit `2f83046d` replaces the separate if/switch common-key, guarded-fact, implication, limit, and truncation builders with one typed guarded-branch merger while preserving distinct if/switch limits and provenance. Focused switch/if/pattern/limit tests: 185 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,831, or +155 from the rewrite start. |
 | Phase 3 canonical switch assignment choices | Commit `63033d31` moves switch-expression assignment choices into canonical assignment lowering, reuses the guarded-choice constructor for statement and expression merging, and deletes the legacy assignment-state switch interpreter. Focused switch/state tests: 153 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,829, or +153 from the rewrite start. |
+| Phase 3 guarded loop break paths | Commit `68417c99` replaces separate direct, nested, and continue-before-break interpreters with one structural enclosing-guard and fallthrough collector while retaining mutation checks and conservative rejection. Focused loop-exit/path tests: 63 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,709, or +33 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; Boolean/reference-null assumptions, guarded switch
-  statement merging, and switch-expression assignment choices now share the
-  canonical branch/event, assignment, and merge mechanics.
-- Last confirmed fact: focused switch/state tests pass 153/153,
+- State: Phase 2 is gated; switch migration is complete, and loop completion
+  now has one structural guarded-break path collector instead of three parallel
+  interpreters. Loop entry/back-edge/exit operations remain to be routed.
+- Last confirmed fact: focused loop-exit/path tests pass 63/63,
   MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
-  matches its 256-pass/one-baseline-failure result after switch migration.
-- Next cheapest step: inventory loop entry, back-edge, exit, and bounded
-  fixed-point transfer owners, then migrate the first complete loop family into
-  canonical loop-edge operations and delete its superseded state mutation.
+  matches its 256-pass/one-baseline-failure result after guarded-break unification.
+- Next cheapest step: make `SymbolicLoopEdgeOperation` own loop entry/exit
+  condition application, route completed while/for/do exits through it, and
+  delete the remaining direct path-condition mutation in that family.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
