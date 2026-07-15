@@ -81,12 +81,14 @@ internal static class SymbolicNormalCompletionStateTransfer
                     cancellationToken))
                 continue;
 
-            SymbolicProgramPointFacts.AddReachabilityCondition(
-                ref state,
+            var transition = SymbolicReachabilityLowerer.Apply(
+                state,
                 argumentSyntax.Expression,
                 !doesNotReturnWhen,
                 semanticModel,
                 cancellationToken);
+            if (transition.IsExact)
+                state = transition.State;
         }
     }
 

@@ -239,9 +239,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Route all-path return/throw completion through terminal CFG paths,
     guarded canonical merging, and `SymbolicCompletionOperation`; require an
     unreachable Roslyn target block before producing the contradictory state.
-  - [ ] Add bounded loop revisits and finally continuations. Execution roots
-    containing loops are rejected up front until loop-carried invalidation and
-    fixed-point convergence migrate together.
+  - [x] Add bounded loop revisits and finally continuations. While, do, and
+    counted-for roots now use typed loop plans, loop-carried invalidation, and a
+    normalized-state worklist; unsupported loop shapes retain the structural
+    fallback.
     - [x] Route direct increment/decrement and compound assignment CFG operations
       through typed computed-update lowering and canonical transitions; reject
       overloads, missing prior values, and unsupported arithmetic.
@@ -261,7 +262,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
     - [x] Key the worklist by block plus typed finally continuation, execute
       ordered finally regions before their saved destination, and keep
       finally-local targets on the structural fallback until capture parity.
-- [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
+- [x] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
   - [x] Replace the 425-line program-point recursive/list/designation pattern
@@ -284,6 +285,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Lower array-size, awaitable, element-in-range, and dereference-success
     completion facts into a typed source plan. Source discovery now returns
     conditions with exact syntax provenance and never mutates state directly.
+  - [x] Route `DoesNotReturnIf`, inline-assignment reachability, pattern-bound
+    reachability, and conditional/coalesce throw guards through typed canonical
+    transitions. Their structural callers now only adopt exact transition
+    states and retain unsupported shapes as conservative fallbacks.
 - [ ] Migrate source queries, invariant/reachability analysis, exception paths,
   and Analyzer purity CFG consumers in behavior-locked vertical slices.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
@@ -430,6 +435,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 bounded counted-for revisits | `f596da0c` | 106,421 | -1,255 |
 | Phase 7 typed finally continuations | `98747716` | 106,528 | -1,148 |
 | Phase 7 canonical pattern binding | `c4adcade` | 106,237 | -1,439 |
+| Phase 7 typed finite-foreach domains | `0ad4ece9` | 106,296 | -1,380 |
+| Phase 7 canonical finite-element discovery | `b31b8fef` | 106,307 | -1,369 |
+| Phase 7 typed loop-bound invariants | `46cf1914` | 106,320 | -1,356 |
+| Phase 7 typed framework postconditions | `deb1813a` | 106,424 | -1,252 |
+| Phase 7 typed source-completion facts | `ae0fa398` | 106,448 | -1,228 |
+| Phase 7 typed reachability and throw guards | pending | 106,643 | -1,033 |
 
 ## Validation Ledger
 
@@ -572,6 +583,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed loop-bound invariants | Commit `46cf1914` replaces loop-bound discovery's temporary `SymbolicState` construction with `SymbolicLoopInvariantPlan`. For/while/do initializer bounds, strict upper bounds, dependency invalidation, and monotonic-update checks now produce typed conditions; both CFG lowering and structural fallback apply them only through canonical loop-edge transitions. Focused loop/lowerer/program-point/operation fixtures pass 186/186; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,320, or -1,356 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed framework postconditions | Commit `deb1813a` introduces `SymbolicFrameworkPostconditionLowerer` as the single owner of parameter-not-null, inferred-not-null, known argument-guard, and member-not-null normal-completion discovery. Statement and expression paths consume ordered typed condition groups through one bulk canonical assumption transition; the legacy direct-state implementations and their shared member helpers are deleted. Focused nullable/program-point/reachability/element/exception fixtures have 293 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,424, or -1,252 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed source-completion facts | Commit `ae0fa398` introduces `SymbolicSourceCompletionLowerer` for explicit array-size non-negativity, awaitable non-null, element in-range, and dereference-receiver non-null discovery. It returns ordered conditions with their original syntax provenance, and `SymbolicNormalCompletionStateTransfer` applies the plan through the bulk canonical assumption transition; the 146-line direct-state discovery block is deleted. Focused program-point/reference/element/expression/async/exception fixtures have 326 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,448, or -1,228 from the rewrite start; test LOC remains 142,831. |
+| Phase 7 typed reachability and throw guards | Pending commit introduces `SymbolicReachabilityLowerer` as the canonical owner of branch assumptions, inline-assignment ordering, and pattern-bound reachability, and routes `DoesNotReturnIf` plus conditional/coalesce throw normal completion through typed transitions. The 227-line program-point reachability interpreter and direct throw-guard state mutation are deleted. Focused reachability, program-point, foreach, throw-expression, and exception fixtures pass 527 cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. The reusable transition scaffold raises production LOC to 106,643, or -1,033 from the rewrite start; test LOC remains 142,831. |
 
 ## Current Checkpoint
 
@@ -652,13 +664,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   their destinations. Pattern binding has one typed canonical owner; the
   425-line program-point interpreter is deleted. Finite-element discovery and
   bounded prior-assignment validation now have one typed owner, and the 231-line
-  legacy discovery block is deleted. Framework normal-completion postconditions
-  and source-derived array/dereference completion facts now have typed owners and
-  enter state through canonical assumptions. Test LOC is 142,831; production LOC
-  is 106,448, or -1,228 from the rewrite start; the 863-line
-  scaffold must be repaid when structural transfer paths are deleted.
-- Next cheapest step: lower `DoesNotReturnIf` and throw-guard normal completion
-  through typed reachability conditions while preserving inline-assignment and
-  pattern-binding provenance, then delete their final direct-state paths.
+  legacy discovery block is deleted. Framework normal-completion postconditions,
+  source-derived array/dereference completion facts, `DoesNotReturnIf`, inline
+  assignments, and throw guards now have typed owners and enter state through
+  canonical transitions. Test LOC is 142,831; production LOC is 106,643, or
+  -1,033 from the rewrite start; the 1,058-line scaffold must be repaid when
+  structural transfer paths are deleted.
+- Next cheapest step: begin the source-query vertical slice by routing supported
+  post-join and loop-independent program points exclusively through the CFG
+  collector, characterize fallback reasons, and delete the superseded ancestor
+  reachability path once no supported query reaches it.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

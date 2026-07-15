@@ -334,82 +334,14 @@ internal static class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        condition = UnwrapExpression(condition);
-        if (mustBeTrue &&
-            condition is BinaryExpressionSyntax andCondition &&
-            andCondition.IsKind(SyntaxKind.LogicalAndExpression))
-        {
-            AddReachabilityCondition(ref state, andCondition.Left, true, semanticModel, cancellationToken);
-            AddReachabilityCondition(ref state, andCondition.Right, true, semanticModel, cancellationToken);
-            return;
-        }
-
-        if (!mustBeTrue &&
-            condition is BinaryExpressionSyntax orCondition &&
-            orCondition.IsKind(SyntaxKind.LogicalOrExpression))
-        {
-            AddReachabilityCondition(ref state, orCondition.Left, false, semanticModel, cancellationToken);
-            AddReachabilityCondition(ref state, orCondition.Right, false, semanticModel, cancellationToken);
-            return;
-        }
-
-        if (TryAddInlineAssignmentReachabilityState(
-                ref state,
-                condition,
-                mustBeTrue,
-                semanticModel,
-                cancellationToken))
-            return;
-
-        if (SymbolicReachabilityService.ApplyBranchFacts(
-                state,
-                condition,
-                mustBeTrue,
-                semanticModel,
-                cancellationToken) is { IsExact: true, Value: { } branchState })
-        {
-            state = branchState;
-            AddBranchPatternBindingStateFacts(
-                ref state,
-                condition,
-                mustBeTrue,
-                semanticModel,
-                cancellationToken);
-            return;
-        }
-
-    }
-
-    private static void AddBranchPatternBindingStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        condition = UnwrapExpression(condition);
-        if (condition is PrefixUnaryExpressionSyntax negation &&
-            negation.IsKind(SyntaxKind.LogicalNotExpression))
-        {
-            AddBranchPatternBindingStateFacts(
-                ref state,
-                negation.Operand,
-                !branchWhenTrue,
-                semanticModel,
-                cancellationToken);
-            return;
-        }
-
-        if (!branchWhenTrue ||
-            condition is not IsPatternExpressionSyntax isPatternExpression)
-            return;
-
-        AddPatternBindingStateFacts(
-            ref state,
-            isPatternExpression.Expression,
-            isPatternExpression.Pattern,
+        var transition = SymbolicReachabilityLowerer.Apply(
+            state,
+            condition,
+            mustBeTrue,
             semanticModel,
             cancellationToken);
+        if (transition.IsExact)
+            state = transition.State;
     }
 
     internal static bool TryAddInlineAssignmentReachabilityState(
@@ -419,157 +351,18 @@ internal static class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (!TryCollectInlineAssignmentBranchState(
+        if (!SymbolicReachabilityLowerer.TryApplyInlineAssignment(
                 state,
                 condition,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                out var branchState))
+                out var transition) ||
+            !transition.IsExact)
             return false;
 
-        state = branchState;
+        state = transition.State;
         return true;
-    }
-
-    private static bool TryCollectInlineAssignmentBranchState(
-        SymbolicState state,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicState branchState)
-    {
-        branchState = state;
-        condition = UnwrapExpression(condition);
-        if (condition is PrefixUnaryExpressionSyntax negation &&
-            negation.IsKind(SyntaxKind.LogicalNotExpression))
-            return TryCollectInlineAssignmentBranchState(
-                state,
-                negation.Operand,
-                !branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                out branchState);
-
-        if (condition is not BinaryExpressionSyntax comparison ||
-            !SymbolicOperatorLowerer.TryGetRelationOperator(
-                comparison.Kind(),
-                out var relationOperator))
-            return false;
-
-        var leftAssignment = UnwrapExpression(comparison.Left) as AssignmentExpressionSyntax;
-        var rightAssignment = UnwrapExpression(comparison.Right) as AssignmentExpressionSyntax;
-        if (leftAssignment is null == rightAssignment is null) return false;
-
-        var assignmentIsLeft = leftAssignment != null;
-        var assignment = assignmentIsLeft ? leftAssignment! : rightAssignment!;
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
-            assignedSymbol is not ILocalSymbol and not IParameterSymbol)
-            return false;
-
-        assignedSymbol = assignedSymbol.OriginalDefinition;
-        var siblingExpression = assignmentIsLeft
-            ? comparison.Right
-            : comparison.Left;
-        if (!assignmentIsLeft &&
-            SymbolMutationFacts.ExpressionReferencesSymbol(
-                siblingExpression,
-                assignedSymbol,
-                semanticModel,
-                cancellationToken))
-            return false;
-
-        if (!TryCreateAssignedValueComparisonTerm(
-                state,
-                assignedSymbol,
-                assignment.Right,
-                semanticModel,
-                cancellationToken,
-                out _) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var assignedTerm))
-            return false;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var siblingLowering = SymbolicSemanticPipeline.LowerTerm(siblingExpression, context);
-        if (siblingLowering is not { IsExact: true, Value: { } siblingTerm }) return false;
-
-        var leftTerm = assignmentIsLeft
-            ? assignedTerm
-            : siblingTerm;
-        var rightTerm = assignmentIsLeft
-            ? siblingTerm
-            : assignedTerm;
-        if (!CanCompareIrTerms(leftTerm, rightTerm)) return false;
-
-        branchState = state;
-        SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
-            ref branchState,
-            assignedSymbol,
-            assignment.Right,
-            semanticModel,
-            cancellationToken,
-            "ir.path.inline-assignment");
-        var branchCondition = (SymbolicCondition)new SymbolicFactCondition(
-            SymbolicFact.Exact(
-                new SymbolicRelationAtom(relationOperator, leftTerm, rightTerm),
-                comparison,
-                "ir.path.inline-assignment.comparison"));
-        if (!branchWhenTrue) branchCondition = new SymbolicNotCondition(branchCondition);
-
-        branchState = branchState.AddPathCondition(branchCondition);
-        return true;
-    }
-
-    private static bool TryCreateAssignedValueComparisonTerm(
-        SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicTerm assignedValueTerm)
-    {
-        assignedValueTerm = null!;
-        var effectiveValueExpression = SymbolicAssignmentStateTransfer
-            .GetThrowGuardedValue(valueExpression)
-            .EffectiveValueExpression;
-        if (SymbolMutationFacts.ExpressionReferencesSymbol(
-                effectiveValueExpression,
-                assignedSymbol,
-                semanticModel,
-                cancellationToken))
-            return SymbolicStateValueFacts.TryGetCurrentValue(
-                       state,
-                       assignedSymbol,
-                       out var previousValueTerm) &&
-                   SymbolicAssignmentStateTransfer.TryCreateSelfReferentialAssignedValueStateTerm(
-                       previousValueTerm,
-                       assignedSymbol,
-                       effectiveValueExpression,
-                       semanticModel,
-                       cancellationToken,
-                       out assignedValueTerm);
-
-        var lowering = SymbolicSemanticPipeline.LowerTerm(
-            effectiveValueExpression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is { IsExact: true, Value: { } loweredAssignedValueTerm })
-        {
-            assignedValueTerm = loweredAssignedValueTerm;
-            return true;
-        }
-
-        if (TryCreateSymbolTerm(assignedSymbol, out var assignedTerm) &&
-            assignedTerm.Kind == SmtValueKind.Reference &&
-            effectiveValueExpression is BinaryExpressionSyntax asExpression &&
-            asExpression.IsKind(SyntaxKind.AsExpression))
-        {
-            assignedValueTerm = assignedTerm;
-            return true;
-        }
-
-        return false;
     }
 
     internal static void AddReferenceNullCondition(

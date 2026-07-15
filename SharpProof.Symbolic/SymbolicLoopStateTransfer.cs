@@ -490,32 +490,15 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken,
         string nonNullProvenance = "ir.path.foreach-entry.throw-guarded-not-null")
     {
-        var throwGuardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(expression);
-        if (!throwGuardedValue.HasGuard) return;
-
-        if (throwGuardedValue.GuardExpression != null)
-        {
-            if (!AnyConditionSymbolInvalidatedInStatement(throwGuardedValue.GuardExpression, guardedStatement, semanticModel,
-                    cancellationToken))
-                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, throwGuardedValue.GuardExpression,
-                    throwGuardedValue.GuardBranchWhenTrue, semanticModel,
-                    cancellationToken);
-        }
-        else if (throwGuardedValue.RequiresNonNullValue &&
-                 !ReferenceIdentityFactIsInvalidatedInStatement(
-                     throwGuardedValue.EffectiveValueExpression,
-                     guardedStatement,
-                     semanticModel,
-                     cancellationToken))
-        {
-            SymbolicProgramPointFacts.AddReferenceNullCondition(
-                ref state,
-                throwGuardedValue.EffectiveValueExpression,
-                false,
-                semanticModel,
-                cancellationToken,
-                nonNullProvenance);
-        }
+        var transition = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
+            state,
+            expression,
+            guardedStatement,
+            semanticModel,
+            cancellationToken,
+            nonNullProvenance);
+        if (transition.IsExact)
+            state = transition.State;
     }
 
     private static void AddForeachLengthPositiveStateFact(

@@ -12,6 +12,68 @@ internal sealed record SymbolicSourceCompletionPlan(
 
 internal static class SymbolicSourceCompletionLowerer
 {
+    internal static SymbolicOperationTransitionResult ApplyThrowGuard(
+        SymbolicState state,
+        ExpressionSyntax expression,
+        StatementSyntax guardedStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string nonNullProvenance)
+    {
+        var guardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(expression);
+        if (!guardedValue.HasGuard)
+            return Exact(state, expression, "no-throw-guard");
+        if (guardedValue.GuardExpression is { } guard)
+            return SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                guard,
+                guardedStatement,
+                semanticModel,
+                cancellationToken)
+                ? Exact(state, guard, "invalidated-guard")
+                : SymbolicReachabilityLowerer.Apply(
+                    state,
+                    guard,
+                    guardedValue.GuardBranchWhenTrue,
+                    semanticModel,
+                    cancellationToken);
+        if (!guardedValue.RequiresNonNullValue ||
+            SymbolicLoopStateTransfer.ReferenceIdentityFactIsInvalidatedInStatement(
+                guardedValue.EffectiveValueExpression,
+                guardedStatement,
+                semanticModel,
+                cancellationToken))
+            return Exact(state, expression, "no-stable-reference");
+        if (NullableFlowFacts.IsDefinitelyNullReferenceValue(
+                guardedValue.EffectiveValueExpression,
+                semanticModel,
+                cancellationToken))
+            return SymbolicOperationTransferKernel.Complete(
+                state,
+                guardedValue.EffectiveValueExpression.Span);
+        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                guardedValue.EffectiveValueExpression,
+                semanticModel,
+                cancellationToken))
+            return Exact(state, expression, "known-non-null");
+
+        var lowering = SymbolicSemanticPipeline.LowerTerm(
+            guardedValue.EffectiveValueExpression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject })
+            return Unsupported(state, expression, "reference");
+        return SymbolicOperationTransferKernel.Assume(
+            state,
+            SymbolicIrLowerer.CreateRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                subject,
+                new SymbolicNullTerm(),
+                guardedValue.EffectiveValueExpression,
+                nonNullProvenance),
+            assumeTrue: true,
+            guardedValue.EffectiveValueExpression.Span,
+            nonNullProvenance);
+    }
+
     internal static SymbolicLoweringResult<SymbolicSourceCompletionPlan> Lower(
         ExpressionSyntax expression,
         StatementSyntax statement,
@@ -159,4 +221,27 @@ internal static class SymbolicSourceCompletionLowerer
         CancellationToken cancellationToken) =>
         semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation
             { TargetMethod.ReducedFrom: not null };
+
+    private static SymbolicOperationTransitionResult Exact(
+        SymbolicState state,
+        SyntaxNode source,
+        string detail) =>
+        SymbolicOperationTransitionResult.Exact(
+            state,
+            ImmutableArray.Create(new SymbolicLoweringProvenance(
+                "source-completion",
+                source.Span,
+                detail)));
+
+    private static SymbolicOperationTransitionResult Unsupported(
+        SymbolicState state,
+        SyntaxNode source,
+        string detail) =>
+        SymbolicOperationTransitionResult.Unsupported(
+            state,
+            SymbolicUnknownReason.UnsupportedIrEncoding,
+            ImmutableArray.Create(new SymbolicLoweringProvenance(
+                "source-completion",
+                source.Span,
+                detail)));
 }
