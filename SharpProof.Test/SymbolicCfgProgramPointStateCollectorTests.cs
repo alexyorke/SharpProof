@@ -129,6 +129,74 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
     }
 
+    [TestCase("static class C { static void M() { int value = 7; value = 9; } }")]
+    [TestCase("static class C { static void M() { int value = 7; value = 9; return; } }")]
+    public void RootBlockCompletion_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(RootBlockCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void NestedBlockCompletion_RemainsConservativeFallback()
+    {
+        const string source =
+            "static class C { static void M(bool condition) { if (condition) { int value = 7; } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NestedBlockCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [TestCase("static class C { static void M() { System.Console.WriteLine(); } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) value = 1; } }")]
+    public void UnsupportedRootBlockCompletion_RemainsConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedRootBlockCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
     [Test]
     public void ConditionalControlFlow_MatchesStructuralCollector()
     {

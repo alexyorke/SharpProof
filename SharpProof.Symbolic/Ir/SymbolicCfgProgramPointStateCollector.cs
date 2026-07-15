@@ -21,6 +21,11 @@ internal static class SymbolicCfgProgramPointStateCollector
             ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(site, "execution-root");
+        var targetIsCompletedRootBlock = includeCurrentStatementCompletionFacts &&
+                                         site is BlockSyntax &&
+                                         ReferenceEquals(site, CSharpSyntaxFacts.GetBlockBody(executionRoot));
+        if (includeCurrentStatementCompletionFacts && site is BlockSyntax && !targetIsCompletedRootBlock)
+            return Unsupported(site, "nested-block-completion");
         if (!UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
             return Unsupported(site, "analysis-limits");
         if (!TryLowerLoopPlans(
@@ -45,6 +50,9 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        if (targetIsCompletedRootBlock &&
+            graph.Blocks.Count(static block => block.Operations.Length != 0 || block.BranchValue != null) != 1)
+            return Unsupported(site, "root-block-control-flow");
 
         var state = initialState ?? new SymbolicState();
         SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
@@ -77,12 +85,17 @@ internal static class SymbolicCfgProgramPointStateCollector
             var block = point.Block;
             var currentPath = MergeIncomingStates(incoming[point], site);
             state = currentPath.State;
+            if (targetIsCompletedRootBlock && block.Kind == BasicBlockKind.Exit)
+            {
+                targetState = state;
+                continue;
+            }
             var foundTarget = false;
             foreach (var operation in block.Operations)
             {
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
                     continue;
-                if (ContainsSite(operation.Syntax, site))
+                if (!targetIsCompletedRootBlock && ContainsSite(operation.Syntax, site))
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
@@ -104,7 +117,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     foundTarget = true;
                     break;
                 }
-                if (operation.Syntax.SpanStart >= site.SpanStart)
+                if (!targetIsCompletedRootBlock && operation.Syntax.SpanStart >= site.SpanStart)
                     return Unsupported(site, "operation-order");
                 if (!TryApplyOperation(
                         ref state,
@@ -126,7 +139,7 @@ internal static class SymbolicCfgProgramPointStateCollector
 
             if (block.BranchValue != null)
             {
-                if (ContainsSite(block.BranchValue.Syntax, site))
+                if (!targetIsCompletedRootBlock && ContainsSite(block.BranchValue.Syntax, site))
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
@@ -154,6 +167,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
+        if (targetIsCompletedRootBlock && queue.Count == 0 && completedPaths.Count != 0)
+            targetState = MergeIncomingStates(completedPaths, site).State;
         targetState ??= guardedTargetState;
         if (targetState == null &&
             queue.Count == 0 &&

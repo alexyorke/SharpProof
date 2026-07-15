@@ -336,6 +336,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     implicit declarator assignment operation and the canonical normal-completion
     conditions. Multi-declarator and throw-guarded initializer shapes retain
     typed structural fallback until their ordered state parity migrates.
+  - [x] Route straight-line root-block current completion through the canonical
+    CFG path state at normal exit or explicit completion. Nested blocks,
+    branching roots, scoped-limit changes, and unsupported operations retain
+    typed structural fallback.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -499,7 +503,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 whole-solution call-graph island deletion | `2edbc902` | 105,292 | -2,384 |
 | Phase 7 canonical current-assignment completion | `3f3efa1f` | 105,285 | -2,391 |
 | Phase 7 canonical explicit-target CFG assignments | `de7c15e5` | 105,301 | -2,375 |
-| Phase 7 canonical declaration completion | This commit | 105,320 | -2,356 |
+| Phase 7 canonical declaration completion | `7242f05e` | 105,320 | -2,356 |
+| Phase 7 canonical straight-line block completion | This commit | 105,335 | -2,341 |
 
 ## Validation Ledger
 
@@ -657,6 +662,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical current-assignment completion | This commit lets assignment-expression and assignment-statement post-state queries use the CFG collector instead of unconditionally selecting the structural interpreter. The collector applies the target operation and its existing normal-completion conditions before observing state; unsupported shapes still return typed fallback. Direct normalized-state and evidence parity passes 22/22, full MainGeneral passes 3,743 with the two documented skips, and full Tooling passes 591/591. The Release developer/test warning-as-error build has zero warnings. Cache ownership is simplified to the actual bounded cache with a record key. Production LOC falls to 105,285, or -2,391 from the rewrite start; test LOC is 142,945. |
 | Phase 7 canonical explicit-target CFG assignments | The execution-root-wide unsupported-target scan is deleted. Current-instance member and element writes lower through the same explicit-target operation owner used by structural transfer, while external member writes and active guarded writes return typed fallback. Roslyn represents an implicit constructor call with the constructor as its syntax and emits no operation for a bare `return;`; skipping that wrapper prevents premature target capture and intentionally retains structural fallback rather than reconstructing semantics from syntax. Direct collector fixtures pass 25/25, the program-point/reachability differential passes 124/124, MainSmtOracle passes 573/573, MainGeneral passes 3,746 with the same two explicit skips, Tooling passes 591/591, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,301, or -2,375 from the rewrite start; test LOC is 143,012. |
 | Phase 7 canonical declaration completion | Roslyn CFG represents a local initializer as an implicit simple assignment whose syntax is the declarator, not as the declaration-group operation returned by `SemanticModel.GetOperation`. Exact single-declarator current completion now consumes that assignment and the shared typed normal-completion lowerers. Multi-declarator and throw-guarded initializer shapes return typed fallback before partial state can escape. Direct collector fixtures pass 28/28, the broader program-point/reachability differential passes 127/127, MainSmtOracle passes 573/573, MainGeneral passes 3,749 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,320, or -2,356 from the rewrite start; test LOC is 143,057. |
+| Phase 7 canonical straight-line block completion | Current completion for a root block no longer observes the first contained operation. Exact straight-line roots consume every supported operation and observe the merged state at the CFG exit; explicit `return;` uses the existing completed-path state. Nested blocks, branching roots, and unsupported invocations return typed fallback before partial state escapes, while non-default scoped limits already select structural transfer. Direct collector fixtures pass 33/33, the broader program-point/reachability differential passes 132/132, MainSmtOracle passes 573/573, MainGeneral passes 3,754 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,335, or -2,341 from the rewrite start; test LOC is 143,116. |
 
 ## Current Checkpoint
 
@@ -760,17 +766,20 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 105,320, or -2,356 from the rewrite start. Assignment-expression current
+  now 105,335, or -2,341 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
   current completion consumes Roslyn's implicit assignment plus the shared
   normal-completion lowerers. External member writes, active guards,
-  multi-declarator and throw-guarded declaration completion, blocks, loop-local
-  targets, finally-local targets, and implicit constructor/bare-return CFG
-  shapes remain conservative structural fallbacks. Test LOC is 143,057.
-- Next cheapest step: characterize current completed-block state at an acyclic
-  block exit, reuse the CFG path merger and completion events when exact, and
-  retain structural fallback for scoped limits or unsupported statements.
+  multi-declarator and throw-guarded declaration completion, nested or branching
+  blocks, loop-local targets, finally-local targets, and implicit
+  constructor/bare-return CFG shapes remain conservative structural fallbacks.
+  Straight-line root blocks now observe the completed CFG path at normal exit or
+  explicit completion instead of stopping at their first contained operation.
+  Test LOC is 143,116.
+- Next cheapest step: characterize multi-declarator current completion, apply
+  each implicit declarator assignment and normal-completion plan in source
+  order, and retain fallback if any declarator is unsupported.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
