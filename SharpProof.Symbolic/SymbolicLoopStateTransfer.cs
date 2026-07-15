@@ -18,8 +18,8 @@ internal static class SymbolicLoopStateTransfer
         out SymbolicTerm bound,
         out IReadOnlyList<ISymbol> boundSymbols);
 
-    private static void AddForLoopBodyInvariantStateFacts(
-        ref SymbolicState state,
+    private static void AddForLoopBodyInvariantConditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -29,8 +29,8 @@ internal static class SymbolicLoopStateTransfer
             semanticModel,
             cancellationToken,
             TryLowerInitializerBoundTerm);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             forStatement,
             forStatement.Statement,
             initializerBounds,
@@ -39,8 +39,8 @@ internal static class SymbolicLoopStateTransfer
             "ir.path.for-loop-invariant.lower-bound",
             semanticModel,
             cancellationToken);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             forStatement,
             forStatement.Statement,
             initializerBounds,
@@ -49,8 +49,8 @@ internal static class SymbolicLoopStateTransfer
             "ir.path.for-loop-invariant.initial-upper-bound",
             semanticModel,
             cancellationToken);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             forStatement,
             forStatement.Statement,
             EnumerateLoopBoundTerms(
@@ -62,8 +62,8 @@ internal static class SymbolicLoopStateTransfer
             cancellationToken);
     }
 
-    private static void AddPreLoopBodyInvariantStateFacts(
-        ref SymbolicState state,
+    private static void AddPreLoopBodyInvariantConditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
         StatementSyntax loopStatement,
         StatementSyntax loopBody,
         string provenancePrefix,
@@ -75,8 +75,8 @@ internal static class SymbolicLoopStateTransfer
             semanticModel,
             cancellationToken,
             TryLowerInitializerBoundTerm);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             loopStatement,
             loopBody,
             initializerBounds,
@@ -85,8 +85,8 @@ internal static class SymbolicLoopStateTransfer
             provenancePrefix + ".lower-bound",
             semanticModel,
             cancellationToken);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             loopStatement,
             loopBody,
             initializerBounds,
@@ -95,8 +95,8 @@ internal static class SymbolicLoopStateTransfer
             provenancePrefix + ".initial-upper-bound",
             semanticModel,
             cancellationToken);
-        AddLoopMonotonicBoundStateFacts(
-            ref state,
+        AddLoopMonotonicBoundConditions(
+            conditions,
             loopStatement,
             loopBody,
             EnumerateLoopBoundTerms(
@@ -108,8 +108,8 @@ internal static class SymbolicLoopStateTransfer
             cancellationToken);
     }
 
-    private static void AddLoopMonotonicBoundStateFacts(
-        ref SymbolicState state,
+    private static void AddLoopMonotonicBoundConditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
         StatementSyntax loopStatement,
         StatementSyntax loopBody,
         IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)> initializers,
@@ -183,13 +183,12 @@ internal static class SymbolicLoopStateTransfer
                 !mutationsPreserveBound)
                 continue;
 
-            AddRelationPathFact(
-                ref state,
+            conditions.Add(SymbolicIrLowerer.CreateRelationCondition(
                 relation,
                 symbolTerm,
                 initializer.Bound,
                 loopStatement,
-                provenance);
+                provenance));
         }
     }
 
@@ -434,7 +433,10 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var condition in CollectLoopBodyInvariantState(loopStatement, semanticModel, cancellationToken).PathConditions)
+        var lowering = LowerLoopBodyInvariants(loopStatement, semanticModel, cancellationToken);
+        if (lowering is not { IsExact: true, Value: { } plan })
+            return;
+        foreach (var condition in plan.Conditions)
             state = SymbolicOperationTransferKernel.TransitionLoopEdge(
                 state,
                 edgeKind,
@@ -641,20 +643,24 @@ internal static class SymbolicLoopStateTransfer
                 "ir.path.for-initializer-entry").State;
     }
 
-    internal static SymbolicState CollectLoopBodyInvariantState(
+    internal static SymbolicLoweringResult<SymbolicLoopInvariantPlan> LowerLoopBodyInvariants(
         StatementSyntax loopStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var state = new SymbolicState();
+        var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         switch (loopStatement)
         {
             case ForStatementSyntax forStatement:
-                AddForLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+                AddForLoopBodyInvariantConditions(
+                    conditions,
+                    forStatement,
+                    semanticModel,
+                    cancellationToken);
                 break;
             case WhileStatementSyntax whileStatement:
-                AddPreLoopBodyInvariantStateFacts(
-                    ref state,
+                AddPreLoopBodyInvariantConditions(
+                    conditions,
                     whileStatement,
                     whileStatement.Statement,
                     "ir.path.while-loop-invariant",
@@ -662,8 +668,8 @@ internal static class SymbolicLoopStateTransfer
                     cancellationToken);
                 break;
             case DoStatementSyntax doStatement:
-                AddPreLoopBodyInvariantStateFacts(
-                    ref state,
+                AddPreLoopBodyInvariantConditions(
+                    conditions,
                     doStatement,
                     doStatement.Statement,
                     "ir.path.do-loop-invariant",
@@ -672,7 +678,9 @@ internal static class SymbolicLoopStateTransfer
                 break;
         }
 
-        return state.Normalize();
+        return SymbolicLoweringResult<SymbolicLoopInvariantPlan>.Exact(
+            new SymbolicLoopInvariantPlan(conditions.ToImmutable()),
+            new SymbolicLoweringProvenance("loop-invariants", loopStatement.Span, "exact"));
     }
 
     internal static SymbolicState CollectCompletedLoopExitInvariantState(

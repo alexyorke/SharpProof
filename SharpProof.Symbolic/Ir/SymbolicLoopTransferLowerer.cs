@@ -11,6 +11,9 @@ internal sealed record SymbolicLoopTransferPlan(
     ImmutableArray<SymbolicInvalidationTarget> BackEdgeInvalidations,
     ImmutableArray<SymbolicCondition> Invariants);
 
+internal sealed record SymbolicLoopInvariantPlan(
+    ImmutableArray<SymbolicCondition> Conditions);
+
 internal static class SymbolicLoopTransferLowerer
 {
     internal static SymbolicLoweringResult<SymbolicLoopTransferPlan> Lower(
@@ -51,16 +54,19 @@ internal static class SymbolicLoopTransferLowerer
                 out var invalidations))
             return Unsupported(loop, "invalidation");
 
-        var invariants = SymbolicLoopStateTransfer
-            .CollectLoopBodyInvariantState(loop, semanticModel, cancellationToken)
-            .PathConditions;
+        var invariantLowering = SymbolicLoopStateTransfer.LowerLoopBodyInvariants(
+            loop,
+            semanticModel,
+            cancellationToken);
+        if (invariantLowering is not { IsExact: true, Value: { } invariantPlan })
+            return Unsupported(loop, "invariants");
         return SymbolicLoweringResult<SymbolicLoopTransferPlan>.Exact(
             new SymbolicLoopTransferPlan(
                 loop,
                 entryCondition,
                 exitCondition,
                 invalidations,
-                invariants),
+                invariantPlan.Conditions),
             Provenance(loop, "exact"));
     }
 
