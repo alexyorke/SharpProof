@@ -3059,13 +3059,30 @@ public class TestClass
     [Test]
     public void UnsupportedTypedProjectionRuntimeHazard_MapsToConservativePublicProofMetadata()
     {
-        var hazard = new SymbolicRuntimeHazard(
-            "Hazards.cs",
-            SymbolicRuntimeHazardKind.DivideByZero,
-            SymbolicRuntimeHazardStatus.Unknown,
+        var operation = SyntaxFactory.ParseExpression("10 / divisor");
+        var subject = new SymbolicVariableTerm("divisor", SmtValueKind.Int);
+        var trigger = new SymbolicFactCondition(new SymbolicFact(
+            new SymbolicTruthAtom(new SymbolicVariableTerm("unsupported#10_22", SmtValueKind.Bool)),
+            true,
+            SymbolicFactConfidence.Unsupported,
             "unsupported_typed_projection",
+            operation.Span,
+            null,
+            "unsupported_typed_projection"));
+        var descriptor = new SymbolicHazardOperation(
+            SymbolicRuntimeHazardKind.DivideByZero,
+            SymbolicExceptionPreconditionKind.DivideByZero,
+            subject,
+            trigger,
+            SymbolicFactConfidence.Unsupported,
             "System.DivideByZeroException",
             "definite_divide_by_zero",
+            new SymbolicOperationOrigin(operation.Span, 0, "unsupported_typed_projection"));
+        var hazard = new SymbolicRuntimeHazard(
+            "Hazards.cs",
+            descriptor,
+            SymbolicRuntimeHazardStatus.Unknown,
+            "unsupported_typed_projection",
             "DivideExpression",
             "10 / divisor",
             10,
