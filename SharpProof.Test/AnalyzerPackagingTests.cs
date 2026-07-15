@@ -2216,19 +2216,26 @@ namespace TestNamespace {
     [Test]
     public void CiWorkflow_ShouldRun_AllTestLanes_AndPackAllNuGetPackages()
     {
-        var workflowPath = Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml");
+        var repositoryRoot = FindRepositoryRoot();
+        var workflowPath = Path.Combine(repositoryRoot, ".github", "workflows", "ci.yml");
         var source = File.ReadAllText(workflowPath);
+        using var manifest = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "scripts", "package-projects.json")));
+        var projects = manifest.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Select(static project => project.GetString())
+            .ToArray();
 
         Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All"));
-        Assert.That(source,
-            Does.Contain(
-                "dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs"));
-        Assert.That(source,
-            Does.Contain(
-                "dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs"));
-        Assert.That(source,
-            Does.Contain(
-                "dotnet pack SharpProof.Symbolic/SharpProof.Symbolic.csproj --configuration Release --no-build --output nupkgs"));
+        Assert.That(projects, Is.EqualTo(new[]
+        {
+            "SharpProof.Package/SharpProof.Package.csproj",
+            "SharpProof.Attributes/SharpProof.Attributes.csproj",
+            "SharpProof.Symbolic/SharpProof.Symbolic.csproj"
+        }));
+        Assert.That(source, Does.Contain("Get-Content scripts/package-projects.json -Raw | ConvertFrom-Json"));
+        Assert.That(source, Does.Contain(
+            "Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs"));
         Assert.That(source, Does.Contain("SharpProof.Attributes package"));
         Assert.That(source, Does.Contain("SharpProof.Symbolic package"));
         Assert.That(source, Does.Contain("SharpProof.Symbolic/PackageBaseline.json"));
