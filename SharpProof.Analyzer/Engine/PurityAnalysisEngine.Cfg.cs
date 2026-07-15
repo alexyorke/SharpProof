@@ -36,54 +36,26 @@ internal partial class PurityAnalysisEngine
         if (cfg == null || cfg.Blocks.IsEmpty) return PurityAnalysisResult.Pure;
 
 
-        var blockStates = new Dictionary<CfgTraversalPoint, PurityAnalysisState>(cfg.Blocks.Length);
-        var exitBlockStates = new Dictionary<CfgTraversalPoint, PurityAnalysisState>(cfg.Blocks.Length);
-        var worklist = new Queue<CfgTraversalPoint>();
-        var inQueue = new HashSet<CfgTraversalPoint>();
-
-        if (cfg.Blocks.Any())
-        {
-            var entryBlock = cfg.Blocks.First();
-
-            var entryPoint = new CfgTraversalPoint(entryBlock, null);
-            blockStates[entryPoint] = CreateInitialRequiresState(
+        var fixedPoint = new CfgFixedPointWorklist(cfg.Blocks.Length * 200);
+        fixedPoint.Seed(
+            new CfgTraversalPoint(cfg.Blocks.First(), null),
+            CreateInitialRequiresState(
                 containingMethodSymbol,
                 bodyNode,
                 semanticModel,
                 context.AttributePolicy,
-                cancellationToken);
-            worklist.Enqueue(entryPoint);
-            inQueue.Add(entryPoint);
-        }
-        else
+                cancellationToken));
+
+        while (fixedPoint.TryDequeue(out var currentPoint, out var stateBefore))
         {
-            return PurityAnalysisResult.Pure;
-        }
-
-
-        var loopIterations = 0;
-
-        while (worklist.Count > 0 && loopIterations < cfg.Blocks.Length * 200)
-        {
-            loopIterations++;
-
-            var currentPoint = worklist.Dequeue();
-            inQueue.Remove(currentPoint);
             var currentBlock = currentPoint.Block;
-
-            if (!blockStates.TryGetValue(currentPoint, out var stateBefore))
-            {
-                stateBefore = PurityAnalysisState.Pure;
-                blockStates[currentPoint] = stateBefore;
-            }
-
 
             var stateAfter = ApplyTransferFunction(
                 currentBlock,
                 stateBefore,
                 context);
 
-            exitBlockStates[currentPoint] = stateAfter;
+            fixedPoint.RecordExit(currentPoint, stateAfter);
 
 
             if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken,
@@ -105,9 +77,7 @@ internal partial class PurityAnalysisEngine
                         currentBlock.BranchValue,
                         takenState,
                         cfg,
-                        blockStates,
-                        worklist,
-                        inQueue);
+                        fixedPoint);
             }
             else
             {
@@ -121,9 +91,7 @@ internal partial class PurityAnalysisEngine
                         currentBlock.BranchValue,
                         conditionalState,
                         cfg,
-                        blockStates,
-                        worklist,
-                        inQueue);
+                        fixedPoint);
 
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         !trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var fallThroughState))
@@ -133,15 +101,13 @@ internal partial class PurityAnalysisEngine
                         currentBlock.BranchValue,
                         fallThroughState,
                         cfg,
-                        blockStates,
-                        worklist,
-                        inQueue);
+                        fixedPoint);
             }
         }
 
-        if (worklist.Count != 0) return PurityAnalysisResult.Impure(bodyNode);
+        if (fixedPoint.HasPendingWork) return PurityAnalysisResult.Impure(bodyNode);
 
-        var normalExitStates = exitBlockStates
+        var normalExitStates = fixedPoint.ExitStates
             .Where(pair => pair.Key.Block.Kind == BasicBlockKind.Exit)
             .Select(static pair => pair.Value)
             .ToArray();
@@ -150,7 +116,7 @@ internal partial class PurityAnalysisEngine
 
         var finalResult = PurityAnalysisResult.Pure;
 
-        foreach (var exitState in exitBlockStates.Values)
+        foreach (var exitState in fixedPoint.ExitStates.Values)
             if (exitState.HasPotentialImpurity)
             {
                 finalResult = exitState.FirstImpureSyntaxNode != null

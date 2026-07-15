@@ -167,9 +167,7 @@ internal partial class PurityAnalysisEngine
         IOperation? branchValue,
         PurityAnalysisState newState,
         ControlFlowGraph cfg,
-        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
-        Queue<CfgTraversalPoint> worklist,
-        HashSet<CfgTraversalPoint> inQueue)
+        CfgFixedPointWorklist fixedPoint)
     {
         if (branch == null) return;
 
@@ -183,25 +181,19 @@ internal partial class PurityAnalysisEngine
                 0,
                 branch.Destination,
                 activeContinuation);
-            PropagateToSuccessor(
+            fixedPoint.Propagate(
                 new CfgTraversalPoint(
                     cfg.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal],
                     continuation),
-                newState,
-                blockStates,
-                worklist,
-                inQueue);
+                newState);
             return;
         }
 
         if (branch.Destination != null)
         {
-            PropagateToSuccessor(
+            fixedPoint.Propagate(
                 new CfgTraversalPoint(branch.Destination, activeContinuation),
-                newState,
-                blockStates,
-                worklist,
-                inQueue);
+                newState);
             return;
         }
 
@@ -209,18 +201,14 @@ internal partial class PurityAnalysisEngine
             activeContinuation,
             newState,
             cfg,
-            blockStates,
-            worklist,
-            inQueue);
+            fixedPoint);
     }
 
     private static void CompleteFinallyContinuation(
         CfgFinallyContinuation? continuation,
         PurityAnalysisState state,
         ControlFlowGraph cfg,
-        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
-        Queue<CfgTraversalPoint> worklist,
-        HashSet<CfgTraversalPoint> inQueue)
+        CfgFixedPointWorklist fixedPoint)
     {
         if (continuation == null) return;
 
@@ -228,25 +216,19 @@ internal partial class PurityAnalysisEngine
         if (nextRegionIndex < continuation.Regions.Length)
         {
             var nextContinuation = continuation with { RegionIndex = nextRegionIndex };
-            PropagateToSuccessor(
+            fixedPoint.Propagate(
                 new CfgTraversalPoint(
                     cfg.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal],
                     nextContinuation),
-                state,
-                blockStates,
-                worklist,
-                inQueue);
+                state);
             return;
         }
 
         if (continuation.Destination != null)
         {
-            PropagateToSuccessor(
+            fixedPoint.Propagate(
                 new CfgTraversalPoint(continuation.Destination, continuation.Parent),
-                state,
-                blockStates,
-                worklist,
-                inQueue);
+                state);
             return;
         }
 
@@ -254,37 +236,56 @@ internal partial class PurityAnalysisEngine
             continuation.Parent,
             state,
             cfg,
-            blockStates,
-            worklist,
-            inQueue);
+            fixedPoint);
     }
 
-    private static void PropagateToSuccessor(
-        CfgTraversalPoint successor,
-        PurityAnalysisState newState,
-        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
-        Queue<CfgTraversalPoint> worklist,
-        HashSet<CfgTraversalPoint> inQueue)
+    private sealed class CfgFixedPointWorklist(int iterationLimit)
     {
-        var previouslyVisited = blockStates.TryGetValue(successor, out var existingState);
-        if (!previouslyVisited) existingState = PurityAnalysisState.Pure;
+        private readonly Dictionary<CfgTraversalPoint, PurityAnalysisState> _states = new();
+        private readonly Queue<CfgTraversalPoint> _queue = new();
+        private readonly HashSet<CfgTraversalPoint> _queued = new();
+        private int _iterations;
 
+        internal Dictionary<CfgTraversalPoint, PurityAnalysisState> ExitStates { get; } = new();
+        internal bool HasPendingWork => _queue.Count != 0;
 
-        var mergedState = previouslyVisited
-            ? PurityAnalysisStateMerger.MergeStates(existingState, newState, successor.Block.Ordinal)
-            : newState;
-
-
-        var stateChanged = !previouslyVisited || !mergedState.Equals(existingState);
-
-
-        if (!stateChanged) return;
-
-        blockStates[successor] = mergedState;
-        if (!inQueue.Contains(successor))
+        internal void Seed(CfgTraversalPoint point, PurityAnalysisState state)
         {
-            worklist.Enqueue(successor);
-            inQueue.Add(successor);
+            _states[point] = state;
+            _queue.Enqueue(point);
+            _queued.Add(point);
+        }
+
+        internal bool TryDequeue(out CfgTraversalPoint point, out PurityAnalysisState state)
+        {
+            if (_queue.Count == 0 || _iterations >= iterationLimit)
+            {
+                point = default;
+                state = default;
+                return false;
+            }
+
+            _iterations++;
+            point = _queue.Dequeue();
+            _queued.Remove(point);
+            state = _states.TryGetValue(point, out var existing) ? existing : PurityAnalysisState.Pure;
+            _states[point] = state;
+            return true;
+        }
+
+        internal void RecordExit(CfgTraversalPoint point, PurityAnalysisState state) =>
+            ExitStates[point] = state;
+
+        internal void Propagate(CfgTraversalPoint successor, PurityAnalysisState newState)
+        {
+            var visited = _states.TryGetValue(successor, out var existingState);
+            var mergedState = visited
+                ? PurityAnalysisStateMerger.MergeStates(existingState!, newState, successor.Block.Ordinal)
+                : newState;
+            if (visited && mergedState.Equals(existingState)) return;
+
+            _states[successor] = mergedState;
+            if (_queued.Add(successor)) _queue.Enqueue(successor);
         }
     }
 
