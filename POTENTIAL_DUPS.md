@@ -10,9 +10,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Tooling and build scripts
 
-19. **Repository-relative path conversion and production-source discovery** - `scripts/Get-SharpProofProductionMetrics.ps1:40-52,97-109`; `scripts/Get-SharpProofRawSmtHotspots.ps1:23-35`; `scripts/Get-SharpProofCloneInventory.ps1:31-61`
-    Path containment conversion and source exclusion policy are reimplemented across audit scripts, with the clone inventory missing one containment guard. Share strict conversion plus discovery policy to keep audit scope and safety consistent.
-
 20. **Line-scanning collectors** - `scripts/Get-SharpProofRawSmtHotspots.ps1:123-182,231-292,354-423`
     Six functions enumerate source files, read lines with a counter, and emit path/line/text records; only roots and matching predicates differ. Extract a generic source-line scanner with predicates/needles.
 

@@ -33,23 +33,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProofSourceInventory.ps1')
 $architectureManifestPath = Join-Path $PSScriptRoot 'architecture-modules.json'
 $architecture = Get-Content -LiteralPath $architectureManifestPath -Raw | ConvertFrom-Json
 $moduleRules = @($architecture.modules)
-
-function Convert-ToRepoPath
-{
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $repoPrefix = $repoRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
-    if (-not $fullPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase))
-    {
-        throw "Path is outside the repository root: $fullPath"
-    }
-
-    return $fullPath.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
-}
 
 function Get-ModuleMatches
 {
@@ -94,18 +81,9 @@ function Get-PartialTypeNames
 Push-Location $repoRoot
 try
 {
-    $files = Get-ChildItem -Path $repoRoot -Recurse -Filter '*.cs' |
-        Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-             $repoPath -notmatch '(^|/)(bin|obj)/' -and
-             $repoPath -notmatch '^artifacts/' -and
-             $repoPath -notmatch '^docs/readme-examples/' -and
-             $repoPath -notmatch '(^|/)\.[^/]+/' -and
-             $repoPath -notmatch '^SharpProof\.(Test|ToolingTest)/' -and
-             $repoPath -notmatch '^SharpProof\.(Demo|Smoke\.Net472)/'
-        } |
+    $files = Get-SharpProofProductionSourceFiles -RepositoryRoot $repoRoot |
         ForEach-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath = $_.RepoPath
             $source = Get-Content -LiteralPath $_.FullName -Raw
             $moduleMatches = @(Get-ModuleMatches $repoPath)
             $module = if ($moduleMatches.Count -eq 1) { [string]$moduleMatches[0].name }
@@ -182,14 +160,14 @@ try
     $dependencyViolations = @()
     $projectFiles = Get-ChildItem -Path $repoRoot -Recurse -Filter '*.csproj' |
         Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath = ConvertTo-SharpProofRepoPath -RepositoryRoot $repoRoot -Path $_.FullName
             $repoPath -notmatch '(^|/)(bin|obj)/' -and
             $repoPath -notmatch '(^|/)\.[^/]+/' -and
             $repoPath -notmatch '^SharpProof\.(Test|ToolingTest|Demo|Smoke\.Net472)/'
         }
     foreach ($projectFile in $projectFiles)
     {
-        $projectPath = Convert-ToRepoPath $projectFile.FullName
+        $projectPath = ConvertTo-SharpProofRepoPath -RepositoryRoot $repoRoot -Path $projectFile.FullName
         $sourceMatches = @(Get-ModuleMatches $projectPath)
         if ($sourceMatches.Count -ne 1) { continue }
 
@@ -203,7 +181,7 @@ try
 
             $targetFullPath = [System.IO.Path]::GetFullPath(
                 (Join-Path $projectFile.DirectoryName $referencePath))
-            $targetPath = Convert-ToRepoPath $targetFullPath
+            $targetPath = ConvertTo-SharpProofRepoPath -RepositoryRoot $repoRoot -Path $targetFullPath
             $targetMatches = @(Get-ModuleMatches $targetPath)
             if ($targetMatches.Count -ne 1)
             {
@@ -235,7 +213,9 @@ try
 
     $report = [ordered]@{
         schemaVersion = 4
-        architectureManifest = Convert-ToRepoPath $architectureManifestPath
+        architectureManifest = ConvertTo-SharpProofRepoPath `
+            -RepositoryRoot $repoRoot `
+            -Path $architectureManifestPath
         totalFiles = [int]$files.Count
         totalLines = [int](($files | Measure-Object lines -Sum).Sum)
         handwrittenFiles = [int]$handwrittenFiles.Count

@@ -148,15 +148,22 @@ public sealed class ScriptProcessOwnershipTests
     public void RepositoryScriptsValidatePathsAndAggregateCompatibleSchemas()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
+        var inventorySource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "SharpProofSourceInventory.ps1"));
+        Assert.That(inventorySource, Does.Contain("Path is outside the repository root"));
+        Assert.That(inventorySource, Does.Contain("StartsWith($rootPrefix"));
         foreach (var scriptName in new[]
                  {
                      "Get-SharpProofRawSmtHotspots.ps1",
-                     "Get-SharpProofProductionMetrics.ps1"
+                     "Get-SharpProofProductionMetrics.ps1",
+                     "Get-SharpProofCloneInventory.ps1"
                  })
         {
             var source = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", scriptName));
-            Assert.That(source, Does.Contain("Path is outside the repository root"), scriptName);
-            Assert.That(source, Does.Contain("StartsWith($repoPrefix"), scriptName);
+            Assert.That(source, Does.Contain("SharpProofSourceInventory.ps1"), scriptName);
+            Assert.That(source, Does.Not.Contain("function Convert-ToRepoPath"), scriptName);
         }
 
         var dotnetWrapper = File.ReadAllText(Path.Combine(

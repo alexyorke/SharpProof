@@ -19,19 +19,15 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProofSourceInventory.ps1')
 
-function Convert-ToRepoPath
+function Get-ProductionSourceFiles
 {
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param([Parameter(Mandatory = $true)][string]$RelativeRoot)
 
-    $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $repoPrefix = $repoRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
-    if (-not $fullPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase))
-    {
-        throw "Path is outside the repository root: $fullPath"
-    }
-
-    return $fullPath.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+    return Get-SharpProofProductionSourceFiles `
+        -RepositoryRoot $repoRoot `
+        -SearchRoot (Join-Path $repoRoot $RelativeRoot)
 }
 
 $categories = @(
@@ -64,12 +60,7 @@ $categories = @(
 
 function Get-AnalyzerHotspots
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Analyzer') -Recurse -Filter '*.cs' |
-        Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/'
-        } |
-        Sort-Object FullName
+    $files = Get-ProductionSourceFiles 'SharpProof.Analyzer'
 
     $hotspots = @()
     foreach ($file in $files)
@@ -107,7 +98,7 @@ function Get-AnalyzerHotspots
         if ($matchCount -gt 0)
         {
             $hotspots += [pscustomobject]@{
-                path = Convert-ToRepoPath $file.FullName
+                path = $file.RepoPath
                 matchCount = $matchCount
                 categories = @($matchedCategories)
             }
@@ -122,12 +113,7 @@ function Get-AnalyzerHotspots
 
 function Get-AnalyzerTranslatorShimUsage
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Analyzer') -Recurse -Filter '*.cs' |
-        Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/'
-        } |
-        Sort-Object FullName
+    $files = Get-ProductionSourceFiles 'SharpProof.Analyzer'
 
     $usages = @()
     foreach ($file in $files)
@@ -139,7 +125,7 @@ function Get-AnalyzerTranslatorShimUsage
             if ($line.IndexOf('CSharpSmtFormulaTranslator.', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $usages += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     text = $line.Trim()
                 }
@@ -152,12 +138,7 @@ function Get-AnalyzerTranslatorShimUsage
 
 function Get-SymbolicPublicFormulaSurfaces
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic') -Recurse -Filter '*.cs' |
-        Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/'
-        } |
-        Sort-Object FullName
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic'
 
     $surfaces = @()
     foreach ($file in $files)
@@ -170,7 +151,7 @@ function Get-SymbolicPublicFormulaSurfaces
                 $line.IndexOf('SmtFormula', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $surfaces += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     text = $line.Trim()
                 }
@@ -183,13 +164,10 @@ function Get-SymbolicPublicFormulaSurfaces
 
 function Get-SymbolicCompatibilitySurfaces
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic') -Recurse -Filter '*.cs' |
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic' |
         Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/' -and
-                $repoPath -notmatch '^SharpProof\.Symbolic/Ir/'
-        } |
-        Sort-Object FullName
+            $_.RepoPath -notmatch '^SharpProof\.Symbolic/Ir/'
+        }
 
     $patterns = @(
         [pscustomobject]@{
@@ -215,7 +193,7 @@ function Get-SymbolicCompatibilitySurfaces
                 if ($line -match $pattern.regex)
                 {
                     $surfaces += [pscustomobject]@{
-                        path = Convert-ToRepoPath $file.FullName
+                        path = $file.RepoPath
                         line = $lineNumber
                         category = $pattern.category
                         text = $line.Trim()
@@ -230,14 +208,11 @@ function Get-SymbolicCompatibilitySurfaces
 
 function Get-SymbolicDirectTranslatorUsage
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic') -Recurse -Filter '*.cs' |
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic' |
         Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/' -and
-                $repoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpConditionToFormula' -and
-                $repoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
-        } |
-        Sort-Object FullName
+            $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpConditionToFormula' -and
+                $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
+        }
 
     $usages = @()
     foreach ($file in $files)
@@ -249,7 +224,7 @@ function Get-SymbolicDirectTranslatorUsage
             if ($line.IndexOf('CSharpConditionToFormula.', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $usages += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     text = $line.Trim()
                 }
@@ -262,14 +237,11 @@ function Get-SymbolicDirectTranslatorUsage
 
 function Get-SymbolicTranslatorShimUsage
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic') -Recurse -Filter '*.cs' |
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic' |
         Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/' -and
-                $repoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpConditionToFormula' -and
-                $repoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
-        } |
-        Sort-Object FullName
+            $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpConditionToFormula' -and
+                $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
+        }
 
     $usages = @()
     foreach ($file in $files)
@@ -281,7 +253,7 @@ function Get-SymbolicTranslatorShimUsage
             if ($line.IndexOf('CSharpSmtFormulaTranslator.', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $usages += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     text = $line.Trim()
                 }
@@ -353,12 +325,7 @@ function Get-SymbolicTranslatorShimFamilies
 
 function Get-IrKnownApiLoweringLocations
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic\Ir') -Recurse -Filter '*.cs' |
-        Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/'
-        } |
-        Sort-Object FullName
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic\Ir'
 
     $locations = @()
     foreach ($file in $files)
@@ -377,7 +344,7 @@ function Get-IrKnownApiLoweringLocations
             if ($descriptorKind)
             {
                 $locations += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     kind = $descriptorKind
                     text = $line.Trim()
@@ -391,14 +358,11 @@ function Get-IrKnownApiLoweringLocations
 
 function Get-RuntimeHazardFormulaFallbackLocations
 {
-    $files = Get-ChildItem -Path (Join-Path $repoRoot 'SharpProof.Symbolic') -Recurse -Filter '*.cs' |
+    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic' |
         Where-Object {
-            $repoPath = Convert-ToRepoPath $_.FullName
-            $repoPath -notmatch '(^|/)(bin|obj)/' -and
-                ($repoPath -match '^SharpProof\.Symbolic/SymbolicRuntimeHazard' -or
-                    $repoPath -eq 'SharpProof.Symbolic/SymbolicReachabilityService.cs')
-        } |
-        Sort-Object FullName
+            $_.RepoPath -match '^SharpProof\.Symbolic/SymbolicRuntimeHazard' -or
+                $_.RepoPath -eq 'SharpProof.Symbolic/SymbolicReachabilityService.cs'
+        }
 
     $locations = @()
     foreach ($file in $files)
@@ -411,7 +375,7 @@ function Get-RuntimeHazardFormulaFallbackLocations
                 $line.IndexOf('formula-fallback', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $locations += [pscustomobject]@{
-                    path = Convert-ToRepoPath $file.FullName
+                    path = $file.RepoPath
                     line = $lineNumber
                     text = $line.Trim()
                 }

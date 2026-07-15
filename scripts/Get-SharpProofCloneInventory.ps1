@@ -27,28 +27,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-
-function Convert-ToRepoPath
-{
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $fullPath = [IO.Path]::GetFullPath($Path)
-    $repoPath = $fullPath.Substring($repoRoot.Length).TrimStart('\', '/')
-    return $repoPath.Replace('\', '/')
-}
-
-function Test-IsProductionSource
-{
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $repoPath = Convert-ToRepoPath $Path
-    return $repoPath -notmatch '(^|/)(bin|obj)/' -and
-        $repoPath -notmatch '^artifacts/' -and
-        $repoPath -notmatch '^docs/readme-examples/' -and
-        $repoPath -notmatch '(^|/)\.[^/]+/' -and
-        $repoPath -notmatch '^SharpProof\.(Test|ToolingTest)/' -and
-        $repoPath -notmatch '^SharpProof\.(Demo|Smoke\.Net472)/'
-}
+. (Join-Path $PSScriptRoot 'SharpProofSourceInventory.ps1')
 
 function Test-IsGeneratedSource
 {
@@ -80,8 +59,7 @@ function Convert-ToSignificantLine
 
 $windows = [Collections.Generic.Dictionary[string, Collections.Generic.List[object]]]::new(
     [StringComparer]::Ordinal)
-$files = Get-ChildItem -LiteralPath $repoRoot -Recurse -Filter '*.cs' |
-    Where-Object { Test-IsProductionSource $_.FullName }
+$files = Get-SharpProofProductionSourceFiles -RepositoryRoot $repoRoot
 
 foreach ($file in $files)
 {
@@ -118,7 +96,7 @@ foreach ($file in $files)
             $windows.Add($key, $locations)
         }
         $locations.Add([pscustomobject]@{
-            path = Convert-ToRepoPath $file.FullName
+            path = $file.RepoPath
             startLine = $slice[0].number
             endLine = $slice[-1].number
         })
@@ -222,7 +200,9 @@ if ($Json)
         totalCloneCount = $allClones.Count
         cloneCount = $clones.Count
         clones = $clones
-        adjudicationManifest = Convert-ToRepoPath $adjudicationManifestPath
+        adjudicationManifest = ConvertTo-SharpProofRepoPath `
+            -RepositoryRoot $repoRoot `
+            -Path $adjudicationManifestPath
         adjudicationApplied = $adjudicationApplied
         cloneSetCount = $detectedCloneSets.Count
         adjudicatedCloneSetCount = $adjudicatedCloneSetCount
