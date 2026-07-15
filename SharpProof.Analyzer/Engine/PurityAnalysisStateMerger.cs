@@ -12,16 +12,6 @@ namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityAnalysisStateMerger
 {
-    private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersionsAcrossAll(
-        IEnumerable<ImmutableDictionary<ISymbol, int>> maps,
-        int phiScope)
-    {
-        return AggregateAcrossAll(
-            maps,
-            ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default),
-            (first, second) => MergeSmtSymbolVersions(first, second, phiScope));
-    }
-
     internal static PurityAnalysisState MergeStates(
         PurityAnalysisState state1,
         PurityAnalysisState state2,
@@ -35,8 +25,8 @@ internal static class PurityAnalysisStateMerger
         int phiScope)
     {
         var (firstImpureNode, firstImpurityEvidence) = SelectFirstImpurity(states);
-        var mergedSmtSymbolVersions = MergeSmtSymbolVersionsAcrossAll(
-            states.Select(static state => state.SmtSymbolVersions),
+        var mergedSmtSymbolVersions = SymbolicStateValueFacts.MergeSymbolVersions(
+            states.Select(static state => state.PathState),
             phiScope);
         return new PurityAnalysisState(
             states.Any(static state => state.HasPotentialImpurity),
@@ -48,7 +38,6 @@ internal static class PurityAnalysisStateMerger
             IntersectOwnedLocalArraySymbolsAcrossAll(states.Select(static state => state.DefinitelyNullLocalSymbols)),
             firstImpurityEvidence,
             IntersectLocalConcreteTypesAcrossAll(states.Select(static state => state.LocalConcreteTypes)),
-            mergedSmtSymbolVersions,
             IntersectFlowCaptureConcreteTypesAcrossAll(states.Select(static state => state.FlowCaptureConcreteTypes)),
             MergePathStatesAcrossAll(states, mergedSmtSymbolVersions),
             IntersectFlowCaptureSymbolsAcrossAll(states.Select(static state => state.FlowCaptureSymbols)),
@@ -79,7 +68,7 @@ internal static class PurityAnalysisStateMerger
 
     private static SymbolicState MergePathStatesAcrossAll(
         IReadOnlyList<PurityAnalysisState> states,
-        ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
+        ImmutableDictionary<string, int> mergedSmtSymbolVersions)
     {
         if (states.Count == 0) return new SymbolicState();
 
@@ -95,28 +84,14 @@ internal static class PurityAnalysisStateMerger
 
         var commonConditions = SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates);
         commonFacts = MergeResourceStateFacts(commonFacts, normalizedStates);
-        return new SymbolicState(commonFacts, commonConditions);
+        return new SymbolicState(commonFacts, commonConditions, mergedSmtSymbolVersions);
     }
 
     private static SymbolicState NormalizePathStateForMergedState(
         SymbolicState pathState,
-        ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
+        ImmutableDictionary<string, int> mergedSmtSymbolVersions)
     {
-        if (mergedSmtSymbolVersions.Count == 0) return pathState;
-
-        var targetVersions = mergedSmtSymbolVersions
-            .Select(pair => new KeyValuePair<string, int>(
-                SymbolicFactFactory.GetSmtVariableName(pair.Key.OriginalDefinition),
-                pair.Value))
-            .ToImmutableDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value,
-                StringComparer.Ordinal);
-        var facts = pathState.Facts
-            .Select(fact => SymbolicIrVersionRewriter.RewriteToCurrentVersions(fact, targetVersions));
-        var conditions = pathState.PathConditions
-            .Select(condition => SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, targetVersions));
-        return new SymbolicState(facts, conditions);
+        return SymbolicStateValueFacts.RewriteToVersions(pathState, mergedSmtSymbolVersions);
     }
 
     private static ImmutableArray<SymbolicFact> IntersectSymbolicFacts(
@@ -438,29 +413,6 @@ internal static class PurityAnalysisStateMerger
             second,
             SymbolEqualityComparer.Default,
             static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
-    }
-
-    private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersions(
-        ImmutableDictionary<ISymbol, int> first,
-        ImmutableDictionary<ISymbol, int> second,
-        int phiScope)
-    {
-        var symbols = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
-        symbols.UnionWith(first.Keys);
-        symbols.UnionWith(second.Keys);
-
-        var result = ImmutableDictionary.CreateBuilder<ISymbol, int>(SymbolEqualityComparer.Default);
-        foreach (var symbol in symbols)
-        {
-            var original = symbol.OriginalDefinition;
-            var firstVersion = first.TryGetValue(original, out var left) ? left : 0;
-            var secondVersion = second.TryGetValue(original, out var right) ? right : 0;
-            result[original] = firstVersion == secondVersion
-                ? firstVersion
-                : checked(phiScope * 2 + 1);
-        }
-
-        return result.ToImmutable();
     }
 
     private static ImmutableDictionary<ISymbol, INamedTypeSymbol> IntersectLocalConcreteTypesAcrossAll(

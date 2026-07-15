@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
@@ -12,6 +13,69 @@ internal static class SymbolicStateValueFacts
     {
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
         return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
+    }
+
+    internal static int GetSymbolVersion(SymbolicState state, ISymbol symbol)
+    {
+        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+        return state.SymbolVersions.TryGetValue(symbolName, out var version) ? version : 0;
+    }
+
+    internal static SymbolicState WithDefinitionVersion(
+        SymbolicState state,
+        ISymbol symbol,
+        SyntaxNode definitionSyntax)
+    {
+        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+        var spanStart = Math.Max(0, definitionSyntax.SpanStart);
+        // Definition versions are even; CFG join (phi) versions are odd. The syntax position
+        // makes reprocessing the same block idempotent, including loop backedges.
+        var nextVersion = spanStart <= (int.MaxValue - 2) / 2
+            ? (spanStart + 1) * 2
+            : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
+        return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName)
+            .WithSymbolVersion(symbolName, nextVersion);
+    }
+
+    internal static ImmutableDictionary<string, int> MergeSymbolVersions(
+        IEnumerable<SymbolicState> states,
+        int phiScope)
+    {
+        var stateArray = states as SymbolicState[] ?? states.ToArray();
+        if (stateArray.Length == 0)
+            return ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+
+        var symbolNames = stateArray
+            .SelectMany(static state => state.SymbolVersions.Keys)
+            .Distinct(StringComparer.Ordinal);
+        var result = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+        foreach (var symbolName in symbolNames)
+        {
+            var firstVersion = GetVersion(stateArray[0], symbolName);
+            result[symbolName] = stateArray.Skip(1).All(state => GetVersion(state, symbolName) == firstVersion)
+                ? firstVersion
+                : checked(phiScope * 2 + 1);
+        }
+
+        return result.ToImmutable();
+    }
+
+    internal static SymbolicState RewriteToVersions(
+        SymbolicState state,
+        ImmutableDictionary<string, int> targetVersions)
+    {
+        if (targetVersions.Count == 0) return state;
+
+        return new SymbolicState(
+            state.Facts.Select(fact => SymbolicIrVersionRewriter.RewriteToCurrentVersions(fact, targetVersions)),
+            state.PathConditions.Select(condition =>
+                SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, targetVersions)),
+            targetVersions);
+    }
+
+    private static int GetVersion(SymbolicState state, string symbolName)
+    {
+        return state.SymbolVersions.TryGetValue(symbolName, out var version) ? version : 0;
     }
 
     internal static SymbolicState RemoveImplicitThisMemberReferences(SymbolicState state, string memberName)
