@@ -53,6 +53,13 @@ internal static class SymbolicStateValueFacts
         return TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
     }
 
+    internal static bool IsKnownNullReference(SymbolicState state, SymbolicTerm reference)
+    {
+        return reference is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } variable &&
+               TryGetKnownBooleanState(state, variable.Name, TryGetReferenceNullFactState, out var isNull) &&
+               isNull;
+    }
+
     internal static bool IsKnownNullableHasValue(SymbolicState state, ISymbol symbol)
     {
         return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
@@ -114,8 +121,17 @@ internal static class SymbolicStateValueFacts
         TryGetBooleanFactState tryGetFactState,
         out bool value)
     {
-        value = false;
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+        return TryGetKnownBooleanState(state, symbolName, tryGetFactState, out value);
+    }
+
+    private static bool TryGetKnownBooleanState(
+        SymbolicState state,
+        string symbolName,
+        TryGetBooleanFactState tryGetFactState,
+        out bool value)
+    {
+        value = false;
         for (var index = state.PathConditions.Length - 1; index >= 0; index--)
             if (TryGetKnownBooleanState(state.PathConditions[index], symbolName, tryGetFactState, out value))
                 return true;

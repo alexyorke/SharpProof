@@ -117,7 +117,6 @@ internal partial class PurityAnalysisEngine
             currentState,
             symbolicBranchState,
             smtAnalysis,
-            expressionSyntax,
             out successorState);
     }
 
@@ -125,11 +124,10 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState currentState,
         SymbolicState nextPathState,
         SmtAnalysisService smtAnalysis,
-        SyntaxNode? sourceNode,
         out PurityAnalysisState successorState)
     {
         successorState = currentState;
-        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, sourceNode))
+        if (IsPathStateUnsatisfiable(nextPathState, smtAnalysis))
             return false;
 
         successorState = currentState.WithPathState(nextPathState);
@@ -235,7 +233,7 @@ internal partial class PurityAnalysisEngine
             "analyzer.null_assumption");
         if (!transition.IsExact) return true;
         var nextPathState = transition.State;
-        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, value?.Syntax))
+        if (IsPathStateUnsatisfiable(nextPathState, smtAnalysis))
             return false;
 
         branchState = currentState.WithPathState(nextPathState);
@@ -265,13 +263,10 @@ internal partial class PurityAnalysisEngine
     }
 
     private static bool IsPathStateUnsatisfiable(
-        PurityAnalysisState currentState,
         SymbolicState pathState,
-        SmtAnalysisService smtAnalysis,
-        SyntaxNode? sourceNode = null)
+        SmtAnalysisService smtAnalysis)
     {
-        var proofState = AppendDefinitelyNullFacts(currentState, pathState, sourceNode);
-        return SymbolicReachabilityService.ClassifyStateFeasibility(proofState, smtAnalysis).Info.Status ==
+        return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
                SymbolicProofStatus.Unreachable;
     }
 
@@ -294,33 +289,6 @@ internal partial class PurityAnalysisEngine
 
         term = null!;
         return false;
-    }
-
-    private static SymbolicState AppendDefinitelyNullFacts(
-        PurityAnalysisState currentState,
-        SymbolicState pathState,
-        SyntaxNode? sourceNode)
-    {
-        if (currentState.DefinitelyNullLocalSymbols.Count == 0) return pathState;
-
-        var source = sourceNode ?? SyntaxFactory.IdentifierName("__symbolic_null_fact");
-
-        foreach (var localSymbol in currentState.DefinitelyNullLocalSymbols.OfType<ILocalSymbol>())
-        {
-            if (localSymbol.Type?.IsReferenceType != true) continue;
-
-            var fact = SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, currentState),
-                    new SymbolicNullTerm()),
-                source,
-                "analyzer.definitely-null",
-                evidenceKey: "analyzer.definitely-null");
-            pathState = pathState.AddPathCondition(new SymbolicFactCondition(fact));
-        }
-
-        return pathState;
     }
 
     internal static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)

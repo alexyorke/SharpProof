@@ -253,7 +253,6 @@ internal partial class PurityAnalysisEngine
         public ImmutableDictionary<CaptureId, INamedTypeSymbol> FlowCaptureConcreteTypes { get; }
         public ImmutableDictionary<CaptureId, ISymbol> FlowCaptureSymbols { get; }
         public ImmutableHashSet<CaptureId> OwnedArrayFlowCaptures { get; }
-        public ImmutableHashSet<ISymbol> DefinitelyNullLocalSymbols { get; }
         public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
         public SymbolicState PathState { get; }
 
@@ -264,7 +263,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, PotentialTargets>? delegateTargetMap,
             ImmutableDictionary<CaptureId, PurityAnalysisResult>? flowCaptures,
             ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
-            ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
             PurityEvidence firstImpurityEvidence = default,
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
@@ -284,8 +282,6 @@ internal partial class PurityAnalysisEngine
                 flowCaptureConcreteTypes ?? ImmutableDictionary<CaptureId, INamedTypeSymbol>.Empty;
             FlowCaptureSymbols = flowCaptureSymbols ?? ImmutableDictionary.Create<CaptureId, ISymbol>();
             OwnedArrayFlowCaptures = ownedArrayFlowCaptures ?? ImmutableHashSet<CaptureId>.Empty;
-            DefinitelyNullLocalSymbols = definitelyNullLocalSymbols ??
-                                         ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
             LocalConcreteTypes = localConcreteTypes ??
                                  ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
             PathState = pathState ?? new SymbolicState();
@@ -318,7 +314,6 @@ internal partial class PurityAnalysisEngine
                    MapsEqual(FlowCaptureSymbols, other.FlowCaptureSymbols,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
                    OwnedArrayFlowCaptures.SetEquals(other.OwnedArrayFlowCaptures) &&
-                   DefinitelyNullLocalSymbols.SetEquals(other.DefinitelyNullLocalSymbols) &&
                    SymbolicStatesEqual(PathState, other.PathState) &&
                    MapsEqual(LocalConcreteTypes, other.LocalConcreteTypes,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
@@ -387,9 +382,6 @@ internal partial class PurityAnalysisEngine
             foreach (var captureId in OwnedArrayFlowCaptures.OrderBy(id => id.GetHashCode()))
                 hash = hash * 23 + captureId.GetHashCode();
 
-            foreach (var symbol in DefinitelyNullLocalSymbols.OrderBy(sym => sym.Name))
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(symbol);
-
             foreach (var fact in PathState.Facts) hash = hash * 23 + fact.GetHashCode();
 
             foreach (var condition in PathState.PathConditions) hash = hash * 23 + condition.GetHashCode();
@@ -443,7 +435,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, PotentialTargets>? delegateTargetMap = null,
             ImmutableDictionary<CaptureId, PurityAnalysisResult>? flowCaptures = null,
             ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
-            ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
             PurityEvidence? firstImpurityEvidence = null,
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
@@ -457,7 +448,6 @@ internal partial class PurityAnalysisEngine
                 delegateTargetMap ?? DelegateTargetMap,
                 flowCaptures ?? FlowCaptures,
                 flowCaptureTargets ?? FlowCaptureTargets,
-                definitelyNullLocalSymbols ?? DefinitelyNullLocalSymbols,
                 firstImpurityEvidence ?? FirstImpurityEvidence,
                 localConcreteTypes ?? LocalConcreteTypes,
                 flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
@@ -607,23 +597,11 @@ internal partial class PurityAnalysisEngine
                 fact.Provenance.StartsWith("analyzer.array.acquire.", StringComparison.Ordinal));
         }
 
-        public PurityAnalysisState WithDefinitelyNullLocal(ISymbol localSymbol)
-        {
-            return Copy(
-                definitelyNullLocalSymbols: DefinitelyNullLocalSymbols.Add(localSymbol),
-                localConcreteTypes: LocalConcreteTypes.Remove(localSymbol));
-        }
-
-        public PurityAnalysisState WithoutDefinitelyNullLocal(ISymbol localSymbol)
-        {
-            if (!DefinitelyNullLocalSymbols.Contains(localSymbol)) return this;
-
-            return Copy(definitelyNullLocalSymbols: DefinitelyNullLocalSymbols.Remove(localSymbol));
-        }
-
         public bool IsDefinitelyNullLocalSymbol(ISymbol localSymbol)
         {
-            return DefinitelyNullLocalSymbols.Contains(localSymbol);
+            return SymbolicStateValueFacts.IsKnownNullReference(
+                PathState,
+                PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this));
         }
 
         public PurityAnalysisState WithLocalConcreteType(ISymbol localSymbol, INamedTypeSymbol concreteType)
@@ -633,7 +611,6 @@ internal partial class PurityAnalysisEngine
                 return this;
 
             return Copy(
-                definitelyNullLocalSymbols: DefinitelyNullLocalSymbols.Remove(localSymbol),
                 localConcreteTypes: LocalConcreteTypes.SetItem(localSymbol, concreteType));
         }
 

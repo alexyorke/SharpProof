@@ -74,10 +74,6 @@ internal static partial class PurityAssignmentStateTransfer
                 writtenLocalSymbol,
                 valueOperation);
 
-            if (PurityConcreteReceiverResolver.IsDefinitelyNullValue(valueOperation, valueState))
-                nextState = nextState.WithDefinitelyNullLocal(writtenLocalSymbol);
-            else
-                nextState = nextState.WithoutDefinitelyNullLocal(writtenLocalSymbol);
         }
 
         return nextState;

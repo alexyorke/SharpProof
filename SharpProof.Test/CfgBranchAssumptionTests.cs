@@ -38,7 +38,6 @@ public class CfgBranchAssumptionTests
             PurityAnalysisEngine.PurityAnalysisState.Pure,
             branchState,
             smtAnalysis,
-            sourceNode: null,
             out _);
 
         Assert.That(hasSuccessor, Is.False);

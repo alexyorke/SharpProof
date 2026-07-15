@@ -128,7 +128,6 @@ internal static partial class PurityAssignmentStateTransfer
                 foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(localSymbol, context))
                     nextState = nextState
                         .WithoutLocalConcreteType(writtenLocalSymbol)
-                        .WithoutDefinitelyNullLocal(writtenLocalSymbol)
                         .WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
             else if (targetSymbol is IParameterSymbol parameterSymbol)
                 nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, operationToTrack.Syntax);
@@ -154,7 +153,6 @@ internal static partial class PurityAssignmentStateTransfer
                     {
                         nextState = nextState
                             .WithoutLocalConcreteType(writtenLocalSymbol)
-                            .WithoutDefinitelyNullLocal(writtenLocalSymbol)
                             .WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
 
                         if (writtenLocalSymbol.Type?.TypeKind == TypeKind.Delegate)

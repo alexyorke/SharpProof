@@ -140,10 +140,9 @@ internal partial class PurityAnalysisEngine
 
         if (stateBefore.HasPotentialImpurity) return stateBefore;
 
-        var blockSourceNode = block.Operations.FirstOrDefault()?.Syntax ?? block.BranchValue?.Syntax;
         if ((!stateBefore.PathState.Facts.IsDefaultOrEmpty ||
              !stateBefore.PathState.PathConditions.IsDefaultOrEmpty) &&
-            IsPathStateUnsatisfiable(stateBefore, stateBefore.PathState, smtAnalysis, blockSourceNode))
+            IsPathStateUnsatisfiable(stateBefore.PathState, smtAnalysis))
             return stateBefore;
 
         var currentStateInBlock = stateBefore;

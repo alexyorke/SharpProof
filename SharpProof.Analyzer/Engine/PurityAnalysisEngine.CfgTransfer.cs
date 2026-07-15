@@ -12,8 +12,7 @@ internal partial class PurityAnalysisEngine
     {
         if ((!currentState.PathState.Facts.IsDefaultOrEmpty ||
              !currentState.PathState.PathConditions.IsDefaultOrEmpty) &&
-            IsPathStateUnsatisfiable(currentState, currentState.PathState, context.SmtAnalysis,
-                operation.Syntax))
+            IsPathStateUnsatisfiable(currentState.PathState, context.SmtAnalysis))
             return PurityAnalysisResult.Pure;
 
         if ((!currentState.PathState.Facts.IsDefaultOrEmpty ||
