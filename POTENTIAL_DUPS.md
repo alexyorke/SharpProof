@@ -100,11 +100,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Symbolic Smt
 
-### Duplicated merge-fact shape (Integer/String/Reference/Boolean) - `SmtSyntacticClassifier.cs:598-612,614-642,644-658`, `Boolean.cs:500-516`
-Same "merge into canonical then drop alias" shape. **Recommendation:** Generic `MergeFact<T>(map, canonical, alias, combine, isConflict)`.
-
----
-
 ## Symbolic root
 
 ### `Shared\Constants.cs` / `Shared\BclPurityFallbackHeuristics.cs` use Analyzer namespaces
