@@ -445,6 +445,7 @@ transfer policy after its slice is complete.
 | Phase 6 central compact method location projection | Commit `6d402908` introduces `SymbolicCompactMethodResult<T>` as the single owner of the nine file/method/span location passthroughs shared by capability and complexity compact results. Explicit payload ordering preserves the existing schema-kind-location-domain JSON sequence; a focused invariant now locks all nine flattened location columns. Capability, complexity, and compact-domain fixtures pass 12/12, and the Release CLI warning-as-error build has zero warnings. Production LOC fell to 105,706, or -1,970 from the rewrite start; tracked test LOC is 142,478. |
 | Phase 6 central condition-proof filtering | Commit `630fce4d` replaces the two type-specific condition-proof filters with one typed selector-based implementation shared by summary and point-result text rendering. Both target-filter text/JSON fixtures pass 2/2. Production LOC fell to 105,698, or -1,978 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 central capability-site formatting | Commit `5fc154ae` makes one formatter own unknown/capability prefix selection and symbol/operation detail fallback for both standard and explain text output. Capability and explain fixtures pass 5/5. Production LOC fell to 105,692, or -1,984 from the rewrite start; tracked test LOC remains 142,478. |
+| Phase 6 central Fuzz source imports | Commit `ef00c012` replaces fifteen independently emitted import blocks with one ordered LF-based `BuildUsings` source helper while retaining each generated program's exact namespace list. Fuzz and Roslyn-shape fixtures pass 27/27. Production LOC fell to 105,684, or -1,992 from the rewrite start; tracked test LOC remains 142,478. |
 
 ## Current Checkpoint
 
@@ -493,10 +494,11 @@ transfer policy after its slice is complete.
   projection while retaining their exact serialized property order. Condition
   proof target filtering now has one generic implementation for summary and
   point-result projections. Standard and explain capability output now share
-  one site prefix/detail formatter.
-- Last confirmed fact: capability and explain fixtures pass 5/5. Test LOC is
-  142,478; production LOC is 105,692, or -1,984 from the rewrite start.
+  one site prefix/detail formatter. Generated Fuzz imports now have one ordered,
+  LF-stable source builder.
+- Last confirmed fact: Fuzz and Roslyn-shape fixtures pass 27/27. Test LOC is
+  142,478; production LOC is 105,684, or -1,992 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, repeated Fuzz generator using directives.
+  `POTENTIAL_DUPS.md`, duplicated Fuzz expectation classification.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
