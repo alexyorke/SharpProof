@@ -142,7 +142,7 @@ transfer policy after its slice is complete.
 - [x] Migrate switch statement/expression branch selection and merging.
 - [x] Migrate loop entry/back-edge/exit transitions and bounded fixed points.
 - [x] Migrate try/catch/finally, exceptional completion, and reachability.
-- [ ] Make one merge implementation own fact choices, versions, ownership, and
+- [x] Make one merge implementation own fact choices, versions, ownership, and
   conservative truncation.
 - [ ] Delete superseded branch, loop, completion, and merge paths.
 - [ ] Gate: normalized-state, flow, exception, and reachability lanes are green;
@@ -238,6 +238,8 @@ transfer policy after its slice is complete.
 | Canonical no-fallthrough completion | `982c23ad` | 107,564 | -112 |
 | Canonical try completion merge | `cbe2ecce` | 107,558 | -118 |
 | Canonical symbolic fact intersection | `8ad69193` | 107,553 | -123 |
+| Canonical ownership joins | `9f6628d5` | 107,509 | -167 |
+| Canonical path-state versions | `addf9379` | 107,476 | -200 |
 
 ## Validation Ledger
 
@@ -283,17 +285,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical no-fallthrough completion | Commit `982c23ad` makes `SymbolicCompletionOperation` own contradictory normal-flow termination for branches, loops, impossible null branches, exhausted try alternatives, and throwing finally blocks, deleting the standalone contradictory-state constructor. Focused completion/loop/try tests: 172 passed. The reusable completion scaffolding raises production LOC to 107,564, or -112 from the rewrite start, and must be repaid by completion-path deletion. |
 | Phase 3 canonical try completion merge | Commit `cbe2ecce` routes try/catch alternative states through `SymbolicMergeOperation`, moves limited common fact/condition/version selection into the canonical merger, unifies try/catch block completion collection, and deletes the source-owned merge. Focused completion/limit/exception tests: 162 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,558, or -118 from the rewrite start. |
 | Phase 3 canonical fact intersection | Commit `8ad69193` makes `SymbolicStateMerger` own incoming-state fact traversal while allowing the Analyzer to retain its evidence-aware identity predicate, and deletes the duplicate Analyzer intersection loop. Focused merge/resource/CFG/try tests: 102 passed. Production LOC fell to 107,553, or -123 from the rewrite start. |
+| Phase 3 canonical ownership joins | Commit `9f6628d5` moves all-path release, outstanding obligation, alias traversal, and evidence-aware ownership merging into `SymbolicStateMerger`, deletes the Analyzer implementation, and removes the circular dependency between the merger and `PuritySymbolicStateFacts`. Focused ownership/alias/CFG/try tests: 137 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,509, or -167 from the rewrite start. |
+| Phase 3 canonical path-state versions | Commit `addf9379` removes Analyzer's parallel `ISymbol` version map and makes `SymbolicState.SymbolVersions` own definition versions, phi joins, IR rewriting, equality, hashing, and convergence. Focused version/CFG/ownership tests: 228 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,476, or -200 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; switch, loop, and try completion are migrated. The
-  canonical merger now owns path choices and fact intersection; Analyzer keeps
-  only its evidence identity, resource, version, and metadata policies.
-- Last confirmed fact: focused merge/resource/CFG/try tests pass 102/102; the
-  preceding try tranche passed Oracle 573/573, Analyzer 487/487, and baseline Flow.
-- Next cheapest step: centralize exact string-keyed version intersection and the
-  normalized path-state merge envelope, then identify which Analyzer version and
-  resource policies can move without changing phi or ownership semantics.
+- State: Phase 2 is gated; switch, loop, and try completion are migrated. One
+  canonical merger now owns symbolic fact/path choices, ownership joins, version
+  phi construction and rewriting, and try truncation. Analyzer retains metadata.
+- Last confirmed fact: focused version/CFG/ownership tests pass 228/228 and
+  MainSmtAnalyzer passes 487/487 after removing the parallel version map.
+- Next cheapest step: audit remaining branch, loop, completion, and merge owners
+  for reachable state mutation; delete the first superseded path and retain only
+  source traversal, condition lowering, and Analyzer metadata projection.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
