@@ -31,27 +31,20 @@ internal static partial class PurityResourceStateFacts
             return nextState;
 
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
-        var returnedFact = SymbolicOwnershipFactFactory.CreateReturnedOwnership(
-            term,
-            returnedValue.Syntax,
-            "analyzer.resource.returned",
-            resourceSymbol,
-            "evidence.resource.returned");
-        var lifetimeFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
-            term,
-            SymbolicResourceLifetimeState.Returned,
-            returnedValue.Syntax,
-            "analyzer.resource.returned.lifetime",
-            resourceSymbol,
-            "evidence.resource.returned");
-
         var pathState = RemoveExclusiveResourceStateFacts(
             nextState.PathState,
             term,
             resourceSymbol,
             removeDisposal: false,
             removeLifetime: true);
-        return nextState.WithPathState(pathState.AddFact(returnedFact).AddFact(lifetimeFact));
+        return ApplyLifetime(
+            nextState.WithPathState(pathState),
+            term,
+            SymbolicLifetimeOperationKind.Return,
+            returnedValue.Syntax,
+            "analyzer.resource.returned",
+            resourceSymbol,
+            "evidence.resource.returned");
     }
 
     internal static PurityAnalysisState AddDisposeInvocationFacts(
@@ -149,28 +142,20 @@ internal static partial class PurityResourceStateFacts
         string provenance,
         string evidenceKey)
     {
-        var disposedFact = SymbolicOwnershipFactFactory.CreateDisposal(
-            term,
-            SymbolicDisposalState.Disposed,
-            syntax,
-            provenance,
-            resourceSymbol,
-            evidenceKey);
-        var releasedFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
-            term,
-            SymbolicResourceLifetimeState.Released,
-            syntax,
-            provenance + ".lifetime",
-            resourceSymbol,
-            evidenceKey);
-
         var pathState = RemoveExclusiveResourceStateFacts(
             nextState.PathState,
             term,
             resourceSymbol,
             removeDisposal: true,
             removeLifetime: true);
-        return nextState.WithPathState(pathState.AddFact(disposedFact).AddFact(releasedFact));
+        return ApplyLifetime(
+            nextState.WithPathState(pathState),
+            term,
+            SymbolicLifetimeOperationKind.Dispose,
+            syntax,
+            provenance,
+            resourceSymbol,
+            evidenceKey);
     }
 
     private static SymbolicState RemoveExclusiveResourceStateFacts(
@@ -206,10 +191,13 @@ internal static partial class PurityResourceStateFacts
         if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
             return nextState;
 
-        var mutationFact = CreateCallerVisibleMutationFact(term, syntax, symbol);
-
-        return nextState.WithPathState(
-            nextState.PathState.AddFact(mutationFact));
+        return nextState.WithPathState(SymbolicOperationTransferKernel.TransitionMutation(
+            nextState.PathState,
+            term,
+            syntax.Span,
+            "analyzer.mutation.caller-visible",
+            symbol,
+            "evidence.mutation.caller-visible").State);
     }
 
     internal static bool TryCreateCallerVisibleMutationEvidence(
@@ -225,96 +213,44 @@ internal static partial class PurityResourceStateFacts
             return false;
         }
 
-        var mutationFact = CreateCallerVisibleMutationFact(term, targetOperation.Syntax, symbol);
-        if (mutationFact.Atom is not SymbolicMutationAtom { CallerVisible: true })
-        {
-            evidence = default;
-            return false;
-        }
-
         evidence = PurityEvidence.Create(
             "mutable_state_write",
             ruleName,
             operation,
             operation.Syntax,
             symbol,
-            mutationFact.Provenance);
+            "analyzer.mutation.caller-visible");
         return true;
     }
 
-    private static SymbolicFact CreateCallerVisibleMutationFact(
-        SymbolicTerm term,
-        SyntaxNode syntax,
-        ISymbol? symbol)
-    {
-        return SymbolicOwnershipFactFactory.CreateMutation(
-            term,
-            true,
-            syntax,
-            "analyzer.mutation.caller-visible",
-            symbol,
-            "evidence.mutation.caller-visible");
-    }
-
-    internal static bool TryCreateReturnEscapeEvidence(
+    internal static PurityEvidence CreateReturnEscapeEvidence(
         IReturnOperation returnOperation,
         SyntaxNode escapeSyntax,
         ISymbol escapeSymbol,
-        PurityAnalysisState currentState,
         string ruleName,
-        string fallbackCatalogSource,
-        out PurityEvidence evidence)
+        string fallbackCatalogSource)
     {
-        var escapeTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(escapeSymbol, currentState);
-        var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
-            escapeTerm,
-            SymbolicEscapeKind.Return,
-            escapeSyntax,
-            "analyzer.escape.return",
-            escapeSymbol,
-            "evidence.escape.return");
-        if (escapeFact.Atom is not SymbolicEscapeAtom { Kind: SymbolicEscapeKind.Return })
-        {
-            evidence = default;
-            return false;
-        }
-
-        evidence = PurityEvidence.Create(
+        return PurityEvidence.Create(
             "mutable_state_escape",
             ruleName,
             returnOperation,
             escapeSyntax,
             escapeSymbol,
             string.IsNullOrEmpty(fallbackCatalogSource)
-                ? escapeFact.Provenance
+                ? "analyzer.escape.return"
                 : fallbackCatalogSource);
-        return true;
     }
 
     internal static PurityEvidence CreateByRefReturnEscapeEvidence(
         IMethodSymbol methodSymbol,
         SyntaxNode escapeSyntax)
     {
-        var escapeTerm = new SymbolicVariableTerm(
-            methodSymbol.ToDisplayString(PurityAnalysisEngine.SignatureFormat),
-            SmtValueKind.Reference);
-        var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
-            escapeTerm,
-            SymbolicEscapeKind.Return,
-            escapeSyntax,
-            "analyzer.escape.return.byref",
-            methodSymbol,
-            "evidence.escape.return.byref");
-
-        var catalogSource = escapeFact.Atom is SymbolicEscapeAtom { Kind: SymbolicEscapeKind.Return }
-            ? escapeFact.Provenance
-            : "return_by_ref";
         return PurityEvidence.Create(
             "mutable_state_escape",
             "ReturnByRefAnalysis",
             syntaxNode: escapeSyntax,
             symbol: methodSymbol,
-            catalogSource: catalogSource);
+            catalogSource: "analyzer.escape.return.byref");
     }
 
     internal static bool TryCreateCallerVisibleMutationTerm(
@@ -369,16 +305,14 @@ internal static partial class PurityResourceStateFacts
         IOperation valueOperation)
     {
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        var pathState = nextState.PathState;
-        var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+        return ApplyLifetime(
+            nextState,
             term,
+            SymbolicLifetimeOperationKind.CreateOwnedValue,
             valueOperation.Syntax,
             "analyzer.array.acquire",
             localSymbol,
             "evidence.array.acquire");
-        foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
-
-        return nextState.WithPathState(pathState);
     }
 
     internal static PurityAnalysisState AddFreshMutableObjectFacts(
@@ -392,16 +326,14 @@ internal static partial class PurityResourceStateFacts
             return nextState;
 
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        var pathState = nextState.PathState;
-        var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+        return ApplyLifetime(
+            nextState,
             term,
+            SymbolicLifetimeOperationKind.CreateOwnedValue,
             valueOperation.Syntax,
             "analyzer.object.acquire",
             localSymbol,
             "evidence.object.acquire");
-        foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
-
-        return nextState.WithPathState(pathState);
     }
 
     internal static PurityAnalysisState AddOwnedDisposableLocalFacts(
@@ -415,16 +347,15 @@ internal static partial class PurityResourceStateFacts
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
         if (HasReleasedResourceFact(term, nextState)) return nextState;
 
-        var pathState = nextState.PathState;
-        var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+        nextState = ApplyLifetime(
+            nextState,
             term,
+            SymbolicLifetimeOperationKind.AcquireDisposable,
             valueOperation.Syntax,
             "analyzer.resource.acquire",
             localSymbol,
             "evidence.resource.acquire");
-        foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
-
-        pathState = pathState.AddFact(SymbolicFact.Exact(
+        var pathState = nextState.PathState.AddFact(SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 SymbolicRelationOperator.NotEqual,
                 term,
@@ -434,15 +365,26 @@ internal static partial class PurityResourceStateFacts
             localSymbol,
             "evidence.resource.acquire.not-null"));
 
-        pathState = pathState.AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
-            term,
-            SymbolicDisposalState.NotDisposed,
-            valueOperation.Syntax,
-            "analyzer.resource.acquire.disposal",
-            localSymbol,
-            "evidence.resource.acquire"));
-
         return nextState.WithPathState(pathState);
+    }
+
+    internal static PurityAnalysisState ApplyLifetime(
+        PurityAnalysisState state,
+        SymbolicTerm subject,
+        SymbolicLifetimeOperationKind kind,
+        SyntaxNode source,
+        string provenance,
+        ISymbol? symbol,
+        string? evidenceKey)
+    {
+        return state.WithPathState(SymbolicOperationTransferKernel.TransitionLifetime(
+            state.PathState,
+            subject,
+            kind,
+            source.Span,
+            provenance,
+            symbol,
+            evidenceKey).State);
     }
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)

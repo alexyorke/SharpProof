@@ -221,26 +221,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         string catalogSource,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (PurityResourceStateFacts.TryCreateReturnEscapeEvidence(
-                returnOperation,
-                escapeSyntax,
-                escapeSymbol,
-                currentState,
-                nameof(ReturnStatementPurityRule),
-                catalogSource,
-                out var escapeEvidence))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                escapeSyntax,
-                escapeEvidence);
-
         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
             escapeSyntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "mutable_state_escape",
-                nameof(ReturnStatementPurityRule),
+            PurityResourceStateFacts.CreateReturnEscapeEvidence(
                 returnOperation,
                 escapeSyntax,
                 escapeSymbol,
+                nameof(ReturnStatementPurityRule),
                 catalogSource));
     }
 

@@ -573,14 +573,13 @@ internal partial class PurityAnalysisEngine
             if (source == null) return pathState;
 
             var term = CreateOwnedArrayFlowCaptureTerm(id);
-            var facts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+            return SymbolicOperationTransferKernel.TransitionLifetime(
+                pathState,
                 term,
-                source,
+                SymbolicLifetimeOperationKind.CreateOwnedValue,
+                source.Span,
                 "analyzer.owned-array-flow-capture",
-                evidenceKey: "evidence.owned-array-flow-capture");
-            foreach (var fact in facts) pathState = pathState.AddFact(fact);
-
-            return pathState;
+                evidenceKey: "evidence.owned-array-flow-capture").State;
         }
 
         private static SymbolicState RemoveOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id)

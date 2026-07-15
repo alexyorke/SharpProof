@@ -121,11 +121,14 @@ internal static class SymbolicOperationLowerer
             _ => new SymbolicMutationOperation(
                 bindings,
                 System.Collections.Immutable.ImmutableArray<SymbolicInvalidationTarget>.Empty,
+                null,
                 updateKind == SymbolicComputedUpdateKind.Increment
                     ? SymbolicMutationOperationKind.Increment
                     : SymbolicMutationOperationKind.Decrement,
                 isChecked,
                 CallerVisible: false,
+                null,
+                null,
                 origin)
         };
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(

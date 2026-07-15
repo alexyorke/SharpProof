@@ -59,7 +59,9 @@ internal enum SymbolicCompletionKind
 internal enum SymbolicLifetimeOperationKind
 {
     Alias,
+    CreateOwnedValue,
     CreateOwned,
+    AcquireDisposable,
     BorrowShared,
     BorrowMutable,
     Escape,
@@ -101,9 +103,12 @@ internal sealed record SymbolicAssignmentOperation(
 internal sealed record SymbolicMutationOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
     ImmutableArray<SymbolicInvalidationTarget> Invalidations,
+    SymbolicTerm? Subject,
     SymbolicMutationOperationKind MutationKind,
     bool IsChecked,
     bool CallerVisible,
+    ISymbol? Symbol,
+    string? EvidenceKey,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicInvocationOperation(

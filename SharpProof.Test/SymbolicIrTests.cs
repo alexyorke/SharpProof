@@ -1936,11 +1936,13 @@ public sealed class SymbolicIrTests
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("new MutableResource()");
 
-        var facts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+        var facts = SymbolicOperationTransferKernel.TransitionLifetime(
+            new SymbolicState(),
             value,
-            syntax,
+            SymbolicLifetimeOperationKind.CreateOwned,
+            syntax.Span,
             "test.ownership",
-            evidenceKey: "evidence.ownership");
+            evidenceKey: "evidence.ownership").State.Facts;
 
         Assert.That(facts, Has.Length.EqualTo(3));
         Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
@@ -1963,11 +1965,13 @@ public sealed class SymbolicIrTests
         var value = new SymbolicVariableTerm("array#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("new int[1]");
 
-        var facts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+        var facts = SymbolicOperationTransferKernel.TransitionLifetime(
+            new SymbolicState(),
             value,
-            syntax,
+            SymbolicLifetimeOperationKind.CreateOwnedValue,
+            syntax.Span,
             "test.array",
-            evidenceKey: "evidence.array");
+            evidenceKey: "evidence.array").State.Facts;
 
         Assert.That(facts, Has.Length.EqualTo(2));
         Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
@@ -1990,14 +1994,22 @@ public sealed class SymbolicIrTests
         var syntax = SyntaxFactory.ParseExpression("owner");
         var facts = new[]
         {
-            SymbolicOwnershipFactFactory.CreateAlias(owner, alias, true, syntax, "test.alias"),
-            SymbolicOwnershipFactFactory.CreateBorrow(owner, alias, SymbolicBorrowKind.Mutable, syntax, "test.borrow"),
-            SymbolicOwnershipFactFactory.CreateEscape(owner, SymbolicEscapeKind.Argument, syntax, "test.escape"),
-            SymbolicOwnershipFactFactory.CreateReturnedOwnership(owner, syntax, "test.returned"),
-            SymbolicOwnershipFactFactory.CreateMutation(owner, true, syntax, "test.mutation"),
-            SymbolicOwnershipFactFactory.CreateDisposal(owner, SymbolicDisposalState.MaybeDisposed, syntax,
-                "test.disposal"),
-            SymbolicOwnershipFactFactory.CreateResourceLifetime(owner, SymbolicResourceLifetimeState.Escaped, syntax,
+            SymbolicOperationTransferKernel.TransitionLifetime(
+                new SymbolicState(), owner, SymbolicLifetimeOperationKind.Alias, syntax.Span, "test.alias",
+                relatedSubject: alias).State.Facts.Single(),
+            SymbolicOperationTransferKernel.TransitionLifetime(
+                new SymbolicState(), owner, SymbolicLifetimeOperationKind.BorrowMutable, syntax.Span, "test.borrow",
+                relatedSubject: alias).State.Facts.Single(),
+            SymbolicOperationTransferKernel.TransitionLifetime(
+                new SymbolicState(), owner, SymbolicLifetimeOperationKind.Escape, syntax.Span, "test.escape",
+                escapeKind: SymbolicEscapeKind.Argument).State.Facts.Single(),
+            SymbolicFact.Exact(new SymbolicReturnedOwnershipAtom(owner), syntax, "test.returned"),
+            SymbolicOperationTransferKernel.TransitionMutation(
+                new SymbolicState(), owner, syntax.Span, "test.mutation").State.Facts.Single(),
+            SymbolicFact.Exact(
+                new SymbolicDisposalAtom(owner, SymbolicDisposalState.MaybeDisposed), syntax, "test.disposal"),
+            SymbolicFact.Exact(
+                new SymbolicResourceLifetimeAtom(owner, SymbolicResourceLifetimeState.Escaped), syntax,
                 "test.lifetime")
         };
         var state = new SymbolicState(facts);

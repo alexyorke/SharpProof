@@ -153,55 +153,28 @@ internal static partial class PurityAssignmentStateTransfer
     {
         if (aliasSymbols.IsDefaultOrEmpty) return nextState;
 
-        var pathState = nextState.PathState;
         foreach (var aliasSymbol in aliasSymbols)
         {
             var aliasTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(aliasSymbol, nextState);
-            foreach (var fact in CreatePreservedAliasFacts(aliasTerm, aliasSymbol, source, aliasState))
-                pathState = pathState.AddFact(fact);
+            var kind = aliasState == PreservedAliasState.OwnedDisposable
+                ? SymbolicLifetimeOperationKind.AcquireDisposable
+                : SymbolicLifetimeOperationKind.Dispose;
+            var provenance = aliasState == PreservedAliasState.OwnedDisposable
+                ? "analyzer.resource.alias-preserve"
+                : "analyzer.resource.alias-preserve.disposed";
+            nextState = PurityResourceStateFacts.ApplyLifetime(
+                nextState,
+                aliasTerm,
+                kind,
+                source,
+                provenance,
+                aliasSymbol,
+                aliasState == PreservedAliasState.OwnedDisposable
+                    ? "evidence.resource.alias-preserve"
+                    : "evidence.resource.alias-preserve.disposed");
         }
 
-        return nextState.WithPathState(pathState);
-    }
-
-    private static ImmutableArray<SymbolicFact> CreatePreservedAliasFacts(
-        SymbolicTerm aliasTerm,
-        ISymbol aliasSymbol,
-        SyntaxNode source,
-        PreservedAliasState aliasState)
-    {
-        if (aliasState == PreservedAliasState.OwnedDisposable)
-        {
-            return SymbolicOwnershipFactFactory.CreateFreshOwned(
-                    aliasTerm,
-                    source,
-                    "analyzer.resource.alias-preserve",
-                    aliasSymbol,
-                    "evidence.resource.alias-preserve")
-                .Add(SymbolicOwnershipFactFactory.CreateDisposal(
-                    aliasTerm,
-                    SymbolicDisposalState.NotDisposed,
-                    source,
-                    "analyzer.resource.alias-preserve.disposal",
-                    aliasSymbol,
-                    "evidence.resource.alias-preserve"));
-        }
-
-        return ImmutableArray.Create(
-            SymbolicOwnershipFactFactory.CreateDisposal(
-                aliasTerm,
-                SymbolicDisposalState.Disposed,
-                source,
-                "analyzer.resource.alias-preserve.disposed",
-                aliasSymbol,
-                "evidence.resource.alias-preserve.disposed"),
-            SymbolicOwnershipFactFactory.CreateResourceLifetime(
-                aliasTerm,
-                SymbolicResourceLifetimeState.Released,
-                source,
-                "analyzer.resource.alias-preserve.disposed.lifetime",
-                aliasSymbol,
-                "evidence.resource.alias-preserve.disposed"));
+        return nextState;
     }
 
     private enum PreservedAliasState

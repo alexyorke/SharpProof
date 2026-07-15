@@ -55,9 +55,12 @@ internal static class SymbolicOperationTransferKernel
         var operation = new SymbolicMutationOperation(
             ImmutableArray<SymbolicAssignmentBinding>.Empty,
             targets,
+            null,
             SymbolicMutationOperationKind.Invalidate,
             IsChecked: false,
             CallerVisible: false,
+            null,
+            null,
             new SymbolicOperationOrigin(sourceSpan, 0, provenance));
         return Apply(state, SymbolicOperationSequence.Single(operation));
     }
@@ -70,6 +73,52 @@ internal static class SymbolicOperationTransferKernel
         return spanStart <= (int.MaxValue - 2) / 2
             ? (spanStart + 1) * 2
             : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
+    }
+
+    internal static SymbolicOperationTransitionResult TransitionLifetime(
+        SymbolicState state,
+        SymbolicTerm subject,
+        SymbolicLifetimeOperationKind kind,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance,
+        Microsoft.CodeAnalysis.ISymbol? symbol = null,
+        string? evidenceKey = null,
+        SymbolicTerm? relatedSubject = null,
+        SymbolicEscapeKind escapeKind = SymbolicEscapeKind.Unknown)
+    {
+        return Apply(
+            state,
+            SymbolicOperationSequence.Single(new SymbolicLifetimeOperation(
+                subject,
+                kind,
+                relatedSubject,
+                escapeKind,
+                symbol,
+                evidenceKey,
+                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
+    }
+
+    internal static SymbolicOperationTransitionResult TransitionMutation(
+        SymbolicState state,
+        SymbolicTerm subject,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance,
+        Microsoft.CodeAnalysis.ISymbol? symbol = null,
+        string? evidenceKey = null,
+        bool callerVisible = true)
+    {
+        return Apply(
+            state,
+            SymbolicOperationSequence.Single(new SymbolicMutationOperation(
+                ImmutableArray<SymbolicAssignmentBinding>.Empty,
+                ImmutableArray<SymbolicInvalidationTarget>.Empty,
+                subject,
+                SymbolicMutationOperationKind.CallerVisible,
+                IsChecked: false,
+                callerVisible,
+                symbol,
+                evidenceKey,
+                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     }
 
     private static bool TryApplyAssignment(
@@ -90,34 +139,82 @@ internal static class SymbolicOperationTransferKernel
             state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
                 ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
                 : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
-        return TryApplyBindings(ref state, mutation.Bindings, mutation.Origin);
+        if (!TryApplyBindings(ref state, mutation.Bindings, mutation.Origin)) return false;
+        if (mutation.MutationKind != SymbolicMutationOperationKind.CallerVisible) return true;
+        if (mutation.Subject == null) return false;
+
+        state = state.AddFact(new SymbolicFact(
+            new SymbolicMutationAtom(mutation.Subject, mutation.CallerVisible),
+            true,
+            SymbolicFactConfidence.Exact,
+            mutation.Origin.Provenance,
+            mutation.Origin.SourceSpan,
+            mutation.Symbol,
+            mutation.EvidenceKey));
+        return true;
     }
 
     private static bool TryApplyLifetime(
         ref SymbolicState state,
         SymbolicLifetimeOperation lifetime)
     {
-        SymbolicAtom? atom = lifetime.LifetimeKind switch
+        var atoms = lifetime.LifetimeKind switch
         {
             SymbolicLifetimeOperationKind.Alias when lifetime.RelatedSubject != null =>
-                new SymbolicAliasAtom(lifetime.Subject, lifetime.RelatedSubject, true),
+                ImmutableArray.Create<(SymbolicAtom Atom, string Provenance)>(
+                    (new SymbolicAliasAtom(lifetime.Subject, lifetime.RelatedSubject, true), lifetime.Origin.Provenance)),
             SymbolicLifetimeOperationKind.BorrowShared when lifetime.RelatedSubject != null =>
-                new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Shared),
+                ImmutableArray.Create<(SymbolicAtom, string)>(
+                    (new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Shared), lifetime.Origin.Provenance)),
             SymbolicLifetimeOperationKind.BorrowMutable when lifetime.RelatedSubject != null =>
-                new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Mutable),
-            _ => null
+                ImmutableArray.Create<(SymbolicAtom, string)>(
+                    (new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Mutable), lifetime.Origin.Provenance)),
+            SymbolicLifetimeOperationKind.CreateOwnedValue => CreateOwnedAtoms(lifetime, includeLifetime: false),
+            SymbolicLifetimeOperationKind.CreateOwned => CreateOwnedAtoms(lifetime, includeLifetime: true),
+            SymbolicLifetimeOperationKind.AcquireDisposable => CreateOwnedAtoms(lifetime, includeLifetime: true).Add(
+                (new SymbolicDisposalAtom(lifetime.Subject, SymbolicDisposalState.NotDisposed),
+                    lifetime.Origin.Provenance + ".disposal")),
+            SymbolicLifetimeOperationKind.Return => ImmutableArray.Create<(SymbolicAtom, string)>(
+                (new SymbolicReturnedOwnershipAtom(lifetime.Subject), lifetime.Origin.Provenance),
+                (new SymbolicResourceLifetimeAtom(lifetime.Subject, SymbolicResourceLifetimeState.Returned),
+                    lifetime.Origin.Provenance + ".lifetime")),
+            SymbolicLifetimeOperationKind.Dispose => ImmutableArray.Create<(SymbolicAtom, string)>(
+                (new SymbolicDisposalAtom(lifetime.Subject, SymbolicDisposalState.Disposed), lifetime.Origin.Provenance),
+                (new SymbolicResourceLifetimeAtom(lifetime.Subject, SymbolicResourceLifetimeState.Released),
+                    lifetime.Origin.Provenance + ".lifetime")),
+            SymbolicLifetimeOperationKind.Release => ImmutableArray.Create<(SymbolicAtom, string)>(
+                (new SymbolicResourceLifetimeAtom(lifetime.Subject, SymbolicResourceLifetimeState.Released),
+                    lifetime.Origin.Provenance)),
+            SymbolicLifetimeOperationKind.Escape => ImmutableArray.Create<(SymbolicAtom, string)>(
+                (new SymbolicEscapeAtom(lifetime.Subject, lifetime.EscapeKind), lifetime.Origin.Provenance)),
+            _ => ImmutableArray<(SymbolicAtom, string)>.Empty
         };
-        if (atom == null) return false;
+        if (atoms.IsDefaultOrEmpty) return false;
 
-        state = state.AddFact(new SymbolicFact(
-            atom,
-            true,
-            SymbolicFactConfidence.Exact,
-            lifetime.Origin.Provenance,
-            lifetime.Origin.SourceSpan,
-            lifetime.Symbol,
-            lifetime.EvidenceKey));
+        foreach (var (atom, provenance) in atoms)
+            state = state.AddFact(new SymbolicFact(
+                atom,
+                true,
+                SymbolicFactConfidence.Exact,
+                provenance,
+                lifetime.Origin.SourceSpan,
+                lifetime.Symbol,
+                lifetime.EvidenceKey));
         return true;
+    }
+
+    private static ImmutableArray<(SymbolicAtom Atom, string Provenance)> CreateOwnedAtoms(
+        SymbolicLifetimeOperation lifetime,
+        bool includeLifetime)
+    {
+        var builder = ImmutableArray.CreateBuilder<(SymbolicAtom, string)>(includeLifetime ? 3 : 2);
+        builder.Add((new SymbolicFreshnessAtom(lifetime.Subject), lifetime.Origin.Provenance + ".fresh"));
+        builder.Add((new SymbolicOwnershipAtom(lifetime.Subject, false), lifetime.Origin.Provenance + ".owned"));
+        if (includeLifetime)
+            builder.Add((new SymbolicResourceLifetimeAtom(
+                lifetime.Subject,
+                SymbolicResourceLifetimeState.Owned), lifetime.Origin.Provenance + ".lifetime"));
+        return builder.MoveToImmutable();
     }
 
     private static bool TryApplyBindings(

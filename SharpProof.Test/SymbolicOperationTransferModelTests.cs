@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
@@ -324,6 +325,65 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void TransferKernel_OwnershipLifetimeBundlesMatchLegacyFacts(int caseValue)
+    {
+        var source = SyntaxFactory.ParseExpression("resource");
+        var term = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+        const string provenance = "test.resource";
+        const string evidence = "test.resource.evidence";
+        var (kind, legacyFacts) = caseValue switch
+        {
+            0 => (SymbolicLifetimeOperationKind.CreateOwnedValue,
+                ImmutableArray.Create(
+                    Exact(new SymbolicFreshnessAtom(term), source, provenance + ".fresh", evidence),
+                    Exact(new SymbolicOwnershipAtom(term, false), source, provenance + ".owned", evidence))),
+            1 => (SymbolicLifetimeOperationKind.CreateOwned,
+                OwnedFacts(term, source, provenance, evidence)),
+            2 => (SymbolicLifetimeOperationKind.AcquireDisposable,
+                OwnedFacts(term, source, provenance, evidence).Add(
+                    Exact(
+                        new SymbolicDisposalAtom(term, SymbolicDisposalState.NotDisposed),
+                        source,
+                        provenance + ".disposal",
+                        evidence))),
+            3 => (SymbolicLifetimeOperationKind.Return,
+                ImmutableArray.Create(
+                    Exact(new SymbolicReturnedOwnershipAtom(term), source, provenance, evidence),
+                    Exact(
+                        new SymbolicResourceLifetimeAtom(term, SymbolicResourceLifetimeState.Returned),
+                        source,
+                        provenance + ".lifetime",
+                        evidence))),
+            _ => (SymbolicLifetimeOperationKind.Dispose,
+                ImmutableArray.Create(
+                    Exact(
+                        new SymbolicDisposalAtom(term, SymbolicDisposalState.Disposed),
+                        source,
+                        provenance,
+                        evidence),
+                    Exact(
+                        new SymbolicResourceLifetimeAtom(term, SymbolicResourceLifetimeState.Released),
+                        source,
+                        provenance + ".lifetime",
+                        evidence)))
+        };
+
+        var result = SymbolicOperationTransferKernel.TransitionLifetime(
+            new SymbolicState(),
+            term,
+            kind,
+            source.Span,
+            provenance,
+            evidenceKey: evidence);
+
+        Assert.That(result.State.Facts, Is.EqualTo(legacyFacts));
+    }
+
     private static SymbolicAssignmentOperation Assignment(
         SymbolicTerm target,
         long value,
@@ -354,5 +414,37 @@ public sealed class SymbolicOperationTransferModelTests
             default,
             null,
             null);
+    }
+
+    private static ImmutableArray<SymbolicFact> OwnedFacts(
+        SymbolicTerm term,
+        SyntaxNode source,
+        string provenance,
+        string evidence)
+    {
+        return ImmutableArray.Create(
+            Exact(new SymbolicFreshnessAtom(term), source, provenance + ".fresh", evidence),
+            Exact(new SymbolicOwnershipAtom(term, false), source, provenance + ".owned", evidence),
+            Exact(
+                new SymbolicResourceLifetimeAtom(term, SymbolicResourceLifetimeState.Owned),
+                source,
+                provenance + ".lifetime",
+                evidence));
+    }
+
+    private static SymbolicFact Exact(
+        SymbolicAtom atom,
+        SyntaxNode source,
+        string provenance,
+        string? evidenceKey = null)
+    {
+        return new SymbolicFact(
+            atom,
+            true,
+            SymbolicFactConfidence.Exact,
+            provenance,
+            source.Span,
+            null,
+            evidenceKey);
     }
 }
