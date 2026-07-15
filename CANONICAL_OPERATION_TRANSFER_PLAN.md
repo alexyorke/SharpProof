@@ -150,7 +150,7 @@ transfer policy after its slice is complete.
 
 ## Phase 4 - Runtime Hazards Lowered Once
 
-- [ ] Emit divide-by-zero, checked-overflow, and conversion preconditions from
+- [x] Emit divide-by-zero, checked-overflow, and conversion preconditions from
   canonical operation events.
 - [ ] Emit null, nullable-value, dynamic-binding, and disposal preconditions.
 - [ ] Emit indexing, range, collection-cardinality, and array preconditions.
@@ -243,6 +243,7 @@ transfer policy after its slice is complete.
 | Canonical guarded branch joins | `64e44777` | 107,460 | -216 |
 | Canonical residual flow events | `034ba294` | 107,470 | -206 |
 | Canonical divide/remainder hazards | `56ebdb15` | 107,497 | -179 |
+| Canonical checked-overflow hazards | `eda4b912` | 107,152 | -524 |
 
 ## Validation Ledger
 
@@ -293,18 +294,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical guarded branch joins | Commit `64e44777` moves common-state intersection, guarded branch choices, merge limits, and truncation recording into `SymbolicStateMerger` and deletes the branch-owned implementation. Focused switch/path/pattern/limit tests: 154 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,460, or -216 from the rewrite start. |
 | Phase 3 residual flow events and gate | Commit `034ba294` routes switch-section assumptions, switch-exit exclusions, finite-foreach domains, loop length facts, and branch invalidations through canonical branch, loop-edge, and mutation events. Branch, loop, and completion owners now retain source/CFG discovery but no independent condition or invalidation mutation. Release Symbolic build: zero warnings; focused operation/branch/loop/state/limit tests: 218 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,470, or -206 from the rewrite start; the ten-line cost removes the final flow mutation escape hatches and closes Phase 3. |
 | Phase 4 canonical divide/remainder hazards | Commit `56ebdb15` lowers binary and compound divide/remainder operations into typed `SymbolicHazardOperation` descriptors, preserves exact and unsupported confidence/provenance, projects candidates from the descriptor, and deletes the dedicated syntax trigger builder. Direct descriptor plus arithmetic hazard/evidence tests: 143 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Reusable hazard-operation scaffolding temporarily raises production LOC to 107,497, or -179 from the rewrite start, and must be repaid by checked-overflow and conversion deletions. |
+| Phase 4 canonical checked-overflow hazards | Commit `eda4b912` lowers checked binary, signed-division, unary, increment/decrement, compound-assignment, and explicit numeric-conversion overflow into typed hazard operations and deletes the parallel syntax candidate, operator/range, trigger, and fallback builders. Focused operation/exception/authoring tests: 148 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 345 net production lines, bringing production LOC to 107,152, or -524 from the rewrite start, and completes the first Phase 4 item. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. Phase 4 now emits divide/remainder hazards as
-  typed operations; checked overflow and conversion still use legacy candidate
-  and trigger builders.
-- Last confirmed fact: canonical divide/remainder descriptors preserve exact and
-  unsupported outcomes across 143 focused tests, Oracle 573/573, Analyzer
+- State: Phases 2 and 3 are gated. Phase 4 arithmetic and conversion hazards now
+  emit typed operations; null, nullable-value, dynamic-binding, and disposal
+  preconditions remain on the legacy trigger path.
+- Last confirmed fact: the arithmetic/conversion migration removes 345 net
+  production lines and passes 148 focused tests, Oracle 573/573, Analyzer
   487/487, and Flow 256 plus only the documented SP0010 baseline failure.
-- Next cheapest step: migrate checked binary overflow onto the same hazard
-  operation projection, then extend it to unary/update/compound and conversion
-  forms before checking the first Phase 4 item.
+- Next cheapest step: inventory null-family candidate/trigger entry points and
+  migrate the structurally shared null precondition lowering first, preserving
+  definite-not-null suppression and conservative unsupported evidence.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
