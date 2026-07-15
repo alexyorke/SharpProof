@@ -250,6 +250,7 @@ transfer policy after its slice is complete.
 | Canonical relational bounds hazards | `c91a10ed` | 107,096 | -580 |
 | Canonical indexing hazards | `1562e72f` | 107,017 | -659 |
 | Canonical slicing bounds hazards | `2b86726f` | 107,029 | -647 |
+| Canonical runtime-type hazards | `39e7368a` | 106,918 | -758 |
 
 ## Validation Ledger
 
@@ -305,19 +306,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical relational bounds hazards | Commit `c91a10ed` lowers negative array/stackalloc lengths and collection cardinality into typed operations, preserves conservative mixed-dimension unsupported aggregates and their exact subject, and deletes the dedicated relational trigger builders plus the legacy aggregate trigger API. Focused descriptor, hazard, exception, and authoring tests: 259 passed. Production LOC fell by 62 lines to 107,096, or -580 from the rewrite start. |
 | Phase 4 canonical indexing hazards | Commit `1562e72f` lowers built-in element access, safe `Math.Abs` modulo indexes, multidimensional array access, and `Array.GetValue` bounds through canonical hazard operations and deletes four legacy index trigger builders. Focused descriptor, semantic-oracle, exception, authoring, and unknown-hazard tests: 259 passed. Production LOC fell by 79 lines to 107,017, or -659 from the rewrite start. |
 | Phase 4 canonical slicing bounds hazards | Commit `2b86726f` moves slicing and `Index` construction argument-range semantics into canonical hazard operations. Together with the relational and indexing slices, all indexing, range, collection-cardinality, negative-length, and array-bounds preconditions now have typed operation owners; array-store mismatch remains correctly grouped with the following cast/type-compatibility family. Focused tests: 259 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The completed bounds batch is net -67 lines from its 107,096 checkpoint; production LOC is 107,029, or -647 from the rewrite start. |
+| Phase 4 canonical runtime-type hazards | Commit `39e7368a` moves invalid reference casts, unboxing mismatches, and covariant array-store mismatches into canonical operation lowering while preserving exact runtime-type checks, null behavior, unsupported subjects, bounds guards, and evidence provenance. The three legacy trigger/candidate semantic blocks were deleted. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. Production LOC fell by 111 lines to 106,918, or -758 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 and 3 are gated. The first three Phase 4 items are complete;
   arithmetic, null-family, and all bounds/cardinality hazards emit typed
-  operations. Cast/type compatibility, switch, direct-throw, and remaining
-  framework-model preconditions still use legacy trigger paths.
-- Last confirmed fact: the completed bounds batch passes 259 focused tests,
-  Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented SP0010
-  baseline failure. Production LOC is 107,029, or -647 from the rewrite start.
-- Next cheapest step: migrate invalid cast, unbox/type mismatch, array-store
-  mismatch, switch-no-match, and direct-throw preconditions in deletion-sized
-  groups, starting with the shared runtime-type compatibility lowering.
+  operations. Cast/type compatibility is now canonical; switch, direct-throw,
+  argument, and remaining framework-model preconditions use legacy triggers.
+- Last confirmed fact: runtime-type migration passes 258 focused tests and
+  removes 111 production lines. Production LOC is 106,918, or -758 from the
+  rewrite start; the preceding full lanes remain Oracle 573/573, Analyzer
+  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
+- Next cheapest step: migrate direct-throw and switch-no-match together, then
+  group the remaining framework/argument models by shared relational or null
+  lowering and delete their legacy trigger builders.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
