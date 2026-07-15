@@ -303,6 +303,7 @@ transfer policy after its slice is complete.
 | Resolved source-query materialization finding | `2ec1efdd` | 105,746 | -1,930 |
 | Shared tooling temporary-source lifecycle | `71ec1af7` | 105,746 | -1,930 |
 | Shared compact CLI test contracts | `52f1b63c` | 105,746 | -1,930 |
+| Shared SARIF input materialization | `26b5b233` | 105,745 | -1,931 |
 
 ## Validation Ledger
 
@@ -394,6 +395,7 @@ transfer policy after its slice is complete.
 | Phase 6 resolved source-query materialization finding | Commit `2ec1efdd` removes the stale line/span query entry. Line, line-point, and span paths already share the full `AnalyzeAndProjectNode` materializer; only their node selectors, nearest-point logic, and scope metadata remain distinct. Wrapping the two short `Select` calls would add code without centralizing semantics. Focused program-point/query/path tests pass 113 and tooling source-query/projection/JSON tests pass 114. Production LOC remains 105,746, or -1,930 from the rewrite start. |
 | Phase 6 shared tooling temporary-source lifecycle | Commit `71ec1af7` introduces one disposable `TemporarySourceFile` fixture and migrates all nine capability, complexity, and standalone-profile CLI tests from repeated GUID/write/`try/finally`/delete blocks. Test names, sources, commands, and assertions are unchanged; `using` now owns cleanup even on failure. Focused fixtures pass 9/9 and the Release ToolingTest build has zero warnings. The tranche removes 51 test lines, bringing tracked test LOC to 142,428; production LOC remains 105,746, or -1,930 from the rewrite start. |
 | Phase 6 shared compact CLI test contracts | Commit `52f1b63c` centralizes compact JSON kind/schema/evidence assertions and capability/complexity `--all-lines` rejection checks while retaining the original test methods and feature-specific payload assertions. The shared envelope now also locks `schemaVersion`. Focused compact, capability, complexity, and source-query fixtures pass 108/108; Release ToolingTest build: zero warnings. Test LOC fell by 18 to 142,410; production LOC remains 105,746, or -1,930 from the rewrite start. |
+| Phase 6 shared SARIF input materialization | Commit `26b5b233` makes the linked `DotnetSarifBuildRunner` own ordered `.sln`/`.csproj` materialization and disposable temporary-file cleanup for Baseline and CorpusReport. The focused reproduction exposed that an up-to-date incremental build can skip compilation and produce no SARIF, so the shared runner now uses `--no-incremental`. A mixed direct-SARIF/project regression locks input order and zero leaked materialized files. Both Release tool builds have zero warnings; focused Baseline, CorpusReport, and process-ownership fixtures pass 28/28. Production LOC is 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,482 after the behavioral regression. |
 
 ## Current Checkpoint
 
@@ -403,14 +405,15 @@ transfer policy after its slice is complete.
   exception-flow diagnostic-envelope findings plus the switch-visibility shape
   finding are removed with evidence, and exception-catalog type/source
   registration, proof path-state encoding, and typed proof-status projection are
-  centralized. The stale source-query entry is removed, and tooling temporary
-  source lifecycle plus compact CLI test contracts are centralized.
-- Last confirmed fact: focused compact, capability, complexity, and source-query
-  fixtures pass 108/108 and the Release ToolingTest build has zero warnings.
-  Test LOC is 142,410; production LOC remains 105,746, or -1,930 from the
-  rewrite start.
-- Next cheapest step: adjudicate project/solution-to-SARIF materialization in
-  Baseline and CorpusReport, preserving temporary-file ownership and input
-  ordering.
+  centralized. The stale source-query entry is removed; tooling temporary-source
+  lifecycle, compact CLI test contracts, and project/solution-to-SARIF
+  materialization are centralized. Up-to-date project builds now reliably emit
+  the SARIF expected by both tools.
+- Last confirmed fact: both Release tool builds have zero warnings; focused
+  Baseline, CorpusReport, and process-ownership fixtures pass 28/28. Test LOC is
+  142,482; production LOC is 105,745, or -1,931 from the rewrite start.
+- Next cheapest step: adjudicate repository-relative path conversion and
+  production-source discovery across the metrics, SMT-hotspot, and clone audit
+  scripts, preserving strict containment and each script's intended scope.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
