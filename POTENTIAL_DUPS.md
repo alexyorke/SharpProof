@@ -6,9 +6,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Symbolic and proof core
 
-11. **Source-query line/span analysis** - `SharpProof.Symbolic/SymbolicSourceQueryService.cs:57-91,138-180`
-    Line and span queries both validate a tree, obtain a semantic model, select nodes, then perform the same `AnalyzeAndProjectNode` materialization. Share node analysis/projection and leave selection and result metadata separate.
-
 ## Code fixes, attributes, and test infrastructure
 
 16. **Tooling-test temporary source lifecycle** - `SharpProof.ToolingTest/SymbolicCapabilityQueryTests.cs:24-201`; `SharpProof.ToolingTest/SymbolicComplexityQueryTests.cs:26-208`; `SharpProof.ToolingTest/StandaloneCompilationProfileTests.cs:23-60`
