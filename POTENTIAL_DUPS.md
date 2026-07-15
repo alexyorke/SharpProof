@@ -74,14 +74,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## SharpProof.Test - Q-S
 
-### Large-scale duplicated embedded source fragments
-`SemanticOracleSmtTests.cs` (~9,400 lines) and `SemanticOracleRuntimeHazardAnalyzerSmtTests.cs` (~1,900 lines)
-share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
-
-**Recommendation:** Factor common scenario sources into shared fragment constants in `SemanticOracleSmtTestBase`.
-
----
-
 ## SharpProof.Test - T-V
 
 ---

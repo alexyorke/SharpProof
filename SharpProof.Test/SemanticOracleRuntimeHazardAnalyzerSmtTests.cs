@@ -360,22 +360,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_IfElseElseExitImpliesZeroDivisor_ReportsDivideByZero()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int divisor)
-    {
-        if (divisor == 0)
-        {
-        }
-        else
-        {
-            return 0;
-        }
-
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.IfElseElseExitZeroDivisor);
 
         AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
@@ -383,15 +369,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_DefaultLiteralDivisor_ReportsDivideByZero()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        int divisor = default;
-        return 10 / divisor;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.DefaultIntegralZeroDivisor);
 
         AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
@@ -610,19 +589,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_RelationalPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value is > 0 and var divisor)
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.RelationalPatternBoundNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -630,19 +598,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_PropertyPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text is { Length: > 0 and var length })
-        {
-            return 10 / length;
-        }
-
-        return 0;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.PropertyPatternBoundNonZeroLength);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -650,20 +607,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_SwitchStatementPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case > 0 and var divisor:
-                return 10 / divisor;
-            default:
-                return 0;
-        }
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.SwitchStatementPatternBoundNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -671,20 +616,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_SwitchStatementPriorSectionExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case 0:
-                return 0;
-            case var divisor:
-                return 10 / divisor;
-        }
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.SwitchStatementPriorSectionExcludesZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -692,18 +625,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_SwitchExpressionPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        return value switch
-        {
-            > 0 and var divisor => 10 / divisor,
-            _ => 0
-        };
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.SwitchExpressionPatternBoundNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -711,18 +634,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_SwitchExpressionFallbackExcludesZeroDivisor_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        return value switch
-        {
-            0 => 0,
-            _ => 10 / value
-        };
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.SwitchExpressionFallbackExcludesZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1118,19 +1031,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_ListPatternElementBindingNonZero_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [> 0 and var divisor, ..])
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.ListPatternFirstElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1138,19 +1040,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_TrailingListPatternElementBindingNonZero_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [.., > 0 and var divisor])
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.ListPatternTrailingElementNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1158,20 +1049,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_ArrayElementReadFromListPatternFacts_DoesNotReport()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [> 0, ..])
-        {
-            var divisor = values[0];
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.ArrayElementReadFromListPatternNonZeroDivisor);
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
     }
@@ -1563,15 +1442,8 @@ public class TestClass
     [Test]
     public async Task Sp0010_DefaultLiteralReference_ReportsNullReference()
     {
-        var diagnostics = await GetExceptionDiagnosticsAsync(@"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        string value = default;
-        return value.Length;
-    }
-}");
+        var diagnostics = await GetExceptionDiagnosticsAsync(
+            SemanticOracleTestSources.DefaultReferenceNull);
 
         AssertSingleExceptionDiagnostic(diagnostics, "System.NullReferenceException", "definite_null_dereference");
     }

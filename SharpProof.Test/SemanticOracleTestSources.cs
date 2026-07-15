@@ -153,4 +153,168 @@ public class TestClass
         return 10 / divisor;
     }
 }";
+
+    internal const string SwitchStatementPatternBoundNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case > 0 and var divisor:
+                return 10 / divisor;
+            default:
+                return 0;
+        }
+    }
+}";
+
+    internal const string SwitchStatementPriorSectionExcludesZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+            case var divisor:
+                return 10 / divisor;
+        }
+    }
+}";
+
+    internal const string SwitchExpressionPatternBoundNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            > 0 and var divisor => 10 / divisor,
+            _ => 0
+        };
+    }
+}";
+
+    internal const string SwitchExpressionFallbackExcludesZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            0 => 0,
+            _ => 10 / value
+        };
+    }
+}";
+
+    internal const string RelationalPatternBoundNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value is > 0 and var divisor)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+
+    internal const string PropertyPatternBoundNonZeroLength = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text is { Length: > 0 and var length })
+        {
+            return 10 / length;
+        }
+
+        return 0;
+    }
+}";
+
+    internal const string ListPatternFirstElementNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [> 0 and var divisor, ..])
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+
+    internal const string ListPatternTrailingElementNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [.., > 0 and var divisor])
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+
+    internal const string ArrayElementReadFromListPatternNonZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [> 0, ..])
+        {
+            var divisor = values[0];
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+
+    internal const string IfElseElseExitZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+        }
+        else
+        {
+            return 0;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+    internal const string DefaultIntegralZeroDivisor = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int divisor = default;
+        return 10 / divisor;
+    }
+}";
+
+    internal const string DefaultReferenceNull = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string value = default;
+        return value.Length;
+    }
+}";
 }

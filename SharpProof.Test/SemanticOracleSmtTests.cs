@@ -1810,20 +1810,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsSwitchStatementPatternBindingFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case > 0 and var divisor:
-                return 10 / divisor;
-            default:
-                return 0;
-        }
-    }
-}",
+            SemanticOracleTestSources.SwitchStatementPatternBoundNonZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -1839,20 +1826,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsSwitchStatementPriorSectionExclusionFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        switch (value)
-        {
-            case 0:
-                return 0;
-            case var divisor:
-                return 10 / divisor;
-        }
-    }
-}",
+            SemanticOracleTestSources.SwitchStatementPriorSectionExcludesZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -1954,18 +1928,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsSwitchExpressionFallbackExclusionFacts()
     {
         var facts = CollectExpressionProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        return value switch
-        {
-            0 => 0,
-            _ => 10 / value
-        };
-    }
-}",
+            SemanticOracleTestSources.SwitchExpressionFallbackExcludesZeroDivisor,
             "10 / value");
 
         Assert.That(facts, Is.Not.Empty);
@@ -1979,18 +1942,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsSwitchExpressionPatternBindingFacts()
     {
         var facts = CollectExpressionProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        return value switch
-        {
-            > 0 and var divisor => 10 / divisor,
-            _ => 0
-        };
-    }
-}",
+            SemanticOracleTestSources.SwitchExpressionPatternBoundNonZeroDivisor,
             "10 / divisor");
 
         Assert.That(facts, Is.Not.Empty);
@@ -4147,19 +4099,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_QuerySource_CollectsPatternVariableBindingFacts()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (value is > 0 and var divisor)
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}";
+        const string source = SemanticOracleTestSources.RelationalPatternBoundNonZeroDivisor;
         var result = new SymbolicSourceQueryService().QuerySource(
             source,
             "QuerySourcePatternBindingFacts.cs",
@@ -4175,19 +4115,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_QuerySource_CollectsPropertyPatternVariableBindingFacts()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text is { Length: > 0 and var length })
-        {
-            return 10 / length;
-        }
-
-        return 0;
-    }
-}";
+        const string source = SemanticOracleTestSources.PropertyPatternBoundNonZeroLength;
         var result = new SymbolicSourceQueryService().QuerySource(
             source,
             "QuerySourcePropertyPatternBindingFacts.cs",
@@ -4203,19 +4131,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_QuerySource_CollectsListPatternElementBindingFacts()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [> 0 and var divisor, ..])
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}";
+        const string source = SemanticOracleTestSources.ListPatternFirstElementNonZeroDivisor;
         var result = new SymbolicSourceQueryService().QuerySource(
             source,
             "QuerySourceListPatternElementBindingFacts.cs",
@@ -4234,19 +4150,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_QuerySource_CollectsTrailingListPatternElementBindingFacts()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [.., > 0 and var divisor])
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}";
+        const string source = SemanticOracleTestSources.ListPatternTrailingElementNonZeroDivisor;
         var result = new SymbolicSourceQueryService().QuerySource(
             source,
             "QuerySourceTrailingListPatternElementBindingFacts.cs",
@@ -4265,20 +4169,7 @@ public class TestClass
     [Test]
     public void SymbolicSourceQueryService_QuerySource_ProvesArrayElementReadFromListPatternFacts()
     {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values is [> 0, ..])
-        {
-            var divisor = values[0];
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}";
+        const string source = SemanticOracleTestSources.ArrayElementReadFromListPatternNonZeroDivisor;
         var result = new SymbolicSourceQueryService().QuerySource(
             source,
             "QuerySourceArrayElementReadFromListPatternFacts.cs",
@@ -4541,22 +4432,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsIfElseElseExitFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod(int divisor)
-    {
-        if (divisor == 0)
-        {
-        }
-        else
-        {
-            return 0;
-        }
-
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.IfElseElseExitZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -4680,15 +4556,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsDefaultLiteralAssignmentFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        int divisor = default;
-        return 10 / divisor;
-    }
-}",
+            SemanticOracleTestSources.DefaultIntegralZeroDivisor,
             "return 10 / divisor;");
 
         Assert.That(facts, Is.Not.Empty);
@@ -4701,15 +4569,7 @@ public class TestClass
     public void SymbolicInvariantService_CollectsDefaultReferenceAssignmentFacts()
     {
         var facts = CollectProgramPointFacts(
-            @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        string value = default;
-        return value.Length;
-    }
-}",
+            SemanticOracleTestSources.DefaultReferenceNull,
             "return value.Length;");
 
         Assert.That(facts, Is.Not.Empty);
