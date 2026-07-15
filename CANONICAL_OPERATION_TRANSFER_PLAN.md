@@ -261,6 +261,7 @@ transfer policy after its slice is complete.
 | Canonical owned flow-capture state | `d08c7179` | 106,442 | -1,234 |
 | Canonical purity consumer gate | `50309315` | 106,415 | -1,261 |
 | Superseded nullable interpreter deletion | `92bc2b50` | 106,343 | -1,333 |
+| Shared exact runtime-type resolution | `640c1426` | 106,282 | -1,394 |
 
 ## Validation Ledger
 
@@ -327,19 +328,22 @@ transfer policy after its slice is complete.
 | Phase 5 canonical owned flow-capture state | Commit `d08c7179` removes the parallel owned-array flow-capture set and derives capture ownership from canonical freshness/ownership facts over the existing synthetic capture term. Canonical path merging now owns all-path retention. Release test build: zero warnings; focused array, collection, lambda, capture, and purity tests: 143 passed; MainSmtAnalyzer: 487 passed. The adjacent local concrete-type map was audited and retained because it stores exact `INamedTypeSymbol` identity while a canonical type-test atom proves assignability, not exact runtime type. Production LOC fell to 106,442, or -1,234 from the rewrite start. |
 | Phase 5 canonical purity consumer gate | Commit `50309315` removes a second disposable-acquisition pass, the now-dead using-declarator classifier, and a resource-specific non-null fact already emitted by canonical assignment lowering. Exact audit finds purity path semantics entering through canonical assignment, lifetime, mutation, branch-assumption, or merge transitions; retained delegate targets, exact Roslyn types, flow-capture results, and capture-source maps are Analyzer metadata rather than competing symbolic transfer. Release test build: zero warnings; focused using, disposal, alias, mutation, and resource tests: 181 passed; MainSmtAnalyzer: 487 passed; MainGeneral: 3,676 passed and the two documented reflection skips. The first Phase 5 item closes at 106,415 production LOC, or -1,261 from the rewrite start. |
 | Phase 5 superseded nullable interpreter deletion | Commit `92bc2b50` deletes the unreferenced exception-site null interpreter that recursively reconstructed cast/default/dominating-if state, plus its now-dead exception syntax helpers and reference-like wrapper. Nullable contract verification already enters through the canonical query service; Roslyn nullable flow remains only a conservative fallback when canonical proof is unknown. Release test build: zero warnings; focused nullable, null-forgiving, reachability, and exception-flow tests: 163 passed. Production LOC fell to 106,343, or -1,333 from the rewrite start. |
+| Phase 5 shared exact runtime-type resolution | Commit `640c1426` routes exception method/property dispatch through `SymbolicRuntimeTypeFacts`, extends that shared resolver with same-type conditional/coalesce merges, and deletes exception flow's independent statement-scanning exact-local dictionary. The strengthened fixture proves a conditional local followed by a same-type coalesce still reaches the exact property implementation. Release test build: zero warnings; focused exact-dispatch and exception-flow tests: 60 passed plus the strengthened focused reproduction; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 106,282, or -1,394 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 through 4 are gated. Phase 5 purity migration is complete;
   nullable contract proofs use the canonical query boundary, and the dead
-  exception-site null interpreter is deleted. Runtime-type migration remains.
-- Last confirmed fact: the nullable deletion passes 163 focused tests with a
-  zero-warning Release build. Production LOC is 106,343, or -1,333 from the
-  rewrite start; Analyzer remains 487/487 and MainGeneral remains 3,676 with two
-  documented skips.
-- Next cheapest step: replace exception flow's statement-scanning exact-local-
-  type dictionary with canonical assignment/runtime-type state, while retaining
-  exact Roslyn type identity rather than weakening it to assignability.
+  exception-site null interpreter is deleted. Exception dispatch now shares the
+  Symbolic current-value/runtime-type resolver; purity's exact local and flow-
+  capture type maps remain.
+- Last confirmed fact: the shared runtime-type slice has a zero-warning Release
+  build, 60 focused dispatch/exception tests plus the strengthened reproduction,
+  Analyzer 487/487, and Flow 256/257 with only baseline SP0010. Production LOC
+  is 106,282, or -1,394 from the rewrite start.
+- Next cheapest step: shadow purity's exact local/flow-capture receiver metadata
+  against the shared Symbolic current-value/runtime-type resolver, then delete
+  only the entries for which exact Roslyn type identity and CFG behavior match.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
