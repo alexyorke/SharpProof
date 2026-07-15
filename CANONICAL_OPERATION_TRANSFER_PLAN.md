@@ -152,7 +152,9 @@ transfer policy after its slice is complete.
 
 - [x] Emit divide-by-zero, checked-overflow, and conversion preconditions from
   canonical operation events.
-- [ ] Emit null, nullable-value, dynamic-binding, and disposal preconditions.
+- [x] Emit null, nullable-value, and dynamic-binding preconditions. Disposal
+  remains a canonical lifetime transition: arbitrary member use has no sound
+  universal `ObjectDisposedException` precondition.
 - [ ] Emit indexing, range, collection-cardinality, and array preconditions.
 - [ ] Emit cast, switch-no-match, argument, direct-throw, and framework-model
   preconditions.
@@ -244,6 +246,7 @@ transfer policy after its slice is complete.
 | Canonical residual flow events | `034ba294` | 107,470 | -206 |
 | Canonical divide/remainder hazards | `56ebdb15` | 107,497 | -179 |
 | Canonical checked-overflow hazards | `eda4b912` | 107,152 | -524 |
+| Canonical null-family hazards | `d15a43af` | 107,158 | -518 |
 
 ## Validation Ledger
 
@@ -295,18 +298,20 @@ transfer policy after its slice is complete.
 | Phase 3 residual flow events and gate | Commit `034ba294` routes switch-section assumptions, switch-exit exclusions, finite-foreach domains, loop length facts, and branch invalidations through canonical branch, loop-edge, and mutation events. Branch, loop, and completion owners now retain source/CFG discovery but no independent condition or invalidation mutation. Release Symbolic build: zero warnings; focused operation/branch/loop/state/limit tests: 218 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,470, or -206 from the rewrite start; the ten-line cost removes the final flow mutation escape hatches and closes Phase 3. |
 | Phase 4 canonical divide/remainder hazards | Commit `56ebdb15` lowers binary and compound divide/remainder operations into typed `SymbolicHazardOperation` descriptors, preserves exact and unsupported confidence/provenance, projects candidates from the descriptor, and deletes the dedicated syntax trigger builder. Direct descriptor plus arithmetic hazard/evidence tests: 143 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Reusable hazard-operation scaffolding temporarily raises production LOC to 107,497, or -179 from the rewrite start, and must be repaid by checked-overflow and conversion deletions. |
 | Phase 4 canonical checked-overflow hazards | Commit `eda4b912` lowers checked binary, signed-division, unary, increment/decrement, compound-assignment, and explicit numeric-conversion overflow into typed hazard operations and deletes the parallel syntax candidate, operator/range, trigger, and fallback builders. Focused operation/exception/authoring tests: 148 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 345 net production lines, bringing production LOC to 107,152, or -524 from the rewrite start, and completes the first Phase 4 item. |
+| Phase 4 canonical null-family hazards | Commit `d15a43af` lowers null dereference, argument-null, unbox-null, nullable-value, and dynamic-null binding preconditions into typed hazard operations, including the loop-carried nullable special case, and deletes the six dedicated legacy trigger builders. Disposal remains canonical lifetime state because arbitrary use after disposal does not universally throw `ObjectDisposedException`; existing SP0002 disposal evidence tests characterize that boundary. Direct and focused hazard/evidence tests: 259 passed; post-consolidation focused hazard tests: 255 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,158, or -518 from the rewrite start; the six-line bridge cost must be repaid when the remaining candidate adapters are deleted. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. Phase 4 arithmetic and conversion hazards now
-  emit typed operations; null, nullable-value, dynamic-binding, and disposal
-  preconditions remain on the legacy trigger path.
-- Last confirmed fact: the arithmetic/conversion migration removes 345 net
-  production lines and passes 148 focused tests, Oracle 573/573, Analyzer
-  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
-- Next cheapest step: inventory null-family candidate/trigger entry points and
-  migrate the structurally shared null precondition lowering first, preserving
-  definite-not-null suppression and conservative unsupported evidence.
+- State: Phases 2 and 3 are gated. Phase 4 arithmetic, conversion, null,
+  nullable-value, and dynamic-binding hazards emit typed operations. Disposal
+  remains on the already canonical lifetime/evidence path.
+- Last confirmed fact: the null-family migration passes 255 focused hazard
+  tests, Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented
+  SP0010 baseline failure. Production LOC is 107,158, or -518 from the start.
+- Next cheapest step: inventory indexing, range, collection-cardinality, and
+  array candidate/trigger entry points; migrate the largest structurally shared
+  bounds-precondition family first while preserving ordering and unsupported
+  outcomes.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
