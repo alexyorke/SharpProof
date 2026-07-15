@@ -57,7 +57,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !operation.TargetMethod.IsStatic ||
             !SymbolicKnownApiLowerer.IsMathAbs(operation.TargetMethod) ||
             operation.TargetMethod.Parameters.Length != 1 ||
-            !TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
+            !SymbolicTypeFacts.TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
             minValue >= 0 ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var operand) ||
             !TryCreateCheckedEqualityOverflowTrigger(
@@ -228,169 +228,33 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         BinaryExpressionSyntax binaryExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!TryGetCheckedIntegralBinaryOperator(
-                binaryExpression,
-                semanticModel,
-                cancellationToken,
-                out var smtOperator,
-                out var minValue,
-                out var maxValue))
-            return false;
-
-        var hasExactTrigger = TryCreateCheckedIntegralBinaryOverflowTrigger(
-            binaryExpression,
-            smtOperator,
-            minValue,
-            maxValue,
-            semanticModel,
-            cancellationToken,
-            out var overflowTrigger);
-        candidate = CreateCheckedOverflowCandidate(
-            binaryExpression,
-            hasExactTrigger,
-            overflowTrigger,
-            "ir.runtime-hazard.checked-integral-overflow.unsupported",
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
-        return true;
-    }
+        out RuntimeHazardCandidate candidate) =>
+        TryCreateOperationCheckedOverflowCandidate(
+            binaryExpression, semanticModel, cancellationToken, out candidate);
 
     internal static bool TryCreateCheckedIntegralOverflowCandidate(
         PrefixUnaryExpressionSyntax unaryExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        if (TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
-                unaryExpression,
-                semanticModel,
-                cancellationToken,
-                out candidate))
-            return true;
-
-        return TryCreateCheckedIntegralUpdateOverflowCandidate(
-            unaryExpression,
-            unaryExpression.Operand,
-            semanticModel,
-            cancellationToken,
-            out candidate);
-    }
-
-    internal static bool TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
-        PrefixUnaryExpressionSyntax unaryExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!TryGetCheckedIntegralUnaryOperator(
-                unaryExpression,
-                semanticModel,
-                cancellationToken,
-                out var minValue,
-                out var maxValue))
-            return false;
-
-        var hasExactTrigger = TryCreateCheckedIntegralUnaryOverflowTrigger(
-            unaryExpression,
-            minValue,
-            maxValue,
-            semanticModel,
-            cancellationToken,
-            out var overflowTrigger);
-        candidate = CreateCheckedOverflowCandidate(
-            unaryExpression,
-            hasExactTrigger,
-            overflowTrigger,
-            "ir.runtime-hazard.checked-integral-overflow.unsupported",
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
-        return true;
-    }
+        out RuntimeHazardCandidate candidate) =>
+        TryCreateOperationCheckedOverflowCandidate(
+            unaryExpression, semanticModel, cancellationToken, out candidate);
 
     internal static bool TryCreateCheckedIntegralOverflowCandidate(
         PostfixUnaryExpressionSyntax unaryExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        return TryCreateCheckedIntegralUpdateOverflowCandidate(
-            unaryExpression,
-            unaryExpression.Operand,
-            semanticModel,
-            cancellationToken,
-            out candidate);
-    }
-
-    internal static bool TryCreateCheckedIntegralUpdateOverflowCandidate(
-        ExpressionSyntax updateExpression,
-        ExpressionSyntax operand,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
-                updateExpression,
-                operand,
-                semanticModel,
-                cancellationToken,
-                out var smtOperator,
-                out var minValue,
-                out var maxValue))
-            return false;
-
-        var hasExactTrigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
-            updateExpression,
-            operand,
-            smtOperator,
-            minValue,
-            maxValue,
-            semanticModel,
-            cancellationToken,
-            out var overflowTrigger);
-        candidate = CreateCheckedOverflowCandidate(
-            updateExpression,
-            hasExactTrigger,
-            overflowTrigger,
-            "ir.runtime-hazard.checked-integral-overflow.unsupported",
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
-        return true;
-    }
+        out RuntimeHazardCandidate candidate) =>
+        TryCreateOperationCheckedOverflowCandidate(
+            unaryExpression, semanticModel, cancellationToken, out candidate);
 
     internal static bool TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(
         AssignmentExpressionSyntax assignment,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!TryGetCheckedIntegralCompoundAssignmentOperator(
-                assignment,
-                semanticModel,
-                cancellationToken,
-                out var smtOperator,
-                out var minValue,
-                out var maxValue))
-            return false;
-
-        var hasExactTrigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
-            assignment,
-            smtOperator,
-            minValue,
-            maxValue,
-            semanticModel,
-            cancellationToken,
-            out var overflowTrigger);
-        candidate = CreateCheckedOverflowCandidate(
-            assignment,
-            hasExactTrigger,
-            overflowTrigger,
-            "ir.runtime-hazard.checked-integral-overflow.unsupported",
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
-        return true;
-    }
+        out RuntimeHazardCandidate candidate) =>
+        TryCreateOperationCheckedOverflowCandidate(
+            assignment, semanticModel, cancellationToken, out candidate);
 
     internal static bool TryCreateCompoundAssignmentDivideByZeroCandidate(
         AssignmentExpressionSyntax assignment,
@@ -484,53 +348,27 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         CastExpressionSyntax castExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate) =>
+        TryCreateOperationCheckedOverflowCandidate(
+            castExpression, semanticModel, cancellationToken, out candidate);
+
+    private static bool TryCreateOperationCheckedOverflowCandidate(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!TryGetCheckedExplicitNumericConversionRange(
-                castExpression,
-                semanticModel,
-                cancellationToken,
-                out var minValue,
-                out var maxValue))
+        var operation = semanticModel.GetOperation(site, cancellationToken);
+        if (operation == null ||
+            !SymbolicOperationLowerer.TryLowerCheckedOverflowHazard(
+                operation,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        var hasExactTrigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
-            castExpression,
-            minValue,
-            maxValue,
-            semanticModel,
-            cancellationToken,
-            out var overflowTrigger);
-        candidate = CreateCheckedOverflowCandidate(
-            castExpression,
-            hasExactTrigger,
-            overflowTrigger,
-            "ir.runtime-hazard.checked-numeric-conversion-overflow.unsupported",
-            ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
+        candidate = new RuntimeHazardCandidate(site, hazard);
         return true;
-    }
-
-    internal static RuntimeHazardCandidate CreateCheckedOverflowCandidate(
-        SyntaxNode site,
-        bool hasExactTrigger,
-        RuntimeHazardTrigger exactTrigger,
-        string unsupportedProvenance,
-        string category)
-    {
-        var trigger = hasExactTrigger
-            ? exactTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                site,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                unsupportedProvenance);
-        return new RuntimeHazardCandidate(
-            site,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
-            category);
     }
 
     internal static bool TryCreateUnboxNullCastCandidate(

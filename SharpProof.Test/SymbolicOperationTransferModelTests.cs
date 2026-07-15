@@ -63,6 +63,37 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [TestCase("return checked(value + 1);", "value + 1", "definite_checked_integral_overflow")]
+    [TestCase("return checked(-value);", "-value", "definite_checked_integral_overflow")]
+    [TestCase("return checked(++value);", "++value", "definite_checked_integral_overflow")]
+    [TestCase("return checked(value += 1);", "value += 1", "definite_checked_integral_overflow")]
+    [TestCase("return checked((byte)value);", "(byte)value", "definite_checked_numeric_conversion_overflow")]
+    public void CheckedOverflowLowering_EmitsTypedOperation(
+        string statement,
+        string operationText,
+        string expectedCategory)
+    {
+        var source = $"static class C {{ static int M(int value) {{ {statement} }} }}";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(CheckedOverflowLowering_EmitsTypedOperation));
+        var expression = fixture.Root.DescendantNodes().OfType<ExpressionSyntax>()
+            .Single(candidate => candidate.ToString() == operationText);
+        var operation = fixture.SemanticModel.GetOperation(expression)!;
+
+        var lowered = SymbolicOperationLowerer.TryLowerCheckedOverflowHazard(
+            operation,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.HazardKind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.PreconditionKind, Is.EqualTo(SymbolicExceptionPreconditionKind.CheckedOverflow));
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Category, Is.EqualTo(expectedCategory));
+        });
+    }
+
     [Test]
     public void OperationDescriptors_KeepTypedPayloadAndEvaluationSequence()
     {

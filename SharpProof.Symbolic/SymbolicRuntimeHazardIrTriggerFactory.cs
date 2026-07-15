@@ -262,69 +262,6 @@ internal static class SymbolicRuntimeHazardIrTriggerFactory
         return true;
     }
 
-    internal static bool TryCreateCheckedIntegralOutOfRangeTrigger(
-        ExpressionSyntax expression,
-        long minValue,
-        long maxValue,
-        string provenance,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardTrigger trigger)
-    {
-        trigger = default;
-        if (!TryLowerExactIntegerTerm(expression, semanticModel, cancellationToken, out var value))
-            return false;
-
-        var lowerOverflow = CreateExactIntegerRelationCondition(
-            value, SymbolicRelationOperator.LessThan, minValue, expression, provenance + ".below-min");
-        var upperOverflow = CreateExactIntegerRelationCondition(
-            value, SymbolicRelationOperator.GreaterThan, maxValue, expression, provenance + ".above-max");
-        var outOfRange = new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            lowerOverflow,
-            upperOverflow);
-
-        return TryCreateIrExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind.CheckedOverflow,
-            value,
-            outOfRange,
-            expression,
-            provenance,
-            out trigger);
-    }
-
-    internal static bool TryCreateCheckedSignedDivisionOverflowTrigger(
-        SyntaxNode site,
-        ExpressionSyntax leftExpression,
-        ExpressionSyntax rightExpression,
-        long minValue,
-        string provenance,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardTrigger trigger)
-    {
-        trigger = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!TryLowerExactTerm(leftExpression, SmtValueKind.Int, context, out var left) ||
-            !TryLowerExactTerm(rightExpression, SmtValueKind.Int, context, out var right))
-            return false;
-
-        var overflowCondition = SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
-            left,
-            right,
-            minValue,
-            site,
-            provenance);
-
-        return TryCreateIrExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind.CheckedOverflow,
-            left,
-            overflowCondition,
-            site,
-            provenance,
-            out trigger);
-    }
-
     internal static bool TryCreateCheckedEqualityOverflowTrigger(
         SyntaxNode site,
         ExpressionSyntax expression,
