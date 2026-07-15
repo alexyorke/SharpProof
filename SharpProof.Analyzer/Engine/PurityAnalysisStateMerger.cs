@@ -35,8 +35,7 @@ internal static class PurityAnalysisStateMerger
             IntersectLocalConcreteTypesAcrossAll(states.Select(static state => state.LocalConcreteTypes)),
             IntersectFlowCaptureConcreteTypesAcrossAll(states.Select(static state => state.FlowCaptureConcreteTypes)),
             MergePathStatesAcrossAll(states, phiScope),
-            IntersectFlowCaptureSymbolsAcrossAll(states.Select(static state => state.FlowCaptureSymbols)),
-            IntersectOwnedArrayFlowCapturesAcrossAll(states.Select(static state => state.OwnedArrayFlowCaptures)));
+            IntersectFlowCaptureSymbolsAcrossAll(states.Select(static state => state.FlowCaptureSymbols)));
     }
 
     private static (SyntaxNode? FirstImpureNode, PurityEvidence FirstImpurityEvidence) SelectFirstImpurity(
@@ -78,22 +77,6 @@ internal static class PurityAnalysisStateMerger
             maps,
             ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default),
             IntersectDelegateTargetMaps);
-    }
-
-    private static ImmutableHashSet<CaptureId> IntersectOwnedArrayFlowCaptures(
-        ImmutableHashSet<CaptureId> first,
-        ImmutableHashSet<CaptureId> second)
-    {
-        return first.Intersect(second).ToImmutableHashSet();
-    }
-
-    private static ImmutableHashSet<CaptureId> IntersectOwnedArrayFlowCapturesAcrossAll(
-        IEnumerable<ImmutableHashSet<CaptureId>> captureSets)
-    {
-        return AggregateAcrossAll(
-            captureSets,
-            ImmutableHashSet<CaptureId>.Empty,
-            IntersectOwnedArrayFlowCaptures);
     }
 
     private static ImmutableDictionary<CaptureId, PurityAnalysisResult> MergeFlowCaptureMapsAcrossAll(

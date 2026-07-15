@@ -252,7 +252,6 @@ internal partial class PurityAnalysisEngine
         public ImmutableDictionary<CaptureId, PotentialTargets> FlowCaptureTargets { get; }
         public ImmutableDictionary<CaptureId, INamedTypeSymbol> FlowCaptureConcreteTypes { get; }
         public ImmutableDictionary<CaptureId, ISymbol> FlowCaptureSymbols { get; }
-        public ImmutableHashSet<CaptureId> OwnedArrayFlowCaptures { get; }
         public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
         public SymbolicState PathState { get; }
 
@@ -267,8 +266,7 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
-            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
-            ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
+            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
         {
             HasPotentialImpurity = hasPotentialImpurity;
             FirstImpureSyntaxNode = firstImpureSyntaxNode;
@@ -281,7 +279,6 @@ internal partial class PurityAnalysisEngine
             FlowCaptureConcreteTypes =
                 flowCaptureConcreteTypes ?? ImmutableDictionary<CaptureId, INamedTypeSymbol>.Empty;
             FlowCaptureSymbols = flowCaptureSymbols ?? ImmutableDictionary.Create<CaptureId, ISymbol>();
-            OwnedArrayFlowCaptures = ownedArrayFlowCaptures ?? ImmutableHashSet<CaptureId>.Empty;
             LocalConcreteTypes = localConcreteTypes ??
                                  ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
             PathState = pathState ?? new SymbolicState();
@@ -313,7 +310,6 @@ internal partial class PurityAnalysisEngine
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
                    MapsEqual(FlowCaptureSymbols, other.FlowCaptureSymbols,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
-                   OwnedArrayFlowCaptures.SetEquals(other.OwnedArrayFlowCaptures) &&
                    SymbolicStatesEqual(PathState, other.PathState) &&
                    MapsEqual(LocalConcreteTypes, other.LocalConcreteTypes,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
@@ -379,9 +375,6 @@ internal partial class PurityAnalysisEngine
                 hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
             }
 
-            foreach (var captureId in OwnedArrayFlowCaptures.OrderBy(id => id.GetHashCode()))
-                hash = hash * 23 + captureId.GetHashCode();
-
             foreach (var fact in PathState.Facts) hash = hash * 23 + fact.GetHashCode();
 
             foreach (var condition in PathState.PathConditions) hash = hash * 23 + condition.GetHashCode();
@@ -439,8 +432,7 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
-            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
-            ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
+            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
         {
             return new PurityAnalysisState(
                 hasPotentialImpurity ?? HasPotentialImpurity,
@@ -452,8 +444,7 @@ internal partial class PurityAnalysisEngine
                 localConcreteTypes ?? LocalConcreteTypes,
                 flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
                 pathState ?? PathState,
-                flowCaptureSymbols ?? FlowCaptureSymbols,
-                ownedArrayFlowCaptures ?? OwnedArrayFlowCaptures);
+                flowCaptureSymbols ?? FlowCaptureSymbols);
         }
 
 
@@ -519,25 +510,22 @@ internal partial class PurityAnalysisEngine
 
         public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode? source)
         {
-            if (OwnedArrayFlowCaptures.Contains(id)) return this;
+            if (IsOwnedArrayFlowCapture(id)) return this;
 
-            return Copy(
-                ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Add(id),
-                pathState: AddOwnedArrayFlowCaptureFacts(PathState, id, source));
+            return Copy(pathState: AddOwnedArrayFlowCaptureFacts(PathState, id, source));
         }
 
         public PurityAnalysisState WithoutOwnedArrayFlowCapture(CaptureId id)
         {
-            if (!OwnedArrayFlowCaptures.Contains(id)) return this;
+            if (!IsOwnedArrayFlowCapture(id)) return this;
 
-            return Copy(
-                ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Remove(id),
-                pathState: RemoveOwnedArrayFlowCaptureFacts(PathState, id));
+            return Copy(pathState: RemoveOwnedArrayFlowCaptureFacts(PathState, id));
         }
 
         public bool IsOwnedArrayFlowCapture(CaptureId id)
         {
-            return OwnedArrayFlowCaptures.Contains(id);
+            var term = CreateOwnedArrayFlowCaptureTerm(id);
+            return PathState.Facts.Any(fact => IsOwnedArrayFlowCaptureFact(fact, term));
         }
 
         private static SymbolicState AddOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id,
