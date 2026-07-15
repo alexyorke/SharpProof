@@ -1665,10 +1665,12 @@ internal static class SymbolicOperationLowerer
                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 SymbolicTypeFacts.IsSymbolicReferenceLikeType,
                 out var elementKind) ||
-            !SymbolicProgramPointFacts.TryGetFiniteElementExpressions(valueExpression, out var elementExpressions) ||
+            SymbolicFiniteDomainLowerer.LowerElements(valueExpression) is not
+                { IsExact: true, Value: { } finiteElements } ||
             target.Kind != SmtValueKind.Reference)
             return;
 
+        var elementExpressions = finiteElements.Expressions;
         for (var index = 0; index < elementExpressions.Length; index++)
         {
             var elementExpression = elementExpressions[index];
