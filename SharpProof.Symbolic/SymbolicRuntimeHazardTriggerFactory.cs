@@ -15,61 +15,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardTriggerFactory
 {
-    internal static bool TryCreateSwitchExpressionNoMatchCandidate(
-        SwitchExpressionSyntax switchExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        SymbolicCondition? anyArmSelected = null;
-        foreach (var arm in switchExpression.Arms)
-        {
-            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
-                    switchExpression.GoverningExpression,
-                    arm,
-                    semanticModel,
-                    cancellationToken,
-                    out var armCondition))
-            {
-                candidate = new RuntimeHazardCandidate(
-                    switchExpression,
-                    SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-                    CreateUnsupportedExceptionPreconditionTrigger(
-                        switchExpression,
-                        SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
-                        null,
-                        "ir.runtime-hazard.switch-expression.no-match.unsupported"),
-                    ExceptionTypes.SwitchExpressionException,
-                    ExceptionCategories.DefiniteSwitchExpressionNoMatch);
-                return true;
-            }
-
-            anyArmSelected = anyArmSelected == null
-                ? armCondition
-                : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, anyArmSelected, armCondition);
-        }
-
-        if (anyArmSelected == null) return false;
-        var triggerCondition = new SymbolicNotCondition(anyArmSelected);
-        if (!TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
-                null,
-                triggerCondition,
-                switchExpression,
-                "ir.runtime-hazard.switch-expression.no-match",
-                out var trigger))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(
-            switchExpression,
-            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            trigger,
-            ExceptionTypes.SwitchExpressionException,
-            ExceptionCategories.DefiniteSwitchExpressionNoMatch);
-        return true;
-    }
-
     internal static RuntimeHazardTrigger CreateUnsupportedExceptionPreconditionTrigger(
         SyntaxNode site,
         SymbolicExceptionPreconditionKind kind,

@@ -144,56 +144,33 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             cancellationToken,
             false);
         var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
-        if (!TryCreateDirectThrowTrigger(throwNode, out var directTrigger))
-            throw new InvalidOperationException("Could not encode direct-throw runtime-hazard precondition.");
-
-        if (!isRethrow &&
-            SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var thrownExpression) &&
-            TryCreateReferenceNullCondition(
-                thrownExpression,
-                semanticModel,
-                cancellationToken,
-                "ir.runtime-hazard.throw-null.trigger",
-                out var nullCondition))
-        {
-            var subject = nullCondition is SymbolicFactCondition
-                {
-                    Fact.Atom: SymbolicRelationAtom { Left: var left }
-                }
-                ? left
-                : null;
-            if (TryCreateIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.NullDereference,
-                    subject,
-                    nullCondition,
-                    throwNode,
-                    "ir.runtime-hazard.throw-null",
-                    out var nullTrigger))
-                yield return new RuntimeHazardCandidate(
-                    throwNode,
-                    SymbolicRuntimeHazardKind.DirectThrow,
-                    nullTrigger,
-                    ExceptionTypes.NullReferenceException,
-                    ExceptionCategories.DefiniteThrowNull);
-
-            if (TryCreateIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.DirectThrow,
-                    subject,
-                    new SymbolicNotCondition(nullCondition),
-                    throwNode,
-                    "ir.runtime-hazard.direct-throw.non-null",
-                    out var nonNullTrigger))
-                directTrigger = nonNullTrigger;
-        }
-
-        yield return new RuntimeHazardCandidate(
-            throwNode,
-            isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
-            directTrigger,
+        var exceptionTypeName =
             exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 .Replace("global::", string.Empty) ??
-            (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),
-            isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow);
+            (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception);
+        foreach (var hazard in SymbolicOperationLowerer.LowerThrowHazards(
+                     throwNode,
+                     isRethrow,
+                     exceptionTypeName,
+                     new SymbolicLoweringContext(semanticModel, cancellationToken)))
+            yield return new RuntimeHazardCandidate(throwNode, hazard);
+    }
+
+    internal static bool TryCreateSwitchExpressionNoMatchCandidate(
+        SwitchExpressionSyntax switchExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!SymbolicOperationLowerer.TryLowerSwitchNoMatchHazard(
+                switchExpression,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(switchExpression, hazard);
+        return true;
     }
 
     internal static bool TryCreateDivideByZeroCandidate(

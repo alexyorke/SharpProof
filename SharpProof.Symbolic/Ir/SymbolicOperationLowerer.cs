@@ -570,6 +570,103 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerSwitchNoMatchHazard(
+        SwitchExpressionSyntax switchExpression,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        SymbolicCondition? selected = null;
+        foreach (var arm in switchExpression.Arms)
+        {
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    out var armCondition))
+            {
+                hazard = CreateHazard(
+                    switchExpression,
+                    SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+                    SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+                    null,
+                    null,
+                    ExceptionTypes.SwitchExpressionException,
+                    ExceptionCategories.DefiniteSwitchExpressionNoMatch,
+                    "ir.runtime-hazard.switch-expression.no-match");
+                return true;
+            }
+
+            selected = selected == null
+                ? armCondition
+                : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, selected, armCondition);
+        }
+
+        if (selected == null) return NoHazard(out hazard);
+        hazard = CreateHazard(
+            switchExpression,
+            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+            SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+            null,
+            new SymbolicNotCondition(selected),
+            ExceptionTypes.SwitchExpressionException,
+            ExceptionCategories.DefiniteSwitchExpressionNoMatch,
+            "ir.runtime-hazard.switch-expression.no-match");
+        return true;
+    }
+
+    internal static ImmutableArray<SymbolicHazardOperation> LowerThrowHazards(
+        SyntaxNode throwNode,
+        bool isRethrow,
+        string exceptionType,
+        SymbolicLoweringContext context)
+    {
+        var hazards = ImmutableArray.CreateBuilder<SymbolicHazardOperation>(2);
+        SymbolicTerm? subject = null;
+        SymbolicCondition? nullCondition = null;
+        if (!isRethrow &&
+            SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression))
+        {
+            var operand = SymbolicSemanticPipeline.LowerTerm(expression, context);
+            if (operand is { IsExact: true, Value: SymbolicNullTerm })
+                nullCondition = new SymbolicConstantCondition(true);
+            else if (operand is { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference })
+            {
+                subject = reference;
+                nullCondition = SymbolicIrLowerer.CreateReferenceNullCondition(
+                    reference, true, expression, "ir.runtime-hazard.throw-null.trigger");
+            }
+        }
+
+        SymbolicCondition directTrigger = new SymbolicConstantCondition(true);
+        if (nullCondition != null)
+        {
+            hazards.Add(CreateHazard(
+                throwNode,
+                SymbolicRuntimeHazardKind.DirectThrow,
+                SymbolicExceptionPreconditionKind.NullDereference,
+                subject,
+                nullCondition,
+                ExceptionTypes.NullReferenceException,
+                ExceptionCategories.DefiniteThrowNull,
+                "ir.runtime-hazard.throw-null"));
+            directTrigger = new SymbolicNotCondition(nullCondition);
+        }
+
+        hazards.Add(CreateHazard(
+            throwNode,
+            isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
+            SymbolicExceptionPreconditionKind.DirectThrow,
+            subject,
+            directTrigger,
+            exceptionType,
+            isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow,
+            nullCondition == null
+                ? "ir.runtime-hazard.direct-throw"
+                : "ir.runtime-hazard.direct-throw.non-null"));
+        return hazards.ToImmutable();
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,

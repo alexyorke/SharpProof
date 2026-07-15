@@ -12,21 +12,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardIrTriggerFactory
 {
-    internal static bool TryCreateDirectThrowTrigger(
-        SyntaxNode throwNode,
-        out RuntimeHazardTrigger trigger)
-    {
-        var precondition = SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(
-                SymbolicExceptionPreconditionKind.DirectThrow,
-                null,
-                new SymbolicConstantCondition(true)),
-            throwNode,
-            "ir.runtime-hazard.direct-throw");
-
-        return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
-    }
-
     internal static bool TryCreateCheckedEqualityOverflowTrigger(
         SyntaxNode site,
         ExpressionSyntax expression,
