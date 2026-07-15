@@ -264,82 +264,6 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         CancellationToken cancellationToken,
         out SymbolicCondition breakCondition)
     {
-        return TryCreateDirectGuardedBreakSymbolicCondition(
-                   breakStatement,
-                   loopStatement,
-                   loopBody,
-                   semanticModel,
-                   cancellationToken,
-                   out breakCondition) ||
-               TryCreateNestedGuardedBreakSymbolicCondition(
-                   breakStatement,
-                   loopStatement,
-                   loopBody,
-                   semanticModel,
-                   cancellationToken,
-                   out breakCondition) ||
-               TryCreateGuardedContinueBeforeBreakSymbolicCondition(
-                   loopStatement,
-                   loopBody,
-                   breakStatement,
-                   semanticModel,
-                   cancellationToken,
-                   out breakCondition);
-    }
-
-    private static bool TryCreateDirectGuardedBreakSymbolicCondition(
-        BreakStatementSyntax breakStatement,
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition breakCondition)
-    {
-        breakCondition = null!;
-        var ifStatement = breakStatement.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault();
-        if (ifStatement == null ||
-            !IsTopLevelLoopBodyStatement(ifStatement, loopBody) ||
-            !TryGetDirectBreakBranch(ifStatement, breakStatement, out var branchWhenTrue) ||
-            AnyConditionSymbolInvalidatedBeforeStatement(
-                ifStatement.Condition,
-                loopBody,
-                ifStatement.SpanStart,
-                semanticModel,
-                cancellationToken) ||
-            !SymbolicBranchCompletionStateTransfer.TryCreateBranchSymbolicCondition(
-                ifStatement.Condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                out breakCondition))
-        {
-            breakCondition = null!;
-            return false;
-        }
-
-        if (TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
-                loopStatement,
-                loopBody,
-                ifStatement,
-                semanticModel,
-                cancellationToken,
-                out var fallThroughCondition))
-            breakCondition = new SymbolicBinaryCondition(
-                SymbolicConditionOperator.And,
-                fallThroughCondition,
-                breakCondition);
-
-        return true;
-    }
-
-    private static bool TryCreateNestedGuardedBreakSymbolicCondition(
-        BreakStatementSyntax breakStatement,
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition breakCondition)
-    {
         breakCondition = null!;
         var guards = new List<(IfStatementSyntax IfStatement, bool BranchWhenTrue)>();
         StatementSyntax currentStatement = breakStatement;
@@ -349,15 +273,17 @@ internal static class SymbolicControlFlowCompletionStateTransfer
             currentStatement = ifStatement;
         }
 
-        if (guards.Count <= 1 || !IsTopLevelLoopBodyStatement(currentStatement, loopBody)) return false;
+        if (!IsTopLevelLoopBodyStatement(currentStatement, loopBody)) return false;
 
-        if (!TryCreateCombinedNestedGuardCondition(
+        SymbolicCondition? combinedCondition = null;
+        if (guards.Count > 0 &&
+            !TryCreateCombinedNestedGuardCondition(
                 guards,
                 loopBody,
                 invalidationSpanStart: null,
                 semanticModel,
                 cancellationToken,
-                out var combinedCondition))
+                out combinedCondition))
             return false;
 
         if (TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
@@ -367,43 +293,15 @@ internal static class SymbolicControlFlowCompletionStateTransfer
                 semanticModel,
                 cancellationToken,
                 out var fallThroughCondition))
-            combinedCondition = new SymbolicBinaryCondition(
-                SymbolicConditionOperator.And,
-                fallThroughCondition,
-                combinedCondition);
+            combinedCondition = combinedCondition == null
+                ? fallThroughCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    fallThroughCondition,
+                    combinedCondition);
 
-        breakCondition = combinedCondition;
-        return true;
-    }
-
-    private static bool TryCreateGuardedContinueBeforeBreakSymbolicCondition(
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        BreakStatementSyntax breakStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition breakCondition)
-    {
-        breakCondition = null!;
-        if (loopBody is not BlockSyntax block) return false;
-
-        var breakIndex = -1;
-        for (var index = 0; index < block.Statements.Count; index++)
-            if (StatementDirectlyContainsOnlyBreak(block.Statements[index], breakStatement))
-            {
-                breakIndex = index;
-                break;
-            }
-
-        if (breakIndex <= 0) return false;
-
-        return TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
-            loopStatement,
-            loopBody,
-            block.Statements[breakIndex],
-            semanticModel,
-            cancellationToken,
-            out breakCondition);
+        breakCondition = combinedCondition!;
+        return combinedCondition != null;
     }
 
     private static bool TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
@@ -662,28 +560,6 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         return false;
     }
 
-    private static bool TryGetDirectBreakBranch(
-        IfStatementSyntax ifStatement,
-        BreakStatementSyntax breakStatement,
-        out bool branchWhenTrue)
-    {
-        if (StatementDirectlyContainsOnlyBreak(ifStatement.Statement, breakStatement))
-        {
-            branchWhenTrue = true;
-            return true;
-        }
-
-        if (ifStatement.Else?.Statement is { } elseStatement &&
-            StatementDirectlyContainsOnlyBreak(elseStatement, breakStatement))
-        {
-            branchWhenTrue = false;
-            return true;
-        }
-
-        branchWhenTrue = false;
-        return false;
-    }
-
     private static bool TryGetDirectContinueBranch(
         IfStatementSyntax ifStatement,
         StatementSyntax loopStatement,
@@ -704,14 +580,6 @@ internal static class SymbolicControlFlowCompletionStateTransfer
 
         branchWhenTrue = false;
         return false;
-    }
-
-    private static bool StatementDirectlyContainsOnlyBreak(
-        StatementSyntax statement,
-        BreakStatementSyntax breakStatement)
-    {
-        statement = SymbolicControlFlowFacts.UnwrapSingleStatementBlock(statement);
-        return ReferenceEquals(statement, breakStatement);
     }
 
     private static bool StatementDirectlyContainsOnlyContinue(
