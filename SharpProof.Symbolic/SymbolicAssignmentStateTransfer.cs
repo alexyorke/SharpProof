@@ -115,7 +115,7 @@ internal static class SymbolicAssignmentStateTransfer
             effectiveValueExpression) is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(SyntaxKind.AsExpression);
         if (!isSelfReferential &&
-            (isAsExpression ||
+            (isAsExpression || assignedType?.SpecialType == SpecialType.System_String ||
              assignedType != null &&
              (assignedType.SpecialType == SpecialType.System_Boolean ||
               SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))) &&
@@ -130,7 +130,8 @@ internal static class SymbolicAssignmentStateTransfer
                 cancellationToken,
                 provenance: provenanceRoot,
                 bindingProvenance: provenanceRoot + ".assigned-value",
-                asExpressionProvenanceRoot: provenanceRoot + ".as");
+                asExpressionProvenanceRoot: provenanceRoot + ".as",
+                postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
             if (transition.IsExact)
                 state = transition.State;
         }
@@ -199,16 +200,7 @@ internal static class SymbolicAssignmentStateTransfer
                 provenanceRoot);
         }
 
-        if (assignedType?.SpecialType == SpecialType.System_String &&
-            assignedValueTerm is not SymbolicNullTerm &&
-            !IsDefinitelyNullReferenceValue(effectiveValueExpression, semanticModel, cancellationToken))
-            AddAssignedStringStateFacts(
-                ref state,
-                assignedSymbol,
-                effectiveValueExpression,
-                context,
-                provenanceRoot);
-        else if (isSelfReferential &&
+        if (isSelfReferential &&
                  TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
                  assignedValueTerm != null &&
                  assignedValueTerm.Kind == targetTerm.Kind &&
@@ -261,22 +253,10 @@ internal static class SymbolicAssignmentStateTransfer
             semanticModel,
             cancellationToken,
             provenanceRoot);
-        AddCollectionExpressionLengthLowerBoundStateFact(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            provenanceRoot);
         AddRemainderAssignedRangeStateFacts(
             ref state,
             assignedSymbol,
             effectiveValueExpression,
-            context,
-            provenanceRoot);
-        AddAssignedLengthStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            assignedType,
             context,
             provenanceRoot);
         AddTupleElementAssignedValueStateFacts(
@@ -575,35 +555,6 @@ internal static class SymbolicAssignmentStateTransfer
             semanticModel,
             context,
             provenanceRoot + ".member");
-    }
-
-    private static void AddCollectionExpressionLengthLowerBoundStateFact(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        string provenanceRoot)
-    {
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        if (valueExpression is not CollectionExpressionSyntax collectionExpression) return;
-
-        var fixedElementCount = collectionExpression.Elements.Count(static element =>
-            element is ExpressionElementSyntax);
-        if (fixedElementCount == 0 ||
-            !collectionExpression.Elements.Any(static element => element is SpreadElementSyntax) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
-                SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol),
-                targetReference,
-                valueExpression) is not { IsExact: true, Value: { } targetLength })
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.GreaterThanOrEqual,
-            targetLength,
-            new SymbolicIntegerConstantTerm(fixedElementCount),
-            valueExpression,
-            provenanceRoot + ".collection-expression.fixed-lower-bound");
     }
 
     private static void AddFiniteArrayElementAssignedValueStateFacts(
@@ -1165,95 +1116,6 @@ internal static class SymbolicAssignmentStateTransfer
             (false, SymbolicRelationOperator.Equal) => requireStrictlyPositive ? constant > 0 : constant >= 0,
             _ => false
         };
-    }
-
-    private static void AddAssignedStringStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        var valueLowering = SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context);
-        if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is not
-                { IsExact: true, Value: { } targetString } ||
-            valueLowering is not { IsExact: true, Value: { } valueString })
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetString,
-            valueString,
-            valueExpression,
-            provenanceRoot + ".assigned-string");
-
-        if (TryIsDefinitelyNonNullStringExpression(valueExpression, context))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                targetReference,
-                new SymbolicNullTerm(),
-                valueExpression,
-                provenanceRoot + ".assigned-string.non-null");
-    }
-
-    private static bool TryIsDefinitelyNonNullStringExpression(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-
-        var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        if (constantValue.HasValue) return constantValue.Value is string;
-
-        if (expression is CastExpressionSyntax castExpression &&
-            context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type?.SpecialType ==
-            SpecialType.System_String)
-            return TryIsDefinitelyNonNullStringExpression(castExpression.Expression, context);
-
-        if (expression is BinaryExpressionSyntax coalesceExpression &&
-            coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
-            return TryIsDefinitelyNonNullStringExpression(coalesceExpression.Left, context) ||
-                   TryIsDefinitelyNonNullStringExpression(coalesceExpression.Right, context);
-
-        if (expression is ConditionalExpressionSyntax conditionalExpression)
-            return TryIsDefinitelyNonNullStringExpression(conditionalExpression.WhenTrue, context) &&
-                   TryIsDefinitelyNonNullStringExpression(conditionalExpression.WhenFalse, context);
-
-        if (SymbolicSemanticPipeline.LowerStringTerm(expression, context) is
-            { IsExact: true, Value: { } term })
-            return term is SymbolicStringConstantTerm or SymbolicStringConcatTerm;
-
-        return false;
-    }
-
-    private static void AddAssignedLengthStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        ITypeSymbol? assignedType,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        var lengthLowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context);
-        if (assignedType == null ||
-            IsDefinitelyNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(assignedType, targetReference, valueExpression) is not
-                { IsExact: true, Value: { } targetLength } ||
-            lengthLowering is not { IsExact: true, Value: { } valueLength } ||
-            !CanCompareIrTerms(targetLength, valueLength))
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetLength,
-            valueLength,
-            valueExpression,
-            provenanceRoot + ".assigned-length");
     }
 
     private static void AddAssignedArrayDimensionLengthStateFacts(

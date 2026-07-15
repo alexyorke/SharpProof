@@ -7,6 +7,12 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
+internal enum SymbolicAssignmentPostconditionProfile
+{
+    Analyzer,
+    Symbolic
+}
+
 internal static class SymbolicOperationLowerer
 {
     internal static SymbolicLoweringResult<SymbolicOperationSequence> Lower(
@@ -56,7 +62,9 @@ internal static class SymbolicOperationLowerer
         string provenance,
         string? bindingProvenance = null,
         string? evidenceKey = null,
-        string? asExpressionProvenanceRoot = null)
+        string? asExpressionProvenanceRoot = null,
+        SymbolicAssignmentPostconditionProfile postconditionProfile =
+            SymbolicAssignmentPostconditionProfile.Analyzer)
     {
         if (!TryCreateSymbolTerm(targetSymbol, targetContext, out var target) ||
             valueOperation.Syntax is not ExpressionSyntax valueExpression)
@@ -69,11 +77,9 @@ internal static class SymbolicOperationLowerer
             _ => SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext)
         };
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
-        var suppressCanonicalAsValueBinding = asExpressionProvenanceRoot != null &&
-                                              CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
-                                                  valueExpression) is BinaryExpressionSyntax candidateAsExpression &&
-                                              candidateAsExpression.IsKind(SyntaxKind.AsExpression);
-        if (!suppressCanonicalAsValueBinding &&
+        var suppressValueBinding = postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
+                                   target.Kind == SmtValueKind.Reference;
+        if (!suppressValueBinding &&
             value is { IsExact: true, Value: { } sourceTerm } &&
             SymbolicStateFactBuilder.CanCompareIrTerms(target, sourceTerm))
             bindings.Add(new SymbolicAssignmentBinding(
@@ -90,7 +96,8 @@ internal static class SymbolicOperationLowerer
             target,
             valueExpression,
             valueContext,
-            provenance);
+            provenance,
+            postconditionProfile);
         var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
             targetSymbol,
             valueExpression,
@@ -119,15 +126,34 @@ internal static class SymbolicOperationLowerer
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SymbolicLoweringContext valueContext,
-        string provenance)
+        string provenance,
+        SymbolicAssignmentPostconditionProfile profile)
     {
         if (target.Kind != SmtValueKind.Reference) return;
+        if (profile == SymbolicAssignmentPostconditionProfile.Symbolic)
+        {
+            AddSymbolicStringAssignmentPostconditions(
+                conditions,
+                targetSymbol,
+                target,
+                valueExpression,
+                valueContext,
+                provenance);
+            AddSymbolicCollectionLowerBound(
+                conditions,
+                targetSymbol,
+                target,
+                valueExpression,
+                provenance);
+            return;
+        }
 
         AddEquality(
             conditions,
             new SymbolicLengthTerm(target),
             SymbolicSemanticPipeline.LowerLengthProjectionTerm(valueExpression, valueContext),
             valueExpression,
+            provenance + ".length",
             provenance + ".length");
         if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression) is
             CollectionExpressionSyntax collection &&
@@ -152,6 +178,7 @@ internal static class SymbolicOperationLowerer
             new SymbolicStringContentTerm(target),
             SymbolicSemanticPipeline.LowerStringTerm(valueExpression, valueContext),
             valueExpression,
+            provenance + ".string",
             provenance + ".string");
         if (SymbolicSemanticPipeline.LowerStringNonNullCondition(valueExpression, valueContext) is not
             { IsExact: true, Value: { } valueNonNull })
@@ -173,12 +200,87 @@ internal static class SymbolicOperationLowerer
                 new SymbolicNotCondition(valueNonNull))));
     }
 
+    private static void AddSymbolicStringAssignmentPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        string provenance)
+    {
+        if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType != SpecialType.System_String)
+            return;
+
+        AddEquality(
+            conditions,
+            new SymbolicStringContentTerm(target),
+            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context),
+            valueExpression,
+            provenance + ".assigned-string");
+        if (IsDefinitelyNonNullStringExpression(valueExpression, context))
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm(),
+                valueExpression,
+                provenance + ".assigned-string.non-null"));
+    }
+
+    private static bool IsDefinitelyNonNullStringExpression(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        if (constant.HasValue) return constant.Value is string;
+        return expression switch
+        {
+            CastExpressionSyntax cast when
+                context.SemanticModel.GetTypeInfo(cast.Type, context.CancellationToken).Type?.SpecialType ==
+                SpecialType.System_String => IsDefinitelyNonNullStringExpression(cast.Expression, context),
+            BinaryExpressionSyntax coalesce when coalesce.IsKind(SyntaxKind.CoalesceExpression) =>
+                IsDefinitelyNonNullStringExpression(coalesce.Left, context) ||
+                IsDefinitelyNonNullStringExpression(coalesce.Right, context),
+            ConditionalExpressionSyntax conditional =>
+                IsDefinitelyNonNullStringExpression(conditional.WhenTrue, context) &&
+                IsDefinitelyNonNullStringExpression(conditional.WhenFalse, context),
+            _ => SymbolicSemanticPipeline.LowerStringTerm(expression, context) is
+                { IsExact: true, Value: SymbolicStringConstantTerm or SymbolicStringConcatTerm }
+        };
+    }
+
+    private static void AddSymbolicCollectionLowerBound(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        string provenance)
+    {
+        if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression) is not
+                CollectionExpressionSyntax collection ||
+            !collection.Elements.Any(static element => element is SpreadElementSyntax))
+            return;
+        var fixedCount = collection.Elements.Count(static element => element is ExpressionElementSyntax);
+        if (fixedCount != 0 &&
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
+                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol),
+                target,
+                valueExpression) is { IsExact: true, Value: { } length })
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.GreaterThanOrEqual,
+                length,
+                new SymbolicIntegerConstantTerm(fixedCount),
+                valueExpression,
+                provenance + ".collection-expression.fixed-lower-bound"));
+    }
+
     private static void AddEquality(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         SymbolicTerm target,
         SymbolicLoweringResult<SymbolicTerm> value,
         ExpressionSyntax source,
-        string provenance)
+        string provenance,
+        string? evidenceKey = null)
     {
         if (value is { IsExact: true, Value: { } valueTerm } &&
             SymbolicStateFactBuilder.CanCompareIrTerms(target, valueTerm))
@@ -188,7 +290,7 @@ internal static class SymbolicOperationLowerer
                 valueTerm,
                 source,
                 provenance,
-                evidenceKey: provenance));
+                evidenceKey: evidenceKey));
     }
 
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerComputedUpdate(
