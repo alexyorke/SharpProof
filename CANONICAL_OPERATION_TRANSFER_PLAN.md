@@ -217,6 +217,7 @@ transfer policy after its slice is complete.
 | `as` assignment interpreter deletion | `c9b46a46` | 108,251 | +575 |
 | String and length assignment deletion | `1ac96cbe` | 108,228 | +552 |
 | Purity declaration-state consolidation | `3e853878` | 108,192 | +516 |
+| Single written-local update pass | `88ad23a6` | 108,184 | +508 |
 
 ## Validation Ledger
 
@@ -241,6 +242,7 @@ transfer policy after its slice is complete.
 | Phase 2 `as` assignment deletion | Commit `c9b46a46` routes Symbolic `as` assignments through the canonical runtime-type/null-condition pipeline with byte-stable provenance and deletes the 68-line syntax interpreter. Focused `as` query/analyzer tests: 28 passed; full MainSmtOracle lane: 573 passed. Total temporary migration scaffolding fell to +575 production LOC. |
 | Phase 2 string and length assignment deletion | Commit `1ac96cbe` gives canonical assignment lowering a Symbolic evidence profile, routes string null/equality and collection lower-bound facts through it, and deletes the redundant string and assigned-length interpreters. Focused transfer/program-point tests: 122 passed; full MainSmtOracle lane: 573 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +552 production LOC. |
 | Phase 2 purity declaration-state consolidation | Commit `3e853878` routes variable declarations through the same concrete-type, owned-array, freshness, null, and canonical assignment updates as ordinary assignments while preserving declaration-only delegate, ref-borrow, and using-resource behavior. Full MainSmtAnalyzer lane: 487 passed; focused ownership/using/alias tests: 111 passed. Total temporary migration scaffolding fell to +516 production LOC. |
+| Phase 2 single written-local update pass | Commit `88ad23a6` replaces three ordered traversals of the same written-local set with one traversal while retaining alias snapshots before version, assignment, ownership, and null-state updates. Full MainSmtAnalyzer lane: 487 passed; focused ownership/using/alias tests: 111 passed. Total temporary migration scaffolding fell to +508 production LOC. |
 
 ## Current Checkpoint
 
@@ -249,9 +251,9 @@ transfer policy after its slice is complete.
   resource lifetime, string, and collection lower-bound families share
   canonical events; purity symbolic facts are now query-only.
 - Last confirmed fact: MainSmtAnalyzer passes 487/487 and the focused
-  ownership/using/alias batch passes 111/111 after deleting the duplicate
-  declaration-state update path.
-- Next cheapest step: replace the remaining three-loop written-local update
-  pipeline with one ordered pass, preserving alias snapshots before mutation.
+  ownership/using/alias batch passes 111/111 after combining the written-local
+  state update pipeline into one ordered pass.
+- Next cheapest step: centralize remaining null/reference assignment
+  postconditions in the canonical lowerer and delete their Symbolic wrappers.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
