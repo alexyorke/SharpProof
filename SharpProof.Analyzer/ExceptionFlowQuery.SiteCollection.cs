@@ -119,6 +119,10 @@ internal static partial class ExceptionFlowQuery
             SymbolicRuntimeHazardKind.DivideByZero,
             SymbolicRuntimeHazardKind.NegativeArrayLength,
             SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            SymbolicRuntimeHazardKind.UnboxNull,
+            SymbolicRuntimeHazardKind.InvalidCast,
+            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
             SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
@@ -211,12 +215,9 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteNullableValueAccessNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.NullableValueWithoutValue),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.InvalidOperationException,
                      ExceptionCategories.DefiniteNullableValueWithoutValue,
@@ -224,12 +225,9 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteUnboxNullCastNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.UnboxNull),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.NullReferenceException,
                      ExceptionCategories.DefiniteUnboxNull,
@@ -237,12 +235,9 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteInvalidCastNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.InvalidCast),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.InvalidCastException,
                      ExceptionCategories.DefiniteInvalidCast,
@@ -250,12 +245,9 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteArrayTypeMismatchStoreNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.ArrayTypeMismatch),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.ArrayTypeMismatchException,
                      ExceptionCategories.DefiniteArrayTypeMismatch,
@@ -263,12 +255,11 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteIndexOutOfRangeNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.IndexOutOfRange &&
+                         string.Equals(hazard.Category, ExceptionCategories.DefiniteIndexOutOfRange,
+                             StringComparison.Ordinal)),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.IndexOutOfRangeException,
                      ExceptionCategories.DefiniteIndexOutOfRange,
@@ -276,12 +267,11 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteArrayGetValueIndexOutOfRangeNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.IndexOutOfRange &&
+                         string.Equals(hazard.Category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
+                             StringComparison.Ordinal)),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.IndexOutOfRangeException,
                      ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
@@ -289,15 +279,14 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteArgumentOutOfRangeNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
+                         string.Equals(hazard.Category, ExceptionCategories.DefiniteRangeOutOfRange,
+                             StringComparison.Ordinal)),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      static _ => ExceptionTypes.ArgumentOutOfRangeException,
                      static _ => ExceptionCategories.DefiniteRangeOutOfRange,
-                     static node => node is InvocationExpressionSyntax
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax
                          ? ExceptionSources.SpanSlice
                          : ExceptionSources.RangeSlice,
                      siteContext))

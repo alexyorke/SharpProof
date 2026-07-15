@@ -55,26 +55,4 @@ internal static partial class ExceptionSiteClassifier
             smtAnalysis);
     }
 
-    private static bool IsDefinitelyMissingNullableValue(
-        MemberAccessExpressionSyntax memberAccess,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (IsKnownMissingNullableValueByPriorAssignment(
-                memberAccess.Expression,
-                memberAccess,
-                semanticModel,
-                cancellationToken))
-            return true;
-
-        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueCondition(
-            memberAccess.Expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } hasValueCondition })
-            return false;
-
-        return IsConditionStatusAtUse(memberAccess, hasValueCondition, semanticModel, cancellationToken, smtAnalysis,
-            SymbolicProofStatus.ProvenFalse);
-    }
 }
