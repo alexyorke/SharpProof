@@ -205,6 +205,42 @@ transfer policy after its slice is complete.
 - [x] Run two `colgrep --force-cpu` semantic-search batches; stop secondary work
   when each finds fewer than 50 safely removable production lines.
 
+## Phase 7 - Authorized Structural Engine Replacement
+
+The user authorized a major rearchitectural rewrite on 2026-07-15. The Phase 6
+low-yield stop remains binding for incidental clone extraction, but it does not
+block this bounded replacement of reachable legacy semantic engines. Behavior,
+conservative `Unknown`, serialized contracts, and test scenarios remain binding;
+the unused preview .NET API may break when it obstructs the canonical design.
+
+- [x] Inventory the reachable structural Symbolic and Analyzer transfer family,
+  classify source/evidence adapters separately from semantic owners, and record
+  gross and reachable LOC before implementation.
+  - All 8,583 handwritten lines in the deletion-map family remain reachable:
+    5,863 in the structural Symbolic transfer family, 2,276 in purity transfer,
+    state-query, merge, and CFG adapters, and 444 in exception-path/hazard
+    adapters. The first replacement pool is the 7,315-line structural plus purity
+    transfer/merge/CFG surface. The remaining 1,268 lines are read-only queries,
+    source discovery, or diagnostic/evidence projection and are not deletion
+    credit unless their consumers migrate too.
+- [ ] Introduce one CFG/`IOperation` program-point state collector whose block
+  transfer, branch assumptions, merge, completion, and fixed-point behavior is
+  expressed by canonical operation descriptors and transition results.
+- [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
+  and source-provenance discovery behind typed lowering results; discovery may
+  retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
+- [ ] Migrate source queries, invariant/reachability analysis, exception paths,
+  and Analyzer purity CFG consumers in behavior-locked vertical slices.
+- [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
+  branch/loop/completion transfer family, and Analyzer assignment/state wrappers
+  once no semantic caller reaches them.
+- [ ] If the transfer deletion does not meet the LOC gate, collapse remaining
+  unused preview query wrappers into the canonical result graph; keep CLI and
+  JSON/SARIF projections byte-compatible.
+- [ ] Gate: normalized states, proof outcomes, hazards, diagnostics/evidence,
+  unknown/truncation reasons, CLI bytes, and affected test lanes match before
+  every legacy-path deletion.
+
 ## Final Gates
 
 - [ ] Net handwritten production reduction is at least 11,000 lines; continue
@@ -458,7 +494,8 @@ transfer policy after its slice is complete.
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 5 and the first three Phase 6 items are gated. The
+- State: Phase 7 is active under explicit authorization for a major,
+  behavior-preserving rearchitecture. The earlier phases are gated. The
   `POTENTIAL_DUPS.md` cleanup is complete; its Requires/Ensures and
   exception-flow diagnostic-envelope findings plus the switch-visibility shape
   finding are removed with evidence, and exception-catalog type/source
@@ -514,12 +551,14 @@ transfer policy after its slice is complete.
   report is deleted. Two bounded semantic-search batches each found fewer than
   50 safely removable production lines; their only accepted residual wrappers
   are deleted, so the plan's secondary-work stop condition is met.
-- Last confirmed fact: all 40 operation-transfer model fixtures pass after the
-  two dead generic wrappers were removed. Test LOC is 142,479; production LOC is
-  105,585, or -2,091 from the rewrite start.
-- Next cheapest step: resolve the incompatible remaining gate: the mandated
-  low-yield stop condition is met, but the 11,000-line production target remains
-  8,909 lines away. Continuing would require relaxing the stop rule or approving
-  feature/policy removal rather than behavior-preserving consolidation.
+- Last confirmed fact: all 8,583 lines in the legacy deletion-map family are
+  reachable. The 7,315-line structural Symbolic plus purity transfer/merge/CFG
+  surface is the first replacement pool; 1,268 lines are read-only queries,
+  source discovery, or evidence projection. Test LOC is 142,479; production LOC
+  is 105,585, or -2,091 from the rewrite start.
+- Next cheapest step: introduce the canonical CFG/operation program-point
+  collector behind the existing reachability boundary and shadow-compare its
+  straight-line declaration/assignment states before migrating branch and loop
+  edges.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
