@@ -180,7 +180,7 @@ internal static class SymbolicReachabilityService
     {
         if (!includeCurrentStatementCompletionFacts)
         {
-            var cfgState = SymbolicCfgProgramPointStateCollector.CollectStraightLineState(
+            var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
                 site,
                 semanticModel,
                 cancellationToken,

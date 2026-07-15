@@ -26,7 +26,7 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
             .OfType<ReturnStatementSyntax>()
             .Single(statement => statement.ToString().StartsWith(testCase.Target, StringComparison.Ordinal));
 
-        var actual = SymbolicCfgProgramPointStateCollector.CollectStraightLineState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
@@ -45,15 +45,80 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
-    public void ConditionalControlFlow_RemainsConservativeFallback()
+    public void ConditionalControlFlow_MatchesStructuralCollector()
     {
         const string source = "static class C { static int M(bool condition) { int value = 0; if (condition) value = 1; return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ConditionalControlFlow_RemainsConservativeFallback));
+            nameof(ConditionalControlFlow_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectStraightLineState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
+    public void MutatedBranchGuard_MatchesConservativeStructuralMerge()
+    {
+        const string source = "static class C { static int M(int value) { if (value > 0) value = 0; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(MutatedBranchGuard_MatchesConservativeStructuralMerge));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
+    public void BranchLocalTarget_RemainsConservativeFallback()
+    {
+        const string source = "static class C { static string? M(string? value) { if (value is null) { var copy = value; value = \"fallback\"; return copy; } return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(BranchLocalTarget_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().First();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True);
+    }
+
+    [Test]
+    public void LoopBackEdge_RemainsConservativeFallback()
+    {
+        const string source = "static class C { static int M(int count) { int value = 0; while (count-- > 0) value = 1; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(LoopBackEdge_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
