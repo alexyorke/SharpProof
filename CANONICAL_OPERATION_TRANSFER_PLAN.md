@@ -132,8 +132,8 @@ transfer policy after its slice is complete.
 - [x] Migrate `ref`/`out`, ref-local aliases, invalidation, and version updates.
 - [x] Migrate freshness, ownership, borrowing, escape, disposal, and resource
   release transitions.
-- [ ] Delete superseded assignment and Analyzer purity-state implementations.
-- [ ] Gate: assignment/lifetime differential suite and affected Analyzer lane are
+- [x] Delete superseded assignment and Analyzer purity-state implementations.
+- [x] Gate: assignment/lifetime differential suite and affected Analyzer lane are
   green; record net production LOC removed.
 
 ## Phase 3 - Branches, Loops, Merge, And Completion
@@ -225,6 +225,7 @@ transfer policy after its slice is complete.
 | Tuple and finite-array projections | `77237b02` | 108,046 | +370 |
 | Kernel-derived assignment bounds | `5e144264` | 107,990 | +314 |
 | Nullable snapshot operations | `0b1cfa4c` | 107,987 | +311 |
+| Explicit-target assignment operations | `a92660db` | 107,986 | +310 |
 
 ## Validation Ledger
 
@@ -257,19 +258,20 @@ transfer policy after its slice is complete.
 | Phase 2 tuple and finite-array projections | Commit `77237b02` moves tuple literal/source and finite-array element postconditions into canonical assignment lowering, reuses the reference-backed projection builder for tuple string/length/dimension facts, and deletes the parallel state-mutating interpreters and tuple identity helpers. Focused transfer/path/program-point tests: 164 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 108,046, or +370 from the rewrite start. |
 | Phase 2 kernel-derived assignment bounds | Commit `5e144264` makes canonical bindings derive positive, nonnegative, and remainder bounds from the pre-state, routes self-referential integer updates through the same binding path, moves the not-null-if-not-null implication into canonical lowering, and deletes the parallel post-assignment proof walkers. Focused nullability/range/self-reference tests: 189 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,990, or +314 from the rewrite start. |
 | Phase 2 nullable snapshot operations | Commit `0b1cfa4c` represents nullable source/target term pairs as assignment-operation propagations and removes the final post-kernel nullable snapshot mutator. Focused nullable/path/transfer tests: 155 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,987, or +311 from the rewrite start. |
+| Phase 2 explicit-target assignments and gate | Commit `a92660db` routes current-instance member and element writes through explicit-target assignment operations, preserves the caller-owned invalidation boundary, and deletes both legacy state mutators. Focused member/element/path/transfer tests: 183 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Exact search finds no migrated assignment mutator or tracked-assignment interpreter. The Phase 2 peak of 108,501 fell by 515 production lines to 107,986; canonical scaffolding remains +310 from the rewrite start and must be repaid by later legacy-engine deletions. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: assignment, declaration, scalar/reference/nullable source snapshots, tuple/array projections,
-  null flow, integer/remainder bounds, alias/borrow, invalidation, ownership,
-  and resource lifetime families share canonical events; purity symbolic facts
-  are now query-only.
-- Last confirmed fact: focused nullable/path/transfer tests pass 155/155,
-  MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487 after removing
-  the final post-kernel nullable snapshot mutation.
-- Next cheapest step: route current-instance member and element assignments
-  through canonical postconditions/bindings, then classify the remaining source
-  order, throw-guard, switch, and deconstruction code as Phase 3 adapters.
+- State: Phase 2 is gated. Assignment, aliasing, invalidation, and lifetime
+  mutations use canonical events; remaining assignment-file code is source
+  ordering, deconstruction pairing, self-reference lowering, or Phase 3
+  throw/switch completion. Purity symbolic facts are query-only.
+- Last confirmed fact: focused member/element/path/transfer tests pass 183/183,
+  MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487. No migrated
+  assignment mutator or tracked-assignment interpreter remains reachable.
+- Next cheapest step: migrate boolean branch assumptions and conditional/coalesce
+  flow into canonical branch-assumption operations, starting with the shared
+  condition-to-state transition used by Symbolic and Analyzer CFG consumers.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
