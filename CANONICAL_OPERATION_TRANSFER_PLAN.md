@@ -179,6 +179,9 @@ transfer policy after its slice is complete.
 
 - [ ] Convert EffectSummary wrapper policy to ordered typed structural rules;
   preserve unresolved-external versus resolved-implementation semantics.
+  - [x] Replace generated-purity exact/prefix predicate fan-out with ordered
+    typed visibility rules while retaining the one structural enumerator
+    predicate.
 - [ ] Project CLI full/compact/invariant/explain/SARIF formats directly from the
   canonical query graph while preserving serialized bytes.
 - [ ] Run a bounded primary-constructor conversion over internal data carriers,
@@ -269,6 +272,7 @@ transfer policy after its slice is complete.
 | Canonical exception-flow hazard projection | `ecb384c5` | 106,104 | -1,572 |
 | Canonical flow-capture invalidation | `ccf50299` | 106,094 | -1,582 |
 | Residual Analyzer transfer deletion and Phase 5 gate | `93d0289b` | 106,111 | -1,565 |
+| Declarative generated-purity policy | `66115c5c` | 106,003 | -1,673 |
 
 ## Validation Ledger
 
@@ -343,20 +347,20 @@ transfer policy after its slice is complete.
 | Phase 5 canonical exception-flow hazard projection | Commit `ecb384c5` replaces 19 independent proven-hazard family loops with one ordered compatibility projection. Exception type comes directly from the canonical hazard descriptor; the adapter retains only source labels, legacy category normalization, supported-site filtering, and the established direct-throw/callee/family order. Release Analyzer build: zero warnings; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Production LOC fell by 62 lines to 106,104, or -1,572 from the rewrite start. |
 | Phase 5 canonical flow-capture invalidation | Commit `ccf50299` invalidates a reassigned CFG flow capture through `SymbolicOperationTransferKernel.Invalidate` before applying exact runtime-type and ownership facts, and deletes Analyzer's owned-array-only fact filter and direct `SymbolicState` reconstruction. The new mixed fresh/external conditional-array regression characterizes conservative caller-visible mutation. Release Analyzer build: zero warnings; focused array/capture/dispatch tests: 35 passed; MainSmtAnalyzer: 487 passed. Production LOC fell by 10 lines to 106,094, or -1,582 from the rewrite start. |
 | Phase 5 residual Analyzer transfer deletion and gate | Commit `93d0289b` routes switch evaluation alias/selection conditions through canonical branch-assumption transitions and makes invalidation descriptors own definition-version updates. Exact mutation search finds no Analyzer live-transfer call to `AddFact`, `AddPathCondition`, `RemoveFacts`, or `WithSymbolVersion`; remaining state construction is limited to contract entry, Ensures snapshots, empty queries, and container defaults. Analyzer runtime-hazard code queries and compatibility-projects canonical descriptors without reconstructing triggers. Release Analyzer build: zero warnings; focused transfer/switch tests: 53 passed; diagnostic/evidence fixtures: 371 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Phase 5 closes at 106,111 production LOC, or -1,565 from the rewrite start. The 17-line increase from the prior checkpoint centralizes correctness-sensitive version ownership and is retained for the later legacy-engine deletions. |
+| Phase 6 declarative generated-purity policy | Commit `66115c5c` replaces 24 one-off generated-purity predicate methods with three ordered visibility rules over exact symbols, prefixes, and the retained immutable-hash-set enumerator predicate. The resolved-summary and unresolved-external entry points remain separate and consume the same table without changing their conservative fallback. Literal inventory accounts for all 153 former `System.*` patterns: 152 live in the table and the remaining containing-type prefix is owned by the structural enumerator predicate. Release EffectSummary build: zero warnings; focused runtime/string/type/cross-assembly/unresolved tests: 12 passed; full Tooling lane: 585 passed. Production LOC fell by 108 lines to 106,003, or -1,673 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 5 are gated. Analyzer consumers now retain CFG/source
-  traversal, metadata, evidence, and diagnostic policy while canonical
-  transitions own live symbolic mutation, versions, hazards, and completion.
-- Last confirmed fact: the Release Analyzer build has zero warnings; focused
-  transfer/switch tests are 53/53, diagnostic/evidence fixtures are 371/371,
-  MainSmtAnalyzer is 487/487, and MainSmtFlow is 256 passing with only baseline
-  SP0010. Production LOC is 106,111, or -1,565 from the rewrite start.
-- Next cheapest step: begin Phase 6 by characterizing EffectSummary's current
-  wrapper classifications and unresolved-external/resolved-implementation
-  boundary, then replace the first largest equivalent predicate family with
-  ordered typed structural rules.
+- State: Phases 2 through 5 are gated. Phase 6 has replaced the generated-purity
+  predicate fan-out with ordered typed rules; semantic wrapper shapes and call
+  policies remain to migrate.
+- Last confirmed fact: the Release EffectSummary build has zero warnings;
+  focused wrapper/boundary tests are 12/12 and the Tooling lane is 585/585.
+  Production LOC is 106,003, or -1,673 from the rewrite start.
+- Next cheapest step: convert the largest equivalent semantic-wrapper call
+  matcher families to shared ordered exact/prefix rule sets, then delete their
+  standalone predicates only if the change is net-negative and runtime slices
+  remain byte-compatible.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
