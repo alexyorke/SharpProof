@@ -113,8 +113,11 @@ transfer policy after its slice is complete.
   branch assumption, merge, loop edge, completion, lifetime, and hazard events.
 - [x] Add an immutable transition result containing normalized state, support
   status, provenance, and conservative unknown/truncation reasons.
-- [ ] Add one Roslyn `IOperation`/CFG lowering front-end. Retain syntax only for
+- [x] Add one Roslyn `IOperation`/CFG lowering front-end. Retain syntax only for
   source spans, evidence text, and syntax shapes Roslyn does not expose.
+  The initial bridge supports local declarations and direct simple assignments;
+  unsupported operation shapes remain explicit and later slices extend the same
+  front-end instead of adding another interpreter.
 - [ ] Add adapters from `SymbolicState` and Analyzer purity state into the kernel
   without duplicating transfer policy.
 - [ ] Add invariants for deterministic event ordering and byte-stable evidence.
@@ -201,6 +204,7 @@ transfer policy after its slice is complete.
 | --- | --- | ---: | ---: |
 | Rewrite start | `eb484cdc` | 107,676 | 0 |
 | Canonical operation model | `97bb94e4` | 107,856 | +180 |
+| Simple-assignment shadow path | `4d970e1a` | 108,046 | +370 |
 
 ## Validation Ledger
 
@@ -212,16 +216,17 @@ transfer policy after its slice is complete.
 | Phase 0 differential harness | `SymbolicStateDifferentialHarness` canonicalizes normalized states and truncation ordering while retaining support, unknown reason, provenance, and truncation dimensions. Focused tests: 2 passed, 0 failed, 0 skipped. |
 | Phase 0 deletion map | Exact production references for the state-transfer, runtime-hazard, purity-state, and exception-path owners were enumerated. Every owner now has a migration slice, retained-adapter boundary, and behavior gate in the table above. |
 | Phase 1 operation model | Commit `97bb94e4` adds typed descriptors for all nine event families and a normalized immutable transition envelope. Focused model tests: 3 passed, 0 failed, 0 skipped. The temporary +180 production LOC is migration scaffolding that must be repaid when legacy transfer paths are deleted. |
+| Phase 1 lowering bridge | Commit `4d970e1a` adds the single `IOperation` front-end and kernel dispatch. Local declaration and simple assignment states shadow-match the legacy path, including previous-value invalidation. Focused model tests: 5 passed, 0 failed, 0 skipped. Total temporary migration scaffolding is +370 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: Phase 0 is complete and the canonical event vocabulary plus immutable
-  transition envelope are committed; production behavior still uses legacy
-  transfer paths.
-- Last confirmed fact: all nine event families have typed descriptors and the
-  transition envelope normalizes state while retaining conservative metadata.
-- Next cheapest step: add the Roslyn `IOperation` lowering front-end for local
-  declaration and simple assignment, then shadow-compare its first transition.
+- State: the canonical model, transition envelope, single `IOperation` lowering
+  front-end, and first assignment kernel handler are committed; production
+  behavior still uses legacy transfer paths.
+- Last confirmed fact: local declarations and simple assignments shadow-match
+  the legacy normalized state in five focused model tests.
+- Next cheapest step: add Symbolic and Analyzer adapters plus deterministic
+  event/evidence ordering, then route the narrow simple-assignment slice.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
