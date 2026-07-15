@@ -63,7 +63,7 @@ compression, test deletion, or moving logic into manifests as a reduction.
 
 ## Phase 0 - Characterization And Deletion Map
 
-- [ ] Capture the Release solution build and all six test-lane counts/skips at
+- [x] Capture the Release solution build and all six test-lane counts/skips at
   the starting commit, recording any pre-existing failures here.
 - [ ] Capture public API snapshots, representative CLI/JSON/SARIF bytes, package
   contents, seeded fuzz output, and EffectSummary golden output.
@@ -173,15 +173,18 @@ compression, test deletion, or moving logic into manifests as a reduction.
 
 | Checkpoint | Evidence |
 | --- | --- |
-| Rewrite start | Analyzer/Symbolic focused builds previously green; exception-flow focused lane 207/208 with one failure reproduced on the starting commit. Full six-lane baseline pending. |
+| Rewrite start | Analyzer/Symbolic focused builds previously green; exception-flow focused lane 207/208 with one failure reproduced on the starting commit. |
+| Phase 0 build/test baseline | Release solution build: 0 warnings, 0 errors. MainSmtOracle: 573 passed. MainSmtAnalyzer: 487 passed. MainSmtFlow: 256 passed, 1 failed (the pre-existing SP0010 case). MainSmtCore: 257 passed. MainGeneral: 3,634 passed, 2 skipped. Tooling: 585 passed. Total: 5,792 passed, 1 pre-existing failure, 2 explicit MainGeneral skips. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: plan created; no canonical-kernel production code has been added yet.
-- Last confirmed fact: the four overlapping semantic surfaces total 14,417
-  handwritten production lines.
-- Next cheapest step: capture the full Phase 0 build/test and contract baseline,
-  then inventory callers for the simple-assignment vertical slice.
+- State: plan committed and the full Release build/test baseline captured; no
+  canonical-kernel production code has been added yet.
+- Last confirmed fact: the Release solution builds with zero warnings and the
+  six lanes pass 5,792 tests, with one pre-existing SP0010 failure and two
+  explicit MainGeneral skips.
+- Next cheapest step: capture public API, CLI/JSON/SARIF, package, fuzz, and
+  EffectSummary contract snapshots, then inventory the simple-assignment slice.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
