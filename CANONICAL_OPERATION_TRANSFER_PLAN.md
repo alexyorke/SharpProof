@@ -302,6 +302,7 @@ transfer policy after its slice is complete.
 | Central proof-status projection | `a93f4062` | 105,746 | -1,930 |
 | Resolved source-query materialization finding | `2ec1efdd` | 105,746 | -1,930 |
 | Shared tooling temporary-source lifecycle | `71ec1af7` | 105,746 | -1,930 |
+| Shared compact CLI test contracts | `52f1b63c` | 105,746 | -1,930 |
 
 ## Validation Ledger
 
@@ -392,6 +393,7 @@ transfer policy after its slice is complete.
 | Phase 6 central proof-status projection | Commit `a93f4062` moves truth-value, condition-summary, and runtime-hazard mappings into typed overloads on `SymbolicProofProjection`. Each overload retains its domain-specific proven values and conservative `Unknown` default. Seventeen table cases cover every current enum member plus unknown numeric values; focused proof/query tests pass 267 and runtime-hazard/serialized projection tests pass 281. Release Symbolic build: zero warnings. Production LOC fell to 105,746, or -1,930 from the rewrite start. |
 | Phase 6 resolved source-query materialization finding | Commit `2ec1efdd` removes the stale line/span query entry. Line, line-point, and span paths already share the full `AnalyzeAndProjectNode` materializer; only their node selectors, nearest-point logic, and scope metadata remain distinct. Wrapping the two short `Select` calls would add code without centralizing semantics. Focused program-point/query/path tests pass 113 and tooling source-query/projection/JSON tests pass 114. Production LOC remains 105,746, or -1,930 from the rewrite start. |
 | Phase 6 shared tooling temporary-source lifecycle | Commit `71ec1af7` introduces one disposable `TemporarySourceFile` fixture and migrates all nine capability, complexity, and standalone-profile CLI tests from repeated GUID/write/`try/finally`/delete blocks. Test names, sources, commands, and assertions are unchanged; `using` now owns cleanup even on failure. Focused fixtures pass 9/9 and the Release ToolingTest build has zero warnings. The tranche removes 51 test lines, bringing tracked test LOC to 142,428; production LOC remains 105,746, or -1,930 from the rewrite start. |
+| Phase 6 shared compact CLI test contracts | Commit `52f1b63c` centralizes compact JSON kind/schema/evidence assertions and capability/complexity `--all-lines` rejection checks while retaining the original test methods and feature-specific payload assertions. The shared envelope now also locks `schemaVersion`. Focused compact, capability, complexity, and source-query fixtures pass 108/108; Release ToolingTest build: zero warnings. Test LOC fell by 18 to 142,410; production LOC remains 105,746, or -1,930 from the rewrite start. |
 
 ## Current Checkpoint
 
@@ -402,12 +404,13 @@ transfer policy after its slice is complete.
   finding are removed with evidence, and exception-catalog type/source
   registration, proof path-state encoding, and typed proof-status projection are
   centralized. The stale source-query entry is removed, and tooling temporary
-  source lifecycle is centralized across nine tests.
-- Last confirmed fact: the focused tooling fixtures pass 9/9 and the Release
-  ToolingTest build has zero warnings. Test LOC is 142,428 after removing 51
-  lines; production LOC remains 105,746, or -1,930 from the rewrite start.
-- Next cheapest step: adjudicate the compact capability/complexity envelope and
-  invalid-mode test finding, parameterizing only assertions that are truly
-  identical while retaining feature-specific payload checks.
+  source lifecycle plus compact CLI test contracts are centralized.
+- Last confirmed fact: focused compact, capability, complexity, and source-query
+  fixtures pass 108/108 and the Release ToolingTest build has zero warnings.
+  Test LOC is 142,410; production LOC remains 105,746, or -1,930 from the
+  rewrite start.
+- Next cheapest step: adjudicate project/solution-to-SARIF materialization in
+  Baseline and CorpusReport, preserving temporary-file ownership and input
+  ordering.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
