@@ -169,7 +169,7 @@ transfer policy after its slice is complete.
 
 - [x] Migrate purity analysis to consume canonical transitions.
 - [x] Migrate nullable and runtime-type analysis to consume canonical state.
-- [ ] Migrate exception flow to consume canonical hazards and completion edges.
+- [x] Migrate exception flow to consume canonical hazards and completion edges.
 - [ ] Centralize Analyzer evidence projection without merging diagnostic policy.
 - [ ] Remove remaining Analyzer-owned transfer and hazard interpretation.
 - [ ] Gate: Analyzer lane and diagnostic/evidence fixtures are green; record net
@@ -264,6 +264,7 @@ transfer policy after its slice is complete.
 | Shared exact runtime-type resolution | `640c1426` | 106,282 | -1,394 |
 | Canonical exact receiver-type state | `79a54498` | 106,316 | -1,360 |
 | Superseded exception path facts | `d1ff9c86` | 106,251 | -1,425 |
+| Canonical throwing-finally completion | `0e4d3bb5` | 106,173 | -1,503 |
 
 ## Validation Ledger
 
@@ -333,6 +334,7 @@ transfer policy after its slice is complete.
 | Phase 5 shared exact runtime-type resolution | Commit `640c1426` routes exception method/property dispatch through `SymbolicRuntimeTypeFacts`, extends that shared resolver with same-type conditional/coalesce merges, and deletes exception flow's independent statement-scanning exact-local dictionary. The strengthened fixture proves a conditional local followed by a same-type coalesce still reaches the exact property implementation. Release test build: zero warnings; focused exact-dispatch and exception-flow tests: 60 passed plus the strengthened focused reproduction; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 106,282, or -1,394 from the rewrite start. |
 | Phase 5 canonical exact receiver-type state | Commit `79a54498` replaces purity's local and flow-capture concrete-type dictionaries, independent intersections, equality, and hashing with versioned `SymbolicExactRuntimeTypeAtom` facts. Assignment invalidation and canonical state merging now own their lifetime; the post-CFG probe explicitly projects only exact-type metadata instead of retaining a parallel map. The 34-line canonical fact scaffold raises production LOC to 106,316, or -1,360 from the rewrite start, but deletes both competing state stores and enables later Analyzer-state deletion. Release build: zero warnings; exact-dispatch/using/disposal tests: 58 passed; focused CFG regression set: 15 passed; MainSmtAnalyzer: 487 passed. |
 | Phase 5 superseded exception path facts | Commit `d1ff9c86` deletes the unreferenced null/zero dominating-if interpreter and its retired `PathFactKind`, then removes the exception-site wrapper whose `relevantRoot` parameter was ignored. Catch filters and path-sensitive finally checks now call the canonical path-state collector directly. Release test build: zero warnings; focused exception, path, catch-filter, and finally tests: 219 passed, with only the documented baseline SP0010 failure. Production LOC fell to 106,251, or -1,425 from the rewrite start. |
+| Phase 5 canonical throwing-finally completion | Commit `0e4d3bb5` replaces exception flow's recursive block/if exit interpreter with canonical completed-block transfer followed by the shared reachability proof. This preserves path-sensitive one-branch and all-branch exits while deleting 89 lines of duplicate completion policy. Direct finally tests: 17 passed; focused exception/path/catch/finally batch: 219 passed with only baseline SP0010. Production LOC fell to 106,173, or -1,503 from the rewrite start. Exception flow now consumes canonical hazard descriptors, path state, and completion semantics, closing the second Phase 5 item. |
 
 ## Current Checkpoint
 
@@ -343,11 +345,11 @@ transfer policy after its slice is complete.
   Symbolic runtime-type resolver, and purity exact local/flow-capture types are
   versioned canonical facts. The nullable/runtime-type item is complete.
 - Last confirmed fact: exact-dispatch, using, disposal, and CFG-focused tests are
-  green; Analyzer is 487/487. The latest exception-focused batch passes 219
-  cases with only baseline SP0010. Production LOC is 106,251, or -1,425 from
-  the rewrite start.
-- Next cheapest step: compare the path-sensitive throwing-finally block/if exit
-  interpreter with canonical completion state, then replace or retain it based
-  on differential evidence before touching catch/exception ordering policy.
+  green; Analyzer is 487/487. Canonical throwing-finally completion passes 17
+  direct cases and the 219-case exception batch with only baseline SP0010.
+  Production LOC is 106,173, or -1,503 from the rewrite start.
+- Next cheapest step: inventory Analyzer diagnostic/evidence envelopes for one
+  shared projection that preserves each rule's diagnostic policy and serialized
+  evidence properties byte-for-byte.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
