@@ -7,19 +7,12 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowQuery
 {
-    internal sealed class MethodExceptionQueryResult
+    internal sealed class MethodExceptionQueryResult(
+        ExceptionEvidenceSet exceptionEvidence,
+        ImmutableArray<UncaughtExceptionSiteEntry> siteEntries)
     {
-        public MethodExceptionQueryResult(
-            ExceptionEvidenceSet exceptionEvidence,
-            ImmutableArray<UncaughtExceptionSiteEntry> siteEntries)
-        {
-            ExceptionEvidence = exceptionEvidence;
-            SiteEntries = siteEntries;
-        }
-
-        public ExceptionEvidenceSet ExceptionEvidence { get; }
-
-        public ImmutableArray<UncaughtExceptionSiteEntry> SiteEntries { get; }
+        public ExceptionEvidenceSet ExceptionEvidence { get; } = exceptionEvidence;
+        public ImmutableArray<UncaughtExceptionSiteEntry> SiteEntries { get; } = siteEntries;
     }
 
     internal sealed class ExceptionCandidate
@@ -49,50 +42,28 @@ internal static partial class ExceptionFlowQuery
         public ImmutableArray<ExceptionEdgeDiagnosticEntry> Edges { get; }
     }
 
-    internal sealed class UncaughtExceptionSiteEntry
+    internal sealed class UncaughtExceptionSiteEntry(
+        SyntaxNode site,
+        IMethodSymbol method,
+        ExceptionCandidate exception,
+        string? exceptionSymbol = null)
     {
-        public UncaughtExceptionSiteEntry(
-            SyntaxNode site,
-            IMethodSymbol method,
-            ExceptionCandidate exception,
-            string? exceptionSymbol = null)
-        {
-            Site = site;
-            Method = method;
-            Exception = exception;
-            ExceptionSymbol = exceptionSymbol;
-        }
-
-        public SyntaxNode Site { get; }
-
-        public IMethodSymbol Method { get; }
-
-        public ExceptionCandidate Exception { get; }
-
-        public string? ExceptionSymbol { get; }
+        public SyntaxNode Site { get; } = site;
+        public IMethodSymbol Method { get; } = method;
+        public ExceptionCandidate Exception { get; } = exception;
+        public string? ExceptionSymbol { get; } = exceptionSymbol;
     }
 
-    internal sealed class ExceptionEvidenceEntry
+    internal sealed class ExceptionEvidenceEntry(
+        string exceptionType,
+        string[] categories,
+        string[] sources,
+        ExceptionEdgeDiagnosticEntry[] edges)
     {
-        public ExceptionEvidenceEntry(
-            string exceptionType,
-            string[] categories,
-            string[] sources,
-            ExceptionEdgeDiagnosticEntry[] edges)
-        {
-            ExceptionType = exceptionType;
-            Categories = categories;
-            Sources = sources;
-            Edges = edges;
-        }
-
-        public string ExceptionType { get; }
-
-        public string[] Categories { get; }
-
-        public string[] Sources { get; }
-
-        public ExceptionEdgeDiagnosticEntry[] Edges { get; }
+        public string ExceptionType { get; } = exceptionType;
+        public string[] Categories { get; } = categories;
+        public string[] Sources { get; } = sources;
+        public ExceptionEdgeDiagnosticEntry[] Edges { get; } = edges;
     }
 
     internal sealed class ExceptionEvidenceSet
