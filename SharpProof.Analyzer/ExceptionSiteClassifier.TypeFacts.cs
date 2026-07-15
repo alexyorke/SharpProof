@@ -18,15 +18,4 @@ internal static partial class ExceptionSiteClassifier
         return SymbolicTypeFacts.IsReferenceLikeType(typeSymbol);
     }
 
-    private static bool IsDynamicExpression(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicTypeFacts.IsDynamicExpression(
-            expression,
-            semanticModel,
-            cancellationToken,
-            UnwrapFactExpression);
-    }
 }

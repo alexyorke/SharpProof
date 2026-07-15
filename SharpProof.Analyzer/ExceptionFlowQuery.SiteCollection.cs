@@ -123,6 +123,8 @@ internal static partial class ExceptionFlowQuery
             SymbolicRuntimeHazardKind.UnboxNull,
             SymbolicRuntimeHazardKind.InvalidCast,
             SymbolicRuntimeHazardKind.ArrayTypeMismatch,
+            SymbolicRuntimeHazardKind.ArgumentNull,
+            SymbolicRuntimeHazardKind.DynamicNullBinding,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
             SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
@@ -172,29 +174,28 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteNullDereferenceNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.NullDereference &&
+                         ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is
+                             MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or
+                             InvocationExpressionSyntax or AwaitExpressionSyntax),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      static _ => ExceptionTypes.NullReferenceException,
-                     static node => node is AwaitExpressionSyntax
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is AwaitExpressionSyntax
                          ? ExceptionCategories.DefiniteAwaitNull
                          : ExceptionCategories.DefiniteNullDereference,
-                     static node => node is AwaitExpressionSyntax
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is AwaitExpressionSyntax
                          ? ExceptionSources.AwaitExpression
                          : ExceptionSources.NullReceiver,
                      siteContext))
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteLockNullNodes(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static node => node,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentNull &&
+                         string.Equals(hazard.Category, ExceptionCategories.DefiniteLockNull,
+                             StringComparison.Ordinal)),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.ArgumentNullException,
                      ExceptionCategories.DefiniteLockNull,
@@ -202,15 +203,12 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionSiteClassifier.GetDefiniteDynamicNullBindingSites(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
-                     static site => site.Site,
-                     static _ => SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
-                     static site => site.Category,
-                     static site => site.Source,
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.DynamicNullBinding),
+                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
+                     static hazard => hazard.ExceptionType,
+                     static hazard => hazard.Category,
+                     static hazard => GetDynamicNullBindingHazardSource(hazard.Category),
                      siteContext))
             yield return entry;
 

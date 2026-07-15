@@ -55,6 +55,15 @@ internal static partial class ExceptionFlowQuery
                string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal);
     }
 
+    private static string GetDynamicNullBindingHazardSource(string category)
+    {
+        if (string.Equals(category, SymbolicDynamicNullBindingFacts.MemberCategory, StringComparison.Ordinal))
+            return SymbolicDynamicNullBindingFacts.MemberSource;
+        if (string.Equals(category, SymbolicDynamicNullBindingFacts.IndexCategory, StringComparison.Ordinal))
+            return SymbolicDynamicNullBindingFacts.IndexSource;
+        return SymbolicDynamicNullBindingFacts.InvocationSource;
+    }
+
     private static string GetAnalyzerOnlySymbolicHazardSource(string category)
     {
         if (string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, StringComparison.Ordinal))
