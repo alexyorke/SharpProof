@@ -15,9 +15,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Follow-up audit (2026-07-14)
 
-23. **Analyzer distribution closure is manually maintained in multiple delivery paths** - `SharpProof.AnalyzerConsumer.props:3-14`; `SharpProof.Package/SharpProof.Package.csproj:36-54`; `SharpProof.Vsix/SharpProof.Vsix.csproj:43,51-70`
-    These files independently describe the deployable analyzer/code-fix component graph (attributes, analyzer, symbolic/proof dependencies, code fixes, and runtime support DLLs). Use one shared component/dependency manifest or item list, with each consumer applying its own packaging metadata. This is distinct from build entrypoint duplication: it concerns the actual shipped payload closure.
-
 24. **ProofCore fixed-point collection drivers** - `SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs:10-50`; `SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs:160-182,1373-1390`
     Boolean, reference, integer, and string collection loops all compute the same bounded iteration count, scan conditions, early-return for non-ready state, decrement, and repeat while changed. A private generic fixed-point driver can own convergence behavior while callers supply their collector and result adapter.
 
