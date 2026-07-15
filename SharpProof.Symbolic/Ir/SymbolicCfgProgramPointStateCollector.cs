@@ -18,6 +18,13 @@ internal static class SymbolicCfgProgramPointStateCollector
             ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(site, "execution-root");
+        if (CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot).Any(static node =>
+                node is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax or
+                    Microsoft.CodeAnalysis.CSharp.Syntax.DoStatementSyntax or
+                    Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax or
+                    Microsoft.CodeAnalysis.CSharp.Syntax.ForEachStatementSyntax or
+                    Microsoft.CodeAnalysis.CSharp.Syntax.ForEachVariableStatementSyntax))
+            return Unsupported(site, "loop-fixed-point");
 
         ControlFlowGraph? graph;
         try
@@ -47,6 +54,11 @@ internal static class SymbolicCfgProgramPointStateCollector
         var queued = new HashSet<int> { 0 };
         queue.Enqueue(graph.Blocks[0]);
         SymbolicState? targetState = null;
+        SymbolicState? guardedTargetState = null;
+        var targetIsInsideBranch = site.Ancestors().Any(static ancestor =>
+            ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax or
+                Microsoft.CodeAnalysis.CSharp.Syntax.ElseClauseSyntax or
+                Microsoft.CodeAnalysis.CSharp.Syntax.SwitchSectionSyntax);
         var iterations = 0;
         while (queue.Count != 0 && iterations++ < graph.Blocks.Length * 4)
         {
@@ -61,6 +73,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 {
                     if (currentPath.Guard == null)
                         targetState = state;
+                    else if (!targetIsInsideBranch)
+                        guardedTargetState = state;
                     foundTarget = true;
                     break;
                 }
@@ -89,6 +103,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 {
                     if (currentPath.Guard == null)
                         targetState = state;
+                    else if (!targetIsInsideBranch)
+                        guardedTargetState = state;
                     continue;
                 }
             }
@@ -104,6 +120,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
+        targetState ??= guardedTargetState;
         return targetState == null || queue.Count != 0
             ? Unsupported(site, queue.Count == 0 ? "target-block" : "iteration-limit")
             : Exact(targetState, site);

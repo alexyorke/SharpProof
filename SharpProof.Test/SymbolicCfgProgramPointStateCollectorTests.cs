@@ -112,6 +112,31 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void SingleSurvivingBranch_MatchesStructuralCompletionState()
+    {
+        const string source = "static class C { static int M(bool stop) { if (stop) return 0; int value = 2; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(SingleSurvivingBranch_MatchesStructuralCompletionState));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Last();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
     public void LoopBackEdge_RemainsConservativeFallback()
     {
         const string source = "static class C { static int M(int count) { int value = 0; while (count-- > 0) value = 1; return value; } }";
