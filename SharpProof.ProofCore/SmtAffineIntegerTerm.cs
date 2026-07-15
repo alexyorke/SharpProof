@@ -281,6 +281,42 @@ internal readonly struct SmtAffineIntegerTerm
 
 internal static class SmtIntegerArithmetic
 {
+    internal static bool TryEvaluateBinary(
+        SmtIntegerBinaryOperator op,
+        long left,
+        long right,
+        out long value)
+    {
+        if (op is not (SmtIntegerBinaryOperator.Add or
+            SmtIntegerBinaryOperator.Subtract or
+            SmtIntegerBinaryOperator.Multiply or
+            SmtIntegerBinaryOperator.Divide or
+            SmtIntegerBinaryOperator.Remainder))
+        {
+            value = default;
+            return false;
+        }
+
+        try
+        {
+            value = op switch
+            {
+                SmtIntegerBinaryOperator.Add => checked(left + right),
+                SmtIntegerBinaryOperator.Subtract => checked(left - right),
+                SmtIntegerBinaryOperator.Multiply => checked(left * right),
+                SmtIntegerBinaryOperator.Divide => checked(left / right),
+                SmtIntegerBinaryOperator.Remainder => checked(left % right),
+                _ => throw new InvalidOperationException("Unexpected integer operator.")
+            };
+            return true;
+        }
+        catch (Exception exception) when (exception is OverflowException or DivideByZeroException)
+        {
+            value = default;
+            return false;
+        }
+    }
+
     internal static bool TryAdd(long left, long right, out long value)
     {
         return TryBinary(left, right, static (first, second) => checked(first + second), out value);

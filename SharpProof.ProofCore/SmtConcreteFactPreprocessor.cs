@@ -1037,47 +1037,30 @@ internal sealed class SmtConcreteFactPreprocessor
         ConcreteFactContext facts,
         out long value)
     {
-        try
+        if (formula is SmtIntegerConstant integerConstant)
         {
-            if (formula is SmtIntegerConstant integerConstant)
-            {
-                value = integerConstant.Value;
-                return true;
-            }
-
-            if (facts.IntegerEqualities.TryGetValue(formula, out value)) return true;
-
-            switch (formula)
-            {
-                case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unaryTerm
-                    when TryEvaluateInteger(unaryTerm.Operand, facts, out var operand):
-                    value = checked(-operand);
-                    return true;
-                case SmtIntegerBinaryTerm binaryTerm:
-                    return TryEvaluateIntegerBinary(binaryTerm, facts, out value);
-                case SmtConditionalFormula { Kind: SmtValueKind.Int } conditionalFormula:
-                    if (TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
-                        return TryEvaluateInteger(
-                            selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                            facts,
-                            out value);
-
-                    value = default;
-                    return false;
-                default:
-                    value = default;
-                    return false;
-            }
+            value = integerConstant.Value;
+            return true;
         }
-        catch (OverflowException)
+
+        if (facts.IntegerEqualities.TryGetValue(formula, out value)) return true;
+
+        switch (formula)
         {
-            value = default;
-            return false;
-        }
-        catch (DivideByZeroException)
-        {
-            value = default;
-            return false;
+            case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unaryTerm
+                when TryEvaluateInteger(unaryTerm.Operand, facts, out var operand):
+                return SmtIntegerArithmetic.TryNegate(operand, out value);
+            case SmtIntegerBinaryTerm binaryTerm:
+                return TryEvaluateIntegerBinary(binaryTerm, facts, out value);
+            case SmtConditionalFormula { Kind: SmtValueKind.Int } conditionalFormula
+                when TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch):
+                return TryEvaluateInteger(
+                    selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
+                    facts,
+                    out value);
+            default:
+                value = default;
+                return false;
         }
     }
 
@@ -1091,16 +1074,7 @@ internal sealed class SmtConcreteFactPreprocessor
             !TryEvaluateInteger(term.Right, facts, out var right))
             return false;
 
-        value = term.Operator switch
-        {
-            SmtIntegerBinaryOperator.Add => checked(left + right),
-            SmtIntegerBinaryOperator.Subtract => checked(left - right),
-            SmtIntegerBinaryOperator.Multiply => checked(left * right),
-            SmtIntegerBinaryOperator.Divide => checked(left / right),
-            SmtIntegerBinaryOperator.Remainder => checked(left % right),
-            _ => default
-        };
-        return true;
+        return SmtIntegerArithmetic.TryEvaluateBinary(term.Operator, left, right, out value);
     }
 
     private static bool CompareEquality(SmtBinaryOperator op, bool equality)

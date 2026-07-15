@@ -44,49 +44,11 @@ internal static partial class SmtSyntacticClassifier
                 case SmtIntegerBinaryTerm binary
                     when TryGetKnownInteger(binary.Left, out var left) &&
                          TryGetKnownInteger(binary.Right, out var right):
-                    return TryEvaluateIntegerBinaryTerm(binary.Operator, left, right, out value);
+                    return SmtIntegerArithmetic.TryEvaluateBinary(binary.Operator, left, right, out value);
                 default:
                     value = 0;
                     return false;
             }
-        }
-
-        private static bool TryEvaluateIntegerBinaryTerm(
-            SmtIntegerBinaryOperator op,
-            long left,
-            long right,
-            out long value)
-        {
-            try
-            {
-                checked
-                {
-                    switch (op)
-                    {
-                        case SmtIntegerBinaryOperator.Add:
-                            value = left + right;
-                            return true;
-                        case SmtIntegerBinaryOperator.Subtract:
-                            value = left - right;
-                            return true;
-                        case SmtIntegerBinaryOperator.Multiply:
-                            value = left * right;
-                            return true;
-                        case SmtIntegerBinaryOperator.Divide when right != 0:
-                            value = left / right;
-                            return true;
-                        case SmtIntegerBinaryOperator.Remainder when right != 0:
-                            value = left % right;
-                            return true;
-                    }
-                }
-            }
-            catch (OverflowException)
-            {
-            }
-
-            value = 0;
-            return false;
         }
 
         private bool TryAddIntegerIntervalFact(
