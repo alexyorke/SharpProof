@@ -129,7 +129,7 @@ transfer policy after its slice is complete.
 - [x] Migrate compound assignments, increments/decrements, checked arithmetic,
   and coalesce assignment.
 - [x] Migrate tuple/deconstruction assignment and evaluation order.
-- [ ] Migrate `ref`/`out`, ref-local aliases, invalidation, and version updates.
+- [x] Migrate `ref`/`out`, ref-local aliases, invalidation, and version updates.
 - [ ] Migrate freshness, ownership, borrowing, escape, disposal, and resource
   release transitions.
 - [ ] Delete superseded assignment and Analyzer purity-state implementations.
@@ -209,6 +209,7 @@ transfer policy after its slice is complete.
 | Scalar assignment migration | `01a36afd` | 108,209 | +533 |
 | Computed assignment migration | `38ea0509` | 108,350 | +674 |
 | Tuple/deconstruction migration | `611b4e17` | 108,393 | +717 |
+| Alias and invalidation migration | `fc40894c` | 108,501 | +825 |
 
 ## Validation Ledger
 
@@ -225,15 +226,16 @@ transfer policy after its slice is complete.
 | Phase 2 scalar assignments | Commit `01a36afd` routes non-self-referential Boolean, integral, and enum declarations/assignments through the canonical kernel in Symbolic and Analyzer. The superseded scalar-equality branches were removed while reference and self-referential policy remains explicit. Focused affected fixtures: 299 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +533 production LOC. |
 | Phase 2 computed assignments | Commit `38ea0509` routes compound assignments, checked/unchecked increment and decrement, and unknown coalesce postconditions through typed assignment/mutation events. The old coalesce interpreter was deleted. Focused transfer/program-point/invariant tests: 113 passed; full MainSmtOracle lane: 573 passed. Total temporary migration scaffolding is +674 production LOC. |
 | Phase 2 tuple/deconstruction | Commit `611b4e17` gives Symbolic and Analyzer one nested target/pairing plan, removes both independent target walkers, and routes tuple-local equalities as one ordered binding batch. It also restores legacy provenance/evidence fields on canonical scalar bindings. Focused tuple/program-point/transfer/invariant tests: 119 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +717 production LOC. |
+| Phase 2 alias and invalidation | Commit `fc40894c` makes mutation events own variable-prefix and member-path invalidation, centralizes idempotent definition-version calculation, and routes Analyzer reference aliases and ref-local shared/mutable borrows through lifetime events. Focused ref/out, alias, mutation, version, and program-point tests: 35 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +825 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: scalar, computed, tuple, and deconstruction assignment families now
-  share canonical events or the common ordered deconstruction plan.
-- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after deleting the
-  independent Symbolic and Analyzer deconstruction target walkers.
-- Next cheapest step: migrate `ref`/`out`, ref-local aliases, invalidation, and
-  version updates into mutation/lifetime events.
+- State: scalar, computed, tuple, deconstruction, alias/borrow, and invalidation
+  families now share canonical events or their common ordered plans.
+- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after routing ref/out
+  invalidation, definition versions, and ref-local borrow facts through the kernel.
+- Next cheapest step: migrate freshness, ownership, borrowing, escape, disposal,
+  and resource release transitions into lifetime events.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
