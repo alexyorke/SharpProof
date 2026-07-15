@@ -234,7 +234,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
     acyclic branches. Branch-condition mutation falls back to common-state
     merging; branch-local target queries remain on the structural collector
     until capture/version snapshots migrate.
-  - [ ] Add bounded revisits, completion edges, and finally continuations.
+  - [x] Preserve the surviving guarded edge when the alternate acyclic branch
+    completes. Lexically branch-local targets still fall back.
+  - [ ] Add all-path completion, bounded loop revisits, and finally
+    continuations. Execution roots containing loops are rejected up front until
+    loop-carried invalidation and fixed-point convergence migrate together.
 - [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
@@ -375,6 +379,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Semantic-search residual adapter deletion | `6773fdc0` | 105,585 | -2,091 |
 | Phase 7 straight-line CFG collector | `1b67e81a` | 105,762 | -1,914 |
 | Phase 7 acyclic CFG branch transfer | `c5e685d3` | 105,970 | -1,706 |
+| Phase 7 single-survivor completion | `cdc1a701` | 105,987 | -1,689 |
 
 ## Validation Ledger
 
@@ -503,6 +508,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 6 bounded semantic-search stop gate | Two `colgrep --force-cpu` batches were inspected against production code. Batch 1 found 46 safely removable lines in two generic operation wrappers; commit `6773fdc0` deletes them and keeps the same characterization on the direct lowerer-plus-kernel path, with all 40 operation-transfer model fixtures green. Batch 2 found no >=50-line safe deletion: the catalog hits are required data, option parsing is already registry-driven, and the remaining Analyzer/encoder switches carry distinct policy. Production LOC fell to 105,585, or -2,091 from the rewrite start; tracked test LOC is 142,479. |
 | Phase 7 straight-line CFG collector | Commit `1b67e81a` adds a production-routed CFG/`IOperation` collector for direct local/parameter declarations and simple assignments. It returns typed `Unsupported` for unmigrated control-flow and operation shapes, so the structural engine remains the conservative fallback. Four normalized-state differential cases plus the explicit branch-fallback case pass; the complete program-point and operation-transfer batch passes 120/120. Release Symbolic warning-as-error build: zero warnings. This first migration scaffold raises production LOC to 105,762, or -1,914 from the rewrite start, and test LOC to 142,534. |
 | Phase 7 acyclic CFG branch transfer | Commit `c5e685d3` adds typed true/false successor assumptions, an acyclic worklist, guarded canonical joins, and condition-mutation detection. A path-snapshot regression was reproduced in the broader gate; branch-local targets now fall back until capture/version lowering migrates, while post-join queries use the canonical path. Direct collector fixtures pass 8/8; the path/program-point/transfer batch passes 153/153; full MainSmtOracle passes 573/573; Release Symbolic warning-as-error build has zero warnings. The branch scaffold raises production LOC to 105,970, or -1,706 from the rewrite start, and test LOC to 142,590; it must be repaid with the structural branch-transfer deletion. |
+| Phase 7 single-survivor completion | Commit `cdc1a701` retains the guarded state when one acyclic branch completes and only the other reaches a point after the branch. A full-lane probe exposed optimistic first-pass loop states, so every execution root containing a loop now returns typed `Unsupported` before CFG traversal until bounded fixed-point and loop-carried invalidation migrate together. Direct collector fixtures pass 9/9; full MainSmtOracle passes 573/573. Production LOC is 105,987, or -1,689 from the rewrite start; test LOC is 142,612. |
 
 ## Current Checkpoint
 
@@ -568,10 +574,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
   reachable. Commits `1b67e81a` and `c5e685d3` production-route straight-line
   assignment and post-join acyclic branch states through canonical CFG events.
   Branch-local target queries, back-edges, finally regions, unsupported
-  operations, and completion shapes still fall back. MainSmtOracle passes
-  573/573 and the warning-as-error Symbolic build is clean. Test LOC is 142,590;
-  production LOC is 105,970, or -1,706 from the rewrite start; the 385-line
-  scaffold must be repaid when structural transfer paths are deleted.
+  operations, all-path completion, and finally shapes still fall back. Acyclic
+  single-survivor completion is canonical; loop-containing roots are rejected
+  before traversal. MainSmtOracle passes 573/573 and the warning-as-error
+  Symbolic build is clean. Test LOC is 142,612; production LOC is 105,987, or
+  -1,689 from the rewrite start; the 402-line scaffold must be repaid when
+  structural transfer paths are deleted.
 - Next cheapest step: move direct fact/condition insertion for method entry and
   normal completion behind canonical descriptors, then add bounded loop revisits
   without reintroducing syntax-owned mutation.
