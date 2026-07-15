@@ -24,6 +24,16 @@ internal static class SymbolicStateMerger
                 limits.MaxGuardFactsPerTargetPerState));
     }
 
+    internal static SymbolicCondition CreateGuardedChoice(
+        SymbolicCondition guard,
+        SymbolicCondition value) =>
+        value is SymbolicConstantCondition { Value: false }
+            ? new SymbolicNotCondition(guard)
+            : new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(guard),
+                value);
+
     private static SymbolicCondition Combine(
         SymbolicConditionOperator op,
         IReadOnlyList<SymbolicCondition> conditions)

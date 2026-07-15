@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -131,6 +132,7 @@ internal static class SymbolicOperationLowerer
                 provenance,
                 postconditionProfile);
             if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
+            {
                 AddSymbolicFiniteArrayElementPostconditions(
                     postconditions,
                     targetSymbol,
@@ -138,6 +140,14 @@ internal static class SymbolicOperationLowerer
                     valueExpression,
                     valueContext,
                     provenance);
+                AddSymbolicSwitchExpressionPostconditions(
+                    postconditions,
+                    targetSymbol,
+                    target,
+                    valueExpression,
+                    valueContext,
+                    provenance);
+            }
             var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
                 targetSymbol,
                 valueExpression,
@@ -749,6 +759,62 @@ internal static class SymbolicOperationLowerer
                     sourceElement,
                     valueExpression,
                     provenance + ".tuple-element.snapshot"));
+    }
+
+    private static void AddSymbolicSwitchExpressionPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        string provenance)
+    {
+        if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression) is not
+                SwitchExpressionSyntax { Arms.Count: > 0 } switchExpression ||
+            SymbolicLoopStateTransfer.ExpressionMutatesAnySymbol(
+                switchExpression,
+                SymbolicBranchCompletionStateTransfer.GetSwitchExpressionConditionSymbols(
+                    switchExpression,
+                    context.SemanticModel,
+                    context.CancellationToken),
+                context.SemanticModel,
+                context.CancellationToken))
+            return;
+
+        var addedCount = 0;
+        foreach (var arm in switchExpression.Arms)
+        {
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    out var armCondition))
+                continue;
+
+            SymbolicCondition? armValue = null;
+            if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(arm.Expression) is ThrowExpressionSyntax)
+                armValue = new SymbolicConstantCondition(false);
+            else if (SymbolicSemanticPipeline.LowerTerm(arm.Expression, context) is
+                         { IsExact: true, Value: { } value } &&
+                     SymbolicStateFactBuilder.CanCompareIrTerms(target, value))
+                armValue = ExactRelation(
+                    SymbolicRelationOperator.Equal,
+                    target,
+                    value,
+                    arm.Expression,
+                    provenance + ".switch-expression-assigned-value",
+                    targetSymbol);
+
+            if (armValue == null) continue;
+            if (!SymbolicAnalysisLimitContext.CanAddMergedSwitchFact(
+                    addedCount,
+                    switchExpression,
+                    "program_point.switch_expression_state_fact_merge"))
+                return;
+            conditions.Add(SymbolicStateMerger.CreateGuardedChoice(armCondition, armValue));
+            addedCount++;
+        }
     }
 
     internal static bool TryGetTupleElementStorageNames(

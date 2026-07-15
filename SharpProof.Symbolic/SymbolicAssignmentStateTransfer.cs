@@ -137,15 +137,6 @@ internal static class SymbolicAssignmentStateTransfer
                 state = transition.State;
         }
 
-        if (!isSelfReferential)
-            AddSwitchExpressionAssignedValueStateFacts(
-                ref state,
-                assignedSymbol,
-                effectiveValueExpression,
-                semanticModel,
-                cancellationToken,
-                provenanceRoot);
-
         if (isSelfReferential &&
                  TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
                  selfReferentialValueTerm != null &&
@@ -381,75 +372,6 @@ internal static class SymbolicAssignmentStateTransfer
         if (!transition.IsExact) return;
 
         state = transition.State;
-    }
-
-    private static void AddSwitchExpressionAssignedValueStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression) is not SwitchExpressionSyntax switchExpression ||
-            switchExpression.Arms.Count == 0 ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetTerm))
-            return;
-
-        var conditionSymbols = SymbolicBranchCompletionStateTransfer.GetSwitchExpressionConditionSymbols(
-            switchExpression,
-            semanticModel,
-            cancellationToken);
-        if (SymbolicLoopStateTransfer.ExpressionMutatesAnySymbol(
-                switchExpression,
-                conditionSymbols,
-                semanticModel,
-                cancellationToken))
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var addedCount = 0;
-        foreach (var arm in switchExpression.Arms)
-        {
-            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
-                    switchExpression.GoverningExpression,
-                    arm,
-                    semanticModel,
-                    cancellationToken,
-                    out var armCondition))
-                continue;
-
-            SymbolicCondition? armFact = null;
-            if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(arm.Expression) is ThrowExpressionSyntax)
-            {
-                armFact = new SymbolicNotCondition(armCondition);
-            }
-            else if (SymbolicSemanticPipeline.LowerTerm(arm.Expression, context) is
-                     { IsExact: true, Value: { } armValueTerm } &&
-                     armValueTerm.Kind == targetTerm.Kind &&
-                     CanCompareIrTerms(targetTerm, armValueTerm))
-            {
-                armFact = new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.Or,
-                    new SymbolicNotCondition(armCondition),
-                    new SymbolicFactCondition(SymbolicFact.Exact(
-                        new SymbolicRelationAtom(SymbolicRelationOperator.Equal, targetTerm, armValueTerm),
-                        arm.Expression,
-                        provenanceRoot + ".switch-expression-assigned-value",
-                        assignedSymbol)));
-            }
-
-            if (armFact == null) continue;
-
-            if (!SymbolicAnalysisLimitContext.CanAddMergedSwitchFact(
-                    addedCount,
-                    switchExpression,
-                    "program_point.switch_expression_state_fact_merge"))
-                return;
-
-            state = state.AddPathCondition(armFact);
-            addedCount++;
-        }
     }
 
     internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)

@@ -431,10 +431,7 @@ internal static class SymbolicBranchCompletionStateTransfer
             return false;
         }
 
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(branchCondition),
-            branchFact));
+        state = state.AddPathCondition(SymbolicStateMerger.CreateGuardedChoice(branchCondition, branchFact));
         addedCount++;
         return true;
     }
