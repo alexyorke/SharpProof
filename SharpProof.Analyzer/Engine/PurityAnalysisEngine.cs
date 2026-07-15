@@ -256,7 +256,6 @@ internal partial class PurityAnalysisEngine
         public ImmutableHashSet<ISymbol> OwnedLocalArraySymbols { get; }
         public ImmutableHashSet<ISymbol> DefinitelyNullLocalSymbols { get; }
         public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
-        public ImmutableDictionary<ISymbol, int> SmtSymbolVersions { get; }
         public SymbolicState PathState { get; }
 
 
@@ -270,7 +269,6 @@ internal partial class PurityAnalysisEngine
             ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
             PurityEvidence firstImpurityEvidence = default,
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
-            ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
@@ -294,8 +292,6 @@ internal partial class PurityAnalysisEngine
                                          ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
             LocalConcreteTypes = localConcreteTypes ??
                                  ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-            SmtSymbolVersions = smtSymbolVersions ??
-                                ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
             PathState = pathState ?? new SymbolicState();
         }
 
@@ -330,8 +326,7 @@ internal partial class PurityAnalysisEngine
                    DefinitelyNullLocalSymbols.SetEquals(other.DefinitelyNullLocalSymbols) &&
                    SymbolicStatesEqual(PathState, other.PathState) &&
                    MapsEqual(LocalConcreteTypes, other.LocalConcreteTypes,
-                       static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
-                   MapsEqual(SmtSymbolVersions, other.SmtSymbolVersions, static (left, right) => left == right);
+                       static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
         }
 
         private static bool MapsEqual<TKey, TValue>(
@@ -413,11 +408,8 @@ internal partial class PurityAnalysisEngine
                 hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
             }
 
-            foreach (var kvp in SmtSymbolVersions.OrderBy(kv => kv.Key.Name))
-            {
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Key);
-                hash = hash * 23 + kvp.Value.GetHashCode();
-            }
+            foreach (var kvp in PathState.SymbolVersions.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+                hash = hash * 23 + kvp.GetHashCode();
 
             return hash;
         }
@@ -425,7 +417,9 @@ internal partial class PurityAnalysisEngine
         private static bool SymbolicStatesEqual(SymbolicState first, SymbolicState second)
         {
             if (first.Facts.Length != second.Facts.Length ||
-                first.PathConditions.Length != second.PathConditions.Length)
+                first.PathConditions.Length != second.PathConditions.Length ||
+                first.IsContradictory != second.IsContradictory ||
+                first.SymbolVersions.Count != second.SymbolVersions.Count)
                 return false;
 
             for (var index = 0; index < first.Facts.Length; index++)
@@ -436,7 +430,8 @@ internal partial class PurityAnalysisEngine
                 if (!Equals(first.PathConditions[index], second.PathConditions[index]))
                     return false;
 
-            return true;
+            return first.SymbolVersions.All(pair =>
+                second.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value);
         }
 
         public static bool operator ==(PurityAnalysisState left, PurityAnalysisState right)
@@ -460,7 +455,6 @@ internal partial class PurityAnalysisEngine
             ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
             PurityEvidence? firstImpurityEvidence = null,
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
-            ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
@@ -476,7 +470,6 @@ internal partial class PurityAnalysisEngine
                 definitelyNullLocalSymbols ?? DefinitelyNullLocalSymbols,
                 firstImpurityEvidence ?? FirstImpurityEvidence,
                 localConcreteTypes ?? LocalConcreteTypes,
-                smtSymbolVersions ?? SmtSymbolVersions,
                 flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
                 pathState ?? PathState,
                 flowCaptureSymbols ?? FlowCaptureSymbols,
@@ -691,7 +684,8 @@ internal partial class PurityAnalysisEngine
 
         public int GetSmtSymbolVersion(ISymbol symbol)
         {
-            return SmtSymbolVersions.TryGetValue(symbol.OriginalDefinition, out var version)
+            var key = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+            return PathState.SymbolVersions.TryGetValue(key, out var version)
                 ? version
                 : 0;
         }
@@ -699,15 +693,14 @@ internal partial class PurityAnalysisEngine
         public PurityAnalysisState WithSmtSymbolDefinitionVersion(ISymbol symbol, SyntaxNode definitionSyntax)
         {
             var originalDefinition = symbol.OriginalDefinition;
+            var symbolKey = SymbolicFactFactory.GetSmtVariableName(originalDefinition);
             var nextVersion = SymbolicOperationTransferKernel.GetDefinitionVersion(definitionSyntax.Span);
-            return Copy(
-                smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
-                pathState: SymbolicOperationTransferKernel.Invalidate(
+            var pathState = SymbolicOperationTransferKernel.Invalidate(
                     PathState,
-                    ImmutableArray.Create(new SymbolicInvalidationTarget(
-                        SymbolicFactFactory.GetSmtVariableName(originalDefinition))),
+                    ImmutableArray.Create(new SymbolicInvalidationTarget(symbolKey)),
                     definitionSyntax.Span,
-                    "analyzer.version-update").State);
+                    "analyzer.version-update").State.WithSymbolVersion(symbolKey, nextVersion);
+            return Copy(pathState: pathState);
         }
 
         private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)
