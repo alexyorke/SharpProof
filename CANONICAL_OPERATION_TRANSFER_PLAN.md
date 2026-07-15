@@ -171,8 +171,8 @@ transfer policy after its slice is complete.
 - [x] Migrate nullable and runtime-type analysis to consume canonical state.
 - [x] Migrate exception flow to consume canonical hazards and completion edges.
 - [x] Centralize Analyzer evidence projection without merging diagnostic policy.
-- [ ] Remove remaining Analyzer-owned transfer and hazard interpretation.
-- [ ] Gate: Analyzer lane and diagnostic/evidence fixtures are green; record net
+- [x] Remove remaining Analyzer-owned transfer and hazard interpretation.
+- [x] Gate: Analyzer lane and diagnostic/evidence fixtures are green; record net
   production LOC removed.
 
 ## Phase 6 - Secondary Large Reductions
@@ -268,6 +268,7 @@ transfer policy after its slice is complete.
 | Central contract evidence projection | `26cbd9c6` | 106,166 | -1,510 |
 | Canonical exception-flow hazard projection | `ecb384c5` | 106,104 | -1,572 |
 | Canonical flow-capture invalidation | `ccf50299` | 106,094 | -1,582 |
+| Residual Analyzer transfer deletion and Phase 5 gate | `93d0289b` | 106,111 | -1,565 |
 
 ## Validation Ledger
 
@@ -341,23 +342,21 @@ transfer policy after its slice is complete.
 | Phase 5 central contract evidence projection | Commit `26cbd9c6` makes one typed Requires/Ensures projector own family keys, baseline identity, proof status, structured unknown reason, truncation, and explain metadata while each analyzer retains rule selection, reporting conditions, messages, and evidence-key policy. Inferred-contract and invalid-contract diagnostics now use the same baseline-plus-explain envelope; syntax-tree fallback and trusted-boundary paths remain separate because their identity or explain policy differs. Release Analyzer build: zero warnings; direct envelope and adjacent contract/suggestion tests: 16 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 106,166, or -1,510 from the rewrite start. |
 | Phase 5 canonical exception-flow hazard projection | Commit `ecb384c5` replaces 19 independent proven-hazard family loops with one ordered compatibility projection. Exception type comes directly from the canonical hazard descriptor; the adapter retains only source labels, legacy category normalization, supported-site filtering, and the established direct-throw/callee/family order. Release Analyzer build: zero warnings; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Production LOC fell by 62 lines to 106,104, or -1,572 from the rewrite start. |
 | Phase 5 canonical flow-capture invalidation | Commit `ccf50299` invalidates a reassigned CFG flow capture through `SymbolicOperationTransferKernel.Invalidate` before applying exact runtime-type and ownership facts, and deletes Analyzer's owned-array-only fact filter and direct `SymbolicState` reconstruction. The new mixed fresh/external conditional-array regression characterizes conservative caller-visible mutation. Release Analyzer build: zero warnings; focused array/capture/dispatch tests: 35 passed; MainSmtAnalyzer: 487 passed. Production LOC fell by 10 lines to 106,094, or -1,582 from the rewrite start. |
+| Phase 5 residual Analyzer transfer deletion and gate | Commit `93d0289b` routes switch evaluation alias/selection conditions through canonical branch-assumption transitions and makes invalidation descriptors own definition-version updates. Exact mutation search finds no Analyzer live-transfer call to `AddFact`, `AddPathCondition`, `RemoveFacts`, or `WithSymbolVersion`; remaining state construction is limited to contract entry, Ensures snapshots, empty queries, and container defaults. Analyzer runtime-hazard code queries and compatibility-projects canonical descriptors without reconstructing triggers. Release Analyzer build: zero warnings; focused transfer/switch tests: 53 passed; diagnostic/evidence fixtures: 371 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Phase 5 closes at 106,111 production LOC, or -1,565 from the rewrite start. The 17-line increase from the prior checkpoint centralizes correctness-sensitive version ownership and is retained for the later legacy-engine deletions. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 through 4 are gated. Phase 5 purity migration is complete;
-  nullable contract proofs use the canonical query boundary, and the dead
-  exception-site null interpreter is deleted. Exception dispatch shares the
-  Symbolic runtime-type resolver, and purity exact local/flow-capture types are
-  versioned canonical facts. Exception flow and central evidence projection are
-  complete; diagnostic policy remains in its owning analyzers.
-- Last confirmed fact: the Release Analyzer build has zero warnings; direct
-  evidence-envelope and adjacent contract/suggestion tests are 16/16,
+- State: Phases 2 through 5 are gated. Analyzer consumers now retain CFG/source
+  traversal, metadata, evidence, and diagnostic policy while canonical
+  transitions own live symbolic mutation, versions, hazards, and completion.
+- Last confirmed fact: the Release Analyzer build has zero warnings; focused
+  transfer/switch tests are 53/53, diagnostic/evidence fixtures are 371/371,
   MainSmtAnalyzer is 487/487, and MainSmtFlow is 256 passing with only baseline
-  SP0010. Flow-capture/array/dispatch tests are 35/35 and MainSmtAnalyzer remains
-  487/487. Production LOC is 106,094, or -1,582 from the rewrite start.
-- Next cheapest step: route switch evaluation alias and selection conditions
-  through canonical branch assumptions, then repeat the exact Analyzer mutation
-  audit to distinguish entry-state/snapshot construction from live transfer.
+  SP0010. Production LOC is 106,111, or -1,565 from the rewrite start.
+- Next cheapest step: begin Phase 6 by characterizing EffectSummary's current
+  wrapper classifications and unresolved-external/resolved-implementation
+  boundary, then replace the first largest equivalent predicate family with
+  ordered typed structural rules.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
