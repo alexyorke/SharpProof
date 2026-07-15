@@ -144,8 +144,8 @@ transfer policy after its slice is complete.
 - [x] Migrate try/catch/finally, exceptional completion, and reachability.
 - [x] Make one merge implementation own fact choices, versions, ownership, and
   conservative truncation.
-- [ ] Delete superseded branch, loop, completion, and merge paths.
-- [ ] Gate: normalized-state, flow, exception, and reachability lanes are green;
+- [x] Delete superseded branch, loop, completion, and merge paths.
+- [x] Gate: normalized-state, flow, exception, and reachability lanes are green;
   record net production LOC removed.
 
 ## Phase 4 - Runtime Hazards Lowered Once
@@ -241,6 +241,7 @@ transfer policy after its slice is complete.
 | Canonical ownership joins | `9f6628d5` | 107,509 | -167 |
 | Canonical path-state versions | `addf9379` | 107,476 | -200 |
 | Canonical guarded branch joins | `64e44777` | 107,460 | -216 |
+| Canonical residual flow events | `034ba294` | 107,470 | -206 |
 
 ## Validation Ledger
 
@@ -289,19 +290,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical ownership joins | Commit `9f6628d5` moves all-path release, outstanding obligation, alias traversal, and evidence-aware ownership merging into `SymbolicStateMerger`, deletes the Analyzer implementation, and removes the circular dependency between the merger and `PuritySymbolicStateFacts`. Focused ownership/alias/CFG/try tests: 137 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,509, or -167 from the rewrite start. |
 | Phase 3 canonical path-state versions | Commit `addf9379` removes Analyzer's parallel `ISymbol` version map and makes `SymbolicState.SymbolVersions` own definition versions, phi joins, IR rewriting, equality, hashing, and convergence. Focused version/CFG/ownership tests: 228 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,476, or -200 from the rewrite start. |
 | Phase 3 canonical guarded branch joins | Commit `64e44777` moves common-state intersection, guarded branch choices, merge limits, and truncation recording into `SymbolicStateMerger` and deletes the branch-owned implementation. Focused switch/path/pattern/limit tests: 154 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,460, or -216 from the rewrite start. |
+| Phase 3 residual flow events and gate | Commit `034ba294` routes switch-section assumptions, switch-exit exclusions, finite-foreach domains, loop length facts, and branch invalidations through canonical branch, loop-edge, and mutation events. Branch, loop, and completion owners now retain source/CFG discovery but no independent condition or invalidation mutation. Release Symbolic build: zero warnings; focused operation/branch/loop/state/limit tests: 218 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,470, or -206 from the rewrite start; the ten-line cost removes the final flow mutation escape hatches and closes Phase 3. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; switch, loop, and try completion are migrated. One
-  canonical merger now owns symbolic fact/path choices, ownership joins, version
-  phi construction and rewriting, guarded branch choices, merge limits, and
-  truncation. Analyzer retains metadata.
-- Last confirmed fact: focused branch tests pass 154/154, MainSmtOracle passes
-  573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow retains only the
-  documented SP0010 baseline failure after deleting branch-owned merge policy.
-- Next cheapest step: audit remaining branch, loop, and completion owners for
-  reachable state mutation; route switch exit exclusions and branch-local
-  assumptions through canonical events before deleting their direct mutators.
+- State: Phases 2 and 3 are gated. Canonical events and one merger own assignment,
+  lifetime, branch, loop, completion, invalidation, merge, ownership, version,
+  limit, and truncation state changes; retained flow files are source adapters.
+- Last confirmed fact: the Phase 3 focused suite passes 218/218, MainSmtOracle
+  passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow retains only
+  the documented SP0010 baseline failure.
+- Next cheapest step: begin Phase 4 with divide-by-zero, checked-overflow, and
+  conversion hazards; inventory descriptor availability and shadow-compare the
+  first family before deleting its syntax/trigger reconstruction path.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
