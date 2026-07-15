@@ -160,9 +160,9 @@ transfer policy after its slice is complete.
   preconditions.
 - [x] Migrate query, suppressor, and exception-flow consumers to the canonical
   descriptors.
-- [ ] Delete redundant syntax candidate and trigger-construction paths, leaving
+- [x] Delete redundant syntax candidate and trigger-construction paths, leaving
   only source-span/evidence adapters.
-- [ ] Gate: hazard ordering, type/category, proof status, witnesses, and unknown
+- [x] Gate: hazard ordering, type/category, proof status, witnesses, and unknown
   outcomes match; record net production LOC removed.
 
 ## Phase 5 - Analyzer Consumers Become Adapters
@@ -255,6 +255,7 @@ transfer policy after its slice is complete.
 | Canonical framework hazards and trigger deletion | `8742afc6` | 106,658 | -1,018 |
 | Canonical exception-flow throw consumer | `fe51dd22` | 106,607 | -1,069 |
 | Canonical hazard descriptor consumers | `a1b56f96` | 106,583 | -1,093 |
+| Residual hazard trigger deletion and Phase 4 gate | `07d5b309` | 106,546 | -1,130 |
 
 ## Validation Ledger
 
@@ -315,20 +316,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical framework hazards and trigger deletion | Commit `8742afc6` moves `Math.Abs`, `Math.Clamp`, and known argument-guard preconditions into canonical operation lowering, relocates the remaining array shape adapter, and deletes both legacy trigger-factory files plus the obsolete trigger carrier. Exact search confirms every `RuntimeHazardCandidate` now projects from `SymbolicHazardOperation`. Focused hazard tests: 258 passed; Release test build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 265 production lines, bringing production LOC to 106,658, or -1,018 from the rewrite start; the complete fourth Phase 4 item removes 371 lines from its 107,029 checkpoint. |
 | Phase 4 canonical exception-flow throw consumer | Commit `fe51dd22` replaces exception flow's independent throw/rethrow/null discovery and classification with canonical proven runtime hazards while preserving its position before callee entries and the shared catch/finally/reachability filters. The now-unused throw classifier and rethrow helpers were deleted. Focused exception, semantic-oracle, and unknown-hazard tests: 189 passed. Production LOC fell by 51 lines to 106,607, or -1,069 from the rewrite start. |
 | Phase 4 canonical hazard descriptor consumers | Commit `a1b56f96` retains each `SymbolicHazardOperation` through query classification, derives the public compatibility projection from that descriptor, and shares one per-method hazard query between exception summaries and unknown diagnostics. Exception flow reads direct-throw identity from the descriptor; the suppressor already consumes the same canonical query service and required no parallel classifier. Release test build: zero warnings; focused exception, hazard, unknown-diagnostic, authoring, and suppressor tests: 234 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 106,583, or -1,093 from the rewrite start. |
+| Phase 4 residual trigger deletion and gate | Commit `07d5b309` deletes the final known-guard wrapper and unused fact-trigger projection, and moves loop-carried nullable descriptor construction behind `SymbolicOperationLowerer`. Exact search finds `SymbolicHazardOperation` construction only in that lowerer; the remaining syntax candidate code discovers source/`IOperation` shapes and spans but delegates trigger semantics to canonical lowering. Release test build: zero warnings; focused descriptor, hazard, unknown, authoring, exception, and suppressor tests: 290 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Phase 4 closes at 106,546 production LOC, or -1,130 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. The first four Phase 4 items are complete;
-  every runtime-hazard family emits typed operations and both legacy trigger
-  factories are deleted. Query, suppressor, and exception flow now consume the
-  canonical hazard result, and exception summaries share that result with
-  unknown diagnostics.
-- Last confirmed fact: descriptor-consumer migration passes 234 focused tests;
-  the full lanes remain Oracle 573/573, Analyzer 487/487, and Flow 256 plus only
-  the documented SP0010 baseline failure. Production LOC is 106,583, or -1,093
-  from the rewrite start.
-- Next cheapest step: audit and delete the residual syntax candidate and known-
-  guard adapters whose only remaining work is source-span/evidence discovery.
+- State: Phases 2 through 4 are gated. Every runtime-hazard family is lowered
+  once into a typed operation; query, suppressor, exception flow, and unknown
+  diagnostics consume that canonical result. No parallel trigger constructor
+  remains.
+- Last confirmed fact: the Phase 4 gate passes 290 focused tests; the full lanes
+  remain Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the documented
+  SP0010 baseline failure. Production LOC is 106,546, or -1,130 from the rewrite
+  start.
+- Next cheapest step: inventory purity transfer call sites that still mutate
+  Analyzer-owned state after a canonical assignment, lifetime, branch, or merge
+  transition, then remove the first independently testable duplicate mutation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
