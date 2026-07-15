@@ -667,6 +667,81 @@ internal static class SymbolicOperationLowerer
         return hazards.ToImmutable();
     }
 
+    internal static bool TryLowerMathAbsOverflowHazard(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax operand,
+        long overflowingValue,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var value = LowerIntegerTerm(operand, context);
+        if (value == null) return NoHazard(out hazard);
+
+        const string provenance = "ir.runtime-hazard.math.abs-overflow";
+        hazard = CreateHazard(
+            invocation,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            value,
+            CreateIntegerEquality(value, overflowingValue, operand, provenance + ".operand"),
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow,
+            provenance);
+        return true;
+    }
+
+    internal static bool TryLowerMathClampBoundsHazard(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax minExpression,
+        ExpressionSyntax maxExpression,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var min = LowerIntegerTerm(minExpression, context);
+        var max = LowerIntegerTerm(maxExpression, context);
+        if (min == null || max == null) return NoHazard(out hazard);
+
+        const string provenance = "ir.runtime-hazard.math.clamp.invalid-bounds";
+        hazard = CreateHazard(
+            invocation,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+            null,
+            SymbolicIrLowerer.CreateRelationCondition(
+                SymbolicRelationOperator.GreaterThan, min, max, invocation, provenance),
+            ExceptionTypes.ArgumentException,
+            ExceptionCategories.DefiniteInvalidClampBounds,
+            provenance);
+        return true;
+    }
+
+    internal static bool TryLowerKnownArgumentGuardHazard(
+        InvocationExpressionSyntax invocation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        if (!SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
+                invocation,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var subject,
+                out var trigger,
+                out _,
+                out var guardKey))
+            return NoHazard(out hazard);
+
+        hazard = CreateHazard(
+            invocation,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+            subject,
+            trigger,
+            ExceptionTypes.ArgumentOutOfRangeException,
+            ExceptionCategories.DefiniteArgumentOutOfRangeGuard,
+            "ir.runtime-hazard.argument-out-of-range.guard." + guardKey);
+        return true;
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,

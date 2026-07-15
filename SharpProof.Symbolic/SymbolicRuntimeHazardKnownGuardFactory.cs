@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic.Ir;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardIrTriggerFactory;
 
 namespace SharpProof.Symbolic;
 
@@ -16,29 +15,13 @@ internal static class SymbolicRuntimeHazardKnownGuardFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
+        if (!SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard(
                 invocation,
-                semanticModel,
-                cancellationToken,
-                out var subject,
-                out var triggerCondition,
-                out _,
-                out var guardKey) ||
-            !TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                subject,
-                triggerCondition,
-                invocation,
-                "ir.runtime-hazard.argument-out-of-range.guard." + guardKey,
-                out var trigger))
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            trigger,
-            ExceptionTypes.ArgumentOutOfRangeException,
-            ExceptionCategories.DefiniteArgumentOutOfRangeGuard);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 }

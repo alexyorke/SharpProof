@@ -11,7 +11,6 @@ using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excepti
 using static SharpProof.Symbolic.SymbolicRuntimeHazardKnownGuardFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxCandidateFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardTriggerFactory;
 
 namespace SharpProof.Symbolic;
 

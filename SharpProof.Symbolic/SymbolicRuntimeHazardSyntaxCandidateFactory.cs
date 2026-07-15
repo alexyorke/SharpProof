@@ -8,9 +8,7 @@ using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardIrTriggerFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardTriggerFactory;
 
 namespace SharpProof.Symbolic;
 
@@ -47,22 +45,15 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
             minValue >= 0 ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var operand) ||
-            !TryCreateCheckedEqualityOverflowTrigger(
+            !SymbolicOperationLowerer.TryLowerMathAbsOverflowHazard(
                 invocation,
                 operand,
                 minValue,
-                "ir.runtime-hazard.math.abs-overflow",
-                semanticModel,
-                cancellationToken,
-                out var trigger))
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 
@@ -81,32 +72,15 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 2, out var maxExpression))
             return false;
 
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var min = SymbolicSemanticPipeline.LowerTerm(minExpression, context);
-        var max = SymbolicSemanticPipeline.LowerTerm(maxExpression, context);
-        if (min is not { IsExact: true, Value: { Kind: SmtValueKind.Int } minTerm } ||
-            max is not { IsExact: true, Value: { Kind: SmtValueKind.Int } maxTerm })
-            return false;
-
-        var invalidBounds = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThan, minTerm, maxTerm),
-            invocation,
-            "ir.runtime-hazard.math.clamp.invalid-bounds"));
-        if (!TryCreateIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                null,
-                invalidBounds,
+        if (!SymbolicOperationLowerer.TryLowerMathClampBoundsHazard(
                 invocation,
-                "ir.runtime-hazard.math.clamp.invalid-bounds",
-                out var trigger))
+                minExpression,
+                maxExpression,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            trigger,
-            ExceptionTypes.ArgumentException,
-            ExceptionCategories.DefiniteInvalidClampBounds);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 

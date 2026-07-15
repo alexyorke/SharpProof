@@ -13,6 +13,24 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardSyntaxFacts
 {
+    internal static bool TryGetArrayElementStoreType(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IArrayTypeSymbol arrayType)
+    {
+        arrayType = null!;
+        var argumentCount = elementAccess.ArgumentList.Arguments.Count;
+        if (argumentCount == 0 ||
+            CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is not
+                IArrayTypeSymbol candidate ||
+            candidate.Rank != argumentCount)
+            return false;
+
+        arrayType = candidate;
+        return true;
+    }
+
     internal static bool HasLaterLoopAssignmentOfMissingNullableValue(
         ExpressionSyntax nullableExpression,
         SyntaxNode useNode,
