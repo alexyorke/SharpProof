@@ -635,6 +635,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 unreachable migration-surface deletion | Commit `c6d76ab9` deletes 745 physical lines across eleven internal files after declaration-only symbol inventory and strict compilation proved the APIs unreachable. The removed surface includes `SmtFormulaFactory`, old formula-based `SymbolicFactFactory` entry points, proof/reachability wrappers, and migrated Analyzer/Symbolic helpers. The Release solution warning-as-error build has zero warnings; full Tooling passes 591/591; the recorded full Main gate remains green apart from the documented SP0010 baseline. Production LOC falls to 105,867, or -1,809 from the rewrite start; test LOC remains 142,903. |
 | Phase 7 mutated branch-local guard fallback | Commit `0310d6ee` reproduces a scalar assignment that invalidates its enclosing `if` guard before a branch-local query target. The CFG collector now returns typed `Unsupported` for that state instead of retaining a contradictory stale guard; the original source-query reachability fixture and 21 direct collector cases pass. Production LOC is 105,871, or -1,805 from the rewrite start; test LOC is 142,917. |
 | Phase 7 shared loop-guard mutation detection | Commit `dc9bf7bd` deletes Analyzer execution visibility's parallel dependency collection and assignment/increment/ref-out walk. It now consumes `SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse`, the same mutation owner used by structural and CFG reachability. Focused loop-visibility fixtures pass 9/9; full MainSmtOracle passes 573/573; the Release Analyzer warning-as-error build has zero warnings. Production LOC falls to 105,832, or -1,844 from the rewrite start; test LOC remains 142,917. |
+| Phase 7 whole-solution call-graph island deletion | Commit `2edbc902` builds a temporary Roslyn/MSBuildWorkspace graph over all production projects, 7,006 method nodes, and 15,537 statically resolved edges. Public/protected API, entry points, overrides, interface implementations, attributed callbacks, runtime lifecycle, initializers, and top-level statements are conservative roots; both test projects provide a second reachability classification. The first corrected graph found 181 production-disconnected nodes, including 88 reached only by tests. Collapsing linked-source copies left 84 physical candidates across 77 islands and 596 source-span lines. Exact reference checks plus the warning-as-error build accepted 588 physical line deletions across 38 files. The build rejected an initializer-only formatter and the full lanes rejected two reflection-bound execution-visibility methods; all three were restored. The final graph has only 43 candidate span lines, consisting of those known non-static roots and serializer/public-result getters, so the island stop condition is met. Release warning-as-error developer/test build: zero warnings. MainSmtOracle passes 573/573, MainSmtAnalyzer 487/487, MainSmtCore 257/257, MainGeneral 3,742 with the two documented skips, Tooling 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. Production LOC falls to 105,292, or -2,384 from the rewrite start; test LOC remains 142,917. |
 
 ## Current Checkpoint
 
@@ -730,7 +731,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   build has zero warnings. Scalar and reference guard mutations at branch-local
   targets now select typed fallback, and Analyzer loop visibility shares the
   Symbolic mutation query instead of walking syntax independently. Test LOC is
-  142,917; production LOC is 105,832, or -1,844 from the rewrite start; the
+  142,917. A whole-solution Roslyn call graph then separated production roots,
+  test-only reachability, linked-source copies, and disconnected physical
+  islands. Commit `2edbc902` deletes 588 physical lines from the accepted
+  islands. Strict compilation caught an initializer-only reference and the full
+  lanes caught two reflection-bound oracle methods; all three are retained.
+  The final residual graph contains only 43 candidate span lines, all known
+  reflection, initializer, serializer, or public-result boundaries, so another
+  dead-island sweep is below the 50-line stop threshold. Production LOC is
+  105,292, or -2,384 from the rewrite start; the
   remaining scaffold must be repaid by
   deleting reachable structural transfer paths rather than more small wrappers.
 - Next cheapest step: pivot to the largest reachable structural transfer
