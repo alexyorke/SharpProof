@@ -34,6 +34,23 @@ internal static class SymbolicStateMerger
                 new SymbolicNotCondition(guard),
                 value);
 
+    internal static ImmutableArray<SymbolicFact> IntersectFactsAcrossAll(
+        IReadOnlyList<SymbolicState> states,
+        Func<SymbolicFact, SymbolicFact, bool>? equivalent = null)
+    {
+        if (states.Count == 0) return ImmutableArray<SymbolicFact>.Empty;
+
+        var common = states[0].Facts;
+        for (var index = 1; index < states.Count && !common.IsEmpty; index++)
+        {
+            var candidateFacts = states[index].Facts;
+            common = common.Where(fact => candidateFacts.Any(candidate => equivalent?.Invoke(fact, candidate) ??
+                SymbolicState.CreateProofFactKey(fact) == SymbolicState.CreateProofFactKey(candidate))).ToImmutableArray();
+        }
+
+        return common;
+    }
+
     internal static SymbolicState MergeCompletionStates(
         IReadOnlyList<SymbolicState> states,
         SymbolicState entryState,
@@ -41,17 +58,11 @@ internal static class SymbolicStateMerger
     {
         if (states.Count == 1) return states[0];
 
-        var commonFactKeys = new HashSet<string>(
-            states[0].Facts.Select(SymbolicState.CreateProofFactKey),
-            StringComparer.Ordinal);
-        foreach (var branch in states.Skip(1))
-            commonFactKeys.IntersectWith(branch.Facts.Select(SymbolicState.CreateProofFactKey));
-
         var retainedFacts = entryState.Facts.ToList();
         var retainedConditions = entryState.PathConditions.ToList();
         var addedCount = 0;
         AddLimitedCommonItems(
-            states[0].Facts.Where(fact => commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact))),
+            IntersectFactsAcrossAll(states),
             retainedFacts,
             entryState.Facts.Select(SymbolicState.CreateProofFactKey),
             SymbolicState.CreateProofFactKey, source, ref addedCount);

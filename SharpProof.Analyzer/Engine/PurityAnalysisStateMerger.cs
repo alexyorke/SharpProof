@@ -86,12 +86,9 @@ internal static class PurityAnalysisStateMerger
         var normalizedStates = states
             .Select(state => NormalizePathStateForMergedState(state.PathState, mergedSmtSymbolVersions))
             .ToArray();
-        var commonFacts = normalizedStates[0].Facts;
-        for (var index = 1; index < states.Count; index++)
-        {
-            commonFacts = IntersectSymbolicFacts(commonFacts, normalizedStates[index].Facts);
-            if (commonFacts.IsEmpty) break;
-        }
+        var commonFacts = SymbolicStateMerger.IntersectFactsAcrossAll(
+            normalizedStates,
+            AreMergeEquivalentSymbolicFacts);
 
         var commonConditions = SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates);
         commonFacts = MergeResourceStateFacts(commonFacts, normalizedStates);
@@ -117,20 +114,6 @@ internal static class PurityAnalysisStateMerger
         var conditions = pathState.PathConditions
             .Select(condition => SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, targetVersions));
         return new SymbolicState(facts, conditions);
-    }
-
-    private static ImmutableArray<SymbolicFact> IntersectSymbolicFacts(
-        ImmutableArray<SymbolicFact> first,
-        ImmutableArray<SymbolicFact> second)
-    {
-        if (first.IsDefaultOrEmpty || second.IsDefaultOrEmpty) return ImmutableArray<SymbolicFact>.Empty;
-
-        var builder = ImmutableArray.CreateBuilder<SymbolicFact>();
-        foreach (var fact in first)
-            if (second.Any(secondFact => AreMergeEquivalentSymbolicFacts(fact, secondFact)))
-                builder.Add(fact);
-
-        return builder.ToImmutable();
     }
 
     private static bool AreMergeEquivalentSymbolicFacts(SymbolicFact first, SymbolicFact second)
