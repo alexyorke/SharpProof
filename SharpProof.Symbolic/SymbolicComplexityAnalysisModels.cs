@@ -3,123 +3,40 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class ResolvedComplexityTarget
-{
-    public ResolvedComplexityTarget(
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        SyntaxNode declaration,
-        SyntaxNode bodyNode,
-        IMethodSymbol symbol,
-        string filePath,
-        string methodName,
-        string methodDisplayName,
-        string declarationKind,
-        int spanStart,
-        int spanEnd,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn)
-    {
-        SyntaxTree = syntaxTree;
-        SemanticModel = semanticModel;
-        Declaration = declaration;
-        BodyNode = bodyNode;
-        Symbol = symbol;
-        FilePath = filePath;
-        MethodName = methodName;
-        MethodDisplayName = methodDisplayName;
-        DeclarationKind = declarationKind;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-    }
+internal sealed record ResolvedComplexityTarget(
+    SyntaxTree SyntaxTree,
+    SemanticModel SemanticModel,
+    SyntaxNode Declaration,
+    SyntaxNode BodyNode,
+    IMethodSymbol Symbol,
+    string FilePath,
+    string MethodName,
+    string MethodDisplayName,
+    string DeclarationKind,
+    int SpanStart,
+    int SpanEnd,
+    int StartLine,
+    int StartColumn,
+    int EndLine,
+    int EndColumn);
 
-    public SyntaxTree SyntaxTree { get; }
+internal sealed record MethodAnalysisSummary(
+    SymbolicCostExpression Cost,
+    ImmutableArray<SymbolicComplexityDriverInfo> Drivers,
+    ImmutableArray<SymbolicComplexityUnknownReason> UnknownReasons,
+    ImmutableArray<SymbolicComplexityCalleeInfo> CalleeSummaries);
 
-    public SemanticModel SemanticModel { get; }
-
-    public SyntaxNode Declaration { get; }
-
-    public SyntaxNode BodyNode { get; }
-
-    public IMethodSymbol Symbol { get; }
-
-    public string FilePath { get; }
-
-    public string MethodName { get; }
-
-    public string MethodDisplayName { get; }
-
-    public string DeclarationKind { get; }
-
-    public int SpanStart { get; }
-
-    public int SpanEnd { get; }
-
-    public int StartLine { get; }
-
-    public int StartColumn { get; }
-
-    public int EndLine { get; }
-
-    public int EndColumn { get; }
-}
-
-internal sealed class MethodAnalysisSummary
-{
-    public MethodAnalysisSummary(
-        SymbolicCostExpression cost,
-        ImmutableArray<SymbolicComplexityDriverInfo> drivers,
-        ImmutableArray<SymbolicComplexityUnknownReason> unknownReasons,
-        ImmutableArray<SymbolicComplexityCalleeInfo> calleeSummaries)
-    {
-        Cost = cost;
-        Drivers = drivers;
-        UnknownReasons = unknownReasons;
-        CalleeSummaries = calleeSummaries;
-    }
-
-    public SymbolicCostExpression Cost { get; }
-
-    public ImmutableArray<SymbolicComplexityDriverInfo> Drivers { get; }
-
-    public ImmutableArray<SymbolicComplexityUnknownReason> UnknownReasons { get; }
-
-    public ImmutableArray<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
-}
-
-internal sealed class ComplexityArtifacts
+internal sealed record ComplexityArtifacts(
+    SymbolicCostExpression Cost,
+    IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
+    IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
+    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
 {
     public static readonly ComplexityArtifacts Constant = new(
         SymbolicCostExpression.Constant(),
         Array.Empty<SymbolicComplexityDriverInfo>(),
         Array.Empty<SymbolicComplexityUnknownReason>(),
         Array.Empty<SymbolicComplexityCalleeInfo>());
-
-    private ComplexityArtifacts(
-        SymbolicCostExpression cost,
-        IReadOnlyList<SymbolicComplexityDriverInfo> drivers,
-        IReadOnlyList<SymbolicComplexityUnknownReason> unknownReasons,
-        IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries)
-    {
-        Cost = cost;
-        Drivers = drivers;
-        UnknownReasons = unknownReasons;
-        CalleeSummaries = calleeSummaries;
-    }
-
-    public SymbolicCostExpression Cost { get; }
-
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
-
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
-
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
 
     public static ComplexityArtifacts FromCost(
         SymbolicCostExpression cost,
@@ -197,37 +114,12 @@ internal sealed class ComplexityArtifacts
     }
 }
 
-internal sealed class SubstitutionResult
-{
-    public SubstitutionResult(
-        SymbolicCostExpression cost,
-        IReadOnlyList<SymbolicComplexityDriverInfo> drivers,
-        IReadOnlyList<SymbolicComplexityUnknownReason> unknownReasons)
-    {
-        Cost = cost;
-        Drivers = drivers;
-        UnknownReasons = unknownReasons;
-    }
+internal sealed record SubstitutionResult(
+    SymbolicCostExpression Cost,
+    IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
+    IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons);
 
-    public SymbolicCostExpression Cost { get; }
-
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
-
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
-}
-
-internal readonly struct LoopBoundInfo
-{
-    public LoopBoundInfo(SymbolicCostExpression cost, string description)
-    {
-        Cost = cost;
-        Description = description;
-    }
-
-    public SymbolicCostExpression Cost { get; }
-
-    public string Description { get; }
-}
+internal readonly record struct LoopBoundInfo(SymbolicCostExpression Cost, string Description);
 
 internal enum StepDirection
 {
