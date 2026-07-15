@@ -138,12 +138,23 @@ internal static partial class ExceptionFlowQuery
                      siteContext))
             yield return entry;
 
+        var provenRuntimeHazards = CollectProvenRuntimeHazards(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
+            SymbolicRuntimeHazardKind.IndexOutOfRange,
+            SymbolicRuntimeHazardKind.NullDereference).ToArray();
+
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenInvocationCheckedIntegralOverflowHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.CheckedIntegralOverflow &&
+                         ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.OverflowException,
@@ -165,11 +176,8 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenNegativeStackAllocLengthHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.NegativeStackAllocLength),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.OverflowException,
@@ -314,11 +322,12 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenCountIndexOutOfRangeHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
+                         string.Equals(
+                             hazard.Category,
+                             ExceptionCategories.DefiniteCountIndexOutOfRange,
+                             StringComparison.Ordinal)),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.ArgumentOutOfRangeException,
@@ -327,11 +336,8 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenSwitchExpressionNoMatchHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.SwitchExpressionNoMatch),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.SwitchExpressionException,
@@ -340,11 +346,8 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenInvalidCollectionCardinalityHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(static hazard =>
+                         hazard.Kind == SymbolicRuntimeHazardKind.InvalidCollectionCardinality),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      siteContext,
                      ExceptionTypes.InvalidOperationException,
@@ -353,11 +356,10 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     CollectProvenAnalyzerOnlySymbolicHazards(
-                         methodNode,
-                         semanticModel,
-                         cancellationToken,
-                         smtAnalysis),
+                     provenRuntimeHazards.Where(static hazard =>
+                         (hazard.Kind is SymbolicRuntimeHazardKind.IndexOutOfRange or
+                             SymbolicRuntimeHazardKind.NullDereference) &&
+                         IsAnalyzerOnlySymbolicHazardCategory(hazard.Category)),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      static hazard => hazard.ExceptionType,
                      static hazard => hazard.Category,
