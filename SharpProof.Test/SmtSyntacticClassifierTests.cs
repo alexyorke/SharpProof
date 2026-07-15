@@ -157,6 +157,38 @@ public sealed class SmtSyntacticClassifierTests
     }
 
     [Test]
+    public void IntegerInterval_IntersectionPreservesBoundsAndExclusions()
+    {
+        var interval = SmtIntegerInterval.Unbounded
+            .Apply(SmtBinaryOperator.GreaterThanOrEqual, -2)
+            .Apply(SmtBinaryOperator.LessThanOrEqual, 2)
+            .Apply(SmtBinaryOperator.NotEqual, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(interval.LowerBound, Is.EqualTo(-2));
+            Assert.That(interval.UpperBound, Is.EqualTo(2));
+            Assert.That(interval.Excludes(0), Is.True);
+            Assert.That(interval.Excludes(1), Is.False);
+            Assert.That(interval.IsContradictory, Is.False);
+        });
+
+        Assert.That(
+            interval.Intersect(
+                SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, 0)).IsContradictory,
+            Is.True);
+    }
+
+    [TestCase((int)SmtBinaryOperator.GreaterThan, long.MaxValue)]
+    [TestCase((int)SmtBinaryOperator.LessThan, long.MinValue)]
+    public void IntegerInterval_ImpossibleStrictBoundaryIsContradictory(int operatorValue, long constant)
+    {
+        var interval = SmtIntegerInterval.Unbounded.Apply((SmtBinaryOperator)operatorValue, constant);
+
+        Assert.That(interval.IsContradictory, Is.True);
+    }
+
+    [Test]
     public void OpaqueIntegerOperation_FallsThroughToSolver()
     {
         var opaque = new SmtOpaqueIntegerBinaryTerm(

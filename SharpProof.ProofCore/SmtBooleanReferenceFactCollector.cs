@@ -249,28 +249,9 @@ internal sealed class ConcreteFactContext
 
     internal Dictionary<SmtFormula, long> IntegerEqualities { get; } = new();
 
-    internal Dictionary<SmtFormula, IntegerBounds> IntegerBounds { get; } = new();
+    internal Dictionary<SmtFormula, SmtIntegerInterval> IntegerIntervals { get; } = new();
 
     internal Dictionary<SmtFormula, bool> BooleanEqualities { get; } = new();
 
     internal Dictionary<SmtFormula, bool> ReferenceNullEqualities { get; } = new();
-}
-
-internal struct IntegerBounds
-{
-    internal long? Lower;
-
-    internal long? Upper;
-
-    internal bool ExcludesZero;
-
-    internal bool IsUnsatisfiable =>
-        (Lower.HasValue &&
-         Upper.HasValue &&
-         Lower.Value > Upper.Value) ||
-        (ExcludesZero &&
-         Lower.HasValue &&
-         Upper.HasValue &&
-         Lower.Value == 0 &&
-         Upper.Value == 0);
 }

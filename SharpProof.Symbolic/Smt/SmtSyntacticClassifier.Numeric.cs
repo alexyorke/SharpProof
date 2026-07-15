@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Numerics;
 using SharpProof.ProofCore.Smt;
 
@@ -6,125 +5,6 @@ namespace SharpProof.Symbolic.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
-    private readonly struct IntegerInterval
-    {
-        private IntegerInterval(
-            long? lowerBound,
-            long? upperBound,
-            ImmutableHashSet<long> excludedValues,
-            bool isImpossible)
-        {
-            LowerBound = lowerBound;
-            UpperBound = upperBound;
-            ExcludedValues = excludedValues;
-            IsImpossible = isImpossible;
-        }
-
-        public static IntegerInterval Unbounded { get; } = new(
-            null,
-            null,
-            ImmutableHashSet<long>.Empty,
-            false);
-
-        public long? LowerBound { get; }
-        public long? UpperBound { get; }
-        public ImmutableHashSet<long> ExcludedValues { get; }
-        public bool IsImpossible { get; }
-
-        public bool IsContradictory =>
-            IsImpossible ||
-            (LowerBound.HasValue &&
-             UpperBound.HasValue &&
-             LowerBound.Value > UpperBound.Value) ||
-            (LowerBound.HasValue &&
-             UpperBound.HasValue &&
-             LowerBound.Value == UpperBound.Value &&
-             ExcludedValues.Contains(LowerBound.Value));
-
-        public long? ExactValue =>
-            !IsContradictory &&
-            LowerBound.HasValue &&
-            UpperBound.HasValue &&
-            LowerBound.Value == UpperBound.Value
-                ? LowerBound.Value
-                : null;
-
-        public IntegerInterval Apply(SmtBinaryOperator op, long constant)
-        {
-            return op switch
-            {
-                SmtBinaryOperator.Equal => WithExactValue(constant),
-                SmtBinaryOperator.NotEqual => new IntegerInterval(
-                    LowerBound,
-                    UpperBound,
-                    ExcludedValues.Add(constant),
-                    IsImpossible),
-                SmtBinaryOperator.GreaterThan => constant == long.MaxValue
-                    ? Impossible()
-                    : WithLowerBound(constant + 1),
-                SmtBinaryOperator.GreaterThanOrEqual => WithLowerBound(constant),
-                SmtBinaryOperator.LessThan => constant == long.MinValue
-                    ? Impossible()
-                    : WithUpperBound(constant - 1),
-                SmtBinaryOperator.LessThanOrEqual => WithUpperBound(constant),
-                _ => this
-            };
-        }
-
-        public IntegerInterval Intersect(IntegerInterval other)
-        {
-            var interval = this;
-            if (other.IsImpossible) interval = interval.Impossible();
-
-            if (other.LowerBound.HasValue) interval = interval.WithLowerBound(other.LowerBound.Value);
-
-            if (other.UpperBound.HasValue) interval = interval.WithUpperBound(other.UpperBound.Value);
-
-            foreach (var excludedValue in other.ExcludedValues)
-                interval = interval.Apply(SmtBinaryOperator.NotEqual, excludedValue);
-
-            return interval;
-        }
-
-        private IntegerInterval WithLowerBound(long lowerBound)
-        {
-            return new IntegerInterval(
-                LowerBound.HasValue ? Math.Max(LowerBound.Value, lowerBound) : lowerBound,
-                UpperBound,
-                ExcludedValues,
-                IsImpossible);
-        }
-
-        private IntegerInterval WithUpperBound(long upperBound)
-        {
-            return new IntegerInterval(
-                LowerBound,
-                UpperBound.HasValue ? Math.Min(UpperBound.Value, upperBound) : upperBound,
-                ExcludedValues,
-                IsImpossible);
-        }
-
-        private IntegerInterval WithExactValue(long value)
-        {
-            return new IntegerInterval(
-                value,
-                value,
-                ExcludedValues,
-                IsImpossible ||
-                (LowerBound.HasValue && value < LowerBound.Value) ||
-                (UpperBound.HasValue && value > UpperBound.Value));
-        }
-
-        private IntegerInterval Impossible()
-        {
-            return new IntegerInterval(
-                LowerBound,
-                UpperBound,
-                ExcludedValues,
-                true);
-        }
-    }
-
     private sealed partial class SyntacticFactSet
     {
         private bool TryGetKnownInteger(SmtFormula formula, out long value)
@@ -372,7 +252,7 @@ internal static partial class SmtSyntacticClassifier
             term = NormalizeAliases(term);
             var interval = TryCreateIntrinsicIntegerInterval(term, out var intrinsicInterval)
                 ? intrinsicInterval
-                : IntegerInterval.Unbounded;
+                : SmtIntegerInterval.Unbounded;
             if (_integerIntervals.TryGetValue(term, out var existing)) interval = interval.Intersect(existing);
 
             interval = interval.Apply(op, constant);
@@ -381,10 +261,10 @@ internal static partial class SmtSyntacticClassifier
             return true;
         }
 
-        private bool TryCreateIntrinsicIntegerInterval(SmtFormula term, out IntegerInterval interval)
+        private bool TryCreateIntrinsicIntegerInterval(SmtFormula term, out SmtIntegerInterval interval)
         {
             term = NormalizeAliases(term);
-            interval = IntegerInterval.Unbounded;
+            interval = SmtIntegerInterval.Unbounded;
             if (term is not SmtStringLengthTerm stringLength) return false;
 
             interval = interval.Apply(SmtBinaryOperator.GreaterThanOrEqual, 0);

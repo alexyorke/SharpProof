@@ -183,7 +183,7 @@ internal static partial class SmtSyntacticClassifier
         private readonly Dictionary<SmtFormula, string> _exactStrings = new();
         private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
 
-        private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
+        private readonly Dictionary<SmtFormula, SmtIntegerInterval> _integerIntervals = new();
         private readonly Dictionary<SmtFormula, bool> _referenceNullStates = new();
         private readonly SyntacticWorkBudget _workBudget;
         private int _booleanEvaluationDepth;
@@ -197,7 +197,7 @@ internal static partial class SmtSyntacticClassifier
 
         private SyntacticFactSet(SyntacticFactSet source)
         {
-            _integerIntervals = new Dictionary<SmtFormula, IntegerInterval>(source._integerIntervals);
+            _integerIntervals = new Dictionary<SmtFormula, SmtIntegerInterval>(source._integerIntervals);
             _exactStrings = new Dictionary<SmtFormula, string>(source._exactStrings);
             _excludedStrings = new Dictionary<SmtFormula, ImmutableHashSet<string>>(source._excludedStrings);
             _referenceNullStates = new Dictionary<SmtFormula, bool>(source._referenceNullStates);

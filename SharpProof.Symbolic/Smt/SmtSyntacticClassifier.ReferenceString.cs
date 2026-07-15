@@ -166,7 +166,7 @@ internal static partial class SmtSyntacticClassifier
             var lengthFormula = new SmtStringLengthTerm(stringFormula);
             var interval = _integerIntervals.TryGetValue(lengthFormula, out var existing)
                 ? existing
-                : IntegerInterval.Unbounded;
+                : SmtIntegerInterval.Unbounded;
             interval = interval.Apply(SmtBinaryOperator.Equal, length);
             hasContradiction = interval.IsContradictory;
             _integerIntervals[lengthFormula] = interval;

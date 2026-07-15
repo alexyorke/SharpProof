@@ -246,12 +246,10 @@ internal sealed class SmtConcreteFactPreprocessor
         if (facts.IntegerEqualities.TryGetValue(formula, out var existing)) return existing == value;
 
         facts.IntegerEqualities.Add(formula, value);
-        if (!TryMergeIntegerBounds(
+        if (!TryMergeIntegerInterval(
                 facts,
                 formula,
-                value,
-                value,
-                false,
+                SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, value),
                 ref changed))
             return false;
 
@@ -267,77 +265,26 @@ internal sealed class SmtConcreteFactPreprocessor
         if (!TryNormalizeIntegerComparisonToConstant(formula, out var expression, out var op, out var constant))
             return SmtConcreteFactPreparationStatus.Ready;
 
-        long? lower = null;
-        long? upper = null;
-        var excludesZero = false;
-        switch (op)
-        {
-            case SmtBinaryOperator.Equal:
-                lower = constant;
-                upper = constant;
-                break;
-            case SmtBinaryOperator.NotEqual:
-                excludesZero = constant == 0;
-                break;
-            case SmtBinaryOperator.LessThan:
-                if (!TryCheckedAdd(constant, -1, out var lessThanUpper))
-                    return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-                upper = lessThanUpper;
-
-                break;
-            case SmtBinaryOperator.LessThanOrEqual:
-                upper = constant;
-                break;
-            case SmtBinaryOperator.GreaterThan:
-                if (!TryCheckedAdd(constant, 1, out var greaterThanLower))
-                    return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-                lower = greaterThanLower;
-
-                break;
-            case SmtBinaryOperator.GreaterThanOrEqual:
-                lower = constant;
-                break;
-        }
-
-        return TryMergeIntegerBounds(facts, expression, lower, upper, excludesZero, ref changed)
+        var interval = SmtIntegerInterval.Unbounded.Apply(op, constant);
+        return TryMergeIntegerInterval(facts, expression, interval, ref changed)
             ? SmtConcreteFactPreparationStatus.Ready
             : SmtConcreteFactPreparationStatus.Unsatisfiable;
     }
 
-    private static bool TryMergeIntegerBounds(
+    private static bool TryMergeIntegerInterval(
         ConcreteFactContext facts,
         SmtFormula expression,
-        long? lower,
-        long? upper,
-        bool excludesZero,
+        SmtIntegerInterval interval,
         ref bool changed)
     {
         if (expression.Kind != SmtValueKind.Int) return true;
 
-        facts.IntegerBounds.TryGetValue(expression, out var bounds);
-        if (lower.HasValue && (!bounds.Lower.HasValue || lower.Value > bounds.Lower.Value))
-        {
-            bounds.Lower = lower.Value;
-            changed = true;
-        }
+        var hadExisting = facts.IntegerIntervals.TryGetValue(expression, out var existing);
+        var merged = hadExisting ? existing.Intersect(interval) : interval;
+        if (merged.IsContradictory) return false;
 
-        if (upper.HasValue && (!bounds.Upper.HasValue || upper.Value < bounds.Upper.Value))
-        {
-            bounds.Upper = upper.Value;
-            changed = true;
-        }
-
-        if (excludesZero && !bounds.ExcludesZero)
-        {
-            bounds.ExcludesZero = true;
-            changed = true;
-        }
-
-        if (bounds.IsUnsatisfiable) return false;
-
-        facts.IntegerBounds[expression] = bounds;
+        if (!hadExisting || !merged.Equals(existing)) changed = true;
+        facts.IntegerIntervals[expression] = merged;
         return true;
     }
 
@@ -676,8 +623,8 @@ internal sealed class SmtConcreteFactPreprocessor
             return (lower.HasValue && lower.Value > 0) ||
                    (upper.HasValue && upper.Value < 0);
 
-        return facts.IntegerBounds.TryGetValue(formula, out var bounds) &&
-               bounds.ExcludesZero;
+        return facts.IntegerIntervals.TryGetValue(formula, out var interval) &&
+               interval.Excludes(0);
     }
 
     private static bool TryGetIntegerInterval(
@@ -697,10 +644,10 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         var foundInterval = false;
-        if (facts.IntegerBounds.TryGetValue(formula, out var bounds))
+        if (facts.IntegerIntervals.TryGetValue(formula, out var interval))
         {
-            lower = bounds.Lower;
-            upper = bounds.Upper;
+            lower = interval.LowerBound;
+            upper = interval.UpperBound;
             foundInterval = lower.HasValue || upper.HasValue;
         }
 
