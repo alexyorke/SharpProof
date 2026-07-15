@@ -601,18 +601,9 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 semanticModel,
                 cancellationToken))
         {
-            candidate = new RuntimeHazardCandidate(memberAccess, new SymbolicHazardOperation(
-                SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-                SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
-                null,
-                new SymbolicConstantCondition(true),
-                SymbolicFactConfidence.Exact,
-                ExceptionTypes.InvalidOperationException,
-                ExceptionCategories.DefiniteNullableValueWithoutValue,
-                new SymbolicOperationOrigin(
-                    memberAccess.Span,
-                    0,
-                    "ir.runtime-hazard.nullable-value.loop-carried")));
+            candidate = new RuntimeHazardCandidate(
+                memberAccess,
+                SymbolicOperationLowerer.LowerLoopCarriedNullableValueHazard(memberAccess));
             return true;
         }
 

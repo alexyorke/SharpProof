@@ -159,6 +159,19 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static SymbolicHazardOperation LowerLoopCarriedNullableValueHazard(SyntaxNode site)
+    {
+        return CreateHazard(
+            site,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+            null,
+            new SymbolicConstantCondition(true),
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteNullableValueWithoutValue,
+            "ir.runtime-hazard.nullable-value.loop-carried");
+    }
+
     internal static bool TryLowerNegativeLengthHazard(
         SyntaxNode site,
         IEnumerable<ExpressionSyntax> lengthExpressions,

@@ -8,7 +8,6 @@ using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardKnownGuardFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxCandidateFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
 
@@ -237,8 +236,11 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                         out var regexNullCandidate))
                     yield return regexNullCandidate;
 
-                if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken,
-                        out var guardCandidate)) yield return guardCandidate;
+                if (SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard(
+                        invocation,
+                        new SymbolicLoweringContext(semanticModel, cancellationToken),
+                        out var guardHazard))
+                    yield return new RuntimeHazardCandidate(invocation, guardHazard);
 
                 if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken,
                         out var invocationDynamicCandidate)) yield return invocationDynamicCandidate;

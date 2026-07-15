@@ -1100,26 +1100,6 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicCondition>(expression, "nullable-has-value-condition");
     }
 
-    internal static SymbolicLoweringResult<SymbolicFact> LowerRuntimeHazardTrigger(
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SymbolicCondition trigger,
-        SyntaxNode source,
-        string detail)
-    {
-        if (trigger == null) throw new ArgumentNullException(nameof(trigger));
-
-        var provenance = "ir.runtime-hazard." + detail;
-        return Exact(
-            SymbolicFact.Exact(
-                new SymbolicExceptionPreconditionAtom(kind, subject, trigger),
-                source,
-                provenance,
-                evidenceKey: provenance),
-            source,
-            "runtime-hazard");
-    }
-
     private static SymbolicLoweringResult<T> LowerExactOrUnsupported<T>(
         T? value,
         SyntaxNode source,
