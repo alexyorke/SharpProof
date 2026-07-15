@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Near-duplicated per-scope dispatch - `SymbolicCliInvariantResultAdapter.TryCreate:46-85`
-Four point/line/span/file `case` blocks structurally identical. **Recommendation:** Generic `Build<T>(...)` / reuse `SelectScope`.
-
 ### Repeated `string.Equals(Kind,"span",...)` - `SymbolicCompactQueryModels.cs:438-450` (7 properties)
 **Recommendation:** `IsSpanScope` computed once.
 
