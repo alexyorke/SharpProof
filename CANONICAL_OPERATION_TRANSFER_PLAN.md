@@ -242,6 +242,7 @@ transfer policy after its slice is complete.
 | Canonical path-state versions | `addf9379` | 107,476 | -200 |
 | Canonical guarded branch joins | `64e44777` | 107,460 | -216 |
 | Canonical residual flow events | `034ba294` | 107,470 | -206 |
+| Canonical divide/remainder hazards | `56ebdb15` | 107,497 | -179 |
 
 ## Validation Ledger
 
@@ -291,18 +292,19 @@ transfer policy after its slice is complete.
 | Phase 3 canonical path-state versions | Commit `addf9379` removes Analyzer's parallel `ISymbol` version map and makes `SymbolicState.SymbolVersions` own definition versions, phi joins, IR rewriting, equality, hashing, and convergence. Focused version/CFG/ownership tests: 228 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,476, or -200 from the rewrite start. |
 | Phase 3 canonical guarded branch joins | Commit `64e44777` moves common-state intersection, guarded branch choices, merge limits, and truncation recording into `SymbolicStateMerger` and deletes the branch-owned implementation. Focused switch/path/pattern/limit tests: 154 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,460, or -216 from the rewrite start. |
 | Phase 3 residual flow events and gate | Commit `034ba294` routes switch-section assumptions, switch-exit exclusions, finite-foreach domains, loop length facts, and branch invalidations through canonical branch, loop-edge, and mutation events. Branch, loop, and completion owners now retain source/CFG discovery but no independent condition or invalidation mutation. Release Symbolic build: zero warnings; focused operation/branch/loop/state/limit tests: 218 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC is 107,470, or -206 from the rewrite start; the ten-line cost removes the final flow mutation escape hatches and closes Phase 3. |
+| Phase 4 canonical divide/remainder hazards | Commit `56ebdb15` lowers binary and compound divide/remainder operations into typed `SymbolicHazardOperation` descriptors, preserves exact and unsupported confidence/provenance, projects candidates from the descriptor, and deletes the dedicated syntax trigger builder. Direct descriptor plus arithmetic hazard/evidence tests: 143 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Reusable hazard-operation scaffolding temporarily raises production LOC to 107,497, or -179 from the rewrite start, and must be repaid by checked-overflow and conversion deletions. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. Canonical events and one merger own assignment,
-  lifetime, branch, loop, completion, invalidation, merge, ownership, version,
-  limit, and truncation state changes; retained flow files are source adapters.
-- Last confirmed fact: the Phase 3 focused suite passes 218/218, MainSmtOracle
-  passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow retains only
-  the documented SP0010 baseline failure.
-- Next cheapest step: begin Phase 4 with divide-by-zero, checked-overflow, and
-  conversion hazards; inventory descriptor availability and shadow-compare the
-  first family before deleting its syntax/trigger reconstruction path.
+- State: Phases 2 and 3 are gated. Phase 4 now emits divide/remainder hazards as
+  typed operations; checked overflow and conversion still use legacy candidate
+  and trigger builders.
+- Last confirmed fact: canonical divide/remainder descriptors preserve exact and
+  unsupported outcomes across 143 focused tests, Oracle 573/573, Analyzer
+  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
+- Next cheapest step: migrate checked binary overflow onto the same hazard
+  operation projection, then extend it to unary/update/compound and conversion
+  forms before checking the first Phase 4 item.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
