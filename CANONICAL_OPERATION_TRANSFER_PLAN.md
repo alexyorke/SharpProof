@@ -310,6 +310,7 @@ transfer policy after its slice is complete.
 | Unified artifact build entry points | `45585697` | 105,745 | -1,931 |
 | Unified method-body operation resolution | `d54111b2` | 105,720 | -1,956 |
 | Unshipped legacy package script deletion | `c58f50e7` | 105,720 | -1,956 |
+| Unused exception type display format deletion | `3c3cd2d4` | 105,716 | -1,960 |
 
 ## Validation Ledger
 
@@ -408,6 +409,7 @@ transfer policy after its slice is complete.
 | Phase 6 unified artifact build entry points | Commit `45585697` routes all local dotnet work through `Invoke-SharpProofDotnet.ps1`, deletes duplicated Job Object wrappers, and gives local plus CI packaging one declarative three-project manifest. The attempted standalone-MSBuild gate reproduced an SDK-resolution failure on Build Tools; the wrapper-backed SDK build then produced the VSIX with zero warnings, so obsolete MSBuild discovery was deleted rather than centralized. The real NuGet entry point built and atomically published exactly three packages; focused process/package-policy fixtures pass 11/11. Build scripts remove 41 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,498. |
 | Phase 6 shared method-body operation resolution | Commit `d54111b2` makes `CSharpSyntaxFacts` the sole block-body and expression-body syntax taxonomy used by `MethodBodyOperationResolver`, while preserving the declaration fallback for destructors and deliberately excluded conversion operators. A 16-case table characterizes methods, constructors, operators, conversions, accessors, local functions, properties, indexers, and both fallback paths. Release Symbolic warning-as-error build: zero warnings; direct resolver and capability, complexity, operation-block, operator/conversion, and expression-bodied-property fixtures: 80 passed. Production LOC fell by 25 lines to 105,720, or -1,956 from the rewrite start; tracked test LOC is 142,568. |
 | Phase 6 unshipped legacy package script deletion | Commit `c58f50e7` deletes 557 lines of dead packages.config install/uninstall scripts. The package project and every repository consumer omit them, while CI and `AnalyzerPackagingTests` explicitly forbid both `tools/*` entries, so sharing them would have introduced a new payload rather than consolidating live behavior. The Release package build succeeds with zero warnings and the direct package-content fixture passes. The full packaging fixture exposed one stale assertion from the earlier package-manifest migration; separate commit `ac9421e4` now validates the manifest plus wrapper loop, and all 52 fixture cases pass. Production LOC remains 105,720, or -1,956 from the rewrite start; tracked test LOC is 142,575. |
+| Phase 6 unused exception type display format deletion | Commit `3c3cd2d4` removes the stale format-clone finding after exact reference search proved `ExceptionTypeDisplayFormat` had no consumers. The allocation format remains local because it alone controls two serialized allocation evidence fields; extracting a single-use policy would add indirection. Release Analyzer warning-as-error build: zero warnings; allocation, diagnostic-evidence, exception-propagation, and exception-contract fixtures: 431 passed. Production LOC fell to 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,575. |
 
 ## Current Checkpoint
 
@@ -429,12 +431,12 @@ transfer policy after its slice is complete.
   lookup now consumes the shared block/expression syntax taxonomy while
   retaining its two compatibility fallbacks. The unshipped legacy package
   install/uninstall scripts are deleted; CI continues to forbid those payloads.
-- Last confirmed fact: the Release package build has zero warnings, its direct
-  content check passes, and all 52 packaging fixture cases pass after the stale
-  CI manifest assertion was updated separately. Test LOC is 142,575; production
-  LOC is 105,720, or -1,956 from the rewrite start.
-- Next cheapest step: adjudicate the duplicate four-option analyzer type-identity
-  `SymbolDisplayFormat` in `POTENTIAL_DUPS.md`, preserving exact symbol text in
-  allocation evidence and exception-flow identities.
+  The unused exception type-display format is deleted rather than abstracted.
+- Last confirmed fact: the Release Analyzer warning-as-error build has zero
+  warnings and 431 allocation/evidence/exception fixtures pass. Test LOC is
+  142,575; production LOC is 105,716, or -1,960 from the rewrite start.
+- Next cheapest step: adjudicate the three trusted-platform reference and source
+  compilation hosts in `POTENTIAL_DUPS.md`, preserving each caller's compilation
+  kind, reference fallback, cache, diagnostics, and conservative failure policy.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
