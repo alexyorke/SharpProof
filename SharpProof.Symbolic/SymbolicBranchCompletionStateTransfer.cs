@@ -164,7 +164,7 @@ internal static class SymbolicBranchCompletionStateTransfer
                 cancellationToken);
 
         foreach (var hiddenSymbol in GetLocalsDeclaredInside(branchStatement, semanticModel, cancellationToken))
-            branchState = SymbolicStateValueFacts.RemoveReferences(branchState, hiddenSymbol);
+            SymbolicStateInvalidator.InvalidateSymbol(ref branchState, hiddenSymbol, branchStatement);
 
         return true;
     }
@@ -178,7 +178,7 @@ internal static class SymbolicBranchCompletionStateTransfer
     {
         foreach (var symbol in SymbolicLoopStateTransfer.GetConditionDependencySymbols(condition, semanticModel, cancellationToken))
             if (SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken))
-                state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
+                SymbolicStateInvalidator.InvalidateSymbol(ref state, symbol, statement);
     }
 
     internal static bool TryCreateBranchSymbolicCondition(
@@ -284,7 +284,8 @@ internal static class SymbolicBranchCompletionStateTransfer
                 cancellationToken);
             var sectionState = stateBeforeStatement;
             if (!sectionMutatesConditionSymbols)
-                sectionState = sectionState.AddPathCondition(sectionCondition);
+                sectionState = SymbolicOperationTransferKernel.Assume(
+                    sectionState, sectionCondition, true, section.Span, "operation-transfer.switch-section").State;
 
             foreach (var statement in section.Statements)
             {
@@ -340,7 +341,8 @@ internal static class SymbolicBranchCompletionStateTransfer
                     out var sectionCondition))
                 continue;
 
-            state = state.AddPathCondition(new SymbolicNotCondition(sectionCondition));
+            state = SymbolicOperationTransferKernel.Assume(
+                state, sectionCondition, false, section.Span, "operation-transfer.switch-exit-exclusion").State;
         }
     }
 

@@ -41,7 +41,8 @@ internal static class SymbolicStateFactBuilder
             new SymbolicRelationAtom(op, left, right),
             source,
             provenance);
-        state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        state = SymbolicOperationTransferKernel.Assume(
+            state, new SymbolicFactCondition(fact), true, source.Span, provenance).State;
     }
 
     internal static void AddSymbolReferenceNullCondition(
@@ -102,16 +103,18 @@ internal static class SymbolicStateFactBuilder
         string provenance,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        return TryCreateReferenceNullCondition(
+        if (!TryCreateReferenceNullCondition(
             expression,
             isNull,
             semanticModel,
             cancellationToken,
             provenance,
             out var condition,
-            getSymbolVersion)
-            ? state.AddPathCondition(condition)
-            : state;
+            getSymbolVersion))
+            return state;
+
+        return SymbolicOperationTransferKernel.Assume(
+            state, condition, true, expression.Span, provenance).State;
     }
 
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)

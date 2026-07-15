@@ -518,7 +518,10 @@ internal static class SymbolicLoopStateTransfer
                 NullableFlowFacts.IsDefinitelyNotNullReferenceValue(elementExpression, semanticModel, cancellationToken);
         }
 
-        if (finiteDomain != null) state = state.AddPathCondition(finiteDomain);
+        if (finiteDomain != null)
+            state = SymbolicOperationTransferKernel.TransitionLoopEdge(
+                state, SymbolicLoopEdgeKind.Entry, finiteDomain, foreachStatement.Span,
+                "ir.path.foreach-entry.finite-domain").State;
 
         if (allReferenceElementsDefinitelyNonNull && iterationTerm.Kind == SmtValueKind.Reference)
             AddRelationPathFact(
@@ -590,7 +593,9 @@ internal static class SymbolicLoopStateTransfer
                 new SymbolicIntegerConstantTerm(0)),
             expressionSyntax,
             "ir.path.foreach-entry.length-positive");
-        state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        state = SymbolicOperationTransferKernel.TransitionLoopEdge(
+            state, SymbolicLoopEdgeKind.Entry, new SymbolicFactCondition(fact), foreachStatement.Span,
+            "ir.path.foreach-entry.length-positive").State;
     }
 
     private static bool TryCreateForeachLengthTerm(

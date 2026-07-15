@@ -66,7 +66,7 @@ internal static class SymbolicStateInvalidator
                 "operation-transfer.mutation-invalidation").State;
     }
 
-    private static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
+    internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
     {
         state = SymbolicOperationTransferKernel.Invalidate(
             state,
