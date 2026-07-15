@@ -14,10 +14,10 @@ namespace SharpProof.Symbolic;
 public sealed class SymbolicCompactLineResult
 {
     private readonly SymbolicCompactScopeProjection _projection;
-    private readonly SymbolicLineQueryResult _result;
+    private readonly SymbolicQueryResult _result;
 
     private SymbolicCompactLineResult(
-        SymbolicLineQueryResult result,
+        SymbolicQueryResult result,
         SymbolicCompactScopeProjection projection)
     {
         _result = result ?? throw new ArgumentNullException(nameof(result));
@@ -26,7 +26,7 @@ public sealed class SymbolicCompactLineResult
 
     public string FilePath => _result.FilePath;
 
-    public int Line => _result.Line;
+    public int Line => _result.Line ?? 0;
 
     public int ProgramPointCount => _result.ProgramPoints.Count;
 
@@ -55,7 +55,7 @@ public sealed class SymbolicCompactLineResult
     internal SymbolicCompactScopeProjection Projection => _projection;
 
     internal static SymbolicCompactLineResult FromResult(
-        SymbolicLineQueryResult result,
+        SymbolicQueryResult result,
         SymbolicCompactQueryOptions options,
         int maxProgramPoints)
     {

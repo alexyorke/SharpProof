@@ -2,35 +2,20 @@ using SharpProof.Symbolic;
 
 internal sealed class SymbolicCliInvariantResultAdapter
 {
-    private readonly Func<SymbolicCompactQueryOptions, object> _createCompactResult;
-    private readonly Func<SymbolicCompactQueryOptions, SymbolicInvariantQueryResult> _createInvariantResult;
-    private readonly Func<SymbolicCompactQueryOptions, bool> _isCompactTruncated;
+    private readonly SymbolicQueryResult _result;
 
-    private SymbolicCliInvariantResultAdapter(
-        int programPointCount,
-        int conservativeUnknownCount,
-        SymbolicProofOutcomeSummary proofOutcomes,
-        int reachabilityUnknownCount,
-        Func<SymbolicCompactQueryOptions, object> createCompactResult,
-        Func<SymbolicCompactQueryOptions, SymbolicInvariantQueryResult> createInvariantResult,
-        Func<SymbolicCompactQueryOptions, bool> isCompactTruncated)
+    private SymbolicCliInvariantResultAdapter(SymbolicQueryResult result)
     {
-        ProgramPointCount = programPointCount;
-        ConservativeUnknownCount = conservativeUnknownCount;
-        ProofOutcomes = proofOutcomes;
-        ReachabilityUnknownCount = reachabilityUnknownCount;
-        _createCompactResult = createCompactResult;
-        _createInvariantResult = createInvariantResult;
-        _isCompactTruncated = isCompactTruncated;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
     }
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _result.ProgramPointCount;
 
-    public int ConservativeUnknownCount { get; }
+    public int ConservativeUnknownCount => _result.InvariantQuery.UnknownFactCount;
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => _result.ProgramPointSummary.ProofOutcomes;
 
-    public int ReachabilityUnknownCount { get; }
+    public int ReachabilityUnknownCount => _result.Reachability.UnknownCount;
 
     public static SymbolicCliInvariantResultAdapter Create(object result)
     {
@@ -41,66 +26,28 @@ internal sealed class SymbolicCliInvariantResultAdapter
 
     public static bool TryCreate(object result, out SymbolicCliInvariantResultAdapter adapter)
     {
-        switch (result)
+        if (result is SymbolicQueryResult queryResult)
         {
-            case SymbolicProgramPointResult point:
-                adapter = new SymbolicCliInvariantResultAdapter(
-                    1,
-                    point.InvariantQuery.UnknownFactCount,
-                    point.ProofOutcomes,
-                    point.Reachability == SymbolicReachability.Unknown ? 1 : 0,
-                    options => point.ToCompactResult(options),
-                    options => point.ToInvariantQueryResult(options),
-                    options => point.ToCompactResult(options).Truncation.IsTruncated);
-                return true;
-            case SymbolicLineQueryResult line:
-                adapter = new SymbolicCliInvariantResultAdapter(
-                    line.ProgramPoints.Count,
-                    line.InvariantQuery.UnknownFactCount,
-                    line.ProgramPointSummary.ProofOutcomes,
-                    line.Reachability.UnknownCount,
-                    options => line.ToCompactResult(options),
-                    options => line.ToInvariantQueryResult(options),
-                    options => line.ToCompactResult(options).Truncation.IsTruncated);
-                return true;
-            case SymbolicSpanQueryResult span:
-                adapter = new SymbolicCliInvariantResultAdapter(
-                    span.ProgramPointCount,
-                    span.InvariantQuery.UnknownFactCount,
-                    span.ProgramPointSummary.ProofOutcomes,
-                    span.Reachability.UnknownCount,
-                    options => span.ToCompactResult(options),
-                    options => span.ToInvariantQueryResult(options),
-                    options => span.ToCompactResult(options).Truncation.IsTruncated);
-                return true;
-            case SymbolicFileQueryResult file:
-                adapter = new SymbolicCliInvariantResultAdapter(
-                    file.ProgramPointCount,
-                    file.InvariantQuery.UnknownFactCount,
-                    file.ProgramPointSummary.ProofOutcomes,
-                    file.Reachability.UnknownCount,
-                    options => file.ToCompactResult(options),
-                    options => file.ToInvariantQueryResult(options),
-                    options => file.ToCompactResult(options).Truncation.IsTruncated);
-                return true;
-            default:
-                adapter = null!;
-                return false;
+            adapter = new SymbolicCliInvariantResultAdapter(queryResult);
+            return true;
         }
+
+        adapter = null!;
+        return false;
     }
 
     public object ToCompactResult(SymbolicCompactQueryOptions options)
     {
-        return _createCompactResult(options);
+        return _result.ToCompactResult(options);
     }
 
     public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions options)
     {
-        return _createInvariantResult(options);
+        return _result.ToInvariantQueryResult(options);
     }
 
     public bool IsCompactTruncated(SymbolicCompactQueryOptions options)
     {
-        return _isCompactTruncated(options);
+        return _result.ToCompactResult(options).Truncation.IsTruncated;
     }
 }

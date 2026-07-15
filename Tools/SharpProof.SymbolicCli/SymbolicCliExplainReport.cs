@@ -75,16 +75,16 @@ internal sealed class SymbolicCliExplainReport
         var pointTarget = options.Position.HasValue
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
-        var innerResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
-            service.Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions)));
-        if (innerResult is not SymbolicProgramPointResult point)
+        var pointResult = service.Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
+        if (pointResult.ProgramPoints.Count != 1)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
                 SymbolicErrorCategory.Unsupported,
-                $"Explain requires a resolvable source program point, but the query returned {innerResult.GetType().Name}.",
+                $"Explain requires a resolvable source program point, but the query returned {pointResult.ScopeKind}.",
                 SymbolicErrorExitCodes.InvalidData,
                 "resultKind",
-                innerResult.GetType().Name);
+                pointResult.ScopeKind);
+        var point = pointResult.ProgramPoints[0];
 
         var itemLimit = options.ReportMaxItems;
         var compactOptions = new SymbolicCompactQueryOptions(

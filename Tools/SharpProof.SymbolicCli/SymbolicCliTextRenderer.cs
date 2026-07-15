@@ -1,7 +1,7 @@
 internal static class SymbolicCliTextRenderer
 {
     internal static void PrintFileResult(
-    SymbolicFileQueryResult result,
+    SymbolicQueryResult result,
     SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}");
@@ -37,21 +37,23 @@ internal static class SymbolicCliTextRenderer
     if (result.SmtDiagnostics.IsConfigured && result.Lines.Count == 0) PrintSmtDiagnostics(result.SmtDiagnostics);
 }
 
-    internal static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions options)
+    internal static void PrintLineResult(SymbolicQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     PrintScopedResult(result, "Line", options);
 }
 
-    internal static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions options)
+    internal static void PrintSpanResult(SymbolicQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.SpanStart}-{result.SpanEnd}");
-    Console.WriteLine($"Span lines: {result.StartLine}:{result.StartColumn}-{result.EndLine}:{result.EndColumn}");
+    Console.WriteLine(
+        $"Span lines: {result.Scope.StartLine}:{result.Scope.StartColumn}-" +
+        $"{result.Scope.EndLine}:{result.Scope.EndColumn}");
     PrintScopedResult(result, "Span", options);
 }
 
     private static void PrintScopedResult(
-        SymbolicScopedQueryAggregate result,
+        SymbolicQueryResult result,
         string scopeLabel,
         SymbolicCliOptions options)
 {
@@ -154,73 +156,60 @@ internal static class SymbolicCliTextRenderer
         await PrintProjectAnalyzerDiagnosticsAsync(options, projectContext);
     }
 
-    var pointResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
-        service.Query(new SymbolicQueryContext(source, pointTarget, queryOptions)));
-    if (pointResult is SymbolicProgramPointResult point)
+    var point = service.Query(new SymbolicQueryContext(source, pointTarget, queryOptions)).ProgramPoints.Single();
+    Console.WriteLine();
+    Console.WriteLine("Invariant proof");
+    Console.WriteLine($"Node: {point.NodeKind}");
+    Console.WriteLine($"Method: {point.MethodName ?? "<unknown>"}");
+    Console.WriteLine($"Program point: {point.ProgramPointKind}");
+    Console.WriteLine($"Merged invariant: {point.MergedInvariantText}");
+    Console.WriteLine($"Reachability: {point.Reachability}");
+    Console.WriteLine($"Reachability reason: {point.ReachabilityReason}");
+    PrintAnalysisTruncation(point.AnalysisTruncation);
+    Console.WriteLine(
+        "Proof outcomes: " +
+        $"Total={point.ProofOutcomes.TotalCount}, " +
+        $"ProvenTrue={point.ProofOutcomes.ProvenTrueCount}, " +
+        $"ProvenFalse={point.ProofOutcomes.ProvenFalseCount}, " +
+        $"Unreachable={point.ProofOutcomes.UnreachableCount}, " +
+        $"Unknown={point.ProofOutcomes.UnknownCount}");
+    foreach (var proof in point.ConditionProofs)
     {
-        Console.WriteLine();
-        Console.WriteLine("Invariant proof");
-        Console.WriteLine($"Node: {point.NodeKind}");
-        Console.WriteLine($"Method: {point.MethodName ?? "<unknown>"}");
-        Console.WriteLine($"Program point: {point.ProgramPointKind}");
-        Console.WriteLine($"Merged invariant: {point.MergedInvariantText}");
-        Console.WriteLine($"Reachability: {point.Reachability}");
-        Console.WriteLine($"Reachability reason: {point.ReachabilityReason}");
-        PrintAnalysisTruncation(point.AnalysisTruncation);
         Console.WriteLine(
-            "Proof outcomes: " +
-            $"Total={point.ProofOutcomes.TotalCount}, " +
-            $"ProvenTrue={point.ProofOutcomes.ProvenTrueCount}, " +
-            $"ProvenFalse={point.ProofOutcomes.ProvenFalseCount}, " +
-            $"Unreachable={point.ProofOutcomes.UnreachableCount}, " +
-            $"Unknown={point.ProofOutcomes.UnknownCount}");
-        foreach (var proof in point.ConditionProofs)
-        {
-            Console.WriteLine(
-                $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
-                $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
-            Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
-        }
-    }
-    else
-    {
-        Console.WriteLine();
-        Console.WriteLine("Invariant proof");
-        Console.WriteLine($"Result kind: {pointResult.GetType().Name}");
+            $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
+            $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
+        Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
     }
 
-    if (pointResult is SymbolicProgramPointResult hazardPoint)
-    {
-        var hazards = service.QueryRuntimeHazards(
-            new SymbolicQueryContext(
-                source,
-                SymbolicQueryTarget.Point(hazardPoint.Line, hazardPoint.Column),
-                queryOptions),
-            options.CreateRuntimeHazardOptions());
-        Console.WriteLine();
-        Console.WriteLine("Runtime hazards");
-        Console.WriteLine($"Count: {hazards.HazardCount}");
-        PrintAnalysisTruncation(hazards.AnalysisTruncation);
-        Console.WriteLine("Status summary: " +
-                          FormatCountSummary(SymbolicCliCounts.By(hazards.Hazards, static hazard => hazard.Status.ToString())));
-        var hazardProjection = SymbolicCompactProjection.Project(
-            hazards.Hazards,
-            options.ReportMaxHazards);
-        foreach (var hazard in hazardProjection.Items)
-            Console.WriteLine(
-                $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
-                $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
-    }
+    var hazards = service.QueryRuntimeHazards(
+        new SymbolicQueryContext(
+            source,
+            SymbolicQueryTarget.Point(point.Line, point.Column),
+            queryOptions),
+        options.CreateRuntimeHazardOptions());
+    Console.WriteLine();
+    Console.WriteLine("Runtime hazards");
+    Console.WriteLine($"Count: {hazards.HazardCount}");
+    PrintAnalysisTruncation(hazards.AnalysisTruncation);
+    Console.WriteLine("Status summary: " +
+                      FormatCountSummary(SymbolicCliCounts.By(hazards.Hazards, static hazard => hazard.Status.ToString())));
+    var hazardProjection = SymbolicCompactProjection.Project(
+        hazards.Hazards,
+        options.ReportMaxHazards);
+    foreach (var hazard in hazardProjection.Items)
+        Console.WriteLine(
+            $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
+            $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
 
     PrintExplainCapabilitySummary(service.QueryCapabilities(
         new SymbolicQueryContext(source, pointTarget, queryOptions)), options.ReportMaxItems);
     PrintExplainComplexitySummary(service.QueryComplexity(
         new SymbolicQueryContext(source, pointTarget, queryOptions)), options.ReportMaxItems);
 
-    if (pointResult is SymbolicProgramPointResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
+    if (point.SmtDiagnostics.IsConfigured)
     {
         Console.WriteLine();
-        PrintSmtDiagnostics(finalPoint.SmtDiagnostics);
+        PrintSmtDiagnostics(point.SmtDiagnostics);
     }
 }
 

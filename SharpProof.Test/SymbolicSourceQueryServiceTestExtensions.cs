@@ -93,7 +93,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             impliedConditions);
     }
 
-    internal static SymbolicLineQueryResult QuerySourceLine(
+    internal static SymbolicQueryResult QuerySourceLine(
         this SymbolicSourceQueryService service,
         string sourceText,
         string filePath,

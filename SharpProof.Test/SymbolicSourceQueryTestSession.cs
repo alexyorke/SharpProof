@@ -50,7 +50,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             smtAnalysis: _smtAnalysis);
     }
 
-    public SymbolicLineQueryResult AnalyzeLine(
+    public SymbolicQueryResult AnalyzeLine(
         string marker,
         IEnumerable<string>? impliedConditions = null,
         bool includeExpressionProgramPoints = false,
@@ -84,7 +84,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicSpanQueryResult AnalyzeLineSpan(
+    public SymbolicQueryResult AnalyzeLineSpan(
         int startLine,
         int startColumn,
         int endLine,

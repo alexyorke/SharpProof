@@ -60,11 +60,10 @@ try
                 options.CreateCapabilityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else
-        result = SymbolicCliQueryResultAdapter.ToLegacyResult(
-            new SymbolicQueryService().Query(new SymbolicQueryContext(
-                inputContext.SourceInput,
-                options.CreateQueryTarget(),
-                options.CreateQueryOptions(smtAnalysis, true))));
+        result = new SymbolicQueryService().Query(new SymbolicQueryContext(
+            inputContext.SourceInput,
+            options.CreateQueryTarget(),
+            options.CreateQueryOptions(smtAnalysis, true)));
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
@@ -97,9 +96,12 @@ try
     }
     else if (options.Json)
     {
+        var jsonResult = result is SymbolicQueryResult queryResult
+            ? SymbolicCliQueryResultAdapter.ToFullJsonResult(queryResult)
+            : result;
         Console.WriteLine(JsonSerializer.Serialize(
-            result,
-            result.GetType(),
+            jsonResult,
+            jsonResult.GetType(),
             SymbolicCliOutputPolicy.FullJsonOptions));
     }
     else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
@@ -114,21 +116,23 @@ try
     {
         PrintCapabilityResult(capabilityResult);
     }
-    else if (result is SymbolicFileQueryResult fileResult)
+    else if (result is SymbolicQueryResult queryResult)
     {
-        PrintFileResult(fileResult, options);
-    }
-    else if (result is SymbolicLineQueryResult lineResult)
-    {
-        PrintLineResult(lineResult, options);
-    }
-    else if (result is SymbolicSpanQueryResult spanResult)
-    {
-        PrintSpanResult(spanResult, options);
-    }
-    else
-    {
-        PrintPointResult((SymbolicProgramPointResult)result, options, true);
+        switch (queryResult.Scope.Kind)
+        {
+            case SymbolicQueryScopeKind.File:
+                PrintFileResult(queryResult, options);
+                break;
+            case SymbolicQueryScopeKind.Line:
+                PrintLineResult(queryResult, options);
+                break;
+            case SymbolicQueryScopeKind.Span:
+                PrintSpanResult(queryResult, options);
+                break;
+            default:
+                PrintPointResult(queryResult.ProgramPoints.Single(), options, true);
+                break;
+        }
     }
 
     var gateFailures = SymbolicCliExitGateEvaluator.Evaluate(options, result);

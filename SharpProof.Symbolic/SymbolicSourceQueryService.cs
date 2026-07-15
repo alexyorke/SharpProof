@@ -54,7 +54,7 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken);
     }
 
-    public SymbolicLineQueryResult QuerySyntaxTreeLine(
+    public SymbolicQueryResult QuerySyntaxTreeLine(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int line,
@@ -83,7 +83,7 @@ internal sealed class SymbolicSourceQueryService
                     includeCurrentStatementCompletionFacts))
             .ToArray();
 
-        return new SymbolicLineQueryResult(
+        return SymbolicQueryResult.FromLine(
             syntaxTree.FilePath,
             line,
             results,
@@ -135,7 +135,7 @@ internal sealed class SymbolicSourceQueryService
             ContainsProgramPointPosition(node, position));
     }
 
-    public SymbolicSpanQueryResult QuerySyntaxTreeSpan(
+    public SymbolicQueryResult QuerySyntaxTreeSpan(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int spanStart,
@@ -176,7 +176,7 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken,
             true);
 
-        return new SymbolicSpanQueryResult(
+        return SymbolicQueryResult.FromSpan(
             syntaxTree.FilePath,
             sourceSpan.Start,
             sourceSpan.End,
@@ -188,7 +188,7 @@ internal sealed class SymbolicSourceQueryService
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
     }
 
-    public SymbolicSpanQueryResult QuerySyntaxTreeLineSpan(
+    public SymbolicQueryResult QuerySyntaxTreeLineSpan(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int startLine,
@@ -217,7 +217,7 @@ internal sealed class SymbolicSourceQueryService
             includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicFileQueryResult QuerySyntaxTreeAllLines(
+    public SymbolicQueryResult QuerySyntaxTreeAllLines(
         SyntaxTree syntaxTree,
         Compilation compilation,
         CancellationToken cancellationToken = default,
@@ -229,7 +229,7 @@ internal sealed class SymbolicSourceQueryService
         ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
-        var lineResults = new List<SymbolicLineQueryResult>();
+        var lineResults = new List<SymbolicQueryLineGroup>();
         for (var line = 1; line <= lineCount; line++)
         {
             var lineResult = QuerySyntaxTreeLine(
@@ -241,10 +241,11 @@ internal sealed class SymbolicSourceQueryService
                 impliedConditions,
                 includeExpressionProgramPoints,
                 includeCurrentStatementCompletionFacts);
-            if (lineResult.ProgramPoints.Count != 0) lineResults.Add(lineResult);
+            if (lineResult.ProgramPoints.Count != 0)
+                lineResults.Add(new SymbolicQueryLineGroup(line, lineResult.ProgramPoints));
         }
 
-        return new SymbolicFileQueryResult(
+        return SymbolicQueryResult.FromFile(
             syntaxTree.FilePath,
             lineCount,
             lineResults,

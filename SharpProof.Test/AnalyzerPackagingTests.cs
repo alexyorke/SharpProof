@@ -1941,7 +1941,6 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("options.CreateComplexityTarget()"));
         Assert.That(source, Does.Contain("options.CreateCapabilityTarget()"));
         Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis, true)"));
-        Assert.That(source, Does.Contain("SymbolicFileQueryResult"));
         Assert.That(source, Does.Contain("SymbolicComplexityResult"));
         Assert.That(source, Does.Contain("SymbolicCapabilityResult"));
         Assert.That(source, Does.Contain("SymbolicSourceQueryFilter"));

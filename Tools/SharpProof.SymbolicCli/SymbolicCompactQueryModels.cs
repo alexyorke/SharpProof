@@ -486,7 +486,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             return FromPoint(scope, result.ProgramPoints.Single(), normalizedOptions);
 
         var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File
-            ? result.CreateLineResults()
+            ? result.Lines
             : null;
         return FromAggregate(scope, result, normalizedOptions, sourceLines);
     }
@@ -525,11 +525,11 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         SymbolicCompactQueryScope scope,
         SymbolicQueryResult result,
         SymbolicCompactQueryOptions options,
-        IReadOnlyList<SymbolicLineQueryResult>? sourceLines = null)
+        IReadOnlyList<SymbolicQueryResult>? sourceLines = null)
     {
         var lineResults = new List<SymbolicCompactLineResult>();
         var remainingProgramPoints = options.MaxProgramPoints;
-        foreach (var line in sourceLines ?? Array.Empty<SymbolicLineQueryResult>())
+        foreach (var line in sourceLines ?? Array.Empty<SymbolicQueryResult>())
         {
             if (lineResults.Count >= options.MaxLines) break;
 

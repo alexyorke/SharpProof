@@ -40,34 +40,4 @@ public static class SymbolicCliJsonProjectionExtensions
     public static SymbolicInvariantQueryResult ToInvariantQueryResult(
         this SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null) => SymbolicInvariantQueryResult.FromResult(result, options);
-
-    internal static SymbolicCompactQueryResult ToCompactResult(
-        this SymbolicLineQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicCompactQueryResult.FromResult(SymbolicQueryResult.From(result), options);
-
-    internal static SymbolicInvariantQueryResult ToInvariantQueryResult(
-        this SymbolicLineQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicInvariantQueryResult.FromResult(SymbolicQueryResult.From(result), options);
-
-    internal static SymbolicCompactQueryResult ToCompactResult(
-        this SymbolicSpanQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicCompactQueryResult.FromResult(SymbolicQueryResult.From(result), options);
-
-    internal static SymbolicInvariantQueryResult ToInvariantQueryResult(
-        this SymbolicSpanQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicInvariantQueryResult.FromResult(SymbolicQueryResult.From(result), options);
-
-    internal static SymbolicCompactQueryResult ToCompactResult(
-        this SymbolicFileQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicCompactQueryResult.FromResult(SymbolicQueryResult.From(result), options);
-
-    internal static SymbolicInvariantQueryResult ToInvariantQueryResult(
-        this SymbolicFileQueryResult result,
-        SymbolicCompactQueryOptions? options = null) =>
-        SymbolicInvariantQueryResult.FromResult(SymbolicQueryResult.From(result), options);
 }
