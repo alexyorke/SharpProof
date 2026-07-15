@@ -13,12 +13,20 @@ internal static class SymbolicOperationTransferKernel
 
         var state = initialState;
         var provenance = ImmutableArray.CreateBuilder<SymbolicLoweringProvenance>(sequence.Operations.Length);
+        var previousSequence = -1;
         foreach (var operation in sequence.Operations)
         {
             provenance.Add(new SymbolicLoweringProvenance(
                 "operation-transfer",
                 operation.Origin.SourceSpan,
                 operation.Origin.Provenance));
+            if (operation.Origin.Sequence <= previousSequence)
+                return SymbolicOperationTransitionResult.Unsupported(
+                    state,
+                    SymbolicUnknownReason.UnsupportedIrEncoding,
+                    provenance);
+
+            previousSequence = operation.Origin.Sequence;
             if (operation is SymbolicAssignmentOperation assignment &&
                 TryApplyAssignment(ref state, assignment))
                 continue;

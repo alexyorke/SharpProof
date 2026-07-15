@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
+using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 
@@ -200,5 +201,73 @@ public sealed class SymbolicOperationTransferModelTests
                 SymbolicUnknownReason.None,
                 new[] { provenance }),
             Throws.ArgumentException);
+    }
+
+    [Test]
+    public void SymbolicAndPurityAdapters_ProduceTheSameSimpleAssignmentState()
+    {
+        const string source = "static class C { static void M(int input) { int value = 0; value = input; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(SymbolicAndPurityAdapters_ProduceTheSameSimpleAssignmentState));
+        var assignment = fixture.Root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
+            .Single();
+        var operation = fixture.SemanticModel.GetOperation(assignment)!;
+        var symbolic = SymbolicOperationTransferAdapter.Apply(
+            new SymbolicState(),
+            operation,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var purity = PurityOperationTransferAdapter.Apply(
+            PurityAnalysisEngine.PurityAnalysisState.Pure,
+            operation,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            PurityAnalysisEngine.PurityAnalysisState.Pure,
+            out var purityTransition);
+
+        Assert.That(symbolic.IsExact, Is.True);
+        Assert.That(purityTransition.IsExact, Is.True);
+        Assert.That(purity.PathState.NormalizedProofKey, Is.EqualTo(symbolic.State.NormalizedProofKey));
+    }
+
+    [Test]
+    public void TransferKernel_PreservesSequenceOrderAndRejectsReordering()
+    {
+        var firstTarget = new SymbolicVariableTerm("first", SmtValueKind.Int);
+        var secondTarget = new SymbolicVariableTerm("second", SmtValueKind.Int);
+        var first = Assignment(firstTarget, 1, sequence: 0, "first");
+        var second = Assignment(secondTarget, 2, sequence: 1, "second");
+        var ordered = SymbolicOperationTransferKernel.Apply(
+            new SymbolicState(),
+            new SymbolicOperationSequence(ImmutableArray.Create<SymbolicOperationDescriptor>(first, second)));
+        var reordered = SymbolicOperationTransferKernel.Apply(
+            new SymbolicState(),
+            new SymbolicOperationSequence(ImmutableArray.Create<SymbolicOperationDescriptor>(second, first)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ordered.IsExact, Is.True);
+            Assert.That(
+                ordered.Provenance.Select(static item => item.Detail),
+                Is.EqualTo(new[] { "first", "second" }));
+            Assert.That(reordered.IsUnsupported, Is.True);
+            Assert.That(reordered.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+        });
+    }
+
+    private static SymbolicAssignmentOperation Assignment(
+        SymbolicTerm target,
+        long value,
+        int sequence,
+        string provenance)
+    {
+        return new SymbolicAssignmentOperation(
+            ImmutableArray.Create(new SymbolicAssignmentBinding(
+                ((SymbolicVariableTerm)target).Name,
+                target,
+                new SymbolicIntegerConstantTerm(value))),
+            SymbolicAssignmentOperationKind.Simple,
+            IsChecked: false,
+            new SymbolicOperationOrigin(default, sequence, provenance));
     }
 }
