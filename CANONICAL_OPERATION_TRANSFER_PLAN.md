@@ -253,6 +253,7 @@ transfer policy after its slice is complete.
 | Canonical runtime-type hazards | `39e7368a` | 106,918 | -758 |
 | Canonical throw and switch hazards | `5fb606aa` | 106,923 | -753 |
 | Canonical framework hazards and trigger deletion | `8742afc6` | 106,658 | -1,018 |
+| Canonical exception-flow throw consumer | `fe51dd22` | 106,607 | -1,069 |
 
 ## Validation Ledger
 
@@ -311,20 +312,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical runtime-type hazards | Commit `39e7368a` moves invalid reference casts, unboxing mismatches, and covariant array-store mismatches into canonical operation lowering while preserving exact runtime-type checks, null behavior, unsupported subjects, bounds guards, and evidence provenance. The three legacy trigger/candidate semantic blocks were deleted. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. Production LOC fell by 111 lines to 106,918, or -758 from the rewrite start. |
 | Phase 4 canonical throw and switch hazards | Commit `5fb606aa` moves direct throw, rethrow, throw-null partitioning, and switch-expression no-match into canonical operation lowering and deletes both legacy trigger owners. The focused gate exposed and fixed an immutable-builder capacity bug in single-hazard throws before commit. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. The five-line bridge raises production LOC to 106,923, or -753 from the rewrite start, and must be repaid by final framework-model and trigger-factory deletion. |
 | Phase 4 canonical framework hazards and trigger deletion | Commit `8742afc6` moves `Math.Abs`, `Math.Clamp`, and known argument-guard preconditions into canonical operation lowering, relocates the remaining array shape adapter, and deletes both legacy trigger-factory files plus the obsolete trigger carrier. Exact search confirms every `RuntimeHazardCandidate` now projects from `SymbolicHazardOperation`. Focused hazard tests: 258 passed; Release test build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 265 production lines, bringing production LOC to 106,658, or -1,018 from the rewrite start; the complete fourth Phase 4 item removes 371 lines from its 107,029 checkpoint. |
+| Phase 4 canonical exception-flow throw consumer | Commit `fe51dd22` replaces exception flow's independent throw/rethrow/null discovery and classification with canonical proven runtime hazards while preserving its position before callee entries and the shared catch/finally/reachability filters. The now-unused throw classifier and rethrow helpers were deleted. Focused exception, semantic-oracle, and unknown-hazard tests: 189 passed. Production LOC fell by 51 lines to 106,607, or -1,069 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 and 3 are gated. The first four Phase 4 items are complete;
   every runtime-hazard family emits typed operations and both legacy trigger
-  factories are deleted. Query, suppressor, and exception-flow consumers still
-  require canonical-descriptor migration and adapter cleanup.
-- Last confirmed fact: framework migration and trigger deletion pass 258
-  focused tests, Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the
-  documented SP0010 baseline failure. Production LOC is 106,658, or -1,018
-  from the rewrite start.
-- Next cheapest step: inventory query, suppressor, and exception-flow reads of
-  projected trigger facts; expose canonical descriptor data through the query
-  result and migrate the largest shared consumer without changing schemas.
+  factories are deleted. Exception flow now consumes canonical throw hazards;
+  query descriptor retention and the separate unknown-hazard query remain.
+- Last confirmed fact: exception-flow throw migration passes 189 focused tests
+  and removes 51 production lines. Production LOC is 106,607, or -1,069 from
+  the rewrite start; the preceding full lanes remain Oracle 573/573, Analyzer
+  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
+- Next cheapest step: retain the canonical descriptor through query
+  classification instead of immediately reconstructing a fact, then share one
+  per-method hazard query between exception summaries and unknown diagnostics.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
