@@ -715,7 +715,7 @@ public sealed class SymbolicConditionProofSummary
               string.Empty
             : null;
         Proof = SymbolicProofProjection
-            .FromSolverBackedResult(MapProofStatus(Status), IsSolverBacked, unknownReason)
+            .FromSolverBackedResult(SymbolicProofProjection.MapStatus(Status), IsSolverBacked, unknownReason)
             .CreateInfo(Summary, false, null, Target, FormulaText, FormulaKind);
     }
 
@@ -866,17 +866,6 @@ public sealed class SymbolicConditionProofSummary
             default:
                 return "The condition has at least one unresolved reachable proof outcome.";
         }
-    }
-
-    private static SymbolicProofStatus MapProofStatus(SymbolicConditionProofSummaryStatus status)
-    {
-        return status switch
-        {
-            SymbolicConditionProofSummaryStatus.AlwaysTrue => SymbolicProofStatus.ProvenTrue,
-            SymbolicConditionProofSummaryStatus.AlwaysFalse => SymbolicProofStatus.ProvenFalse,
-            SymbolicConditionProofSummaryStatus.UnreachableOnly => SymbolicProofStatus.Unreachable,
-            _ => SymbolicProofStatus.Unknown
-        };
     }
 
     private readonly struct ProofReasonKey(SymbolicTruthValue truthValue, string? reason)

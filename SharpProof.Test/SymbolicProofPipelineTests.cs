@@ -13,6 +13,44 @@ namespace SharpProof.Test;
 [TestFixture]
 public class SymbolicProofPipelineTests
 {
+    [TestCase(SymbolicTruthValue.Unknown, SymbolicProofStatus.Unknown)]
+    [TestCase(SymbolicTruthValue.ProvenTrue, SymbolicProofStatus.ProvenTrue)]
+    [TestCase(SymbolicTruthValue.ProvenFalse, SymbolicProofStatus.ProvenFalse)]
+    [TestCase(SymbolicTruthValue.Unreachable, SymbolicProofStatus.Unreachable)]
+    [TestCase((SymbolicTruthValue)999, SymbolicProofStatus.Unknown)]
+    public void ProofStatusProjection_MapsTruthValuesConservatively(
+        SymbolicTruthValue value,
+        SymbolicProofStatus expected)
+    {
+        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+    }
+
+    [TestCase(SymbolicConditionProofSummaryStatus.None, SymbolicProofStatus.Unknown)]
+    [TestCase(SymbolicConditionProofSummaryStatus.UnreachableOnly, SymbolicProofStatus.Unreachable)]
+    [TestCase(SymbolicConditionProofSummaryStatus.AlwaysTrue, SymbolicProofStatus.ProvenTrue)]
+    [TestCase(SymbolicConditionProofSummaryStatus.AlwaysFalse, SymbolicProofStatus.ProvenFalse)]
+    [TestCase(SymbolicConditionProofSummaryStatus.Mixed, SymbolicProofStatus.Unknown)]
+    [TestCase(SymbolicConditionProofSummaryStatus.Unknown, SymbolicProofStatus.Unknown)]
+    [TestCase((SymbolicConditionProofSummaryStatus)999, SymbolicProofStatus.Unknown)]
+    public void ProofStatusProjection_MapsSummaryStatusesConservatively(
+        SymbolicConditionProofSummaryStatus value,
+        SymbolicProofStatus expected)
+    {
+        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+    }
+
+    [TestCase(SymbolicRuntimeHazardStatus.Proven, SymbolicProofStatus.ProvenTrue)]
+    [TestCase(SymbolicRuntimeHazardStatus.Unknown, SymbolicProofStatus.Unknown)]
+    [TestCase(SymbolicRuntimeHazardStatus.Unsupported, SymbolicProofStatus.Unknown)]
+    [TestCase(SymbolicRuntimeHazardStatus.Unreachable, SymbolicProofStatus.Unreachable)]
+    [TestCase((SymbolicRuntimeHazardStatus)999, SymbolicProofStatus.Unknown)]
+    public void ProofStatusProjection_MapsHazardStatusesConservatively(
+        SymbolicRuntimeHazardStatus value,
+        SymbolicProofStatus expected)
+    {
+        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+    }
+
     [Test]
     public void ConditionTruth_AttributesUnknownToTheDecisiveBranchStage()
     {

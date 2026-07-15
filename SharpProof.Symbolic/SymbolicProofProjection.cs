@@ -2,6 +2,29 @@ namespace SharpProof.Symbolic;
 
 internal readonly struct SymbolicProofProjection
 {
+    internal static SymbolicProofStatus MapStatus(SymbolicTruthValue truthValue) => truthValue switch
+    {
+        SymbolicTruthValue.ProvenTrue => SymbolicProofStatus.ProvenTrue,
+        SymbolicTruthValue.ProvenFalse => SymbolicProofStatus.ProvenFalse,
+        SymbolicTruthValue.Unreachable => SymbolicProofStatus.Unreachable,
+        _ => SymbolicProofStatus.Unknown
+    };
+
+    internal static SymbolicProofStatus MapStatus(SymbolicConditionProofSummaryStatus status) => status switch
+    {
+        SymbolicConditionProofSummaryStatus.AlwaysTrue => SymbolicProofStatus.ProvenTrue,
+        SymbolicConditionProofSummaryStatus.AlwaysFalse => SymbolicProofStatus.ProvenFalse,
+        SymbolicConditionProofSummaryStatus.UnreachableOnly => SymbolicProofStatus.Unreachable,
+        _ => SymbolicProofStatus.Unknown
+    };
+
+    internal static SymbolicProofStatus MapStatus(SymbolicRuntimeHazardStatus status) => status switch
+    {
+        SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
+        SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
+        _ => SymbolicProofStatus.Unknown
+    };
+
     private SymbolicProofProjection(
         SymbolicProofStatus status,
         SymbolicProofBackend backend,

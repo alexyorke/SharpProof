@@ -551,7 +551,7 @@ public sealed class SymbolicConditionProofResult
         AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
         Proof = SymbolicProofProjection
             .FromSolverBackedResult(
-                MapProofStatus(TruthValue),
+                SymbolicProofProjection.MapStatus(TruthValue),
                 IsSolverBacked,
                 TruthValue == SymbolicTruthValue.Unknown ? Reason : null)
             .CreateInfo(Reason, false, null, Target, FormulaText, FormulaKind);
@@ -710,17 +710,6 @@ public sealed class SymbolicConditionProofResult
             witness: Witness,
             counterexampleWitness: CounterexampleWitness,
             analysisTruncation: truncation);
-    }
-
-    private static SymbolicProofStatus MapProofStatus(SymbolicTruthValue truthValue)
-    {
-        return truthValue switch
-        {
-            SymbolicTruthValue.ProvenTrue => SymbolicProofStatus.ProvenTrue,
-            SymbolicTruthValue.ProvenFalse => SymbolicProofStatus.ProvenFalse,
-            SymbolicTruthValue.Unreachable => SymbolicProofStatus.Unreachable,
-            _ => SymbolicProofStatus.Unknown
-        };
     }
 
 }

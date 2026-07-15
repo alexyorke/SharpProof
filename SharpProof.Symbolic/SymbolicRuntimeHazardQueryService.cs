@@ -567,16 +567,6 @@ public sealed class SymbolicRuntimeHazard
         return SymbolicReasonDisplay.Format(StatusReason);
     }
 
-    private static SymbolicProofStatus MapProofStatus(SymbolicRuntimeHazardStatus status)
-    {
-        return status switch
-        {
-            SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
-            SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
-            _ => SymbolicProofStatus.Unknown
-        };
-    }
-
     private static SymbolicProofInfo CreateProofInfo(
         SymbolicRuntimeHazardStatus status,
         string statusReason,
@@ -585,7 +575,7 @@ public sealed class SymbolicRuntimeHazard
         SymbolicRuntimeHazardKind kind,
         SymbolicProofInfo? proofInfo)
     {
-        var proofStatus = MapProofStatus(status);
+        var proofStatus = SymbolicProofProjection.MapStatus(status);
         if (proofInfo == null)
         {
             var isSolverBacked = status != SymbolicRuntimeHazardStatus.Unsupported &&
