@@ -885,6 +885,15 @@ namespace TestNamespace {
             $"SharpProof.{packageVersion}.nupkg");
         if (!File.Exists(packagePath)) Assert.Inconclusive("Build the package before verifying package contents.");
 
+        var packageTimestamp = File.GetLastWriteTimeUtc(packagePath);
+        var assemblyPaths = new[]
+        {
+            typeof(SharpProofAnalyzer).Assembly.Location,
+            typeof(SharpProofCodeFixProvider).Assembly.Location
+        };
+        if (assemblyPaths.Any(path => File.GetLastWriteTimeUtc(path) > packageTimestamp))
+            Assert.Inconclusive("Rebuild the package after the analyzer assemblies before verifying contents.");
+
         using var archive = ZipFile.OpenRead(packagePath);
         AssertPackageEntryMatchesAssembly(
             archive,
@@ -1578,13 +1587,19 @@ namespace TestNamespace {
         var projectPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj");
         var baselinePath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PackageBaseline.json");
         var project = XDocument.Load(projectPath);
+        var repositoryDefaults = XDocument.Load(Path.Combine(repositoryRoot, "Directory.Build.props"));
         var sharedMetadata = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.PackageMetadata.props"));
         var releaseMetadata = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.Release.props"));
         using var baseline = JsonDocument.Parse(File.ReadAllText(baselinePath));
         var baselineRoot = baseline.RootElement;
-        var propertyResolver = new MsBuildPropertyTestResolver(releaseMetadata, sharedMetadata, project);
-        var properties = sharedMetadata
+        var propertyResolver = new MsBuildPropertyTestResolver(
+            releaseMetadata,
+            repositoryDefaults,
+            sharedMetadata,
+            project);
+        var properties = repositoryDefaults
             .Descendants()
+            .Concat(sharedMetadata.Descendants())
             .Concat(project.Descendants())
             .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
             .Select(static element => element.Name.LocalName)

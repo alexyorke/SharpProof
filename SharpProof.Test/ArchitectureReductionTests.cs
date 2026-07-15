@@ -1363,6 +1363,10 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.ProofCore",
             "Z3RegexTranslator.cs"));
+        var regexValidatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtRegexValidator.cs"));
         var smtAnalysisSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1373,8 +1377,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(encoderSource, Does.Contain("Z3RegexTranslator.TryTranslate"));
         Assert.That(encoderSource, Does.Not.Contain("CreateRegexCharacterRangesOrEmpty"));
         Assert.That(regexTranslatorSource, Does.Contain("CreateRegexCharacterRangesOrEmpty"));
-        Assert.That(regexTranslatorSource, Does.Contain("catch (RegexMatchTimeoutException)"));
-        Assert.That(regexTranslatorSource, Does.Contain("return Array.Empty<CharacterRange>();"));
+        Assert.That(regexTranslatorSource, Does.Contain("IsValidDotNetRegexPattern"));
+        Assert.That(regexValidatorSource, Does.Contain("catch (RegexMatchTimeoutException)"));
+        Assert.That(regexValidatorSource, Does.Contain("return false;"));
         Assert.That(smtAnalysisSource, Does.Contain("catch (RegexMatchTimeoutException)"));
         Assert.That(smtAnalysisSource, Does.Contain("return Unknown(\"smt_timeout\");"));
     }
