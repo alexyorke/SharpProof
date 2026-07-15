@@ -55,11 +55,7 @@ internal static partial class PurityAssignmentStateTransfer
                 nextState = nextState.WithLocalConcreteType(writtenLocalSymbol, concreteType);
             else
                 nextState = nextState.WithoutLocalConcreteType(writtenLocalSymbol);
-        }
 
-        foreach (var writtenLocalSymbol in writtenLocalSymbols)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
             if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
             {
                 nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
@@ -82,11 +78,7 @@ internal static partial class PurityAssignmentStateTransfer
                 nextState,
                 writtenLocalSymbol,
                 valueOperation);
-        }
 
-        foreach (var writtenLocalSymbol in writtenLocalSymbols)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
             if (PurityConcreteReceiverResolver.IsDefinitelyNullValue(valueOperation, valueState))
                 nextState = nextState.WithDefinitelyNullLocal(writtenLocalSymbol);
             else
