@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -104,5 +105,81 @@ public class CSharpSyntaxFactsTests
             CSharpSyntaxFacts.GetContainingExecutionRoot(expression, ExecutionRootPolicy.Callable),
             Is.Null);
         Assert.That(CSharpSyntaxFacts.GetContainingExecutionRoot(expression), Is.SameAs(root));
+    }
+
+    [TestCase("class C { void M() { } }", SyntaxKind.MethodDeclaration, SyntaxKind.Block)]
+    [TestCase("class C { int M() => 1; }", SyntaxKind.MethodDeclaration, SyntaxKind.NumericLiteralExpression)]
+    [TestCase("class C { C() { } }", SyntaxKind.ConstructorDeclaration, SyntaxKind.Block)]
+    [TestCase("class C { int value; C() => value = 1; }", SyntaxKind.ConstructorDeclaration,
+        SyntaxKind.SimpleAssignmentExpression)]
+    [TestCase("class C { public static C operator +(C left, C right) { return left; } }",
+        SyntaxKind.OperatorDeclaration, SyntaxKind.Block)]
+    [TestCase("class C { public static C operator +(C left, C right) => left; }",
+        SyntaxKind.OperatorDeclaration, SyntaxKind.IdentifierName)]
+    [TestCase("class C { public static explicit operator int(C value) { return 1; } }",
+        SyntaxKind.ConversionOperatorDeclaration, SyntaxKind.Block)]
+    [TestCase("class C { public static explicit operator int(C value) => 1; }",
+        SyntaxKind.ConversionOperatorDeclaration, SyntaxKind.NumericLiteralExpression)]
+    [TestCase("class C { int P { get { return 1; } } }", SyntaxKind.GetAccessorDeclaration, SyntaxKind.Block)]
+    [TestCase("class C { int P { get => 1; } }", SyntaxKind.GetAccessorDeclaration,
+        SyntaxKind.NumericLiteralExpression)]
+    [TestCase("class C { void M() { int Local() { return 1; } } }", SyntaxKind.LocalFunctionStatement,
+        SyntaxKind.Block)]
+    [TestCase("class C { void M() { int Local() => 1; } }", SyntaxKind.LocalFunctionStatement,
+        SyntaxKind.NumericLiteralExpression)]
+    [TestCase("class C { int P => 1; }", SyntaxKind.PropertyDeclaration, SyntaxKind.NumericLiteralExpression)]
+    [TestCase("class C { int this[int index] => index; }", SyntaxKind.IndexerDeclaration,
+        SyntaxKind.IdentifierName)]
+    public void MethodBodyOperationResolver_SelectsSharedBodyOrExpressionTaxonomy(
+        string source,
+        SyntaxKind declarationKind,
+        SyntaxKind expectedOperationSyntaxKind)
+    {
+        var semanticModel = CreateSemanticModel(source, out var root);
+        var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
+
+        var operation = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+            declaration,
+            semanticModel,
+            CancellationToken.None);
+
+        Assert.That(operation, Is.Not.Null);
+        Assert.That(operation!.Syntax.Kind(), Is.EqualTo(expectedOperationSyntaxKind));
+    }
+
+    [TestCase("class C { public static explicit operator int(C value) => 1; }",
+        SyntaxKind.ConversionOperatorDeclaration, false)]
+    [TestCase("class C { ~C() { } }", SyntaxKind.DestructorDeclaration, true)]
+    public void MethodBodyOperationResolver_RetainsDeclarationFallback(
+        string source,
+        SyntaxKind declarationKind,
+        bool includeConversionOperators)
+    {
+        var semanticModel = CreateSemanticModel(source, out var root);
+        var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
+        var expected = semanticModel.GetOperation(declaration);
+
+        var actual = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+            declaration,
+            semanticModel,
+            CancellationToken.None,
+            includeConversionOperators);
+
+        Assert.That(actual?.Kind, Is.EqualTo(expected?.Kind));
+        Assert.That(actual?.Syntax, Is.SameAs(expected?.Syntax));
+    }
+
+    private static SemanticModel CreateSemanticModel(string source, out SyntaxNode root)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            nameof(CSharpSyntaxFactsTests),
+            new[] { tree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+            Is.Empty);
+        root = tree.GetRoot();
+        return compilation.GetSemanticModel(tree);
     }
 }

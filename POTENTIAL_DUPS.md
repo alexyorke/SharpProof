@@ -12,7 +12,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Lower-priority follow-ups
 
-- `SharpProof.Symbolic/MethodBodyOperationResolver.cs:14-45` repeats body/expression operation lookup across method-like syntax types; a shared body-node adapter may simplify it.
 - `SharpProof.Package/tools/install.ps1:1-58` and `uninstall.ps1:1-65` repeat analyzer-root/language traversal and DLL loops; use a common operation helper if packaging permits it.
 - `SharpProof.Analyzer/MethodAllocationAnalyzer.cs:12-15` and `SharpProof.Analyzer/ExceptionFlowQuery.cs:9-12` define the same four-option `SymbolDisplayFormat`; expose one analyzer type-identity format.
 - `SharpProof.Symbolic/SymbolicSourceCompilation.cs:10-78`, `Tools/SharpProof.Fuzz.Core/FuzzRunner.cs:546-584`, and `SharpProof.Analyzer/EffectSummaryMetadataSupport.cs:665-698` independently build trusted-platform references and source compilations. A shared reference/compilation-host factory with caller profiles could centralize cache, fallback, and de-duplication policy while preserving analyzer/fuzz differences.

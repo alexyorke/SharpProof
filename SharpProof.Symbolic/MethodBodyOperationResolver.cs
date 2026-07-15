@@ -11,39 +11,15 @@ internal static class MethodBodyOperationResolver
         CancellationToken cancellationToken,
         bool includeConversionOperators = true)
     {
-        return methodNode switch
-        {
-            MethodDeclarationSyntax methodDeclaration when methodDeclaration.Body != null =>
-                semanticModel.GetOperation(methodDeclaration.Body, cancellationToken),
-            MethodDeclarationSyntax methodDeclaration when methodDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(methodDeclaration.ExpressionBody.Expression, cancellationToken),
-            ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.Body != null =>
-                semanticModel.GetOperation(constructorDeclaration.Body, cancellationToken),
-            ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(constructorDeclaration.ExpressionBody.Expression, cancellationToken),
-            OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.Body != null =>
-                semanticModel.GetOperation(operatorDeclaration.Body, cancellationToken),
-            OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(operatorDeclaration.ExpressionBody.Expression, cancellationToken),
-            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration when includeConversionOperators &&
-                conversionOperatorDeclaration.Body != null =>
-                semanticModel.GetOperation(conversionOperatorDeclaration.Body, cancellationToken),
-            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration when includeConversionOperators &&
-                conversionOperatorDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(conversionOperatorDeclaration.ExpressionBody.Expression, cancellationToken),
-            AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.Body != null =>
-                semanticModel.GetOperation(accessorDeclaration.Body, cancellationToken),
-            AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(accessorDeclaration.ExpressionBody.Expression, cancellationToken),
-            LocalFunctionStatementSyntax localFunction when localFunction.Body != null =>
-                semanticModel.GetOperation(localFunction.Body, cancellationToken),
-            LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
-                semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
-            PropertyDeclarationSyntax propertyDeclaration when propertyDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(propertyDeclaration.ExpressionBody.Expression, cancellationToken),
-            IndexerDeclarationSyntax indexerDeclaration when indexerDeclaration.ExpressionBody != null =>
-                semanticModel.GetOperation(indexerDeclaration.ExpressionBody.Expression, cancellationToken),
-            _ => semanticModel.GetOperation(methodNode, cancellationToken)
-        };
+        var useDeclarationFallback = methodNode is DestructorDeclarationSyntax ||
+                                     methodNode is ConversionOperatorDeclarationSyntax && !includeConversionOperators;
+        var operationNode = useDeclarationFallback
+            ? methodNode
+            : CSharpSyntaxFacts.GetBlockBody(methodNode) ??
+              (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody)
+                  ? expressionBody
+                  : methodNode);
+
+        return semanticModel.GetOperation(operationNode, cancellationToken);
     }
 }
