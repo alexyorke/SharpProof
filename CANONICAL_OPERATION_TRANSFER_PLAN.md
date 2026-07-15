@@ -69,11 +69,43 @@ compression, test deletion, or moving logic into manifests as a reduction.
   contents, seeded fuzz output, and EffectSummary golden output.
 - [x] Add a differential harness that compares normalized `SymbolicState`
   instances, support status, unknown/truncation reasons, and provenance.
-- [ ] Inventory every caller and semantic responsibility in the 14,417-line
+- [x] Inventory every caller and semantic responsibility in the 14,417-line
   overlap surface; assign each old entry point to a migration slice or document
   why it remains a source-only adapter.
-- [ ] Define deletion gates for each legacy file or method before introducing
+- [x] Define deletion gates for each legacy file or method before introducing
   its replacement.
+
+### Legacy Caller And Deletion Map
+
+Paths below are relative to the repository root. A file marked `adapter` may
+remain only as source/CFG traversal or evidence projection; it must not retain
+transfer policy after its slice is complete.
+
+| Legacy owner | Direct production callers | Responsibility | Migration slice and deletion gate |
+| --- | --- | --- | --- |
+| `SymbolicProgramPointFacts` | `SymbolicInvariantService`, `SymbolicReachabilityService`, and the Symbolic statement/branch/loop helpers | Walk containing blocks, order prior statements, construct entry state, expose mutation queries | Phase 1 front-end. Keep only a source-position adapter after every routed operation emits canonical events and differential state parity passes. |
+| `SymbolicStatementStateTransfer` | `SymbolicProgramPointFacts`, `SymbolicBranchCompletionStateTransfer` | Route statements; try/catch, using, declaration, completion, and block entry transfer | Phases 2-3. Delete semantic branches after their event lowerers pass state/provenance/truncation parity; retain no independent state mutation. |
+| `SymbolicExpressionStateTransfer` | `SymbolicProgramPointFacts`, `SymbolicStatementStateTransfer` | Route assignments, coalesce assignment, increment/decrement, and expression completion | Phase 2. Delete the file after all expression forms use assignment/mutation events and the assignment differential suite passes. |
+| `SymbolicAssignmentStateTransfer` | Symbolic expression, loop, program-point, and statement transfer | Declaration/assignment value facts, tuples, elements, nullability, aliases, current-instance members, and throw guards | Phase 2. Delete after simple, compound, tuple, element, nullable, and guarded assignments have canonical parity and no caller remains. |
+| `SymbolicTrackedAssignmentStateTransfer` | Analyzer `PuritySymbolicStateFacts` | Shared scalar/reference/collection assignment facts | Phase 2 seed. Fold into the assignment event handler; delete when Symbolic and Analyzer both consume the handler. |
+| `SymbolicStateInvalidator` | Symbolic assignment, expression, loop, program-point, and statement transfer | Discover nested mutations and remove invalidated symbol/reference facts | Phase 2. Delete after mutation descriptors own invalidation and alias/version tests pass. |
+| `SymbolicNormalCompletionStateTransfer` | Symbolic assignment, branch, expression, and statement transfer | Facts guaranteed by successful expression completion, including index/length and member non-null facts | Phases 2-4. Delete transfer logic after normal-completion and hazard events are canonical; any residual syntax lookup is an adapter. |
+| `SymbolicBranchCompletionStateTransfer` | Symbolic assignment, control-flow, loop, and statement transfer | If/switch branch assumptions, branch-local transfer, merge guards, and member postconditions | Phase 3. Delete state mutation after branch/switch events and canonical merge pass differential tests; retain only source branch enumeration if required. |
+| `SymbolicLoopStateTransfer` | Symbolic assignment, branch, control-flow, normal-completion, program-point, and statement transfer | Loop entry/body/exit facts, bounded invariants, dependency/mutation discovery | Phase 3. Delete transfer and fixed-point policy after CFG loop events pass loop/reachability parity; source dependency extraction may remain as an adapter. |
+| `SymbolicControlFlowCompletionStateTransfer` | Symbolic branch, loop, and statement transfer | Loop completion, break/continue/return/throw reachability, lock/finally completion | Phase 3. Delete after completion events own reachability and exceptional/normal exits. |
+| `SymbolicStateMerger` | Analyzer `PurityAnalysisStateMerger`, Symbolic statement transfer | Canonical path-condition choice and bounded merging | Phase 3 kernel owner. Preserve and expand this implementation; delete all competing fact/version/ownership merge policy from callers. |
+| `SymbolicRuntimeHazardCandidateFactory` | `SymbolicRuntimeHazardQueryService` | Enumerate syntax candidates and dispatch hazard families | Phase 4. Delete after canonical operation events emit typed exception preconditions for every family. |
+| `SymbolicRuntimeHazardSyntaxCandidateFactory` | `SymbolicRuntimeHazardCandidateFactory` | Reconstruct hazard kinds, categories, exception types, and triggers from syntax | Phase 4. Delete semantic reconstruction; retain only source span/evidence extraction for Roslyn gaps. |
+| `SymbolicRuntimeHazardIrTriggerFactory`, `SymbolicRuntimeHazardTriggerFactory`, `SymbolicRuntimeHazardKnownGuardFactory` | Candidate factories and each other | Lower conditions, construct checked/range/null/cast/cardinality triggers, attach known guards | Phase 4. Delete family by family after descriptors match ordering, type/category, trigger, proof status, and unsupported outcomes. |
+| `SymbolicRuntimeHazardQueryService` | `SymbolicQueryService`, Analyzer `ExceptionFlowQuery.RuntimeHazards`, `SharpProofDiagnosticSuppressor` | Select scope, obtain path state, prove preconditions, classify and project hazards | Phase 4 adapter. Keep query/proof/evidence projection only; remove candidate and trigger semantics. |
+| `PurityAssignmentStateTransfer` partials | `PurityAnalysisEngine.Cfg` | Apply writes, aliases, delegate targets, ownership, disposal, borrowing, and caller-visible mutation | Phases 2 and 5. Delete transfer policy after the CFG adapter feeds canonical events and purity state/diagnostic parity passes. |
+| `PuritySymbolicStateFacts` | Purity branch/merge/assignment/resource components and assignment, delegate, invocation, ownership, and return rules | Construct/query aliases, borrows, ownership, releases, and assigned symbolic values | Phases 2 and 5. Move mutation constructors to the kernel; retain read-only diagnostic queries only until evidence projection is migrated. |
+| `PurityResourceStateFacts` partials | Purity CFG/recursive analysis, assignment transfer, and assignment/field/property/invocation/return rules | Ownership, freshness, escape, dispose/release transitions, and lifetime diagnostics | Phases 2 and 5. Delete transition policy after lifetime events match; keep only analyzer-specific evidence predicates. |
+| `PurityAnalysisStateMerger` | `PurityAnalysisEngine.CfgTransfer`, engine initialization, `PuritySymbolicStateFacts` | Merge path states, versions, delegate targets, captures, ownership, and releases | Phases 3 and 5. Replace symbolic merge with the kernel; keep a thin analyzer metadata merge only after state parity and loop convergence pass. |
+| `PurityAnalysisEngine.CfgBranchAssumptions` and `.CfgTransfer` | Purity CFG worklist | Apply branch assumptions, propagate successors, merge revisits, and handle completion | Phases 3 and 5. Keep CFG scheduling as an adapter; delete duplicated condition/state semantics when canonical transitions are consumed. |
+| `ExceptionPathStateService` partials | `ExceptionFlowQuery.Catches`, `ExceptionFlowQuery.SiteCollection`, `ExceptionSiteClassifier.NullFacts` | Collect exception-site state, mutation-aware dominance, reachability, and throwing-finally shadowing | Phases 3 and 5. Keep exception-site/source queries only; delete transfer/completion interpretation after canonical state and completion edges match. |
+| `ExceptionFlowQuery.RuntimeHazards` | `ExceptionFlowQuery.SiteCollection` | Re-query unknown hazards and translate them into exception-flow candidates | Phases 4 and 5. Consume canonical descriptors directly and delete reconstruction after exception ordering/evidence parity passes. |
+| Exception-flow catch/callee/property/resource site collectors | `ExceptionFlowQuery.SiteCollection`, `ExceptionFlowAnalyzer` | Language/runtime source discovery and analyzer-specific diagnostic policy | Adapter by design. Preserve source discovery and policy, but route all state, completion, ownership, and hazard semantics through canonical results. |
 
 ## Phase 1 - Canonical Operation Model
 
@@ -177,15 +209,16 @@ compression, test deletion, or moving logic into manifests as a reduction.
 | Phase 0 build/test baseline | Release solution build: 0 warnings, 0 errors. MainSmtOracle: 573 passed. MainSmtAnalyzer: 487 passed. MainSmtFlow: 256 passed, 1 failed (the pre-existing SP0010 case). MainSmtCore: 257 passed. MainGeneral: 3,634 passed, 2 skipped. Tooling: 585 passed. Total: 5,792 passed, 1 pre-existing failure, 2 explicit MainGeneral skips. |
 | Phase 0 contract baseline | Public API SHA-256: shipped `98C260C649C51451C3BD5629DAF01CDA02ECE7ACEFF1AAF4D39CA6FCF7867D25`, unshipped `B5AFAC50F77E3069B2F1350E068810320D56166F2A7C52E5317F7D7581EA1D4E`. Archive manifests: combined NuGet 17 entries / `c08d68be02c78efced7a080ffbc8eadfd305b91540925f7fd40160a6c614f7a8`; Symbolic NuGet 13 entries / `cc85e4f0f085bc8fb088ed7e44344807731c80594a5d4ac8f382f1791a745dd3`; VSIX 31 entries / `7b876bbb1137084a1eb28e0d863ea33cfcee7bd48708b68ca2131323d4255976`. Existing byte/schema/golden fixtures for CLI, JSON, compact/invariant projection, fuzz, and EffectSummary: 140 passed, 0 failed, 0 skipped. |
 | Phase 0 differential harness | `SymbolicStateDifferentialHarness` canonicalizes normalized states and truncation ordering while retaining support, unknown reason, provenance, and truncation dimensions. Focused tests: 2 passed, 0 failed, 0 skipped. |
+| Phase 0 deletion map | Exact production references for the state-transfer, runtime-hazard, purity-state, and exception-path owners were enumerated. Every owner now has a migration slice, retained-adapter boundary, and behavior gate in the table above. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: Phase 0 baselines and the reusable normalized-state differential
-  harness are complete; no canonical-kernel production code has been added yet.
-- Last confirmed fact: the differential harness preserves every required
-  comparison dimension and its two focused tests pass.
-- Next cheapest step: inventory every caller in the 14,417-line overlap and
-  define deletion gates, starting with the simple-assignment vertical slice.
+- State: Phase 0 characterization, differential infrastructure, caller
+  inventory, adapter boundaries, and deletion gates are complete.
+- Last confirmed fact: every high-overlap owner has a named consumer set and a
+  parity condition that must pass before its legacy semantics can be removed.
+- Next cheapest step: add the canonical operation descriptor and immutable
+  transition-result foundations, then lower the simple-assignment slice.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
