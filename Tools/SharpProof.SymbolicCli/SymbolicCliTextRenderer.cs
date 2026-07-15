@@ -26,7 +26,7 @@ internal static class SymbolicCliTextRenderer
             $"Unknown={result.Reachability.UnknownCount}, " +
             $"NotChecked={result.Reachability.NotCheckedCount}");
 
-    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
+    PrintConditionProofSummaries(FilterConditionProofs(result.ConditionProofs, options, static proof => proof.Target));
 
     foreach (var lineResult in result.Lines)
     {
@@ -66,7 +66,7 @@ internal static class SymbolicCliTextRenderer
     Console.WriteLine($"{scopeLabel} invariant conditions: {result.InvariantInfo.ConditionCount}");
     PrintInvariantQuery(scopeLabel + " invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts(scopeLabel + " merged path facts", result.MergedPathFacts);
-    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
+    PrintConditionProofSummaries(FilterConditionProofs(result.ConditionProofs, options, static proof => proof.Target));
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -616,7 +616,7 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
     }
 
-    foreach (var proof in FilterConditionProofResults(result.ConditionProofs, options))
+    foreach (var proof in FilterConditionProofs(result.ConditionProofs, options, static proof => proof.Target))
     {
         Console.WriteLine(
             $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
@@ -711,25 +711,15 @@ internal static class SymbolicCliTextRenderer
     }
 }
 
-    private static IReadOnlyList<SymbolicConditionProofSummary> FilterConditionProofSummaries(
-    IReadOnlyList<SymbolicConditionProofSummary> proofs,
-    SymbolicCliOptions options)
+    private static IReadOnlyList<T> FilterConditionProofs<T>(
+    IReadOnlyList<T> proofs,
+    SymbolicCliOptions options,
+    Func<T, string> target)
 {
     if (!options.HasInvariantTargetFilter) return proofs;
 
     return proofs
-        .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
-        .ToArray();
-}
-
-    private static IReadOnlyList<SymbolicConditionProofResult> FilterConditionProofResults(
-    IReadOnlyList<SymbolicConditionProofResult> proofs,
-    SymbolicCliOptions options)
-{
-    if (!options.HasInvariantTargetFilter) return proofs;
-
-    return proofs
-        .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
+        .Where(proof => SymbolicInvariantTargetFilter.Matches(target(proof), options.InvariantTargets))
         .ToArray();
 }
 

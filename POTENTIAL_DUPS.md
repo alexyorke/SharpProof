@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Identical `FilterConditionProof*` methods - `SymbolicCliTextRenderer.cs:735,746`
-**Recommendation:** One generic `Filter<T>(IReadOnlyList<T>, SymbolicCliOptions, Func<T,string>)`.
-
 ### Duplicated capability-site prefix/detail formatting - `SymbolicCliTextRenderer.cs:274-277,356-359`
 **Recommendation:** `FormatSite(site)` helper.
 
