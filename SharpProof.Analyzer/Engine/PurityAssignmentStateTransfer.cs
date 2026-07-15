@@ -117,7 +117,7 @@ internal static partial class PurityAssignmentStateTransfer
         else if (operationToTrack is IVariableDeclaratorOperation variableDeclaratorOperation &&
                  variableDeclaratorOperation.Initializer?.Value is { } variableInitializer)
         {
-            nextState = PuritySymbolicStateFacts.AddDeclaredBorrowFact(
+            nextState = PurityOperationTransferAdapter.ApplyDeclaredBorrow(
                 nextState,
                 variableDeclaratorOperation.Symbol,
                 variableInitializer,
@@ -252,19 +252,14 @@ internal static partial class PurityAssignmentStateTransfer
                                 nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
                         }
 
-                        nextState = PuritySymbolicStateFacts.AddAssignedValueFact(
+                        nextState = PurityOperationTransferAdapter.ApplyAssignmentFacts(
                             nextState,
                             declaredSymbol,
                             initializerValue,
                             nextState,
                             context.SemanticModel,
                             context.CancellationToken);
-                        nextState = PuritySymbolicStateFacts.AddAssignedAliasFact(
-                            nextState,
-                            declaredSymbol,
-                            initializerValue,
-                            nextState);
-                        nextState = PuritySymbolicStateFacts.AddDeclaredBorrowFact(
+                        nextState = PurityOperationTransferAdapter.ApplyDeclaredBorrow(
                             nextState,
                             declaredSymbol,
                             initializerValue,
@@ -301,7 +296,7 @@ internal static partial class PurityAssignmentStateTransfer
         if (targetSymbol is IParameterSymbol parameterSymbol)
         {
             nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, definitionSyntax);
-            nextState = PuritySymbolicStateFacts.AddAssignedValueFact(
+            nextState = PurityOperationTransferAdapter.ApplyAssignmentFacts(
                 nextState,
                 parameterSymbol,
                 valueOperation,

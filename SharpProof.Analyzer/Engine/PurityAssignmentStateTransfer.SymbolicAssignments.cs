@@ -41,7 +41,7 @@ internal static partial class PurityAssignmentStateTransfer
                 disposedAliases,
                 valueOperation.Syntax,
                 PreservedAliasState.Disposed);
-            nextState = PuritySymbolicStateFacts.AddAssignedValueFact(
+            nextState = PurityOperationTransferAdapter.ApplyAssignmentFacts(
                 nextState,
                 writtenLocalSymbol,
                 valueOperation,
