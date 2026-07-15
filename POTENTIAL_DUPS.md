@@ -12,7 +12,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Lower-priority follow-ups
 
-- `SharpProof.Symbolic/SymbolicSourceCompilation.cs:10-78`, `Tools/SharpProof.Fuzz.Core/FuzzRunner.cs:546-584`, and `SharpProof.Analyzer/EffectSummaryMetadataSupport.cs:665-698` independently build trusted-platform references and source compilations. A shared reference/compilation-host factory with caller profiles could centralize cache, fallback, and de-duplication policy while preserving analyzer/fuzz differences.
 
 ## Follow-up audit (2026-07-14)
 
