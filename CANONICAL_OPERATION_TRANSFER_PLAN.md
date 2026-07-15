@@ -213,6 +213,8 @@ transfer policy after its slice is complete.
 | Ownership lifetime migration | `cf2fa67c` | 108,401 | +725 |
 | Tracked assignment deletion | `6fc4e26f` | 108,321 | +645 |
 | Purity symbolic query boundary | `fa94a63f` | 108,314 | +638 |
+| Exclusive lifetime policy migration | `fc30d99e` | 108,308 | +632 |
+| `as` assignment interpreter deletion | `c9b46a46` | 108,251 | +575 |
 
 ## Validation Ledger
 
@@ -233,15 +235,18 @@ transfer policy after its slice is complete.
 | Phase 2 ownership lifetime | Commit `cf2fa67c` routes fresh ownership, disposable acquisition, return, disposal, release, flow-capture ownership, preserved-alias lifetime, and caller-visible mutation facts through canonical events. The superseded 127-line ownership fact factory was deleted. Focused symbolic IR, resource, disposal, using, return, alias, and transfer tests: 221 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +725 production LOC. |
 | Phase 2 tracked assignment deletion | Commit `6fc4e26f` folds reference, length, collection, string, null-equivalence, and `as` postconditions into canonical assignment lowering and deletes the 168-line legacy tracked-assignment interpreter. A disposal-alias ordering regression was reproduced and fixed by applying alias evidence after target invalidation. Focused assignment/program-point/alias/resource tests: 140 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +645 production LOC. |
 | Phase 2 purity symbolic query boundary | Commit `fa94a63f` moves the final assignment, alias, and ref-borrow mutations out of `PuritySymbolicStateFacts`, shares one reference-relationship event adapter, and removes a duplicate declaration-alias application. `PuritySymbolicStateFacts` is now read-only. Focused alias/borrow/resource/purity tests: 66 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +638 production LOC. |
+| Phase 2 exclusive lifetime policy | Commit `fc30d99e` makes the kernel remove superseded ownership/disposal facts before return and dispose transitions; Analyzer resource code no longer filters symbolic facts. Focused transfer/resource/disposal tests: 62 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +632 production LOC. |
+| Phase 2 `as` assignment deletion | Commit `c9b46a46` routes Symbolic `as` assignments through the canonical runtime-type/null-condition pipeline with byte-stable provenance and deletes the 68-line syntax interpreter. Focused `as` query/analyzer tests: 28 passed; full MainSmtOracle lane: 573 passed. Total temporary migration scaffolding fell to +575 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
 - State: assignment, alias/borrow, invalidation, ownership, and resource lifetime
   families share canonical events; purity symbolic facts are now query-only.
-- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after removing the last
-  state-mutating methods from `PuritySymbolicStateFacts`.
-- Next cheapest step: finish deleting superseded resource/assignment transition
-  helpers while retaining only source discovery and evidence adapters.
+- Last confirmed fact: MainSmtAnalyzer passes 487/487 after centralizing exclusive
+  lifetime replacement, and MainSmtOracle passes 573/573 after deleting the `as`
+  assignment interpreter.
+- Next cheapest step: delete the next canonicalized reference/string/length
+  assignment branch while preserving its existing provenance and evidence keys.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
