@@ -69,6 +69,7 @@ internal static class SymbolicOperationLowerer
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
         var postconditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
+        {
             AddSymbolicNullableAssignmentPostconditions(
                 postconditions,
                 targetSymbol,
@@ -76,6 +77,14 @@ internal static class SymbolicOperationLowerer
                 targetContext,
                 valueContext,
                 provenance);
+            AddSymbolicTupleAssignmentPostconditions(
+                postconditions,
+                targetSymbol,
+                valueExpression,
+                targetContext,
+                valueContext,
+                provenance);
+        }
 
         if (TryCreateSymbolTerm(targetSymbol, targetContext, out var target))
         {
@@ -111,6 +120,14 @@ internal static class SymbolicOperationLowerer
                 valueContext,
                 provenance,
                 postconditionProfile);
+            if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
+                AddSymbolicFiniteArrayElementPostconditions(
+                    postconditions,
+                    targetSymbol,
+                    target,
+                    valueExpression,
+                    valueContext,
+                    provenance);
             var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
                 targetSymbol,
                 valueExpression,
@@ -450,7 +467,12 @@ internal static class SymbolicOperationLowerer
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SymbolicLoweringContext context,
-        string provenance)
+        string provenance,
+        ITypeSymbol? targetType = null,
+        string lengthSuffix = ".reference-backed-length",
+        string? countSuffix = ".reference-backed-count",
+        string stringSuffix = ".reference-backed-string",
+        string arrayDimensionSuffix = ".reference-backed-array-length")
     {
         if (target.Kind != SmtValueKind.Reference ||
             NullableFlowFacts.IsDefinitelyNullReferenceValue(
@@ -461,8 +483,8 @@ internal static class SymbolicOperationLowerer
 
         var typeInfo = context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken);
         var sourceType = typeInfo.Type;
-        var valueType = typeInfo.ConvertedType ?? sourceType;
-        if (sourceType != null &&
+        var valueType = targetType ?? typeInfo.ConvertedType ?? sourceType;
+        if (targetType == null && sourceType != null &&
             ShouldUseReferenceBackedSourceType(sourceType, valueType))
             valueType = sourceType;
         if (valueType == null) return ImmutableArray<SymbolicCondition>.Empty;
@@ -473,9 +495,10 @@ internal static class SymbolicOperationLowerer
             SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression),
             SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context),
             valueExpression,
-            provenance + ".reference-backed-length");
+            provenance + lengthSuffix);
 
-        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression) is
+        if (countSuffix != null &&
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression) is
                 { IsExact: true, Value: SymbolicCountTerm targetCount } &&
             GetExactListCreationCount(valueExpression, sourceType ?? valueType) is { } count)
             conditions.Add(ExactRelation(
@@ -483,7 +506,7 @@ internal static class SymbolicOperationLowerer
                 targetCount,
                 new SymbolicIntegerConstantTerm(count),
                 valueExpression,
-                provenance + ".reference-backed-count"));
+                provenance + countSuffix));
 
         if (valueType.SpecialType == SpecialType.System_String)
             AddEquality(
@@ -491,7 +514,7 @@ internal static class SymbolicOperationLowerer
                 SymbolicSemanticPipeline.ProjectStringContentTerm(target, valueExpression),
                 SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context),
                 valueExpression,
-                provenance + ".reference-backed-string");
+                provenance + stringSuffix);
 
         if (valueType is IArrayTypeSymbol { Rank: > 1 } arrayType)
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
@@ -503,9 +526,226 @@ internal static class SymbolicOperationLowerer
                         dimension,
                         context),
                     valueExpression,
-                    provenance + ".reference-backed-array-length");
+                    provenance + arrayDimensionSuffix);
 
         return conditions.ToImmutable();
+    }
+
+    private static void AddSymbolicFiniteArrayElementPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        SymbolicTerm target,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext valueContext,
+        string provenance)
+    {
+        if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+            !SymbolicFactFactory.TryGetValueKind(
+                arrayType.ElementType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
+                out var elementKind) ||
+            !SymbolicProgramPointFacts.TryGetFiniteElementExpressions(valueExpression, out var elementExpressions) ||
+            target.Kind != SmtValueKind.Reference)
+            return;
+
+        for (var index = 0; index < elementExpressions.Length; index++)
+        {
+            var elementExpression = elementExpressions[index];
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(
+                    elementExpression,
+                    targetSymbol,
+                    valueContext.SemanticModel,
+                    valueContext.CancellationToken) ||
+                SymbolicSemanticPipeline.LowerTerm(elementExpression, valueContext) is not
+                    { IsExact: true, Value: { } elementValue } ||
+                elementValue.Kind != elementKind)
+                continue;
+
+            var targetElement = new SymbolicElementTerm(
+                target,
+                new SymbolicIntegerConstantTerm(index),
+                elementKind);
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.Equal,
+                targetElement,
+                elementValue,
+                elementExpression,
+                provenance + ".finite-array-element"));
+            conditions.Add(ExactRelation(
+                SymbolicRelationOperator.Equal,
+                new SymbolicElementTerm(
+                    target,
+                    new SymbolicFromEndIndexTerm(
+                        new SymbolicIntegerConstantTerm(elementExpressions.Length - index)),
+                    elementKind),
+                elementValue,
+                elementExpression,
+                provenance + ".finite-array-element.from-end"));
+
+            if (elementKind == SmtValueKind.Reference &&
+                NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                    elementExpression,
+                    valueContext.SemanticModel,
+                    valueContext.CancellationToken))
+                conditions.Add(ExactRelation(
+                    SymbolicRelationOperator.NotEqual,
+                    targetElement,
+                    new SymbolicNullTerm(),
+                    elementExpression,
+                    provenance + ".finite-array-element.non-null"));
+        }
+    }
+
+    private static void AddSymbolicTupleAssignmentPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext targetContext,
+        SymbolicLoweringContext valueContext,
+        string provenance)
+    {
+        var unwrappedValue = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
+        if (unwrappedValue is TupleExpressionSyntax tupleExpression &&
+            TryGetTupleElementStorageNames(targetSymbol, tupleExpression.Arguments.Count, out var targetNames))
+        {
+            for (var index = 0; index < targetNames.Length; index++)
+            {
+                var elementExpression = tupleExpression.Arguments[index].Expression;
+                if (SymbolMutationFacts.ExpressionReferencesSymbol(
+                        elementExpression,
+                        targetSymbol,
+                        valueContext.SemanticModel,
+                        valueContext.CancellationToken) ||
+                    !TryCreateTupleElementTerm(targetSymbol, targetNames[index], targetContext, out var targetElement) ||
+                    !TryGetTupleElementType(targetSymbol, targetNames[index], out var elementType))
+                    continue;
+
+                if (elementType.SpecialType != SpecialType.System_String)
+                    AddEquality(
+                        conditions,
+                        targetElement,
+                        SymbolicSemanticPipeline.LowerTerm(elementExpression, valueContext),
+                        elementExpression,
+                        provenance + ".tuple-element.assigned-value");
+
+                if (targetElement.Kind == SmtValueKind.Reference &&
+                    NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                        elementExpression,
+                        valueContext.SemanticModel,
+                        valueContext.CancellationToken))
+                    conditions.Add(ExactRelation(
+                        SymbolicRelationOperator.NotEqual,
+                        targetElement,
+                        new SymbolicNullTerm(),
+                        elementExpression,
+                        provenance + ".tuple-element.assigned-non-null"));
+
+                conditions.AddRange(LowerSymbolicReferenceBackedPostconditions(
+                    targetElement,
+                    elementExpression,
+                    valueContext,
+                    provenance + ".tuple-element",
+                    elementType,
+                    ".assigned-length",
+                    countSuffix: null,
+                    ".assigned-string",
+                    ".assigned-dimension-length"));
+            }
+
+            return;
+        }
+
+        if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                unwrappedValue,
+                valueContext.SemanticModel,
+                valueContext.CancellationToken,
+                out var sourceSymbol) ||
+            SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
+            !TryGetTupleElementStorageNames(targetSymbol, 0, out var targetElementNames) ||
+            !TryGetTupleElementStorageNames(sourceSymbol, targetElementNames.Length, out var sourceElementNames))
+            return;
+
+        for (var index = 0; index < targetElementNames.Length; index++)
+            if (TryCreateTupleElementTerm(
+                    targetSymbol,
+                    targetElementNames[index],
+                    targetContext,
+                    out var targetElement) &&
+                TryCreateTupleElementTerm(
+                    sourceSymbol,
+                    sourceElementNames[index],
+                    valueContext,
+                    out var sourceElement) &&
+                SymbolicStateFactBuilder.CanCompareIrTerms(targetElement, sourceElement))
+                conditions.Add(ExactRelation(
+                    SymbolicRelationOperator.Equal,
+                    targetElement,
+                    sourceElement,
+                    valueExpression,
+                    provenance + ".tuple-element.snapshot"));
+    }
+
+    internal static bool TryGetTupleElementStorageNames(
+        ISymbol symbol,
+        int expectedCount,
+        out string[] elementNames)
+    {
+        elementNames = Array.Empty<string>();
+        if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not INamedTypeSymbol { IsTupleType: true } tupleType ||
+            expectedCount > 0 && tupleType.TupleElements.Length != expectedCount)
+            return false;
+
+        elementNames = new string[tupleType.TupleElements.Length];
+        for (var index = 0; index < elementNames.Length; index++)
+        {
+            var field = tupleType.TupleElements[index].CorrespondingTupleField ?? tupleType.TupleElements[index];
+            if (string.IsNullOrWhiteSpace(field.Name)) return false;
+            elementNames[index] = field.Name;
+        }
+
+        return true;
+    }
+
+    private static bool TryGetTupleElementType(
+        ISymbol tupleSymbol,
+        string elementName,
+        out ITypeSymbol elementType)
+    {
+        if (SymbolicFactFactory.GetTrackedSymbolType(tupleSymbol) is not INamedTypeSymbol { IsTupleType: true } tupleType)
+        {
+            elementType = null!;
+            return false;
+        }
+
+        var element = tupleType.TupleElements.FirstOrDefault(field =>
+            string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
+        elementType = element?.Type!;
+        return element != null;
+    }
+
+    internal static bool TryCreateTupleElementTerm(
+        ISymbol tupleSymbol,
+        string elementName,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+            !SymbolicFactFactory.TryGetValueKind(
+                elementType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
+                out var elementKind))
+        {
+            term = null!;
+            return false;
+        }
+
+        term = new SymbolicMemberTerm(
+            new SymbolicVariableTerm(context.GetVariableName(tupleSymbol), SmtValueKind.Reference),
+            elementName,
+            elementKind);
+        return true;
     }
 
     private static bool ShouldUseReferenceBackedSourceType(ITypeSymbol sourceType, ITypeSymbol? convertedType)

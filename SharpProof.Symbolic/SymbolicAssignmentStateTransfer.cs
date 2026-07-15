@@ -119,6 +119,7 @@ internal static class SymbolicAssignmentStateTransfer
              assignedType != null &&
              (SymbolicTypeFacts.IsSymbolicReferenceLikeType(assignedType) ||
               SymbolicTypeFacts.IsNullableType(assignedType) ||
+              assignedType is INamedTypeSymbol { IsTupleType: true } ||
               assignedType.SpecialType == SpecialType.System_Boolean ||
               SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
         {
@@ -202,32 +203,11 @@ internal static class SymbolicAssignmentStateTransfer
                          context,
                          provenanceRoot))
                 state = state.AddPathCondition(condition);
-        AddFiniteArrayElementAssignedValueStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot);
         AddRemainderAssignedRangeStateFacts(
             ref state,
             assignedSymbol,
             effectiveValueExpression,
             context,
-            provenanceRoot);
-        AddTupleElementAssignedValueStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot);
-        AddTupleElementSourceSymbolSnapshotStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
             provenanceRoot);
 
         if (throwGuardedValue.HasGuard)
@@ -354,74 +334,6 @@ internal static class SymbolicAssignmentStateTransfer
                      context,
                      provenanceRoot + ".member"))
             state = state.AddPathCondition(condition);
-    }
-
-    private static void AddFiniteArrayElementAssignedValueStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        if (SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
-            !TryGetValueKind(arrayType.ElementType, out var elementKind) ||
-            !SymbolicProgramPointFacts.TryGetFiniteElementExpressions(
-                valueExpression,
-                out var elementExpressions) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var receiver) ||
-            receiver.Kind != SmtValueKind.Reference)
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        for (var index = 0; index < elementExpressions.Length; index++)
-        {
-            var elementExpression = elementExpressions[index];
-            var lowering = SymbolicSemanticPipeline.LowerTerm(elementExpression, context);
-            if (SymbolMutationFacts.ExpressionReferencesSymbol(
-                    elementExpression,
-                    assignedSymbol,
-                    semanticModel,
-                    cancellationToken) ||
-                lowering is not { IsExact: true, Value: { } elementValue } ||
-                elementValue.Kind != elementKind)
-                continue;
-
-            var targetElement = new SymbolicElementTerm(
-                receiver,
-                new SymbolicIntegerConstantTerm(index),
-                elementKind);
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetElement,
-                elementValue,
-                elementExpression,
-                provenanceRoot + ".finite-array-element");
-
-            var targetFromEndElement = new SymbolicElementTerm(
-                receiver,
-                new SymbolicFromEndIndexTerm(
-                    new SymbolicIntegerConstantTerm(elementExpressions.Length - index)),
-                elementKind);
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetFromEndElement,
-                elementValue,
-                elementExpression,
-                provenanceRoot + ".finite-array-element.from-end");
-
-            if (elementKind == SmtValueKind.Reference &&
-                NullableFlowFacts.IsDefinitelyNotNullReferenceValue(elementExpression, semanticModel, cancellationToken))
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.NotEqual,
-                    targetElement,
-                    new SymbolicNullTerm(),
-                    elementExpression,
-                    provenanceRoot + ".finite-array-element.non-null");
-        }
     }
 
     private static void AddAssignedIntegerRangeStateFacts(
@@ -672,151 +584,6 @@ internal static class SymbolicAssignmentStateTransfer
         };
     }
 
-    private static void AddTupleElementAssignedValueStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        if (valueExpression is not TupleExpressionSyntax tupleExpression ||
-            !TryGetTupleElementStorageNames(assignedSymbol, tupleExpression.Arguments.Count, out var elementNames))
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        for (var index = 0; index < tupleExpression.Arguments.Count; index++)
-        {
-            var argumentExpression = tupleExpression.Arguments[index].Expression;
-            if (SymbolMutationFacts.ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken))
-                continue;
-
-            AddTupleElementAssignedValueStateFacts(
-                ref state,
-                assignedSymbol,
-                elementNames[index],
-                argumentExpression,
-                semanticModel,
-                cancellationToken,
-                context,
-                provenanceRoot + ".tuple-element");
-        }
-    }
-
-    private static void AddTupleElementAssignedValueStateFacts(
-        ref SymbolicState state,
-        ISymbol tupleSymbol,
-        string elementName,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SymbolicLoweringContext context,
-        string provenanceRoot)
-    {
-        if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
-            !TryCreateTupleElementTerm(tupleSymbol, elementName, out var targetTerm))
-            return;
-
-        if (elementType.SpecialType == SpecialType.System_String)
-        {
-            if (SymbolicSemanticPipeline.ProjectStringContentTerm(targetTerm, valueExpression) is
-                    { IsExact: true, Value: { } targetString } &&
-                SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
-                    { IsExact: true, Value: { } valueString })
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.Equal,
-                    targetString,
-                    valueString,
-                    valueExpression,
-                    provenanceRoot + ".assigned-string");
-        }
-        else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
-                 { IsExact: true, Value: { } valueTerm } &&
-                 CanCompareIrTerms(targetTerm, valueTerm))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetTerm,
-                valueTerm,
-                valueExpression,
-                provenanceRoot + ".assigned-value");
-
-        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(valueExpression, semanticModel, cancellationToken) &&
-            targetTerm.Kind == SmtValueKind.Reference)
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                targetTerm,
-                new SymbolicNullTerm(),
-                valueExpression,
-                provenanceRoot + ".assigned-non-null");
-
-        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(elementType, targetTerm, valueExpression) is
-                { IsExact: true, Value: { } targetLength } &&
-            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
-                { IsExact: true, Value: { } valueLength } &&
-            CanCompareIrTerms(targetLength, valueLength))
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetLength,
-                valueLength,
-                valueExpression,
-                provenanceRoot + ".assigned-length");
-
-        if (targetTerm.Kind == SmtValueKind.Reference &&
-            elementType is IArrayTypeSymbol { Rank: > 1 } arrayType)
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-                if (SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(
-                        valueExpression,
-                        dimension,
-                        context) is { IsExact: true, Value: { } dimensionLength })
-                    AddRelationPathFact(
-                        ref state,
-                        SymbolicRelationOperator.Equal,
-                        new SymbolicArrayDimensionLengthTerm(targetTerm, dimension),
-                        dimensionLength,
-                        valueExpression,
-                        provenanceRoot + ".assigned-dimension-length");
-    }
-
-    private static void AddTupleElementSourceSymbolSnapshotStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression),
-                semanticModel,
-                cancellationToken,
-                out var sourceSymbol) ||
-            SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol) ||
-            !TryGetTupleElementStorageNames(assignedSymbol, 0, out var targetElementNames) ||
-            !TryGetTupleElementStorageNames(sourceSymbol, targetElementNames.Length, out var sourceElementNames))
-            return;
-
-        for (var index = 0; index < targetElementNames.Length; index++)
-        {
-            if (!TryCreateTupleElementTerm(assignedSymbol, targetElementNames[index], out var targetElement) ||
-                !TryCreateTupleElementTerm(sourceSymbol, sourceElementNames[index], out var sourceElement) ||
-                !CanCompareIrTerms(targetElement, sourceElement))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetElement,
-                sourceElement,
-                valueExpression,
-                provenanceRoot + ".tuple-element.snapshot");
-        }
-    }
-
     internal static bool TryHandleTupleAssignmentState(
         ref SymbolicState state,
         AssignmentExpressionSyntax assignment,
@@ -907,7 +674,10 @@ internal static class SymbolicAssignmentStateTransfer
                 semanticModel,
                 cancellationToken,
                 out var sourceSymbol) ||
-            !TryGetTupleElementStorageNames(sourceSymbol, targetSymbols.Count, out var sourceElementNames))
+            !SymbolicOperationLowerer.TryGetTupleElementStorageNames(
+                sourceSymbol,
+                targetSymbols.Count,
+                out var sourceElementNames))
             return;
 
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(targetSymbols.Count);
@@ -915,7 +685,11 @@ internal static class SymbolicAssignmentStateTransfer
         {
             if (targetSymbols[index] == null ||
                 !TryCreateSymbolTerm(targetSymbols[index]!, out var targetTerm) ||
-                !TryCreateTupleElementTerm(sourceSymbol, sourceElementNames[index], out var sourceElementTerm) ||
+                !SymbolicOperationLowerer.TryCreateTupleElementTerm(
+                    sourceSymbol,
+                    sourceElementNames[index],
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var sourceElementTerm) ||
                 !CanCompareIrTerms(targetTerm, sourceElementTerm))
                 continue;
 
@@ -1040,79 +814,6 @@ internal static class SymbolicAssignmentStateTransfer
             value,
             assignment,
             "ir.path.prior-statement.element-assignment");
-    }
-
-    private static bool TryGetTupleElementStorageNames(
-        ISymbol assignedSymbol,
-        int expectedCount,
-        out string[] elementNames)
-    {
-        elementNames = Array.Empty<string>();
-        var type = assignedSymbol switch
-        {
-            ILocalSymbol localSymbol => localSymbol.Type,
-            IParameterSymbol parameterSymbol => parameterSymbol.Type,
-            _ => null
-        };
-
-        if (type is not INamedTypeSymbol { IsTupleType: true } tupleType ||
-            (expectedCount > 0 &&
-             tupleType.TupleElements.Length != expectedCount))
-            return false;
-
-        elementNames = new string[tupleType.TupleElements.Length];
-        for (var index = 0; index < tupleType.TupleElements.Length; index++)
-        {
-            var field = tupleType.TupleElements[index].CorrespondingTupleField ?? tupleType.TupleElements[index];
-            if (string.IsNullOrWhiteSpace(field.Name)) return false;
-
-            elementNames[index] = field.Name;
-        }
-
-        return true;
-    }
-
-    private static bool TryGetTupleElementType(
-        ISymbol tupleSymbol,
-        string elementName,
-        out ITypeSymbol elementType)
-    {
-        var type = SymbolicFactFactory.GetTrackedSymbolType(tupleSymbol);
-        if (type is not INamedTypeSymbol { IsTupleType: true } tupleType)
-        {
-            elementType = null!;
-            return false;
-        }
-
-        var element = tupleType.TupleElements
-            .FirstOrDefault(field =>
-                string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
-        if (element == null)
-        {
-            elementType = null!;
-            return false;
-        }
-
-        elementType = element.Type;
-        return true;
-    }
-
-    private static bool TryCreateTupleElementTerm(
-        ISymbol tupleSymbol,
-        string elementName,
-        out SymbolicTerm term)
-    {
-        if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
-            !TryGetValueKind(elementType, out var elementKind))
-        {
-            term = null!;
-            return false;
-        }
-
-        var tuple = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(tupleSymbol),
-            SmtValueKind.Reference);
-        term = new SymbolicMemberTerm(tuple, elementName, elementKind);
-        return true;
     }
 
     internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)
