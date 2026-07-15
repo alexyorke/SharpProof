@@ -4,9 +4,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Analyzer
 
-4. **Exception-flow diagnostic envelope** - `SharpProof.Analyzer/ExceptionFlowAnalyzer.cs:105-263`; `SharpProof.Analyzer/ExceptionFlowAnalyzer.Contracts.cs:67-112`
-   Summary, unknown-hazard, uncaught-site, and contract-violation paths all derive locations, add baseline/explain evidence, create a diagnostic, and report it. A focused exception diagnostic factory would reduce evidence-schema drift.
-
 5. **Switch condition proof pipeline** - `SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchExpressions.cs:10-34`; `SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchStatements.cs:28-55`
    Both locate the containing construct, build a symbolic condition, then prove it always false. Share the pipeline with callbacks for arm/section lookup, condition creation, and the statement-only goto exemption.
 
