@@ -251,6 +251,7 @@ transfer policy after its slice is complete.
 | Canonical indexing hazards | `1562e72f` | 107,017 | -659 |
 | Canonical slicing bounds hazards | `2b86726f` | 107,029 | -647 |
 | Canonical runtime-type hazards | `39e7368a` | 106,918 | -758 |
+| Canonical throw and switch hazards | `5fb606aa` | 106,923 | -753 |
 
 ## Validation Ledger
 
@@ -307,20 +308,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical indexing hazards | Commit `1562e72f` lowers built-in element access, safe `Math.Abs` modulo indexes, multidimensional array access, and `Array.GetValue` bounds through canonical hazard operations and deletes four legacy index trigger builders. Focused descriptor, semantic-oracle, exception, authoring, and unknown-hazard tests: 259 passed. Production LOC fell by 79 lines to 107,017, or -659 from the rewrite start. |
 | Phase 4 canonical slicing bounds hazards | Commit `2b86726f` moves slicing and `Index` construction argument-range semantics into canonical hazard operations. Together with the relational and indexing slices, all indexing, range, collection-cardinality, negative-length, and array-bounds preconditions now have typed operation owners; array-store mismatch remains correctly grouped with the following cast/type-compatibility family. Focused tests: 259 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The completed bounds batch is net -67 lines from its 107,096 checkpoint; production LOC is 107,029, or -647 from the rewrite start. |
 | Phase 4 canonical runtime-type hazards | Commit `39e7368a` moves invalid reference casts, unboxing mismatches, and covariant array-store mismatches into canonical operation lowering while preserving exact runtime-type checks, null behavior, unsupported subjects, bounds guards, and evidence provenance. The three legacy trigger/candidate semantic blocks were deleted. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. Production LOC fell by 111 lines to 106,918, or -758 from the rewrite start. |
+| Phase 4 canonical throw and switch hazards | Commit `5fb606aa` moves direct throw, rethrow, throw-null partitioning, and switch-expression no-match into canonical operation lowering and deletes both legacy trigger owners. The focused gate exposed and fixed an immutable-builder capacity bug in single-hazard throws before commit. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. The five-line bridge raises production LOC to 106,923, or -753 from the rewrite start, and must be repaid by final framework-model and trigger-factory deletion. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 and 3 are gated. The first three Phase 4 items are complete;
   arithmetic, null-family, and all bounds/cardinality hazards emit typed
-  operations. Cast/type compatibility is now canonical; switch, direct-throw,
-  argument, and remaining framework-model preconditions use legacy triggers.
-- Last confirmed fact: runtime-type migration passes 258 focused tests and
-  removes 111 production lines. Production LOC is 106,918, or -758 from the
+  operations. Cast/type compatibility, switch-no-match, direct throw, and
+  rethrow are canonical; remaining argument/framework models use legacy paths.
+- Last confirmed fact: throw/switch migration passes 258 focused tests after a
+  pre-commit builder-capacity fix. Production LOC is 106,923, or -753 from the
   rewrite start; the preceding full lanes remain Oracle 573/573, Analyzer
   487/487, and Flow 256 plus only the documented SP0010 baseline failure.
-- Next cheapest step: migrate direct-throw and switch-no-match together, then
-  group the remaining framework/argument models by shared relational or null
-  lowering and delete their legacy trigger builders.
+- Next cheapest step: inventory the residual legacy trigger calls, group the
+  remaining argument/framework models by relational, null, and type policy,
+  migrate them, and delete any now-empty trigger owners.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
