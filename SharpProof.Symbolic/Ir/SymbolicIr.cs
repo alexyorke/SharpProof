@@ -278,6 +278,9 @@ internal sealed class SymbolicState
 
     public string NormalizedProofKey { get; }
 
+    public SymbolicState MarkContradictory() =>
+        new(Facts, PathConditions, SymbolVersions, isContradictory: true);
+
     public SymbolicState AddFact(SymbolicFact fact)
     {
         if (fact == null) throw new ArgumentNullException(nameof(fact));

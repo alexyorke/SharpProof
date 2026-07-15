@@ -50,6 +50,12 @@ internal static class SymbolicOperationTransferKernel
                 if (loop.Condition != null) state = state.AddPathCondition(loop.Condition);
                 continue;
             }
+            if (operation is SymbolicCompletionOperation completion)
+            {
+                if (completion.CompletionKind != SymbolicCompletionKind.Normal)
+                    state = state.MarkContradictory();
+                continue;
+            }
 
             return SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -162,6 +168,16 @@ internal static class SymbolicOperationTransferKernel
                 kind,
                 condition,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
+
+    internal static SymbolicOperationTransitionResult Complete(
+        SymbolicState state,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) =>
+        Apply(
+            state,
+            SymbolicOperationSequence.Single(new SymbolicCompletionOperation(
+                SymbolicCompletionKind.NoFallthrough,
+                null,
+                new SymbolicOperationOrigin(sourceSpan, 0, "operation-transfer.no-fallthrough"))));
 
     private static bool TryApplyAssignment(
         ref SymbolicState state,

@@ -7,15 +7,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicStateFactBuilder
 {
-    internal static SymbolicState MarkContradictory(SymbolicState state)
-    {
-        return new SymbolicState(
-            state.Facts,
-            state.PathConditions,
-            state.SymbolVersions,
-            true);
-    }
-
     internal static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term)
     {
         if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||

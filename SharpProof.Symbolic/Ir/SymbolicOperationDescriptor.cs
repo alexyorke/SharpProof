@@ -50,6 +50,7 @@ internal enum SymbolicLoopEdgeKind
 internal enum SymbolicCompletionKind
 {
     Normal,
+    NoFallthrough,
     Return,
     Throw,
     Break,

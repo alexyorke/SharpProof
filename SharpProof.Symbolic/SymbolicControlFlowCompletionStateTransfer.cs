@@ -17,7 +17,7 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         if (TryGetConditionalLoop(statement, out var loopBody, out var condition))
         {
             if (SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
-                state = MarkContradictory(state);
+                state = SymbolicOperationTransferKernel.Complete(state, statement.Span).State;
             else
                 AddCompletedConditionalLoopStateFacts(
                     ref state,

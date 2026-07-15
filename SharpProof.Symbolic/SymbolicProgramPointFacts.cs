@@ -589,14 +589,16 @@ internal static class SymbolicProgramPointFacts
     {
         if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken))
         {
-            if (!isNull) state = MarkContradictory(state);
+            if (!isNull)
+                state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
 
             return;
         }
 
         if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken))
         {
-            if (isNull) state = MarkContradictory(state);
+            if (isNull)
+                state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
 
             return;
         }

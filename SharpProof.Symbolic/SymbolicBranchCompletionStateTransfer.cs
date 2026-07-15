@@ -24,7 +24,7 @@ internal static class SymbolicBranchCompletionStateTransfer
 
         if (trueBranchExits && falseBranchExits)
         {
-            state = MarkContradictory(stateBeforeStatement);
+            state = SymbolicOperationTransferKernel.Complete(stateBeforeStatement, ifStatement.Span).State;
             return;
         }
 

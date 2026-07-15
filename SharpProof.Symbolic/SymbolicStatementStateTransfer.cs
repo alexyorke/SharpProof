@@ -599,7 +599,7 @@ internal static class SymbolicStatementStateTransfer
 
         if (completionStates.Count == 0)
         {
-            state = MarkContradictory(entryState);
+            state = SymbolicOperationTransferKernel.Complete(entryState, tryStatement.Span).State;
             return;
         }
 
@@ -612,7 +612,7 @@ internal static class SymbolicStatementStateTransfer
                 semanticModel,
                 cancellationToken);
             if (SymbolicControlFlowFacts.StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
-                state = MarkContradictory(state);
+                state = SymbolicOperationTransferKernel.Complete(state, finallyBlock.Span).State;
         }
 
         foreach (var hiddenSymbol in SymbolicBranchCompletionStateTransfer.GetLocalsDeclaredInside(
