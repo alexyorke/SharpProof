@@ -45,7 +45,8 @@ internal static class SymbolicOperationTransferAdapter
         int sequence = 0,
         string provenance = "operation-lowering.assignment",
         string? bindingProvenance = null,
-        string? evidenceKey = null)
+        string? evidenceKey = null,
+        string? asExpressionProvenanceRoot = null)
     {
         var targetContext = new SymbolicLoweringContext(
             semanticModel,
@@ -64,7 +65,8 @@ internal static class SymbolicOperationTransferAdapter
             sequence,
             provenance,
             bindingProvenance,
-            evidenceKey);
+            evidenceKey,
+            asExpressionProvenanceRoot);
         return ApplyLowering(state, lowering);
     }
 

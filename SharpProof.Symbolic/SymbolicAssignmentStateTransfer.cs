@@ -111,10 +111,14 @@ internal static class SymbolicAssignmentStateTransfer
 
         var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var isAsExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
+            effectiveValueExpression) is BinaryExpressionSyntax asExpression &&
+            asExpression.IsKind(SyntaxKind.AsExpression);
         if (!isSelfReferential &&
-            assignedType != null &&
-            (assignedType.SpecialType == SpecialType.System_Boolean ||
-             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType)) &&
+            (isAsExpression ||
+             assignedType != null &&
+             (assignedType.SpecialType == SpecialType.System_Boolean ||
+              SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))) &&
             semanticModel.GetOperation(effectiveValueExpression, cancellationToken) is { } valueOperation)
         {
             var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
@@ -125,7 +129,8 @@ internal static class SymbolicAssignmentStateTransfer
                 semanticModel,
                 cancellationToken,
                 provenance: provenanceRoot,
-                bindingProvenance: provenanceRoot + ".assigned-value");
+                bindingProvenance: provenanceRoot + ".assigned-value",
+                asExpressionProvenanceRoot: provenanceRoot + ".as");
             if (transition.IsExact)
                 state = transition.State;
         }
@@ -266,13 +271,6 @@ internal static class SymbolicAssignmentStateTransfer
             assignedSymbol,
             effectiveValueExpression,
             context,
-            provenanceRoot);
-        AddAssignedAsExpressionStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
             provenanceRoot);
         AddAssignedLengthStateFacts(
             ref state,
@@ -1167,75 +1165,6 @@ internal static class SymbolicAssignmentStateTransfer
             (false, SymbolicRelationOperator.Equal) => requireStrictlyPositive ? constant > 0 : constant >= 0,
             _ => false
         };
-    }
-
-    private static void AddAssignedAsExpressionStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        if (valueExpression is not BinaryExpressionSyntax asExpression ||
-            !asExpression.IsKind(SyntaxKind.AsExpression) ||
-            asExpression.Right is not TypeSyntax typeSyntax ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetTerm) ||
-            targetTerm.Kind != SmtValueKind.Reference)
-            return;
-
-        var targetType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var sourceLowering = SymbolicSemanticPipeline.LowerTerm(asExpression.Left, context);
-        if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
-            sourceLowering is not { IsExact: true, Value: { } source } ||
-            source.Kind != SmtValueKind.Reference)
-            return;
-
-        var targetIsNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                targetTerm,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".as.target-null"));
-        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                targetTerm,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".as.target-non-null"));
-        var sourceNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                source,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".as.source-non-null"));
-        var runtimeTypeTest = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicTypeTestAtom(source, typeKey),
-            valueExpression,
-            provenanceRoot + ".as.runtime-type",
-            evidenceKey: provenanceRoot + ".as.runtime-type"));
-
-        state = state.AddPathCondition(new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull,
-            sourceNonNull));
-        state = state.AddPathCondition(new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull,
-            runtimeTypeTest));
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(new SymbolicBinaryCondition(SymbolicConditionOperator.And, sourceNonNull,
-                runtimeTypeTest)),
-            targetNonNull));
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(new SymbolicBinaryCondition(
-                SymbolicConditionOperator.And,
-                sourceNonNull,
-                new SymbolicNotCondition(runtimeTypeTest))),
-            targetIsNull));
     }
 
     private static void AddAssignedStringStateFacts(

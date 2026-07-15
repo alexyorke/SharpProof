@@ -77,7 +77,8 @@ internal static class SymbolicSemanticPipeline
         ISymbol targetSymbol,
         ExpressionSyntax valueExpression,
         SymbolicLoweringContext context,
-        Func<ISymbol, int>? getTargetSymbolVersion = null)
+        Func<ISymbol, int>? getTargetSymbolVersion = null,
+        string provenanceRoot = "ir.as")
     {
         valueExpression = CSharpSyntaxFacts.UnwrapParentheses(valueExpression);
         var targetContext = new SymbolicLoweringContext(
@@ -107,24 +108,24 @@ internal static class SymbolicSemanticPipeline
             target,
             new SymbolicNullTerm(),
             valueExpression,
-            "ir.as.target-null");
+            provenanceRoot + ".target-null");
         var targetNonNull = CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             target,
             new SymbolicNullTerm(),
             valueExpression,
-            "ir.as.target-non-null");
+            provenanceRoot + ".target-non-null");
         var sourceNonNull = CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             source,
             new SymbolicNullTerm(),
             valueExpression,
-            "ir.as.source-non-null");
+            provenanceRoot + ".source-non-null");
         var runtimeTypeTest = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicTypeTestAtom(source, typeKey),
             valueExpression,
-            "ir.as.runtime-type",
-            evidenceKey: "ir.as.runtime-type"));
+            provenanceRoot + ".runtime-type",
+            evidenceKey: provenanceRoot + ".runtime-type"));
         var conditions = new SymbolicCondition[]
         {
             new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),

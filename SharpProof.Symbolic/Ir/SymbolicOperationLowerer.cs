@@ -55,7 +55,8 @@ internal static class SymbolicOperationLowerer
         int sequence,
         string provenance,
         string? bindingProvenance = null,
-        string? evidenceKey = null)
+        string? evidenceKey = null,
+        string? asExpressionProvenanceRoot = null)
     {
         if (!TryCreateSymbolTerm(targetSymbol, targetContext, out var target) ||
             valueOperation.Syntax is not ExpressionSyntax valueExpression)
@@ -68,7 +69,12 @@ internal static class SymbolicOperationLowerer
             _ => SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext)
         };
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
-        if (value is { IsExact: true, Value: { } sourceTerm } &&
+        var suppressCanonicalAsValueBinding = asExpressionProvenanceRoot != null &&
+                                              CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
+                                                  valueExpression) is BinaryExpressionSyntax candidateAsExpression &&
+                                              candidateAsExpression.IsKind(SyntaxKind.AsExpression);
+        if (!suppressCanonicalAsValueBinding &&
+            value is { IsExact: true, Value: { } sourceTerm } &&
             SymbolicStateFactBuilder.CanCompareIrTerms(target, sourceTerm))
             bindings.Add(new SymbolicAssignmentBinding(
                 SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
@@ -89,7 +95,8 @@ internal static class SymbolicOperationLowerer
             targetSymbol,
             valueExpression,
             valueContext,
-            targetContext.GetSymbolVersion);
+            targetContext.GetSymbolVersion,
+            asExpressionProvenanceRoot ?? "ir.as");
         if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
             postconditions.AddRange(asExpressionState.PathConditions);
         if (bindings.Count == 0 && postconditions.Count == 0)
