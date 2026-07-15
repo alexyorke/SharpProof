@@ -230,8 +230,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
     through the CFG collector and canonical assignment transition; return typed
     `Unsupported` for branch, cycle, target, or operation shapes that have not
     migrated, preserving the structural collector as the fallback.
-  - [ ] Add canonical successor assumptions, state merging, bounded revisits,
-    completion edges, and finally continuations.
+  - [x] Add canonical successor assumptions and guarded state merging for
+    acyclic branches. Branch-condition mutation falls back to common-state
+    merging; branch-local target queries remain on the structural collector
+    until capture/version snapshots migrate.
+  - [ ] Add bounded revisits, completion edges, and finally continuations.
 - [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
@@ -371,6 +374,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Resolved invariant scope-adapter finding | `cee2af96` | 105,707 | -1,969 |
 | Semantic-search residual adapter deletion | `6773fdc0` | 105,585 | -2,091 |
 | Phase 7 straight-line CFG collector | `1b67e81a` | 105,762 | -1,914 |
+| Phase 7 acyclic CFG branch transfer | `c5e685d3` | 105,970 | -1,706 |
 
 ## Validation Ledger
 
@@ -498,6 +502,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 6 duplicate-report completion | Every remaining merged-audit item now has a green implementation or an evidence-backed intentional/stale disposition in this ledger. The empty `POTENTIAL_DUPS.md` scaffolding is deleted. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 bounded semantic-search stop gate | Two `colgrep --force-cpu` batches were inspected against production code. Batch 1 found 46 safely removable lines in two generic operation wrappers; commit `6773fdc0` deletes them and keeps the same characterization on the direct lowerer-plus-kernel path, with all 40 operation-transfer model fixtures green. Batch 2 found no >=50-line safe deletion: the catalog hits are required data, option parsing is already registry-driven, and the remaining Analyzer/encoder switches carry distinct policy. Production LOC fell to 105,585, or -2,091 from the rewrite start; tracked test LOC is 142,479. |
 | Phase 7 straight-line CFG collector | Commit `1b67e81a` adds a production-routed CFG/`IOperation` collector for direct local/parameter declarations and simple assignments. It returns typed `Unsupported` for unmigrated control-flow and operation shapes, so the structural engine remains the conservative fallback. Four normalized-state differential cases plus the explicit branch-fallback case pass; the complete program-point and operation-transfer batch passes 120/120. Release Symbolic warning-as-error build: zero warnings. This first migration scaffold raises production LOC to 105,762, or -1,914 from the rewrite start, and test LOC to 142,534. |
+| Phase 7 acyclic CFG branch transfer | Commit `c5e685d3` adds typed true/false successor assumptions, an acyclic worklist, guarded canonical joins, and condition-mutation detection. A path-snapshot regression was reproduced in the broader gate; branch-local targets now fall back until capture/version lowering migrates, while post-join queries use the canonical path. Direct collector fixtures pass 8/8; the path/program-point/transfer batch passes 153/153; full MainSmtOracle passes 573/573; Release Symbolic warning-as-error build has zero warnings. The branch scaffold raises production LOC to 105,970, or -1,706 from the rewrite start, and test LOC to 142,590; it must be repaid with the structural branch-transfer deletion. |
 
 ## Current Checkpoint
 
@@ -560,13 +565,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   50 safely removable production lines; their only accepted residual wrappers
   are deleted, so the plan's secondary-work stop condition is met.
 - Last confirmed fact: all 8,583 lines in the legacy deletion-map family are
-  reachable. Commit `1b67e81a` now production-routes the first straight-line
-  declaration/assignment slice with conservative fallback. The 120-case focused
-  gate and warning-as-error Symbolic build pass. Test LOC is 142,534; production
-  LOC is 105,762, or -1,914 from the rewrite start; the 177-line scaffold must be
-  repaid when structural transfer paths are deleted.
-- Next cheapest step: add successor branch assumptions and bounded CFG state
-  merging, first for acyclic `if`/conditional flow, with normalized-state parity
-  before routing those sites away from the structural collector.
+  reachable. Commits `1b67e81a` and `c5e685d3` production-route straight-line
+  assignment and post-join acyclic branch states through canonical CFG events.
+  Branch-local target queries, back-edges, finally regions, unsupported
+  operations, and completion shapes still fall back. MainSmtOracle passes
+  573/573 and the warning-as-error Symbolic build is clean. Test LOC is 142,590;
+  production LOC is 105,970, or -1,706 from the rewrite start; the 385-line
+  scaffold must be repaid when structural transfer paths are deleted.
+- Next cheapest step: move direct fact/condition insertion for method entry and
+  normal completion behind canonical descriptors, then add bounded loop revisits
+  without reintroducing syntax-owned mutation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
