@@ -1478,84 +1478,49 @@ internal sealed class Z3RegexTranslator
         return char.IsLetterOrDigit(value) || value == '_';
     }
 
-    private readonly struct RegexLookaheadAssertion
+    private readonly struct RegexLookaheadAssertion(ReExpr regex, bool isPositive, bool isExact)
     {
-        public RegexLookaheadAssertion(ReExpr regex, bool isPositive, bool isExact)
-        {
-            Regex = regex;
-            IsPositive = isPositive;
-            IsExact = isExact;
-        }
+        public ReExpr Regex { get; } = regex;
 
-        public ReExpr Regex { get; }
+        public bool IsPositive { get; } = isPositive;
 
-        public bool IsPositive { get; }
-
-        public bool IsExact { get; }
+        public bool IsExact { get; } = isExact;
     }
 
-    private readonly struct CharacterClassPart
+    private readonly struct CharacterClassPart(
+        ReExpr regex,
+        char? exactCharacter,
+        bool isApproximation,
+        CharacterRange[]? ranges)
     {
-        public CharacterClassPart(
-            ReExpr regex,
-            char? exactCharacter,
-            bool isApproximation,
-            CharacterRange[]? ranges)
-        {
-            Regex = regex;
-            ExactCharacter = exactCharacter;
-            IsApproximation = isApproximation;
-            Ranges = ranges;
-        }
-
-        public ReExpr Regex { get; }
-        public char? ExactCharacter { get; }
-        public bool IsApproximation { get; }
-        public CharacterRange[]? Ranges { get; }
+        public ReExpr Regex { get; } = regex;
+        public char? ExactCharacter { get; } = exactCharacter;
+        public bool IsApproximation { get; } = isApproximation;
+        public CharacterRange[]? Ranges { get; } = ranges;
     }
 
-    private readonly struct RegexClassTranslation
+    private readonly struct RegexClassTranslation(ReExpr regex, bool isExact, CharacterRange[]? ranges)
     {
-        public RegexClassTranslation(ReExpr regex, bool isExact, CharacterRange[]? ranges)
-        {
-            Regex = regex;
-            IsExact = isExact;
-            Ranges = ranges;
-        }
+        public ReExpr Regex { get; } = regex;
 
-        public ReExpr Regex { get; }
+        public bool IsExact { get; } = isExact;
 
-        public bool IsExact { get; }
-
-        public CharacterRange[]? Ranges { get; }
+        public CharacterRange[]? Ranges { get; } = ranges;
     }
 
-    private readonly struct CharacterRange
+    private readonly struct CharacterRange(char start, char end)
     {
-        public CharacterRange(char start, char end)
-        {
-            Start = start;
-            End = end;
-        }
+        public char Start { get; } = start;
 
-        public char Start { get; }
-
-        public char End { get; }
+        public char End { get; } = end;
     }
 
-    private readonly struct RegexOptionScope
+    private readonly struct RegexOptionScope(bool ignorePatternWhitespace, bool singleline, bool ignoreCase)
     {
-        public RegexOptionScope(bool ignorePatternWhitespace, bool singleline, bool ignoreCase)
-        {
-            IgnorePatternWhitespace = ignorePatternWhitespace;
-            Singleline = singleline;
-            IgnoreCase = ignoreCase;
-        }
+        public bool IgnorePatternWhitespace { get; } = ignorePatternWhitespace;
 
-        public bool IgnorePatternWhitespace { get; }
+        public bool Singleline { get; } = singleline;
 
-        public bool Singleline { get; }
-
-        public bool IgnoreCase { get; }
+        public bool IgnoreCase { get; } = ignoreCase;
     }
 }

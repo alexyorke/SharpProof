@@ -1609,19 +1609,12 @@ internal sealed class SmtConcreteFactPreprocessor
         EndsWith
     }
 
-    private readonly struct StringPredicateFact
+    private readonly struct StringPredicateFact(StringPredicateKind kind, SmtFormula value, SmtFormula argument)
     {
-        public StringPredicateFact(StringPredicateKind kind, SmtFormula value, SmtFormula argument)
-        {
-            Kind = kind;
-            Value = value;
-            Argument = argument;
-        }
+        public StringPredicateKind Kind { get; } = kind;
 
-        public StringPredicateKind Kind { get; }
+        public SmtFormula Value { get; } = value;
 
-        public SmtFormula Value { get; }
-
-        public SmtFormula Argument { get; }
+        public SmtFormula Argument { get; } = argument;
     }
 }
