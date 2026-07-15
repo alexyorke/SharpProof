@@ -14,89 +14,23 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (statement is WhileStatementSyntax or ForStatementSyntax or DoStatementSyntax &&
-            SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+        if (TryGetConditionalLoop(statement, out var loopBody, out var condition))
         {
-            state = MarkContradictory(state);
+            if (SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+                state = MarkContradictory(state);
+            else
+                AddCompletedConditionalLoopStateFacts(
+                    ref state,
+                    statement,
+                    loopBody,
+                    condition,
+                    semanticModel,
+                    cancellationToken);
             return;
         }
 
         switch (statement)
         {
-            case WhileStatementSyntax whileStatement
-                when CanAssumeLoopConditionFalseAfterNormalExit(whileStatement, whileStatement.Statement):
-                SymbolicProgramPointFacts.AddReachabilityCondition(
-                    ref state,
-                    whileStatement.Condition,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-                AddLoopBodyInvariantStateFacts(ref state, whileStatement, semanticModel, cancellationToken);
-                break;
-            case WhileStatementSyntax whileStatement
-                when TryCreateGuardedBreakLoopExitSymbolicCondition(
-                    whileStatement,
-                    whileStatement.Statement,
-                    whileStatement.Condition,
-                    semanticModel,
-                    cancellationToken,
-                    out var exitCondition):
-                state = state.AddPathCondition(exitCondition);
-                AddLoopBodyInvariantStateFacts(ref state, whileStatement, semanticModel, cancellationToken);
-                break;
-            case ForStatementSyntax { Condition: { } condition } forStatement
-                when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
-                SymbolicProgramPointFacts.AddReachabilityCondition(
-                    ref state,
-                    condition,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-                break;
-            case ForStatementSyntax { Condition: { } condition } forStatement
-                when TryCreateGuardedBreakLoopExitSymbolicCondition(
-                    forStatement,
-                    forStatement.Statement,
-                    condition,
-                    semanticModel,
-                    cancellationToken,
-                    out var exitCondition):
-                state = state.AddPathCondition(exitCondition);
-                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-                break;
-            case ForStatementSyntax { Condition: null } forStatement
-                when TryCreateGuardedBreakLoopExitSymbolicCondition(
-                    forStatement,
-                    forStatement.Statement,
-                    null,
-                    semanticModel,
-                    cancellationToken,
-                    out var exitCondition):
-                state = state.AddPathCondition(exitCondition);
-                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-                break;
-            case DoStatementSyntax doStatement
-                when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
-                SymbolicProgramPointFacts.AddReachabilityCondition(
-                    ref state,
-                    doStatement.Condition,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-                AddLoopBodyInvariantStateFacts(ref state, doStatement, semanticModel, cancellationToken);
-                break;
-            case DoStatementSyntax doStatement
-                when TryCreateGuardedBreakLoopExitSymbolicCondition(
-                    doStatement,
-                    doStatement.Statement,
-                    doStatement.Condition,
-                    semanticModel,
-                    cancellationToken,
-                    out var exitCondition):
-                state = state.AddPathCondition(exitCondition);
-                AddLoopBodyInvariantStateFacts(ref state, doStatement, semanticModel, cancellationToken);
-                break;
             case ForEachStatementSyntax forEachStatement:
                 AddCompletedForeachStatementStateFacts(
                     ref state,
@@ -121,6 +55,54 @@ internal static class SymbolicControlFlowCompletionStateTransfer
                     cancellationToken);
                 break;
         }
+    }
+
+    private static void AddCompletedConditionalLoopStateFacts(
+        ref SymbolicState state,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        ExpressionSyntax? condition,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (condition != null && CanAssumeLoopConditionFalseAfterNormalExit(loopStatement, loopBody))
+            SymbolicProgramPointFacts.AddReachabilityCondition(
+                ref state,
+                condition,
+                false,
+                semanticModel,
+                cancellationToken);
+        else if (TryCreateGuardedBreakLoopExitSymbolicCondition(
+                     loopStatement,
+                     loopBody,
+                     condition,
+                     semanticModel,
+                     cancellationToken,
+                     out var exitCondition))
+            state = SymbolicOperationTransferKernel.TransitionLoopEdge(
+                state,
+                SymbolicLoopEdgeKind.Exit,
+                exitCondition,
+                loopStatement.Span,
+                "ir.path.loop-exit").State;
+        else
+            return;
+        AddLoopBodyInvariantStateFacts(ref state, loopStatement, semanticModel, cancellationToken);
+    }
+
+    private static bool TryGetConditionalLoop(
+        StatementSyntax statement,
+        out StatementSyntax body,
+        out ExpressionSyntax? condition)
+    {
+        (body, condition) = statement switch
+        {
+            WhileStatementSyntax loop => (loop.Statement, loop.Condition),
+            ForStatementSyntax loop => (loop.Statement, loop.Condition),
+            DoStatementSyntax loop => (loop.Statement, loop.Condition),
+            _ => (null!, null)
+        };
+        return body != null;
     }
 
     private static void AddLoopBodyInvariantStateFacts(

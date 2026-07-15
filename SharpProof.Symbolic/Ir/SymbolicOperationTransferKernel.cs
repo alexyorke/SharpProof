@@ -45,6 +45,11 @@ internal static class SymbolicOperationTransferKernel
                     : new SymbolicNotCondition(branch.Condition));
                 continue;
             }
+            if (operation is SymbolicLoopEdgeOperation loop)
+            {
+                if (loop.Condition != null) state = state.AddPathCondition(loop.Condition);
+                continue;
+            }
 
             return SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -144,6 +149,19 @@ internal static class SymbolicOperationTransferKernel
                 assumeTrue,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     }
+
+    internal static SymbolicOperationTransitionResult TransitionLoopEdge(
+        SymbolicState state,
+        SymbolicLoopEdgeKind kind,
+        SymbolicCondition condition,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance) =>
+        Apply(
+            state,
+            SymbolicOperationSequence.Single(new SymbolicLoopEdgeOperation(
+                kind,
+                condition,
+                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
 
     private static bool TryApplyAssignment(
         ref SymbolicState state,
