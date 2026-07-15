@@ -109,9 +109,9 @@ transfer policy after its slice is complete.
 
 ## Phase 1 - Canonical Operation Model
 
-- [ ] Add typed operation descriptors for assignment, mutation, invocation,
+- [x] Add typed operation descriptors for assignment, mutation, invocation,
   branch assumption, merge, loop edge, completion, lifetime, and hazard events.
-- [ ] Add an immutable transition result containing normalized state, support
+- [x] Add an immutable transition result containing normalized state, support
   status, provenance, and conservative unknown/truncation reasons.
 - [ ] Add one Roslyn `IOperation`/CFG lowering front-end. Retain syntax only for
   source spans, evidence text, and syntax shapes Roslyn does not expose.
@@ -200,6 +200,7 @@ transfer policy after its slice is complete.
 | Checkpoint | Commit | Production LOC | Delta From Start |
 | --- | --- | ---: | ---: |
 | Rewrite start | `eb484cdc` | 107,676 | 0 |
+| Canonical operation model | `97bb94e4` | 107,856 | +180 |
 
 ## Validation Ledger
 
@@ -210,15 +211,17 @@ transfer policy after its slice is complete.
 | Phase 0 contract baseline | Public API SHA-256: shipped `98C260C649C51451C3BD5629DAF01CDA02ECE7ACEFF1AAF4D39CA6FCF7867D25`, unshipped `B5AFAC50F77E3069B2F1350E068810320D56166F2A7C52E5317F7D7581EA1D4E`. Archive manifests: combined NuGet 17 entries / `c08d68be02c78efced7a080ffbc8eadfd305b91540925f7fd40160a6c614f7a8`; Symbolic NuGet 13 entries / `cc85e4f0f085bc8fb088ed7e44344807731c80594a5d4ac8f382f1791a745dd3`; VSIX 31 entries / `7b876bbb1137084a1eb28e0d863ea33cfcee7bd48708b68ca2131323d4255976`. Existing byte/schema/golden fixtures for CLI, JSON, compact/invariant projection, fuzz, and EffectSummary: 140 passed, 0 failed, 0 skipped. |
 | Phase 0 differential harness | `SymbolicStateDifferentialHarness` canonicalizes normalized states and truncation ordering while retaining support, unknown reason, provenance, and truncation dimensions. Focused tests: 2 passed, 0 failed, 0 skipped. |
 | Phase 0 deletion map | Exact production references for the state-transfer, runtime-hazard, purity-state, and exception-path owners were enumerated. Every owner now has a migration slice, retained-adapter boundary, and behavior gate in the table above. |
+| Phase 1 operation model | Commit `97bb94e4` adds typed descriptors for all nine event families and a normalized immutable transition envelope. Focused model tests: 3 passed, 0 failed, 0 skipped. The temporary +180 production LOC is migration scaffolding that must be repaid when legacy transfer paths are deleted. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: Phase 0 characterization, differential infrastructure, caller
-  inventory, adapter boundaries, and deletion gates are complete.
-- Last confirmed fact: every high-overlap owner has a named consumer set and a
-  parity condition that must pass before its legacy semantics can be removed.
-- Next cheapest step: add the canonical operation descriptor and immutable
-  transition-result foundations, then lower the simple-assignment slice.
+- State: Phase 0 is complete and the canonical event vocabulary plus immutable
+  transition envelope are committed; production behavior still uses legacy
+  transfer paths.
+- Last confirmed fact: all nine event families have typed descriptors and the
+  transition envelope normalizes state while retaining conservative metadata.
+- Next cheapest step: add the Roslyn `IOperation` lowering front-end for local
+  declaration and simple assignment, then shadow-compare its first transition.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
