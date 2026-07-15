@@ -88,11 +88,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## Analyzer Engine - I-P
 
-### Repeated "create term + add fresh-ownership facts" boilerplate - `PurityResourceStateFacts.cs:366,384,407`
-`AddOwnedLocalArrayFacts`/`AddFreshMutableObjectFacts`/`AddOwnedDisposableLocalFacts` repeat the same
-`CreateSymbolicReferenceTerm` -> `AddFact` loop -> `WithPathState`.
-**Recommendation:** `AddFreshOwnershipFacts(state, symbol, syntax, ImmutableArray<SymbolicFact>)`.
-
 ### Minor: `Dispose` name matching in two places - `PurityResourceStateFacts.Diagnostics.cs:10` vs `PurityResourceStateFacts.cs:467`
 **Recommendation:** Centralize `IsDisposableType` / `IsDisposeMethod`.
 
