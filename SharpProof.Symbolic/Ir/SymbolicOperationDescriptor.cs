@@ -86,6 +86,8 @@ internal sealed record SymbolicAssignmentBinding(
     bool PropagateSourceFacts = false,
     bool DeriveIntegerBounds = false);
 
+internal readonly record struct SymbolicTermPropagation(SymbolicTerm Source, SymbolicTerm Target);
+
 internal sealed record SymbolicOperationSequence(
     ImmutableArray<SymbolicOperationDescriptor> Operations)
 {
@@ -100,7 +102,8 @@ internal sealed record SymbolicAssignmentOperation(
     ImmutableArray<SymbolicCondition> Postconditions,
     SymbolicAssignmentOperationKind AssignmentKind,
     bool IsChecked,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
+    SymbolicOperationOrigin Origin,
+    ImmutableArray<SymbolicTermPropagation> Propagations = default) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicMutationOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,

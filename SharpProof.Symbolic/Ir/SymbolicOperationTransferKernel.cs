@@ -130,6 +130,9 @@ internal static class SymbolicOperationTransferKernel
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
             state = state.AddPathCondition(postcondition);
+        if (!assignment.Propagations.IsDefaultOrEmpty)
+            foreach (var propagation in assignment.Propagations)
+                state = PropagateSourceFacts(state, propagation.Source, propagation.Target);
         foreach (var binding in assignment.Bindings)
             if (binding.DeriveIntegerBounds)
                 AddDerivedIntegerBounds(ref state, binding, assignment.Origin);

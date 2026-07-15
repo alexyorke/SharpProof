@@ -68,6 +68,7 @@ internal static class SymbolicOperationLowerer
 
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
         var postconditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
+        var propagations = ImmutableArray.CreateBuilder<SymbolicTermPropagation>();
         if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
         {
             AddSymbolicNullableAssignmentPostconditions(
@@ -77,6 +78,12 @@ internal static class SymbolicOperationLowerer
                 targetContext,
                 valueContext,
                 provenance);
+            AddSymbolicNullableAssignmentPropagations(
+                propagations,
+                targetSymbol,
+                valueExpression,
+                targetContext,
+                valueContext);
             AddSymbolicTupleAssignmentPostconditions(
                 postconditions,
                 targetSymbol,
@@ -140,7 +147,7 @@ internal static class SymbolicOperationLowerer
             if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
                 postconditions.AddRange(asExpressionState.PathConditions);
         }
-        if (bindings.Count == 0 && postconditions.Count == 0)
+        if (bindings.Count == 0 && postconditions.Count == 0 && propagations.Count == 0)
             return Unsupported(source, provenance + ".value");
 
         var operation = new SymbolicAssignmentOperation(
@@ -148,7 +155,8 @@ internal static class SymbolicOperationLowerer
             postconditions.ToImmutable(),
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
-            new SymbolicOperationOrigin(source.Span, sequence, provenance));
+            new SymbolicOperationOrigin(source.Span, sequence, provenance),
+            propagations.ToImmutable());
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
             new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
@@ -307,6 +315,37 @@ internal static class SymbolicOperationLowerer
                 valueExpression,
                 provenance + ".nullable.value",
                 targetSymbol)));
+    }
+
+    private static void AddSymbolicNullableAssignmentPropagations(
+        ImmutableArray<SymbolicTermPropagation>.Builder propagations,
+        ISymbol targetSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext targetContext,
+        SymbolicLoweringContext valueContext)
+    {
+        if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression),
+                valueContext.SemanticModel,
+                valueContext.CancellationToken,
+                out var sourceSymbol) ||
+            SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
+            !SymbolicNullableLowerer.TryCreateSymbolTerms(
+                sourceSymbol,
+                valueContext,
+                out var sourceHasValue,
+                out var sourceValue) ||
+            !SymbolicNullableLowerer.TryCreateSymbolTerms(
+                targetSymbol,
+                targetContext,
+                out var targetHasValue,
+                out var targetValue) ||
+            !SymbolicStateFactBuilder.CanCompareIrTerms(sourceHasValue, targetHasValue) ||
+            !SymbolicStateFactBuilder.CanCompareIrTerms(sourceValue, targetValue))
+            return;
+
+        propagations.Add(new SymbolicTermPropagation(sourceHasValue, targetHasValue));
+        propagations.Add(new SymbolicTermPropagation(sourceValue, targetValue));
     }
 
     private static void AddSymbolicStringAssignmentPostconditions(

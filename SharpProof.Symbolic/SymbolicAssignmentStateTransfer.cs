@@ -138,14 +138,6 @@ internal static class SymbolicAssignmentStateTransfer
         }
 
         if (!isSelfReferential)
-            AddAssignedNullableSourceSnapshotStateFacts(
-                ref state,
-                assignedSymbol,
-                effectiveValueExpression,
-                semanticModel,
-                cancellationToken);
-
-        if (!isSelfReferential)
             AddSwitchExpressionAssignedValueStateFacts(
                 ref state,
                 assignedSymbol,
@@ -231,46 +223,6 @@ internal static class SymbolicAssignmentStateTransfer
             semanticModel,
             cancellationToken,
             provenanceRoot + ".throw-guard.non-null");
-    }
-
-    private static void AddAssignedNullableSourceSnapshotStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression),
-                semanticModel,
-                cancellationToken,
-                out var sourceSymbol) ||
-            SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol))
-            return;
-
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicNullableLowerer.TryCreateSymbolTerms(
-                sourceSymbol,
-                context,
-                out var sourceHasValue,
-                out var sourceValue) &&
-            SymbolicNullableLowerer.TryCreateSymbolTerms(
-                assignedSymbol,
-                context,
-                out var targetHasValue,
-                out var targetValue) &&
-            CanCompareIrTerms(sourceHasValue, targetHasValue) &&
-            CanCompareIrTerms(sourceValue, targetValue))
-        {
-            state = SymbolicOperationTransferKernel.PropagateSourceFacts(
-                state,
-                sourceHasValue,
-                targetHasValue);
-            state = SymbolicOperationTransferKernel.PropagateSourceFacts(
-                state,
-                sourceValue,
-                targetValue);
-        }
     }
 
     internal static void AddAssignedCurrentInstanceMemberStateFacts(
