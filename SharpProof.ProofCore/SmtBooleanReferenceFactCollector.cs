@@ -12,19 +12,11 @@ internal static class SmtBooleanReferenceFactCollector
         ConcreteFactContext facts,
         SmtConcreteBooleanEvaluator evaluateBoolean)
     {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-                if (!TryCollectBooleanFacts(condition, facts, evaluateBoolean, ref changed))
-                    return false;
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return true;
+        return SmtFactFixedPoint.Collect(
+            conditions,
+            true,
+            (SmtFormula formula, ref bool changed) =>
+                TryCollectBooleanFacts(formula, facts, evaluateBoolean, ref changed));
     }
 
     internal static SmtConcreteFactPreparationStatus TryCollectReferenceFacts(
@@ -32,21 +24,11 @@ internal static class SmtBooleanReferenceFactCollector
         ConcreteFactContext facts,
         SmtConcreteBooleanEvaluator evaluateBoolean)
     {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-            {
-                var status = TryCollectReferenceFacts(condition, facts, evaluateBoolean, ref changed);
-                if (status != SmtConcreteFactPreparationStatus.Ready) return status;
-            }
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return SmtConcreteFactPreparationStatus.Ready;
+        return SmtFactFixedPoint.Collect(
+            conditions,
+            SmtConcreteFactPreparationStatus.Ready,
+            (SmtFormula formula, ref bool changed) =>
+                TryCollectReferenceFacts(formula, facts, evaluateBoolean, ref changed));
     }
 
     internal static bool TryEvaluateReferenceNull(

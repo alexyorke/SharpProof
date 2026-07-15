@@ -161,24 +161,10 @@ internal sealed class SmtConcreteFactPreprocessor
         IReadOnlyList<SmtFormula> conditions,
         ConcreteFactContext facts)
     {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-            {
-                var status = TryCollectIntegerFacts(
-                    condition,
-                    facts,
-                    ref changed);
-                if (status != SmtConcreteFactPreparationStatus.Ready) return status;
-            }
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return SmtConcreteFactPreparationStatus.Ready;
+        return SmtFactFixedPoint.Collect(
+            conditions,
+            SmtConcreteFactPreparationStatus.Ready,
+            (SmtFormula formula, ref bool changed) => TryCollectIntegerFacts(formula, facts, ref changed));
     }
 
     private static SmtConcreteFactPreparationStatus TryCollectIntegerFacts(
@@ -1091,19 +1077,10 @@ internal sealed class SmtConcreteFactPreprocessor
         IReadOnlyList<SmtFormula> conditions,
         ConcreteFactContext facts)
     {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-                if (!TryCollectStringEqualities(condition, facts, ref changed))
-                    return false;
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return true;
+        return SmtFactFixedPoint.Collect(
+            conditions,
+            true,
+            (SmtFormula formula, ref bool changed) => TryCollectStringEqualities(formula, facts, ref changed));
     }
 
     private static bool TryCollectStringEqualities(
