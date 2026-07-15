@@ -139,7 +139,7 @@ transfer policy after its slice is complete.
 ## Phase 3 - Branches, Loops, Merge, And Completion
 
 - [x] Migrate boolean branch assumptions and conditional/coalesce flow.
-- [ ] Migrate switch statement/expression branch selection and merging.
+- [x] Migrate switch statement/expression branch selection and merging.
 - [ ] Migrate loop entry/back-edge/exit transitions and bounded fixed points.
 - [ ] Migrate try/catch/finally, exceptional completion, and reachability.
 - [ ] Make one merge implementation own fact choices, versions, ownership, and
@@ -228,6 +228,7 @@ transfer policy after its slice is complete.
 | Explicit-target assignment operations | `a92660db` | 107,986 | +310 |
 | Canonical branch assumptions | `d68de6ab` | 107,939 | +263 |
 | Shared guarded branch merging | `2f83046d` | 107,831 | +155 |
+| Canonical switch assignment choices | `63033d31` | 107,829 | +153 |
 
 ## Validation Ledger
 
@@ -263,19 +264,19 @@ transfer policy after its slice is complete.
 | Phase 2 explicit-target assignments and gate | Commit `a92660db` routes current-instance member and element writes through explicit-target assignment operations, preserves the caller-owned invalidation boundary, and deletes both legacy state mutators. Focused member/element/path/transfer tests: 183 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Exact search finds no migrated assignment mutator or tracked-assignment interpreter. The Phase 2 peak of 108,501 fell by 515 production lines to 107,986; canonical scaffolding remains +310 from the rewrite start and must be repaid by later legacy-engine deletions. |
 | Phase 3 canonical branch assumptions | Commit `d68de6ab` routes generic Boolean and reference-null assumptions through `SymbolicBranchAssumptionOperation`, replaces branch-state lowering with one condition result, and removes the redundant null-feasibility probes from coalesce and conditional-access analysis. Focused CFG/null/path/operation tests: 105 passed; Release solution build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,939, or +263 from the rewrite start. |
 | Phase 3 shared guarded branch merging | Commit `2f83046d` replaces the separate if/switch common-key, guarded-fact, implication, limit, and truncation builders with one typed guarded-branch merger while preserving distinct if/switch limits and provenance. Focused switch/if/pattern/limit tests: 185 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,831, or +155 from the rewrite start. |
+| Phase 3 canonical switch assignment choices | Commit `63033d31` moves switch-expression assignment choices into canonical assignment lowering, reuses the guarded-choice constructor for statement and expression merging, and deletes the legacy assignment-state switch interpreter. Focused switch/state tests: 153 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,829, or +153 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated; Boolean/reference-null assumptions and guarded
-  if/switch state choices now share canonical branch/event and merge mechanics.
-  Remaining assignment code is source ordering, deconstruction pairing,
-  self-reference lowering, or Phase 3 throw/switch-expression completion.
-- Last confirmed fact: focused switch/if/pattern/limit tests pass 185/185,
+- State: Phase 2 is gated; Boolean/reference-null assumptions, guarded switch
+  statement merging, and switch-expression assignment choices now share the
+  canonical branch/event, assignment, and merge mechanics.
+- Last confirmed fact: focused switch/state tests pass 153/153,
   MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
-  matches its 256-pass/one-baseline-failure result after guarded merge unification.
-- Next cheapest step: move switch-expression assignment fact choices into
-  canonical assignment lowering and reuse the guarded-branch implication/limit
-  primitive so the final switch policy leaves the assignment transfer owner.
+  matches its 256-pass/one-baseline-failure result after switch migration.
+- Next cheapest step: inventory loop entry, back-edge, exit, and bounded
+  fixed-point transfer owners, then migrate the first complete loop family into
+  canonical loop-edge operations and delete its superseded state mutation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
