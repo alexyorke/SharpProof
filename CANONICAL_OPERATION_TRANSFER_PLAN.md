@@ -307,6 +307,7 @@ transfer policy after its slice is complete.
 | Shared production-source inventory | `2a7cce39` | 105,745 | -1,931 |
 | Unified raw-SMT line scanning | `c7ec8e42` | 105,745 | -1,931 |
 | Intentional compact-domain projection boundary | `49c99dd2` | 105,745 | -1,931 |
+| Unified artifact build entry points | `45585697` | 105,745 | -1,931 |
 
 ## Validation Ledger
 
@@ -402,6 +403,7 @@ transfer policy after its slice is complete.
 | Phase 6 shared production-source inventory | Commit `2a7cce39` makes one PowerShell helper own strict repository containment, normalized relative paths, and production C# exclusions for ProductionMetrics, RawSmtHotspots, and CloneInventory. This fixes CloneInventory's missing outside-root guard and replaces eight repeated module scans while retaining each report's narrower semantic filters. Complete JSON output from all three scripts matches the committed predecessors byte-for-byte by SHA-256; direct root/outside/test/build-output probes pass; focused process-ownership fixtures pass 9/9. The audit scripts remove 21 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,489. |
 | Phase 6 unified raw-SMT line scanning | Commit `c7ec8e42` replaces seven repeated file/read/line-counter/result loops with one ordinal needle-and-classifier scanner. Category and descriptor-kind decisions remain explicit at their call sites, while traversal, line numbers, property ordering, and trimmed evidence text have one owner. The complete RawSmtHotspots JSON is byte-identical to the committed predecessor by SHA-256; focused process-ownership fixtures pass 9/9. The script removes 85 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC remains 142,489. |
 | Phase 6 intentional compact-domain projection boundary | Commit `49c99dd2` removes the compact capability/complexity forwarding finding after testing its proposed shared base. The source results already share `SymbolicMethodResult`, but moving compact envelope/location properties into a base serializes derived domain fields first and changes exact compact JSON bytes. Restoring order requires per-property ordering metadata that makes the abstraction net-positive and adds a new public generic type. The candidate was reverted exactly. Release SymbolicCli build: zero warnings; compact projection, capability, and complexity fixtures: 12 passed. Production LOC remains 105,745, or -1,931 from the rewrite start. |
+| Phase 6 unified artifact build entry points | Commit `45585697` routes all local dotnet work through `Invoke-SharpProofDotnet.ps1`, deletes duplicated Job Object wrappers, and gives local plus CI packaging one declarative three-project manifest. The attempted standalone-MSBuild gate reproduced an SDK-resolution failure on Build Tools; the wrapper-backed SDK build then produced the VSIX with zero warnings, so obsolete MSBuild discovery was deleted rather than centralized. The real NuGet entry point built and atomically published exactly three packages; focused process/package-policy fixtures pass 11/11. Build scripts remove 41 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,498. |
 
 ## Current Checkpoint
 
@@ -417,13 +419,15 @@ transfer policy after its slice is complete.
   the SARIF expected by both tools. Repository containment, relative paths, and
   production-source discovery are now shared across the three audit scripts;
   RawSmtHotspots also has one line-scanning owner. Compact capability/complexity
-  wrappers remain an intentional serialized-order compatibility boundary.
-- Last confirmed fact: the rejected compact base was reverted exactly; Release
-  SymbolicCli build has zero warnings and focused compact capability/complexity
-  fixtures pass 12/12. Test LOC is 142,489; production LOC is 105,745, or -1,931
+  wrappers remain an intentional serialized-order compatibility boundary. Local
+  artifact builds now share the dotnet wrapper and package-project manifest;
+  obsolete standalone-MSBuild discovery is deleted.
+- Last confirmed fact: the real NuGet entry point produced three packages, the
+  wrapper-backed VSIX build succeeds with zero warnings, and focused build-policy
+  fixtures pass 11/11. Test LOC is 142,498; production LOC is 105,745, or -1,931
   from the rewrite start.
-- Next cheapest step: adjudicate build-tool and MSBuild discovery wrappers across
-  local build, NuGet, VSIX, and CI entry points while preserving package coverage
-  and Job Object ownership.
+- Next cheapest step: adjudicate the first lower-priority follow-up in
+  `POTENTIAL_DUPS.md`, method-like body/expression operation lookup, preserving
+  Roslyn syntax distinctions and conservative unsupported results.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
