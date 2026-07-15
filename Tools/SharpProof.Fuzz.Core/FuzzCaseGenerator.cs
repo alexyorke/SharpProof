@@ -699,7 +699,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildOwnershipChainClass(string className, string testMethod)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public sealed class {{className}}Box
                  {
@@ -762,9 +762,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureAwaitTaskDelay(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using System.Threading.Tasks;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System", "System.Threading.Tasks")}}
 
                  public class {{className}}
                  {
@@ -820,8 +818,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureEventAssignment(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System")}}
 
                  public sealed class {{className}}Source
                  {
@@ -854,7 +851,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureDynamicObjectCreation(int index, Random random, string className)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public sealed class {{className}}Widget
                  {
@@ -879,7 +876,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureInterfaceGetter(int index, Random random, string className)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public interface I{{className}}Value
                  {
@@ -900,7 +897,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureRecursivePattern(int index, Random random, string className)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public sealed class {{className}}Node
                  {
@@ -925,8 +922,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureYieldReturn(int index, Random random, string className)
     {
         return $$"""
-                 using System.Collections.Generic;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System.Collections.Generic")}}
 
                  public class {{className}}
                  {
@@ -943,8 +939,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureWithExpression(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System")}}
 
                  public record {{className}}Data(int Value, int Other);
 
@@ -965,8 +960,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureImplicitIndexerReference(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System")}}
 
                  public sealed class {{className}}Bag
                  {
@@ -988,9 +982,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureInterpolatedStringHandler(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using System.Runtime.CompilerServices;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System", "System.Runtime.CompilerServices")}}
 
                  [InterpolatedStringHandler]
                  public ref struct {{className}}Handler
@@ -1016,7 +1008,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureAddressOf(int index, Random random, string className)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public unsafe class {{className}}
                  {
@@ -1034,8 +1026,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureInlineArrayAccess(int index, Random random, string className)
     {
         return $$"""
-                 using System.Runtime.CompilerServices;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System.Runtime.CompilerServices")}}
 
                  [InlineArray(4)]
                  public struct {{className}}Buffer
@@ -1058,7 +1049,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureFunctionPointer(int index, Random random, string className)
     {
         return $$"""
-                 using SharpProof.Attributes;
+                 {{BuildUsings()}}
 
                  public unsafe class {{className}}
                  {
@@ -1076,9 +1067,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildImpureUsingAwaitDelegateFlow(int index, Random random, string className)
     {
         return $$"""
-                 using System;
-                 using System.Threading.Tasks;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System", "System.Threading.Tasks")}}
 
                  public class {{className}}
                  {
@@ -1129,8 +1118,7 @@ public sealed class FuzzCaseGenerator
     private static string BuildClass(string className, string members)
     {
         return $$"""
-                 using System;
-                 using SharpProof.Attributes;
+                 {{BuildUsings("System")}}
 
                  public class {{className}}
                  {
@@ -1138,6 +1126,11 @@ public sealed class FuzzCaseGenerator
                  }
                  """;
     }
+
+    private static string BuildUsings(params string[] namespaces) =>
+        string.Join("\n", namespaces
+            .Append("SharpProof.Attributes")
+            .Select(static value => $"using {value};"));
 
     private static string Indent(string text, int spaces)
     {

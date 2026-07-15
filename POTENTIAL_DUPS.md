@@ -113,9 +113,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - Fuzz
 
-### Repeated `using System;`/`using SharpProof.Attributes;` in generators - many `Build*` methods re-declare manually
-**Recommendation:** Route all generators through `BuildClass` (accept extra `using` directives).
-
 ### Minor: conservative/expectation classification in two sites - `FuzzRunSummaryBuilder.cs` vs `FuzzExpectation`
 **Recommendation:** `FuzzExpectation.Bucket` property.
 
