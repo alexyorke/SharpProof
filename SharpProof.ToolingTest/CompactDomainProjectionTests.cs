@@ -123,6 +123,12 @@ public sealed class CompactDomainProjectionTests
                 root.EnumerateObject().Take(expectedPropertyPrefix.Length).Select(static property => property.Name),
                 Is.EqualTo(expectedPropertyPrefix),
                 compactResult.Kind);
+            if (compactResult.Kind is "capabilities" or "complexity")
+                Assert.That(
+                    root.EnumerateObject().Skip(4).Take(9).Select(static property => property.Name),
+                    Is.EqualTo(new[] { "filePath", "methodDisplayName", "declarationKind", "spanStart", "spanEnd",
+                        "startLine", "startColumn", "endLine", "endColumn" }),
+                    compactResult.Kind);
         }
 
         Assert.That(capability.Kind, Is.EqualTo("capabilities"));

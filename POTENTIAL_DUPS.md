@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Duplicated identity-column passthroughs - `SymbolicCompactComplexityResult` vs `SymbolicCompactCapabilityResult`
-Identical 9-member location block + schema triplet. **Recommendation:** Shared base/interface for method-location fields.
-
 ### Identical `FilterConditionProof*` methods - `SymbolicCliTextRenderer.cs:735,746`
 **Recommendation:** One generic `Filter<T>(IReadOnlyList<T>, SymbolicCliOptions, Func<T,string>)`.
 

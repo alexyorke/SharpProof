@@ -17,44 +17,50 @@ public abstract class SymbolicSchemaResultBase
     public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 }
 
-public sealed class SymbolicCompactComplexityResult : SymbolicSchemaResultBase
+public abstract class SymbolicCompactMethodResult<T>(T result) : SymbolicSchemaResultBase
+    where T : SymbolicMethodResult
 {
-    private readonly SymbolicComplexityResult _result;
+    protected T Result { get; } = result ?? throw new ArgumentNullException(nameof(result));
 
-    private SymbolicCompactComplexityResult(SymbolicComplexityResult result)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-    }
+    public string FilePath => Result.FilePath;
+
+    public string MethodDisplayName => Result.MethodDisplayName;
+
+    public string DeclarationKind => Result.DeclarationKind;
+
+    public int SpanStart => Result.SpanStart;
+
+    public int SpanEnd => Result.SpanEnd;
+
+    public int StartLine => Result.StartLine;
+
+    public int StartColumn => Result.StartColumn;
+
+    public int EndLine => Result.EndLine;
+
+    public int EndColumn => Result.EndColumn;
+}
+
+public sealed class SymbolicCompactComplexityResult(SymbolicComplexityResult result)
+    : SymbolicCompactMethodResult<SymbolicComplexityResult>(result)
+{
 
     public override string Kind => "complexity";
 
-    public string FilePath => _result.FilePath;
+    [JsonPropertyOrder(1)]
+    public SymbolicComplexityInfo Complexity => Result.Complexity;
 
-    public string MethodDisplayName => _result.MethodDisplayName;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers => Result.Drivers;
 
-    public string DeclarationKind => _result.DeclarationKind;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons => Result.UnknownReasons;
 
-    public int SpanStart => _result.SpanStart;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => Result.UnknownReasonDetails;
 
-    public int SpanEnd => _result.SpanEnd;
-
-    public int StartLine => _result.StartLine;
-
-    public int StartColumn => _result.StartColumn;
-
-    public int EndLine => _result.EndLine;
-
-    public int EndColumn => _result.EndColumn;
-
-    public SymbolicComplexityInfo Complexity => _result.Complexity;
-
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers => _result.Drivers;
-
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons => _result.UnknownReasons;
-
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => _result.UnknownReasonDetails;
-
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries => _result.CalleeSummaries;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries => Result.CalleeSummaries;
 
     public static SymbolicCompactComplexityResult FromResult(SymbolicComplexityResult result)
     {
@@ -62,46 +68,28 @@ public sealed class SymbolicCompactComplexityResult : SymbolicSchemaResultBase
     }
 }
 
-public sealed class SymbolicCompactCapabilityResult : SymbolicSchemaResultBase
+public sealed class SymbolicCompactCapabilityResult(SymbolicCapabilityResult result)
+    : SymbolicCompactMethodResult<SymbolicCapabilityResult>(result)
 {
-    private readonly SymbolicCapabilityResult _result;
-
-    private SymbolicCompactCapabilityResult(SymbolicCapabilityResult result)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-    }
-
     public override string Kind => "capabilities";
 
-    public string FilePath => _result.FilePath;
+    [JsonPropertyOrder(1)]
+    public SharpProof.Attributes.SharpProofCapability Capabilities => Result.Capabilities;
 
-    public string MethodDisplayName => _result.MethodDisplayName;
+    [JsonPropertyOrder(1)]
+    public string CapabilityText => Result.CapabilityText;
 
-    public string DeclarationKind => _result.DeclarationKind;
+    [JsonPropertyOrder(1)]
+    public bool HasUnknowns => Result.HasUnknowns;
 
-    public int SpanStart => _result.SpanStart;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons => Result.UnknownReasons;
 
-    public int SpanEnd => _result.SpanEnd;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => Result.UnknownReasonDetails;
 
-    public int StartLine => _result.StartLine;
-
-    public int StartColumn => _result.StartColumn;
-
-    public int EndLine => _result.EndLine;
-
-    public int EndColumn => _result.EndColumn;
-
-    public SharpProof.Attributes.SharpProofCapability Capabilities => _result.Capabilities;
-
-    public string CapabilityText => _result.CapabilityText;
-
-    public bool HasUnknowns => _result.HasUnknowns;
-
-    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons => _result.UnknownReasons;
-
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => _result.UnknownReasonDetails;
-
-    public IReadOnlyList<SymbolicCapabilitySite> Sites => _result.Sites;
+    [JsonPropertyOrder(1)]
+    public IReadOnlyList<SymbolicCapabilitySite> Sites => Result.Sites;
 
     public static SymbolicCompactCapabilityResult FromResult(SymbolicCapabilityResult result)
     {
