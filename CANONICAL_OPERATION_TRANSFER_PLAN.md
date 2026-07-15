@@ -295,6 +295,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     their guard remains stable. Guard-mutating reference assignments,
     post-join guarded projections, loop-local targets, and finally-local targets
     retain the structural fallback until their normalized states match.
+  - [x] Delete the orphaned exception-path mutation-tracking partial after exact
+    call-site inventory proved all five syntax mutation walkers unreachable.
+    Exception path state already enters through `SymbolicReachabilityService`
+    with the shared Requires entry state.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -446,6 +450,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed source-completion facts | `ae0fa398` | 106,448 | -1,228 |
 | Phase 7 typed reachability and throw guards | `f08f6bf5` | 106,643 | -1,033 |
 | Phase 7 stable branch-local query targets | `d92317d9` | 106,652 | -1,024 |
+| Phase 7 dead exception mutation path deletion | pending | 106,572 | -1,104 |
 
 ## Validation Ledger
 
@@ -590,6 +595,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed source-completion facts | Commit `ae0fa398` introduces `SymbolicSourceCompletionLowerer` for explicit array-size non-negativity, awaitable non-null, element in-range, and dereference-receiver non-null discovery. It returns ordered conditions with their original syntax provenance, and `SymbolicNormalCompletionStateTransfer` applies the plan through the bulk canonical assumption transition; the 146-line direct-state discovery block is deleted. Focused program-point/reference/element/expression/async/exception fixtures have 326 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,448, or -1,228 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed reachability and throw guards | Commit `f08f6bf5` introduces `SymbolicReachabilityLowerer` as the canonical owner of branch assumptions, inline-assignment ordering, and pattern-bound reachability, and routes `DoesNotReturnIf` plus conditional/coalesce throw normal completion through typed transitions. The 227-line program-point reachability interpreter and direct throw-guard state mutation are deleted. Focused reachability, program-point, foreach, throw-expression, and exception fixtures pass 527 cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. The reusable transition scaffold raises production LOC to 106,643, or -1,033 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 stable branch-local query targets | Commit `d92317d9` lets the CFG collector return exact branch-local state when the active guard remains stable and permits reference assignments that do not mutate that guard. The original guard-mutating branch-local case, nullable assignment, post-join guarded reference projection, loop-local target, and finally-local target remain explicit conservative fallbacks. Direct normalized-state characterization passes 19/19; broader source-query/program-point fixtures pass 126/126; MainSmtOracle passes 573/573; the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,652, or -1,024 from the rewrite start; test LOC is 142,855. |
+| Phase 7 dead exception mutation path deletion | Pending commit deletes the 90-line `ExceptionPathStateService.MutationTracking` partial after exact symbol inventory found no caller for any of its five private syntax mutation walkers. Exception path state already uses the canonical reachability entry point and shared Requires entry-state builder. MainSmtAnalyzer passes 487/487; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Analyzer warning-as-error build has zero warnings. Production LOC falls to 106,572, or -1,104 from the rewrite start; test LOC remains 142,855. |
 
 ## Current Checkpoint
 
@@ -676,11 +682,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   canonical transitions. Stable branch-local source-query targets now use the
   CFG collector; guard-mutating references, guarded post-join projections,
   loop-local targets, and finally-local targets remain conservative fallbacks.
-  Test LOC is 142,855; production LOC is 106,652, or -1,024 from the rewrite
-  start; the 1,067-line scaffold must be repaid when structural transfer paths
-  are deleted.
-- Next cheapest step: pivot to the exception-path consumer slice, characterize
-  its remaining structural state entry points, and route the first exact caller
-  group through canonical CFG collection before deleting its wrapper.
+  The orphaned 90-line exception mutation-tracking partial is deleted. Test LOC
+  is 142,855; production LOC is 106,572, or -1,104 from the rewrite start; the
+  987-line scaffold must be repaid when structural transfer paths are deleted.
+- Next cheapest step: inspect the remaining exception-path and purity consumer
+  wrappers for unreachable structural helpers, then migrate the smallest exact
+  caller group through the canonical state service and delete its old adapter.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
