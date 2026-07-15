@@ -32,7 +32,6 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "loop-local-target");
         if (site.Ancestors().Any(static ancestor => ancestor is FinallyClauseSyntax))
             return Unsupported(site, "finally-local-target");
-
         ControlFlowGraph? graph;
         try
         {
@@ -82,9 +81,9 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(operation.Syntax, site))
                 {
-                    if (currentPath.Guard == null)
+                    if (currentPath.Guard == null || targetIsInsideBranch)
                         targetState = state;
-                    else if (!targetIsInsideBranch)
+                    else
                         guardedTargetState = state;
                     foundTarget = true;
                     break;
@@ -95,6 +94,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         ref state,
                         operation,
                         currentPath.Guard,
+                        targetIsInsideBranch,
                         semanticModel,
                         cancellationToken,
                         out var guardInvalidated))
@@ -112,9 +112,9 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (ContainsSite(block.BranchValue.Syntax, site))
                 {
-                    if (currentPath.Guard == null)
+                    if (currentPath.Guard == null || targetIsInsideBranch)
                         targetState = state;
-                    else if (!targetIsInsideBranch)
+                    else
                         guardedTargetState = state;
                     continue;
                 }
@@ -628,6 +628,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ref SymbolicState state,
         IOperation operation,
         SymbolicCondition? guard,
+        bool allowGuardedReferenceAssignments,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out bool guardInvalidated)
@@ -644,6 +645,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         declarator.Symbol,
                         value,
                         guard,
+                        allowGuardedReferenceAssignments,
                         semanticModel,
                         cancellationToken,
                         "operation-lowering.declaration",
@@ -668,6 +670,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                        target,
                        assignment.Value,
                        guard,
+                       allowGuardedReferenceAssignments,
                        semanticModel,
                        cancellationToken,
                        "operation-lowering.assignment",
@@ -775,12 +778,13 @@ internal static class SymbolicCfgProgramPointStateCollector
         ISymbol target,
         IOperation value,
         SymbolicCondition? guard,
+        bool allowGuardedReferenceAssignments,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string provenance,
         out bool guardInvalidated)
     {
-        if (RequiresStructuralAssignmentFallback(target, guard))
+        if (RequiresStructuralAssignmentFallback(target, guard, allowGuardedReferenceAssignments))
         {
             guardInvalidated = false;
             return false;
@@ -814,7 +818,8 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool RequiresStructuralAssignmentFallback(
         ISymbol target,
-        SymbolicCondition? guard)
+        SymbolicCondition? guard,
+        bool allowGuardedReferenceAssignments)
     {
         var type = target switch
         {
@@ -823,8 +828,11 @@ internal static class SymbolicCfgProgramPointStateCollector
             _ => null
         };
         return type is INamedTypeSymbol
-                   { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } ||
-               guard != null && type?.IsReferenceType == true;
+        {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+        } || guard != null &&
+            type?.IsReferenceType == true &&
+            (!allowGuardedReferenceAssignments || GuardReferencesTarget(guard, target));
     }
 
     private static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>

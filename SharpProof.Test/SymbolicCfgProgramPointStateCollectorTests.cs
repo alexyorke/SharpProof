@@ -114,6 +114,33 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void BranchLocalTargetWithoutGuardMutation_MatchesStructuralCollector()
+    {
+        const string source = "static class C { static string? M(string? value) { if (value is null) { var copy = value; return copy; } return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(BranchLocalTargetWithoutGuardMutation_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().First();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
     public void SingleSurvivingBranch_MatchesStructuralCompletionState()
     {
         const string source = "static class C { static int M(bool stop) { if (stop) return 0; int value = 2; return value; } }";

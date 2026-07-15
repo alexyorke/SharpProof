@@ -291,6 +291,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     states and retain unsupported shapes as conservative fallbacks.
 - [ ] Migrate source queries, invariant/reachability analysis, exception paths,
   and Analyzer purity CFG consumers in behavior-locked vertical slices.
+  - [x] Route branch-local source-query targets through the CFG collector when
+    their guard remains stable. Guard-mutating reference assignments,
+    post-join guarded projections, loop-local targets, and finally-local targets
+    retain the structural fallback until their normalized states match.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -441,6 +445,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed framework postconditions | `deb1813a` | 106,424 | -1,252 |
 | Phase 7 typed source-completion facts | `ae0fa398` | 106,448 | -1,228 |
 | Phase 7 typed reachability and throw guards | `f08f6bf5` | 106,643 | -1,033 |
+| Phase 7 stable branch-local query targets | pending | 106,652 | -1,024 |
 
 ## Validation Ledger
 
@@ -584,6 +589,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed framework postconditions | Commit `deb1813a` introduces `SymbolicFrameworkPostconditionLowerer` as the single owner of parameter-not-null, inferred-not-null, known argument-guard, and member-not-null normal-completion discovery. Statement and expression paths consume ordered typed condition groups through one bulk canonical assumption transition; the legacy direct-state implementations and their shared member helpers are deleted. Focused nullable/program-point/reachability/element/exception fixtures have 293 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,424, or -1,252 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed source-completion facts | Commit `ae0fa398` introduces `SymbolicSourceCompletionLowerer` for explicit array-size non-negativity, awaitable non-null, element in-range, and dereference-receiver non-null discovery. It returns ordered conditions with their original syntax provenance, and `SymbolicNormalCompletionStateTransfer` applies the plan through the bulk canonical assumption transition; the 146-line direct-state discovery block is deleted. Focused program-point/reference/element/expression/async/exception fixtures have 326 passing cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. This typed scaffold raises production LOC to 106,448, or -1,228 from the rewrite start; test LOC remains 142,831. |
 | Phase 7 typed reachability and throw guards | Commit `f08f6bf5` introduces `SymbolicReachabilityLowerer` as the canonical owner of branch assumptions, inline-assignment ordering, and pattern-bound reachability, and routes `DoesNotReturnIf` plus conditional/coalesce throw normal completion through typed transitions. The 227-line program-point reachability interpreter and direct throw-guard state mutation are deleted. Focused reachability, program-point, foreach, throw-expression, and exception fixtures pass 527 cases plus only the documented SP0010 baseline failure; MainSmtOracle passes 573/573; MainSmtFlow remains at its recorded 256-pass/1-baseline-failure result; the Release Symbolic warning-as-error build has zero warnings. The reusable transition scaffold raises production LOC to 106,643, or -1,033 from the rewrite start; test LOC remains 142,831. |
+| Phase 7 stable branch-local query targets | Pending commit lets the CFG collector return exact branch-local state when the active guard remains stable and permits reference assignments that do not mutate that guard. The original guard-mutating branch-local case, nullable assignment, post-join guarded reference projection, loop-local target, and finally-local target remain explicit conservative fallbacks. Direct normalized-state characterization passes 19/19; broader source-query/program-point fixtures pass 126/126; MainSmtOracle passes 573/573; the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,652, or -1,024 from the rewrite start; test LOC is 142,855. |
 
 ## Current Checkpoint
 
@@ -667,12 +673,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   legacy discovery block is deleted. Framework normal-completion postconditions,
   source-derived array/dereference completion facts, `DoesNotReturnIf`, inline
   assignments, and throw guards now have typed owners and enter state through
-  canonical transitions. Test LOC is 142,831; production LOC is 106,643, or
-  -1,033 from the rewrite start; the 1,058-line scaffold must be repaid when
-  structural transfer paths are deleted.
-- Next cheapest step: begin the source-query vertical slice by routing supported
-  post-join and loop-independent program points exclusively through the CFG
-  collector, characterize fallback reasons, and delete the superseded ancestor
-  reachability path once no supported query reaches it.
+  canonical transitions. Stable branch-local source-query targets now use the
+  CFG collector; guard-mutating references, guarded post-join projections,
+  loop-local targets, and finally-local targets remain conservative fallbacks.
+  Test LOC is 142,855; production LOC is 106,652, or -1,024 from the rewrite
+  start; the 1,067-line scaffold must be repaid when structural transfer paths
+  are deleted.
+- Next cheapest step: pivot to the exception-path consumer slice, characterize
+  its remaining structural state entry points, and route the first exact caller
+  group through canonical CFG collection before deleting its wrapper.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
