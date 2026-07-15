@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -49,6 +50,190 @@ internal static class SymbolicStateMerger
         }
 
         return common;
+    }
+
+    internal static SymbolicState MergePathStatesAcrossAll(
+        IReadOnlyList<SymbolicState> states,
+        Func<SymbolicFact, SymbolicFact, bool> equivalent)
+    {
+        if (states.Count == 0) return new SymbolicState();
+
+        var facts = MergeResourceStateFacts(IntersectFactsAcrossAll(states, equivalent), states);
+        return new SymbolicState(facts, MergePathConditionsAcrossAll(states));
+    }
+
+    internal static bool AreEvidenceEquivalentFacts(SymbolicFact first, SymbolicFact second) =>
+        first.Polarity == second.Polarity &&
+        first.Confidence == second.Confidence &&
+        Equals(first.Atom, second.Atom) &&
+        SymbolEqualityComparer.Default.Equals(first.Symbol, second.Symbol) &&
+        string.Equals(first.EvidenceKey, second.EvidenceKey, StringComparison.Ordinal);
+
+    internal static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
+        SymbolicTerm term,
+        IEnumerable<SymbolicFact> facts)
+    {
+        foreach (var fact in facts)
+        {
+            if (!fact.Polarity ||
+                fact.Confidence != SymbolicFactConfidence.Exact ||
+                fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
+                continue;
+
+            if (Equals(alias.Target, term)) yield return alias.Source;
+            if (Equals(alias.Source, term)) yield return alias.Target;
+        }
+    }
+
+    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state) =>
+        new(EnumerateExactResourceReleases(state).Select(static release => release.Resource));
+
+    private static ImmutableArray<SymbolicFact> MergeResourceStateFacts(
+        ImmutableArray<SymbolicFact> commonFacts,
+        IReadOnlyList<SymbolicState> states)
+    {
+        var builder = commonFacts.ToBuilder();
+        var resources = new List<(SymbolicTerm Resource, ISymbol? Symbol)>();
+        foreach (var fact in states.SelectMany(static state => state.Facts))
+        {
+            if (!TryGetResourceStateIdentity(fact, out var resource, out var symbol) ||
+                resources.Any(key => ResourceStateIdentityMatches(key.Resource, key.Symbol, resource, symbol)))
+                continue;
+            resources.Add((resource, symbol));
+        }
+
+        foreach (var (resource, symbol) in resources)
+        {
+            if (states.All(state => HasExactResourceRelease(state, resource, symbol)))
+            {
+                var representative = states
+                    .SelectMany(state => state.Facts.Select(fact => (State: state, Fact: fact)))
+                    .First(pair =>
+                        TryGetExactResourceRelease(pair.Fact, out var released, out var releasedSymbol) &&
+                        (ResourceStateIdentityMatches(resource, symbol, released, releasedSymbol) ||
+                         IsResourceReleasedViaMergedAliases(
+                             resource,
+                             new HashSet<SymbolicTerm> { released },
+                             pair.State,
+                             new HashSet<SymbolicTerm>())))
+                    .Fact;
+                var mergedFact = representative with
+                {
+                    Atom = new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Released),
+                    Provenance = "analyzer.resource.merge.all-path-release",
+                    EvidenceKey = representative.EvidenceKey ?? "evidence.resource.released",
+                    Symbol = symbol ?? representative.Symbol
+                };
+                if (!builder.Any(fact => AreEvidenceEquivalentFacts(fact, mergedFact))) builder.Add(mergedFact);
+                continue;
+            }
+
+            foreach (var outstanding in states.SelectMany(static state => state.Facts)
+                         .Where(fact => IsOutstandingResourceFactFor(fact, resource, symbol)))
+                if (!builder.Any(fact => AreEvidenceEquivalentFacts(fact, outstanding))) builder.Add(outstanding);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool HasExactResourceRelease(SymbolicState state, SymbolicTerm resource, ISymbol? symbol)
+    {
+        var releasedResources = new HashSet<SymbolicTerm>();
+        foreach (var release in EnumerateExactResourceReleases(state))
+        {
+            if (ResourceStateIdentityMatches(resource, symbol, release.Resource, release.Symbol)) return true;
+            releasedResources.Add(release.Resource);
+        }
+
+        return IsResourceReleasedViaMergedAliases(
+            resource,
+            releasedResources,
+            state,
+            new HashSet<SymbolicTerm>());
+    }
+
+    private static bool IsResourceReleasedViaMergedAliases(
+        SymbolicTerm resource,
+        HashSet<SymbolicTerm> releasedResources,
+        SymbolicState state,
+        HashSet<SymbolicTerm> visited)
+    {
+        if (releasedResources.Contains(resource)) return true;
+        if (!visited.Add(resource)) return false;
+
+        return EnumerateExactAliasNeighbors(resource, state.Facts).Any(neighbor =>
+            IsResourceReleasedViaMergedAliases(neighbor, releasedResources, state, visited));
+    }
+
+    private static bool TryGetResourceStateIdentity(
+        SymbolicFact fact,
+        out SymbolicTerm resource,
+        out ISymbol? symbol)
+    {
+        if (TryGetExactResourceRelease(fact, out resource, out symbol)) return true;
+
+        symbol = fact.Symbol;
+        resource = fact.Atom switch
+        {
+            SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime =>
+                lifetime.Resource,
+            SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal => disposal.Resource,
+            _ => null!
+        };
+        if (resource != null) return true;
+        symbol = null;
+        return false;
+    }
+
+    private static bool IsOutstandingResourceFactFor(
+        SymbolicFact fact,
+        SymbolicTerm resource,
+        ISymbol? symbol)
+    {
+        if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact) return false;
+
+        var outstanding = fact.Atom switch
+        {
+            SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime =>
+                lifetime.Resource,
+            SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal => disposal.Resource,
+            _ => null
+        };
+        return outstanding != null && ResourceStateIdentityMatches(resource, symbol, outstanding, fact.Symbol);
+    }
+
+    private static bool ResourceStateIdentityMatches(
+        SymbolicTerm firstResource,
+        ISymbol? firstSymbol,
+        SymbolicTerm secondResource,
+        ISymbol? secondSymbol) =>
+        firstSymbol != null && secondSymbol != null
+            ? SymbolEqualityComparer.Default.Equals(firstSymbol, secondSymbol)
+            : Equals(firstResource, secondResource);
+
+    private static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
+        SymbolicState state)
+    {
+        foreach (var fact in state.Facts)
+            if (TryGetExactResourceRelease(fact, out var resource, out var symbol))
+                yield return (resource, symbol);
+    }
+
+    private static bool TryGetExactResourceRelease(
+        SymbolicFact fact,
+        out SymbolicTerm resource,
+        out ISymbol? symbol)
+    {
+        resource = fact.Atom switch
+        {
+            SymbolicResourceLifetimeAtom
+                { State: SymbolicResourceLifetimeState.Released or SymbolicResourceLifetimeState.Returned } lifetime =>
+                lifetime.Resource,
+            SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal => disposal.Resource,
+            _ => null!
+        };
+        symbol = resource == null ? null : fact.Symbol;
+        return resource != null && fact.Polarity && fact.Confidence == SymbolicFactConfidence.Exact;
     }
 
     internal static SymbolicState MergeCompletionStates(

@@ -250,43 +250,10 @@ internal static class PuritySymbolicStateFacts
 
     internal static IEnumerable<SymbolicTerm> EnumerateSymbolicAliasTerms(
         SymbolicTerm symbolTerm,
-        PurityAnalysisState currentState)
-    {
-        return EnumerateExactAliasNeighbors(symbolTerm, currentState.PathState.Facts);
-    }
+        PurityAnalysisState currentState) =>
+        SymbolicStateMerger.EnumerateExactAliasNeighbors(symbolTerm, currentState.PathState.Facts);
 
-    internal static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
-        SymbolicTerm term,
-        IEnumerable<SymbolicFact> facts)
-    {
-        foreach (var fact in facts)
-        {
-            if (!fact.Polarity ||
-                fact.Confidence != SymbolicFactConfidence.Exact ||
-                fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
-                continue;
-
-            if (Equals(alias.Target, term)) yield return alias.Source;
-
-            if (Equals(alias.Source, term)) yield return alias.Target;
-        }
-    }
-
-    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state)
-    {
-        return new HashSet<SymbolicTerm>(
-            EnumerateExactResourceReleases(state).Select(static release => release.Resource));
-    }
-
-    internal static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
-        SymbolicState state)
-    {
-        foreach (var fact in state.Facts)
-            if (PurityAnalysisStateMerger.TryGetExactResourceRelease(
-                    fact,
-                    out var releasedResource,
-                    out var releasedSymbol))
-                yield return (releasedResource, releasedSymbol);
-    }
+    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state) =>
+        SymbolicStateMerger.CollectExactReleasedResources(state);
 
 }
