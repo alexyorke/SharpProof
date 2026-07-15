@@ -30,6 +30,9 @@ internal static class SymbolicOperationTransferKernel
             if (operation is SymbolicAssignmentOperation assignment &&
                 TryApplyAssignment(ref state, assignment))
                 continue;
+            if (operation is SymbolicMutationOperation mutation &&
+                TryApplyBindings(ref state, mutation.Bindings, mutation.Origin))
+                continue;
 
             return SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -44,7 +47,18 @@ internal static class SymbolicOperationTransferKernel
         ref SymbolicState state,
         SymbolicAssignmentOperation assignment)
     {
-        foreach (var binding in assignment.Bindings)
+        if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
+        foreach (var postcondition in assignment.Postconditions)
+            state = state.AddPathCondition(postcondition);
+        return true;
+    }
+
+    private static bool TryApplyBindings(
+        ref SymbolicState state,
+        ImmutableArray<SymbolicAssignmentBinding> bindings,
+        SymbolicOperationOrigin origin)
+    {
+        foreach (var binding in bindings)
         {
             if (binding.Source == null ||
                 !SymbolicStateFactBuilder.CanCompareIrTerms(binding.Target, binding.Source))
@@ -58,10 +72,10 @@ internal static class SymbolicOperationTransferKernel
                     binding.Source),
                 true,
                 SymbolicFactConfidence.Exact,
-                assignment.Origin.Provenance + ".value",
-                assignment.Origin.SourceSpan,
+                origin.Provenance + ".value",
+                origin.SourceSpan,
                 null,
-                assignment.Origin.Provenance + ".value")));
+                origin.Provenance + ".value")));
         }
 
         return true;

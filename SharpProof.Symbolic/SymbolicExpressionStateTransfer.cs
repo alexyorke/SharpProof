@@ -134,35 +134,37 @@ internal static class SymbolicExpressionStateTransfer
         else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
                  assignedSymbol is ILocalSymbol or IParameterSymbol)
         {
-            AddCoalesceAssignmentStateFacts(
-                ref state,
+            var transition = SymbolicOperationTransferAdapter.ApplyCoalesceAssignment(
+                state,
                 assignedSymbol.OriginalDefinition,
                 assignment.Right,
                 semanticModel,
-                cancellationToken);
+                cancellationToken,
+                "ir.path.coalesce-assignment");
+            if (transition.IsExact) state = transition.State;
         }
         else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
                  previousAssignedValueTerm != null &&
                  SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment(
                      previousAssignedValueTerm,
                      assignment,
-                     semanticModel,
-                     cancellationToken,
-                     assignedSymbol.OriginalDefinition,
-                     out var compoundAssignmentValueTerm) &&
-                 TryCreateSymbolTerm(assignedSymbol.OriginalDefinition, out var targetTerm) &&
-                 targetTerm.Kind == SmtValueKind.Int &&
-                 !SymbolicIrReferenceScanner.ContainsVariableOrMember(
-                     compoundAssignmentValueTerm,
-                     SymbolicFactFactory.GetSmtVariableName(assignedSymbol.OriginalDefinition)))
+                 semanticModel,
+                 cancellationToken,
+                 assignedSymbol.OriginalDefinition,
+                     out var compoundAssignmentValueTerm,
+                     out var isChecked))
         {
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetTerm,
+            var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+                state,
+                assignedSymbol.OriginalDefinition,
                 compoundAssignmentValueTerm,
                 assignment,
+                semanticModel,
+                cancellationToken,
+                SymbolicComputedUpdateKind.CompoundAssignment,
+                isChecked,
                 "ir.path.prior-statement.compound-assignment");
+            if (transition.IsExact) state = transition.State;
         }
 
         SymbolicAssignmentStateTransfer.AddElementAssignmentStateFact(
@@ -179,119 +181,6 @@ internal static class SymbolicExpressionStateTransfer
                 assignedSymbol is not ILocalSymbol and not IParameterSymbol,
                 semanticModel,
                 cancellationToken);
-    }
-
-    private static void AddCoalesceAssignmentStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax rightExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(rightExpression) is ThrowExpressionSyntax)
-        {
-            if (SymbolicAssignmentStateTransfer.TryCreateNullableSymbolTerms(assignedSymbol, out var completedHasValue, out _))
-            {
-                state = state.AddPathCondition(new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicTruthAtom(completedHasValue),
-                    rightExpression,
-                    "ir.path.coalesce-assignment.throw-completion-has-value",
-                    assignedSymbol)));
-                return;
-            }
-
-            if (TryCreateSymbolTerm(assignedSymbol, out var completedReference) &&
-                completedReference.Kind == SmtValueKind.Reference)
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.NotEqual,
-                    completedReference,
-                    new SymbolicNullTerm(),
-                    rightExpression,
-                    "ir.path.coalesce-assignment.throw-completion-non-null");
-
-            return;
-        }
-
-        if (SymbolicAssignmentStateTransfer.TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue))
-        {
-            SymbolicTerm? rightHasValue = null;
-            var hasValueLowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(rightExpression, context);
-            if (hasValueLowering is { IsExact: true, Value: { } nullableRightHasValue })
-                rightHasValue = nullableRightHasValue;
-            else if (SymbolicSemanticPipeline.LowerTerm(rightExpression, context) is
-                     { IsExact: true, Value: { } wrappedRightValue } &&
-                     wrappedRightValue.Kind == targetValue.Kind)
-                rightHasValue = new SymbolicBooleanConstantTerm(true);
-
-            if (rightHasValue == null) return;
-
-            if (rightHasValue is SymbolicBooleanConstantTerm { Value: true })
-            {
-                var fact = SymbolicFact.Exact(
-                    new SymbolicTruthAtom(targetHasValue),
-                    rightExpression,
-                    "ir.path.coalesce-assignment.nullable-has-value",
-                    assignedSymbol);
-                state = state.AddPathCondition(new SymbolicFactCondition(fact));
-            }
-            else
-            {
-                var targetHasValueFact = SymbolicFact.Exact(
-                    new SymbolicTruthAtom(targetHasValue),
-                    rightExpression,
-                    "ir.path.coalesce-assignment.target-has-value",
-                    assignedSymbol);
-                var rightHasNoValueFact = SymbolicFact.Exact(
-                    new SymbolicTruthAtom(rightHasValue),
-                    rightExpression,
-                    "ir.path.coalesce-assignment.right-has-value");
-                state = state.AddPathCondition(new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.Or,
-                    new SymbolicFactCondition(targetHasValueFact),
-                    new SymbolicNotCondition(new SymbolicFactCondition(rightHasNoValueFact))));
-            }
-
-            return;
-        }
-
-        if (!TryCreateSymbolTerm(assignedSymbol, out var target) ||
-            target.Kind != SmtValueKind.Reference)
-            return;
-
-        if (SymbolicAssignmentStateTransfer.IsDefinitelyNonNullReferenceValue(rightExpression, semanticModel, cancellationToken))
-        {
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                target,
-                new SymbolicNullTerm(),
-                rightExpression,
-                "ir.path.coalesce-assignment.non-null");
-            return;
-        }
-
-        var rightLowering = SymbolicSemanticPipeline.LowerReferenceTerm(rightExpression, context);
-        if (rightLowering is not { IsExact: true, Value: { } right }) return;
-
-        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                target,
-                new SymbolicNullTerm()),
-            rightExpression,
-            "ir.path.coalesce-assignment.target-non-null",
-            assignedSymbol));
-        var targetEqualsRight = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, target, right),
-            rightExpression,
-            "ir.path.coalesce-assignment.target-equals-right",
-            assignedSymbol));
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            targetNonNull,
-            targetEqualsRight));
     }
 
 }

@@ -17,9 +17,11 @@ internal static class SymbolicAssignmentValueUpdater
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ISymbol targetSymbol,
-        out SymbolicTerm updatedValue)
+        out SymbolicTerm updatedValue,
+        out bool isChecked)
     {
         updatedValue = null!;
+        isChecked = false;
         if (previousValue.Kind != SmtValueKind.Int ||
             delta is not 1 and not -1 ||
             semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
@@ -28,6 +30,8 @@ internal static class SymbolicAssignmentValueUpdater
             } operation ||
             !TryGetTargetRange(targetSymbol, out var minimum, out var maximum))
             return false;
+
+        isChecked = operation.IsChecked;
 
         if (previousValue is SymbolicIntegerConstantTerm integerConstant)
             return TryCreateConstantResult(
@@ -59,9 +63,11 @@ internal static class SymbolicAssignmentValueUpdater
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ISymbol targetSymbol,
-        out SymbolicTerm updatedValue)
+        out SymbolicTerm updatedValue,
+        out bool isChecked)
     {
         updatedValue = null!;
+        isChecked = false;
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             assignment.Right,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
@@ -79,6 +85,8 @@ internal static class SymbolicAssignmentValueUpdater
             SymbolicIrReferenceScanner.ContainsVariableOrMember(previousValue, targetName) ||
             SymbolicIrReferenceScanner.ContainsVariableOrMember(rightTerm, targetName))
             return false;
+
+        isChecked = operation.IsChecked;
 
         if (previousValue is SymbolicIntegerConstantTerm leftConstant &&
             rightTerm is SymbolicIntegerConstantTerm rightConstant)

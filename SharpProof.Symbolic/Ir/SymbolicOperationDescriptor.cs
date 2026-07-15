@@ -22,6 +22,13 @@ internal enum SymbolicMutationOperationKind
     CallerVisible
 }
 
+internal enum SymbolicComputedUpdateKind
+{
+    CompoundAssignment,
+    Increment,
+    Decrement
+}
+
 internal enum SymbolicLoopEdgeKind
 {
     Entry,
@@ -73,13 +80,15 @@ internal sealed record SymbolicOperationSequence(
 
 internal sealed record SymbolicAssignmentOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
+    ImmutableArray<SymbolicCondition> Postconditions,
     SymbolicAssignmentOperationKind AssignmentKind,
     bool IsChecked,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicMutationOperation(
-    ImmutableArray<SymbolicTerm> Targets,
+    ImmutableArray<SymbolicAssignmentBinding> Bindings,
     SymbolicMutationOperationKind MutationKind,
+    bool IsChecked,
     bool CallerVisible,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 

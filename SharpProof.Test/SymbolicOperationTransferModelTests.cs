@@ -20,6 +20,7 @@ public sealed class SymbolicOperationTransferModelTests
         var origin = new SymbolicOperationOrigin(new TextSpan(10, 5), 3, "test.assignment");
         SymbolicOperationDescriptor descriptor = new SymbolicAssignmentOperation(
             ImmutableArray.Create(new SymbolicAssignmentBinding("target", target, source)),
+            ImmutableArray<SymbolicCondition>.Empty,
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
             origin);
@@ -266,6 +267,7 @@ public sealed class SymbolicOperationTransferModelTests
                 ((SymbolicVariableTerm)target).Name,
                 target,
                 new SymbolicIntegerConstantTerm(value))),
+            ImmutableArray<SymbolicCondition>.Empty,
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
             new SymbolicOperationOrigin(default, sequence, provenance));

@@ -483,24 +483,28 @@ internal static class SymbolicStatementStateTransfer
                     semanticModel,
                     cancellationToken,
                     mutatedSymbol,
-                    out var updatedValueTerm) &&
-                TryCreateSymbolTerm(mutatedSymbol, out var targetTerm) &&
-                targetTerm.Kind == SmtValueKind.Int &&
-                !SymbolicIrReferenceScanner.ContainsVariableOrMember(
-                    updatedValueTerm,
-                    SymbolicFactFactory.GetSmtVariableName(mutatedSymbol)))
+                    out var updatedValueTerm,
+                    out var isChecked))
             {
-                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.Equal,
-                    targetTerm,
+                var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+                    state,
+                    mutatedSymbol,
                     updatedValueTerm,
                     unaryExpressionStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    delta >= 0
+                        ? SymbolicComputedUpdateKind.Increment
+                        : SymbolicComputedUpdateKind.Decrement,
+                    isChecked,
                     delta >= 0
                         ? "ir.path.prior-statement.increment"
                         : "ir.path.prior-statement.decrement");
-                return;
+                if (transition.IsExact)
+                {
+                    state = transition.State;
+                    return;
+                }
             }
 
             state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
