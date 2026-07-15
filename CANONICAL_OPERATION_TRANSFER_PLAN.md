@@ -240,6 +240,7 @@ transfer policy after its slice is complete.
 | Canonical symbolic fact intersection | `8ad69193` | 107,553 | -123 |
 | Canonical ownership joins | `9f6628d5` | 107,509 | -167 |
 | Canonical path-state versions | `addf9379` | 107,476 | -200 |
+| Canonical guarded branch joins | `64e44777` | 107,460 | -216 |
 
 ## Validation Ledger
 
@@ -287,17 +288,20 @@ transfer policy after its slice is complete.
 | Phase 3 canonical fact intersection | Commit `8ad69193` makes `SymbolicStateMerger` own incoming-state fact traversal while allowing the Analyzer to retain its evidence-aware identity predicate, and deletes the duplicate Analyzer intersection loop. Focused merge/resource/CFG/try tests: 102 passed. Production LOC fell to 107,553, or -123 from the rewrite start. |
 | Phase 3 canonical ownership joins | Commit `9f6628d5` moves all-path release, outstanding obligation, alias traversal, and evidence-aware ownership merging into `SymbolicStateMerger`, deletes the Analyzer implementation, and removes the circular dependency between the merger and `PuritySymbolicStateFacts`. Focused ownership/alias/CFG/try tests: 137 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,509, or -167 from the rewrite start. |
 | Phase 3 canonical path-state versions | Commit `addf9379` removes Analyzer's parallel `ISymbol` version map and makes `SymbolicState.SymbolVersions` own definition versions, phi joins, IR rewriting, equality, hashing, and convergence. Focused version/CFG/ownership tests: 228 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 107,476, or -200 from the rewrite start. |
+| Phase 3 canonical guarded branch joins | Commit `64e44777` moves common-state intersection, guarded branch choices, merge limits, and truncation recording into `SymbolicStateMerger` and deletes the branch-owned implementation. Focused switch/path/pattern/limit tests: 154 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,460, or -216 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phase 2 is gated; switch, loop, and try completion are migrated. One
   canonical merger now owns symbolic fact/path choices, ownership joins, version
-  phi construction and rewriting, and try truncation. Analyzer retains metadata.
-- Last confirmed fact: focused version/CFG/ownership tests pass 228/228 and
-  MainSmtAnalyzer passes 487/487 after removing the parallel version map.
-- Next cheapest step: audit remaining branch, loop, completion, and merge owners
-  for reachable state mutation; delete the first superseded path and retain only
-  source traversal, condition lowering, and Analyzer metadata projection.
+  phi construction and rewriting, guarded branch choices, merge limits, and
+  truncation. Analyzer retains metadata.
+- Last confirmed fact: focused branch tests pass 154/154, MainSmtOracle passes
+  573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow retains only the
+  documented SP0010 baseline failure after deleting branch-owned merge policy.
+- Next cheapest step: audit remaining branch, loop, and completion owners for
+  reachable state mutation; route switch exit exclusions and branch-local
+  assumptions through canonical events before deleting their direct mutators.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
