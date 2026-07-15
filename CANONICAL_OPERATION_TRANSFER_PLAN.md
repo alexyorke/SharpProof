@@ -201,7 +201,7 @@ transfer policy after its slice is complete.
     struct identity, property shapes, or construction sites.
   - [x] Convert 18 internal/private Symbolic carriers while excluding public
     contract types and mutable budgets, pools, builders, sessions, and services.
-- [ ] Remove remaining stale or resolved `POTENTIAL_DUPS.md` findings.
+- [x] Remove remaining stale or resolved `POTENTIAL_DUPS.md` findings.
 - [ ] Run two `colgrep --force-cpu` semantic-search batches; stop secondary work
   when each finds fewer than 50 safely removable production lines.
 
@@ -451,12 +451,13 @@ transfer policy after its slice is complete.
 | Phase 6 central baseline identity equality | Commit `b06476c8` replaces two custom comparer classes with one `BaselineIdentityKey` that owns ordinal ID/symbol and case-insensitive normalized-path equality. Full baseline keys compose it and use generated equality for normalized optional fields. A case-variant path characterization is green; Baseline workflow fixtures pass 7/7. Production LOC fell to 105,637, or -2,039 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 central CorpusReport counters | Commit `f37aab29` replaces string and categorized dictionary increment implementations with one constrained generic counter. CorpusReport fixtures pass 12/12. Production LOC fell to 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 intentional SMT semantic dispatch | Commit `30750190` removes a mixed stale/false-positive entry. `SmtFormulaTraversal` already owns child enumeration, mapping, bottom-up rewrite, and rebuilding; alias normalization and syntactic scans consume it. Structural keys must encode node-specific operators/payloads, while Z3 encoding must map each node to distinct solver semantics. A visitor would retain those cases as one method per node and add interface/dispatch plumbing. Traversal, classifier, structural-key, and encoder fixtures pass 183/183. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
+| Phase 6 duplicate-report completion | Every remaining merged-audit item now has a green implementation or an evidence-backed intentional/stale disposition in this ledger. The empty `POTENTIAL_DUPS.md` scaffolding is deleted. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 through 5 and the first three Phase 6 items are gated. The
-  `POTENTIAL_DUPS.md` cleanup is in progress; its Requires/Ensures and
+  `POTENTIAL_DUPS.md` cleanup is complete; its Requires/Ensures and
   exception-flow diagnostic-envelope findings plus the switch-visibility shape
   finding are removed with evidence, and exception-catalog type/source
   registration, proof path-state encoding, and typed proof-status projection are
@@ -507,11 +508,13 @@ transfer policy after its slice is complete.
   value with case-insensitive path equality. CorpusReport string and categorized
   counts now share one typed increment operation. SMT child traversal and
   rewriting already have one taxonomy; remaining node switches encode genuinely
-  operation-specific payload and solver semantics.
-- Last confirmed fact: traversal, classifier, structural-key, and encoder
-  fixtures pass 183/183. Test LOC is 142,478; production LOC is 105,631, or
-  -2,045 from the rewrite start.
-- Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, the repeated shared-catalog namespace recommendation.
+  operation-specific payload and solver semantics. The exhausted duplicate
+  report is deleted.
+- Last confirmed fact: all merged-audit findings have terminal implementations
+  or evidence-backed dispositions; `POTENTIAL_DUPS.md` has no remaining item.
+  Test LOC is 142,478; production LOC is 105,631, or -2,045 from the rewrite
+  start.
+- Next cheapest step: run the first bounded `colgrep --force-cpu` semantic-search
+  batch and quantify only safely removable production candidates.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
