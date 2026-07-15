@@ -100,9 +100,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Symbolic Smt
 
-### Duplicated FloorDiv / CeilingDiv - `SmtSyntacticClassifier.Numeric.cs:552-566` (BigInteger) vs `:776-792` (long)
-**Recommendation:** Implement `long` versions by delegating to BigInteger overloads.
-
 ### Duplicated conditional-formula "known value" recursion - `SmtSyntacticClassifier.Numeric.cs:156-159`, `ReferenceString.cs:203-206,250-255,159-163`
 Same `conditionValue ? WhenTrue : WhenFalse` dispatch per kind. **Recommendation:** `TryGetConditionalKnownValue(...)` generic helper.
 
