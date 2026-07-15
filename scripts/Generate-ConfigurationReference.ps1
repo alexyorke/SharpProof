@@ -156,16 +156,23 @@ function Get-RegistryOptions {
     )
 
     $constants = Get-ConstantValues -Source $ConfigKeysSource
-    $needle = "new AnalyzerConfigurationOption("
+    $initializerNeedle = "public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = ImmutableArray.Create("
+    $initializerStart = $RegistrySource.IndexOf($initializerNeedle, [System.StringComparison]::Ordinal)
+    if ($initializerStart -lt 0) {
+        throw "Could not find the analyzer configuration option registry initializer."
+    }
+
+    $initializerOpen = $initializerStart + $initializerNeedle.Length - 1
+    $registrations = Get-BalancedArguments -Source $RegistrySource -OpenIndex $initializerOpen
     $options = New-Object System.Collections.Generic.List[object]
-    $searchIndex = 0
-    while (($startIndex = $RegistrySource.IndexOf($needle, $searchIndex, [System.StringComparison]::Ordinal)) -ge 0) {
-        $openIndex = $startIndex + $needle.Length - 1
-        $arguments = Get-BalancedArguments -Source $RegistrySource -OpenIndex $openIndex
-        if ($arguments.Count -lt 5) {
-            throw "AnalyzerConfigurationOption at offset $startIndex has too few arguments."
+    foreach ($registration in $registrations) {
+        if ($registration -notmatch '^(?<factory>GlobalOption|TreeOption|TreeSuggestionScope|TreeBool|GlobalBool|GlobalPositiveInteger)\s*\(') {
+            throw "Unexpected registry option expression '$registration'."
         }
 
+        $factory = $Matches["factory"]
+        $openIndex = $registration.IndexOf('(')
+        $arguments = Get-BalancedArguments -Source $registration -OpenIndex $openIndex
         $constantExpression = $arguments[0].Trim()
         if ($constantExpression -notmatch '^ConfigKeys\.(?<name>[A-Za-z_][A-Za-z0-9_]*)$') {
             throw "Unexpected ConfigKeys expression '$constantExpression'."
@@ -176,17 +183,57 @@ function Get-RegistryOptions {
             throw "Registry references missing ConfigKeys member '$constantName'."
         }
 
-        $allowedValues = @()
-        if ($arguments.Count -ge 6) {
-            $allowedValues = @(
-                [System.Text.RegularExpressions.Regex]::Matches($arguments[5], '"(?<value>[^"]*)"') |
-                    ForEach-Object { $_.Groups["value"].Value })
+        $scope = if ($factory.StartsWith("Tree", [System.StringComparison]::Ordinal)) {
+            "GlobalAndTree"
+        }
+        else {
+            "GlobalOnly"
         }
 
-        $scope = $arguments[1].Trim() -replace '^AnalyzerConfigurationScope\.', ''
-        $valueKind = $arguments[2].Trim() -replace '^AnalyzerConfigurationValueKind\.', ''
-        $defaultValue = Convert-ConfigurationDefault -Expression $arguments[3] -AllowedValues $allowedValues
-        $description = Convert-CSharpString -Expression $arguments[4]
+        $allowedExpression = $null
+        switch ($factory) {
+            { $_ -in @("GlobalOption", "TreeOption") } {
+                if ($arguments.Count -lt 4) { throw "$factory requires at least four arguments." }
+                $valueKind = $arguments[1].Trim() -replace '^AnalyzerConfigurationValueKind\.', ''
+                $defaultExpression = $arguments[2]
+                $descriptionExpression = $arguments[3]
+                if ($arguments.Count -ge 5 -and $arguments[4].Trim().StartsWith("ImmutableArray.Create(",
+                        [System.StringComparison]::Ordinal)) {
+                    $allowedExpression = $arguments[4]
+                }
+                break
+            }
+            "TreeSuggestionScope" {
+                $valueKind = "MissingPuritySuggestionScope"
+                $defaultExpression = '"all"'
+                $descriptionExpression = $arguments[1]
+                $allowedExpression = 'ImmutableArray.Create("all", "public", "internal", "off")'
+                break
+            }
+            { $_ -in @("TreeBool", "GlobalBool") } {
+                $valueKind = "Bool"
+                $defaultExpression = $arguments[1]
+                $descriptionExpression = $arguments[2]
+                break
+            }
+            "GlobalPositiveInteger" {
+                $valueKind = "PositiveInteger"
+                $defaultExpression = $arguments[1]
+                $descriptionExpression = $arguments[2]
+                break
+            }
+            default { throw "Unsupported registry option factory '$factory'." }
+        }
+
+        $allowedValues = if ($null -eq $allowedExpression) {
+            @()
+        }
+        else {
+            @([System.Text.RegularExpressions.Regex]::Matches($allowedExpression, '"(?<value>[^"]*)"') |
+                ForEach-Object { $_.Groups["value"].Value })
+        }
+        $defaultValue = Convert-ConfigurationDefault -Expression $defaultExpression -AllowedValues $allowedValues
+        $description = Convert-CSharpString -Expression $descriptionExpression
 
         $options.Add([pscustomobject]@{
                 Name = $constantName
@@ -197,8 +244,6 @@ function Get-RegistryOptions {
                 Description = $description
                 AllowedValues = $allowedValues
             })
-
-        $searchIndex = $startIndex + $needle.Length
     }
 
     if ($options.Count -eq 0) {

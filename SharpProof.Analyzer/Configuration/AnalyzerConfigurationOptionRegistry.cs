@@ -14,114 +14,57 @@ internal static class AnalyzerConfigurationOptionRegistry
         _optionsByKey ??= All.ToImmutableDictionary(static option => option.Key, StringComparer.Ordinal);
 
     public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = ImmutableArray.Create(
-        new AnalyzerConfigurationOption(
-            ConfigKeys.KnownImpureMethods,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StructuralMemberKeyList,
+        GlobalOption(ConfigKeys.KnownImpureMethods, AnalyzerConfigurationValueKind.StructuralMemberKeyList,
             string.Empty,
             "Canonical structural method keys forced impure before generated or built-in purity evidence; property accessors require .get or .set.",
             purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.KnownPureMethods,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StructuralMemberKeyList,
+        GlobalOption(ConfigKeys.KnownPureMethods, AnalyzerConfigurationValueKind.StructuralMemberKeyList,
             string.Empty,
             "Canonical structural method keys trusted pure unless a higher-priority impure or generated policy wins; property accessors require .get or .set.",
             purityPolicyImpact: PurityPolicyImpact.TrustsPure),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.KnownImpureNamespaces,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StringList,
+        GlobalOption(ConfigKeys.KnownImpureNamespaces, AnalyzerConfigurationValueKind.StringList,
             string.Empty,
             "Namespaces forced impure except for exact configured-pure member exemptions.",
             purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.KnownImpureTypes,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StringList,
+        GlobalOption(ConfigKeys.KnownImpureTypes, AnalyzerConfigurationValueKind.StringList,
             string.Empty,
             "Types forced impure except for exact configured-pure member exemptions.",
             purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AttributeStubNamespaces,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StringList,
+        GlobalOption(ConfigKeys.AttributeStubNamespaces, AnalyzerConfigurationValueKind.StringList,
             "SharpProof.Attributes",
             "Namespaces accepted for source-only SharpProof attributes, including purity boundary attributes.",
             purityPolicyImpact: PurityPolicyImpact.TrustsPure |
                                 PurityPolicyImpact.ForcesImpure |
                                 PurityPolicyImpact.ChangesAttributeIdentity),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.PurityProfile,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PurityProfile,
+        GlobalOption(ConfigKeys.PurityProfile, AnalyzerConfigurationValueKind.PurityProfile,
             "balanced",
             "Selects strict, balanced, or pragmatic purity fallback policy.",
             ImmutableArray.Create("strict", "balanced", "pragmatic"),
             PurityPolicyImpact.ChangesStrictness),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.TrustedBoundaryReviewMode,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.AllowedValue,
+        GlobalOption(ConfigKeys.TrustedBoundaryReviewMode, AnalyzerConfigurationValueKind.AllowedValue,
             "off",
             "Reports applied purity trust shortcuts, or all candidates including overridden shortcuts.",
             ImmutableArray.Create("off", "used", "all")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePure,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "true",
+        TreeBool(ConfigKeys.SuggestMissingEnforcePure, "true",
             "Controls SP0004 inferred purity suggestions."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePureScope,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
-            "all",
-            "Controls which method visibility SP0004 can suggest.",
-            ImmutableArray.Create("all", "public", "internal", "off"),
-            acceptedAliases: ImmutableArray.Create("public-only", "internal-only", "none", "false")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePureExcludeGenerated,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeSuggestionScope(ConfigKeys.SuggestMissingEnforcePureScope,
+            "Controls which method visibility SP0004 can suggest."),
+        TreeBool(ConfigKeys.SuggestMissingEnforcePureExcludeGenerated, "false",
             "Suppresses SP0004 in generated-looking source paths."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePureExcludeTests,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.SuggestMissingEnforcePureExcludeTests, "false",
             "Suppresses SP0004 in test-looking namespaces and source paths."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePureMinComplexity,
-            AnalyzerConfigurationScope.GlobalAndTree,
+        TreeOption(ConfigKeys.SuggestMissingEnforcePureMinComplexity,
             AnalyzerConfigurationValueKind.NonNegativeInteger,
             "0",
             "Minimum inferred complexity required before SP0004 is suggested."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestMissingEnforcePureNamespaceFilters,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.StringList,
+        TreeOption(ConfigKeys.SuggestMissingEnforcePureNamespaceFilters, AnalyzerConfigurationValueKind.StringList,
             string.Empty,
             "Namespace prefixes eligible for SP0004 suggestions."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestInferredContracts,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.SuggestInferredContracts, "false",
             "Controls opt-in SP0034-SP0039 and SP0046 inferred contract suggestions."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestInferredContractsScope,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
-            "all",
-            "Controls which method visibility can receive inferred contract suggestions.",
-            ImmutableArray.Create("all", "public", "internal", "off"),
-            acceptedAliases: ImmutableArray.Create("public-only", "internal-only", "none", "false")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestInferredContractsKinds,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.AllowedValueList,
+        TreeSuggestionScope(ConfigKeys.SuggestInferredContractsScope,
+            "Controls which method visibility can receive inferred contract suggestions."),
+        TreeOption(ConfigKeys.SuggestInferredContractsKinds, AnalyzerConfigurationValueKind.AllowedValueList,
             "zero-allocations, capabilities, complexity, exceptions, ensures, requires, nullability",
             "Selects inferred contract families.",
             ImmutableArray.Create(
@@ -132,29 +75,15 @@ internal static class AnalyzerConfigurationOptionRegistry
                 "ensures",
                 "requires",
                 "nullability")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuggestInferredContractsMinimumConfidence,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.AllowedValue,
+        TreeOption(ConfigKeys.SuggestInferredContractsMinimumConfidence, AnalyzerConfigurationValueKind.AllowedValue,
             "high",
             "Minimum confidence for inferred contract suggestions.",
             ImmutableArray.Create("medium", "high")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.EmitExplanations,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.EmitExplanations, "false",
             "Emits optional SP0009 proof explanation diagnostics."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.ReportBclFallbackGuesses,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.ReportBclFallbackGuesses, "false",
             "Emits optional SP0012 BCL fallback guess diagnostics."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.RuntimeHazardMode,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.RuntimeHazardMode,
+        TreeOption(ConfigKeys.RuntimeHazardMode, AnalyzerConfigurationValueKind.RuntimeHazardMode,
             "none",
             "Controls SP0010, SP0011, and opt-in SP0033 runtime-hazard reporting.",
             ImmutableArray.Create(
@@ -165,16 +94,9 @@ internal static class AnalyzerConfigurationOptionRegistry
                 "unknowns",
                 "sites-and-unknowns",
                 "all-and-unknowns")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuppressProvenDiagnostics,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.SuppressProvenDiagnostics, "false",
             "Controls opt-in suppression of allowlisted external diagnostics backed by exact SharpProof proofs."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SuppressionDiagnosticIds,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.AllowedValueList,
+        TreeOption(ConfigKeys.SuppressionDiagnosticIds, AnalyzerConfigurationValueKind.AllowedValueList,
             string.Join(", ", ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.OrderBy(
                 static id => id,
                 StringComparer.Ordinal)),
@@ -199,148 +121,125 @@ internal static class AnalyzerConfigurationOptionRegistry
                 "v3151",
                 "v3152",
                 "v3218")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.ReportExceptions,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.ReportExceptions, "false",
             "Emits optional SP0010 exception summary diagnostics."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.ReportNullableInconclusive,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.ReportNullableInconclusive, "false",
             "Emits SP0047 when nullable contract or suppression verification is inconclusive."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.CheckedExceptions,
-            AnalyzerConfigurationScope.GlobalAndTree,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        TreeBool(ConfigKeys.CheckedExceptions, "false",
             "Emits optional SP0011 exception site diagnostics."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.EnableEffectSummaryJson,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.Bool,
+        GlobalBool(ConfigKeys.EnableEffectSummaryJson,
             "false",
             "Enables identity-validated AdditionalFiles summaries that can override built-in purity evidence.",
             purityPolicyImpact: PurityPolicyImpact.TrustsPure |
                                 PurityPolicyImpact.ForcesImpure |
                                 PurityPolicyImpact.EnablesGeneratedOverrides),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtMode,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.SmtMode,
+        GlobalOption(ConfigKeys.SmtMode, AnalyzerConfigurationValueKind.SmtMode,
             "bounded",
             "Controls bounded SMT proof mode.",
             ImmutableArray.Create("disabled", "bounded", "deep")),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtTimeoutMs,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
+        GlobalPositiveInteger(ConfigKeys.SmtTimeoutMs,
             AnalyzerConfigurationDefault.ForSmtModes(750, 2000, "ms"),
             "Per-query SMT timeout in milliseconds."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtMethodBudgetMs,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
+        GlobalPositiveInteger(ConfigKeys.SmtMethodBudgetMs,
             AnalyzerConfigurationDefault.ForSmtModes(5000, 15000, "ms"),
             "Per-method SMT budget in milliseconds."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtMaxPathConditions,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
+        GlobalPositiveInteger(ConfigKeys.SmtMaxPathConditions,
             AnalyzerConfigurationDefault.ForSmtModes(192, 512),
             "Maximum SMT path conditions considered per method."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtMaxExpressionNodes,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
+        GlobalPositiveInteger(ConfigKeys.SmtMaxExpressionNodes,
             AnalyzerConfigurationDefault.ForSmtModes(2048, 8192),
             "Maximum SMT expression nodes considered per query."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtTransientRetryCount,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.NonNegativeInteger,
+        GlobalOption(ConfigKeys.SmtTransientRetryCount, AnalyzerConfigurationValueKind.NonNegativeInteger,
             "1",
             "Retries after a transient Z3 context failure."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtRecycleContextOnTransientFailure,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.Bool,
-            "true",
+        GlobalBool(ConfigKeys.SmtRecycleContextOnTransientFailure, "true",
             "Recycles the current thread's solver context after a transient failure."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.SmtDisposeThreadContextOnServiceDispose,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.Bool,
-            "false",
+        GlobalBool(ConfigKeys.SmtDisposeThreadContextOnServiceDispose, "false",
             "Disposes the current thread's shared solver context with the analysis service."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxMergedIfElseFacts,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "16",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxMergedIfElseFacts, "16",
             "Maximum facts retained while merging if/else branches."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxMergedSwitchFacts,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "32",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxMergedSwitchFacts, "32",
             "Maximum facts retained while merging switch branches."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxMergedTryFacts,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "16",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxMergedTryFacts, "16",
             "Maximum facts retained while merging try/catch/finally branches."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxTryCompletionBranches,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "8",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxTryCompletionBranches, "8",
             "Maximum try/catch completion branches analyzed at a program point."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxFiniteForeachElementFacts,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "8",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxFiniteForeachElementFacts, "8",
             "Maximum finite collection elements modeled for foreach facts."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxScopedBlockCompletionStatements,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "32",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxScopedBlockCompletionStatements, "32",
             "Maximum completed statements scanned while deriving scoped block facts."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxStructuralNullStateDepth,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "4",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxStructuralNullStateDepth, "4",
             "Maximum structural expression depth inspected for null-state facts."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxMergedPathConditions,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "32",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxMergedPathConditions, "32",
             "Maximum synthesized path conditions retained across merged states."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "4",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState, "4",
             "Maximum mergeable facts retained per target and state."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "64",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget, "64",
             "Maximum fact-choice combinations explored per merge target."),
-        new AnalyzerConfigurationOption(
-            ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState,
-            AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.PositiveInteger,
-            "6",
+        GlobalPositiveInteger(ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState, "6",
             "Maximum guard facts retained per target and state."));
+
+    private static AnalyzerConfigurationOption GlobalOption(
+        string key,
+        AnalyzerConfigurationValueKind valueKind,
+        AnalyzerConfigurationDefault defaultValue,
+        string description,
+        ImmutableArray<string> allowedValues = default,
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
+        ImmutableArray<string> acceptedAliases = default) =>
+        Option(key, AnalyzerConfigurationScope.GlobalOnly, valueKind, defaultValue, description,
+            allowedValues, purityPolicyImpact, acceptedAliases);
+
+    private static AnalyzerConfigurationOption TreeOption(
+        string key,
+        AnalyzerConfigurationValueKind valueKind,
+        AnalyzerConfigurationDefault defaultValue,
+        string description,
+        ImmutableArray<string> allowedValues = default,
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
+        ImmutableArray<string> acceptedAliases = default) =>
+        Option(key, AnalyzerConfigurationScope.GlobalAndTree, valueKind, defaultValue, description,
+            allowedValues, purityPolicyImpact, acceptedAliases);
+
+    private static AnalyzerConfigurationOption TreeSuggestionScope(string key, string description) =>
+        TreeOption(
+            key,
+            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
+            "all",
+            description,
+            ImmutableArray.Create("all", "public", "internal", "off"),
+            acceptedAliases: ImmutableArray.Create("public-only", "internal-only", "none", "false"));
+
+    private static AnalyzerConfigurationOption TreeBool(
+        string key,
+        string defaultValue,
+        string description) =>
+        TreeOption(key, AnalyzerConfigurationValueKind.Bool, defaultValue, description);
+
+    private static AnalyzerConfigurationOption GlobalBool(
+        string key,
+        string defaultValue,
+        string description,
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None) =>
+        GlobalOption(key, AnalyzerConfigurationValueKind.Bool, defaultValue, description,
+            purityPolicyImpact: purityPolicyImpact);
+
+    private static AnalyzerConfigurationOption GlobalPositiveInteger(
+        string key,
+        AnalyzerConfigurationDefault defaultValue,
+        string description) =>
+        GlobalOption(key, AnalyzerConfigurationValueKind.PositiveInteger, defaultValue, description);
+
+    private static AnalyzerConfigurationOption Option(
+        string key,
+        AnalyzerConfigurationScope scope,
+        AnalyzerConfigurationValueKind valueKind,
+        AnalyzerConfigurationDefault defaultValue,
+        string description,
+        ImmutableArray<string> allowedValues = default,
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
+        ImmutableArray<string> acceptedAliases = default) =>
+        new(key, scope, valueKind, defaultValue, description, allowedValues, purityPolicyImpact, acceptedAliases);
 
     public static ImmutableArray<AnalyzerConfigurationOption> GlobalOptions =>
         All.Where(static option => option.IsGlobal).ToImmutableArray();
