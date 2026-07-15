@@ -450,6 +450,7 @@ transfer policy after its slice is complete.
 | Phase 6 resolved SARIF materialization finding | Commit `62d6cf59` removes a stale entry: Baseline and CorpusReport already call the single `DotnetSarifBuildRunner.MaterializeAsync`, whose disposable result owns all temporary paths. Baseline, corpus, and process-ownership fixtures pass 28/28. Production LOC remains 105,680, or -1,996 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 central baseline identity equality | Commit `b06476c8` replaces two custom comparer classes with one `BaselineIdentityKey` that owns ordinal ID/symbol and case-insensitive normalized-path equality. Full baseline keys compose it and use generated equality for normalized optional fields. A case-variant path characterization is green; Baseline workflow fixtures pass 7/7. Production LOC fell to 105,637, or -2,039 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 central CorpusReport counters | Commit `f37aab29` replaces string and categorized dictionary increment implementations with one constrained generic counter. CorpusReport fixtures pass 12/12. Production LOC fell to 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
+| Phase 6 intentional SMT semantic dispatch | Commit `30750190` removes a mixed stale/false-positive entry. `SmtFormulaTraversal` already owns child enumeration, mapping, bottom-up rewrite, and rebuilding; alias normalization and syntactic scans consume it. Structural keys must encode node-specific operators/payloads, while Z3 encoding must map each node to distinct solver semantics. A visitor would retain those cases as one method per node and add interface/dispatch plumbing. Traversal, classifier, structural-key, and encoder fixtures pass 183/183. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 
 ## Current Checkpoint
 
@@ -504,10 +505,13 @@ transfer policy after its slice is complete.
   SARIF materialization and temporary cleanup already share one disposable
   implementation. Baseline bucket and full-key identity now share one normalized
   value with case-insensitive path equality. CorpusReport string and categorized
-  counts now share one typed increment operation.
-- Last confirmed fact: CorpusReport fixtures pass 12/12. Test LOC is 142,478;
-  production LOC is 105,631, or -2,045 from the rewrite start.
+  counts now share one typed increment operation. SMT child traversal and
+  rewriting already have one taxonomy; remaining node switches encode genuinely
+  operation-specific payload and solver semantics.
+- Last confirmed fact: traversal, classifier, structural-key, and encoder
+  fixtures pass 183/183. Test LOC is 142,478; production LOC is 105,631, or
+  -2,045 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, reported SMT formula node dispatch duplication.
+  `POTENTIAL_DUPS.md`, the repeated shared-catalog namespace recommendation.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
