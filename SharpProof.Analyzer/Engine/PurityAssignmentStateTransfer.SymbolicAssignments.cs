@@ -15,7 +15,8 @@ internal static partial class PurityAssignmentStateTransfer
         PurityAnalysisState valueState,
         SemanticModel semanticModel,
         Compilation compilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool advanceDefinitionVersion = true)
     {
         var nextState = currentState;
 
@@ -30,7 +31,8 @@ internal static partial class PurityAssignmentStateTransfer
                 writtenLocalSymbol,
                 currentState,
                 PreservedAliasState.Disposed);
-            nextState = nextState.WithSmtSymbolDefinitionVersion(writtenLocalSymbol, valueOperation.Syntax);
+            if (advanceDefinitionVersion)
+                nextState = nextState.WithSmtSymbolDefinitionVersion(writtenLocalSymbol, valueOperation.Syntax);
             nextState = AddPreservedAliasFacts(
                 nextState,
                 ownedDisposableAliases,
@@ -223,9 +225,7 @@ internal static partial class PurityAssignmentStateTransfer
         IOperation? valueOperation,
         ILocalSymbol[] writtenLocalSymbols,
         PurityAnalysisState valueState,
-        CancellationToken cancellationToken,
-        string logScope,
-        string unresolvedReason)
+        CancellationToken cancellationToken)
     {
         if (valueOperation == null || targetSymbol == null || targetType?.TypeKind != TypeKind.Delegate)
             return currentState;

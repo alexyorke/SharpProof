@@ -82,9 +82,7 @@ internal static partial class PurityAssignmentStateTransfer
                     currentState,
                     context,
                     operationToTrack.Syntax,
-                    operationToTrack.Syntax,
-                    "[ATF-DEL-COALESCE]",
-                    "coalesce-assigned value targets are unresolved");
+                    operationToTrack.Syntax);
         }
 
         else if (operationToTrack is IDeconstructionAssignmentOperation deconstructionAssignmentOperation)
@@ -109,9 +107,7 @@ internal static partial class PurityAssignmentStateTransfer
                 currentState,
                 context,
                 operationToTrack.Syntax,
-                operationToTrack.Syntax,
-                "[ATF-DEL-ASSIGN]",
-                "assigned value targets are unresolved");
+                operationToTrack.Syntax);
         }
 
         else if (operationToTrack is IVariableDeclaratorOperation variableDeclaratorOperation &&
@@ -211,38 +207,15 @@ internal static partial class PurityAssignmentStateTransfer
                     {
                         var initializerValue = declarator.Initializer.Value;
                         var declaredSymbol = declarator.Symbol;
-
-                        if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation,
-                                out var concreteType))
-                            nextState = nextState.WithLocalConcreteType(declaredSymbol, concreteType);
-                        else
-                            nextState = nextState.WithoutLocalConcreteType(declaredSymbol);
-
-                        if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(
-                                initializerValue,
-                                nextState,
-                                context.SemanticModel.Compilation))
-                        {
-                            nextState = nextState.WithOwnedLocalArray(declaredSymbol);
-                            nextState = PurityResourceStateFacts.AddOwnedLocalArrayFacts(
-                                nextState,
-                                declaredSymbol,
-                                initializerValue);
-                        }
-                        else
-                        {
-                            nextState = nextState.WithoutOwnedLocalArray(declaredSymbol);
-                        }
-
-                        nextState = PurityResourceStateFacts.AddFreshMutableObjectFacts(
+                        nextState = ApplyWrittenLocalStateUpdates(
                             nextState,
-                            declaredSymbol,
-                            initializerValue);
-
-                        if (PurityConcreteReceiverResolver.IsDefinitelyNullValue(initializerValue, nextState))
-                            nextState = nextState.WithDefinitelyNullLocal(declaredSymbol);
-                        else
-                            nextState = nextState.WithoutDefinitelyNullLocal(declaredSymbol);
+                            new[] { declaredSymbol },
+                            initializerValue,
+                            nextState,
+                            context.SemanticModel,
+                            context.SemanticModel.Compilation,
+                            context.CancellationToken,
+                            advanceDefinitionVersion: false);
 
                         if (declaredSymbol.Type?.TypeKind == TypeKind.Delegate)
                         {
@@ -252,13 +225,6 @@ internal static partial class PurityAssignmentStateTransfer
                                 nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
                         }
 
-                        nextState = PurityOperationTransferAdapter.ApplyAssignmentFacts(
-                            nextState,
-                            declaredSymbol,
-                            initializerValue,
-                            nextState,
-                            context.SemanticModel,
-                            context.CancellationToken);
                         nextState = PurityOperationTransferAdapter.ApplyDeclaredBorrow(
                             nextState,
                             declaredSymbol,
@@ -286,9 +252,7 @@ internal static partial class PurityAssignmentStateTransfer
         PurityAnalysisState currentState,
         PurityAnalysisContext context,
         SyntaxNode definitionSyntax,
-        SyntaxNode mutationSyntax,
-        string logScope,
-        string unresolvedReason)
+        SyntaxNode mutationSyntax)
     {
         var writtenLocalSymbols = targetSymbol is ILocalSymbol localSymbol
             ? EnumerateWrittenLocalSymbols(localSymbol, context).ToArray()
@@ -325,9 +289,7 @@ internal static partial class PurityAssignmentStateTransfer
             valueOperation,
             writtenLocalSymbols,
             currentState,
-            context.CancellationToken,
-            logScope,
-            unresolvedReason);
+            context.CancellationToken);
     }
 
     private static PurityAnalysisState ApplyDeconstructionAssignmentStateUpdates(
@@ -358,9 +320,7 @@ internal static partial class PurityAssignmentStateTransfer
                 currentState,
                 context,
                 assignment.Target.Operation.Syntax,
-                deconstructionAssignmentOperation.Syntax,
-                "[ATF-DEL-DECONSTRUCT]",
-                "deconstructed value targets are unresolved");
+                deconstructionAssignmentOperation.Syntax);
         }
 
         return nextState;
