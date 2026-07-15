@@ -109,9 +109,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - SymbolicCli
 
-### Duplicated capability-site prefix/detail formatting - `SymbolicCliTextRenderer.cs:274-277,356-359`
-**Recommendation:** `FormatSite(site)` helper.
-
 ---
 
 ## Tools - Fuzz

@@ -259,13 +259,7 @@ internal static class SymbolicCliTextRenderer
 
     var siteProjection = SymbolicCompactProjection.Project(result.Sites, maxItems);
     foreach (var site in siteProjection.Items)
-    {
-        var prefix = site.IsUnknown ? "Unknown" : site.CapabilityText;
-        var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
-            ? site.OperationKind
-            : site.SymbolDisplayName;
-        Console.WriteLine($"  - {prefix} via {detail} @ {site.SourceLine}:{site.SourceColumn}");
-    }
+        Console.WriteLine($"  - {FormatCapabilitySite(site)} @ {site.SourceLine}:{site.SourceColumn}");
 }
 
     private static void PrintExplainComplexitySummary(SymbolicComplexityResult result, int maxItems)
@@ -342,16 +336,17 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine("Sites:");
         foreach (var site in result.Sites)
         {
-            var prefix = site.IsUnknown ? "Unknown" : site.CapabilityText;
-            var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
-                ? site.OperationKind
-                : site.SymbolDisplayName;
             var transitive = site.IsTransitive ? " transitive" : string.Empty;
             Console.WriteLine(
-                $"  - [{site.SiteKind}] {prefix} via {detail} @ {site.SourceLine}:{site.SourceColumn}{transitive}");
+                $"  - [{site.SiteKind}] {FormatCapabilitySite(site)} @ " +
+                $"{site.SourceLine}:{site.SourceColumn}{transitive}");
         }
     }
 }
+
+    private static string FormatCapabilitySite(SymbolicCapabilitySite site) =>
+    $"{(site.IsUnknown ? "Unknown" : site.CapabilityText)} via " +
+    (string.IsNullOrWhiteSpace(site.SymbolDisplayName) ? site.OperationKind : site.SymbolDisplayName);
 
     private static string FormatCountSummary(IReadOnlyDictionary<string, int> counts)
 {
