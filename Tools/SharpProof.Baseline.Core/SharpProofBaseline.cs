@@ -132,19 +132,16 @@ public static class SharpProofBaseline
                 group => group.Select(entry => NormalizePath(entry.Path))
                     .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase));
         var currentByIdentity = current.Diagnostics
-            .GroupBy(
-                entry => new BaselineBucketKey(entry.Id, entry.Symbol, NormalizePath(entry.Path)),
-                BaselineBucketKeyComparer.Instance)
+            .GroupBy(BaselineIdentityKey.FromEntry)
             .ToDictionary(
                 static group => group.Key,
-                static group => group.ToImmutableArray(),
-                BaselineBucketKeyComparer.Instance);
+                static group => group.ToImmutableArray());
 
         var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
         foreach (var entry in baseline.Diagnostics)
         {
             var normalizedPath = NormalizePath(entry.Path);
-            var bucketKey = new BaselineBucketKey(entry.Id, entry.Symbol, normalizedPath);
+            var bucketKey = new BaselineIdentityKey(entry.Id, entry.Symbol, normalizedPath);
             if (currentByIdentity.TryGetValue(bucketKey, out var matchingBucket) &&
                 matchingBucket.Any(currentEntry => EntryMatchesOptionalIdentity(entry, currentEntry)))
             {
@@ -208,26 +205,23 @@ public static class SharpProofBaseline
                string.Equals(expected.Trim(), actual?.Trim(), StringComparison.Ordinal);
     }
 
-    private readonly record struct BaselineBucketKey(string Id, string Symbol, string Path);
-
-    private sealed class BaselineBucketKeyComparer : IEqualityComparer<BaselineBucketKey>
+    private readonly record struct BaselineIdentityKey(string Id, string Symbol, string Path)
     {
-        internal static readonly BaselineBucketKeyComparer Instance = new();
+        internal static BaselineIdentityKey FromEntry(BaselineEntry entry) =>
+            new(entry.Id, entry.Symbol, NormalizePath(entry.Path));
 
-        public bool Equals(BaselineBucketKey x, BaselineBucketKey y)
-        {
-            return string.Equals(x.Id, y.Id, StringComparison.Ordinal) &&
-                   string.Equals(x.Symbol, y.Symbol, StringComparison.Ordinal) &&
-                   string.Equals(x.Path, y.Path, StringComparison.OrdinalIgnoreCase);
-        }
+        public bool Equals(BaselineIdentityKey other) =>
+            string.Equals(Id, other.Id, StringComparison.Ordinal) &&
+            string.Equals(Symbol, other.Symbol, StringComparison.Ordinal) &&
+            string.Equals(Path, other.Path, StringComparison.OrdinalIgnoreCase);
 
-        public int GetHashCode(BaselineBucketKey obj)
+        public override int GetHashCode()
         {
             unchecked
             {
-                var hash = StringComparer.Ordinal.GetHashCode(obj.Id);
-                hash = hash * 397 ^ StringComparer.Ordinal.GetHashCode(obj.Symbol);
-                hash = hash * 397 ^ StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Path);
+                var hash = StringComparer.Ordinal.GetHashCode(Id);
+                hash = hash * 397 ^ StringComparer.Ordinal.GetHashCode(Symbol);
+                hash = hash * 397 ^ StringComparer.OrdinalIgnoreCase.GetHashCode(Path);
                 return hash;
             }
         }
@@ -437,7 +431,7 @@ public static class SharpProofBaseline
 
     private static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries)
     {
-        var seen = new HashSet<BaselineKey>(BaselineKey.BaselineKeyComparer.Instance);
+        var seen = new HashSet<BaselineKey>();
         var result = ImmutableArray.CreateBuilder<BaselineEntry>();
         foreach (var entry in entries.OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(entry => entry.Id, StringComparer.Ordinal)
@@ -578,9 +572,7 @@ public static class SharpProofBaseline
     }
 
     private readonly record struct BaselineKey(
-        string Id,
-        string Symbol,
-        string Path,
+        BaselineIdentityKey Identity,
         int? Line,
         int? Column,
         string? Contract,
@@ -590,51 +582,12 @@ public static class SharpProofBaseline
         public static BaselineKey FromEntry(BaselineEntry entry)
         {
             return new BaselineKey(
-                entry.Id,
-                entry.Symbol,
-                NormalizePath(entry.Path),
+                BaselineIdentityKey.FromEntry(entry),
                 entry.Line,
                 entry.Column,
                 NormalizeOptional(entry.Contract),
                 NormalizeOptional(entry.OperationKind),
                 NormalizeOptional(entry.EvidenceKey));
-        }
-
-        internal sealed class BaselineKeyComparer : IEqualityComparer<BaselineKey>
-        {
-            internal static readonly BaselineKeyComparer Instance = new();
-
-            public bool Equals(BaselineKey x, BaselineKey y)
-            {
-                return string.Equals(x.Id, y.Id, StringComparison.Ordinal) &&
-                       string.Equals(x.Symbol, y.Symbol, StringComparison.Ordinal) &&
-                       string.Equals(x.Path, y.Path, StringComparison.OrdinalIgnoreCase) &&
-                       x.Line == y.Line &&
-                       x.Column == y.Column &&
-                       string.Equals(x.Contract, y.Contract, StringComparison.Ordinal) &&
-                       string.Equals(x.OperationKind, y.OperationKind, StringComparison.Ordinal) &&
-                       string.Equals(x.EvidenceKey, y.EvidenceKey, StringComparison.Ordinal);
-            }
-
-            public int GetHashCode(BaselineKey obj)
-            {
-                unchecked
-                {
-                    var hash = StringComparer.Ordinal.GetHashCode(obj.Id);
-                    hash = hash * 397 ^ StringComparer.Ordinal.GetHashCode(obj.Symbol);
-                    hash = hash * 397 ^ StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Path);
-                    hash = hash * 397 ^ obj.Line.GetHashCode();
-                    hash = hash * 397 ^ obj.Column.GetHashCode();
-                    hash = hash * 397 ^ (obj.Contract == null ? 0 : StringComparer.Ordinal.GetHashCode(obj.Contract));
-                    hash = hash * 397 ^ (obj.OperationKind == null
-                        ? 0
-                        : StringComparer.Ordinal.GetHashCode(obj.OperationKind));
-                    hash = hash * 397 ^ (obj.EvidenceKey == null
-                        ? 0
-                        : StringComparer.Ordinal.GetHashCode(obj.EvidenceKey));
-                    return hash;
-                }
-            }
         }
 
         private static string? NormalizeOptional(string? value)

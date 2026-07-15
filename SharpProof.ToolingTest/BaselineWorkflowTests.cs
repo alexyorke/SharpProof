@@ -115,7 +115,7 @@ public sealed class BaselineWorkflowTests
         var current = new BaselineDocument(ImmutableArray.Create(
             Entry("SP0002", "M:Sample.Impure", "src/Sample.cs")));
         var baseline = new BaselineDocument(ImmutableArray.Create(
-            Entry("SP0002", "M:Sample.Impure", "src/Sample.cs"),
+            Entry("SP0002", "M:Sample.Impure", "SRC/SAMPLE.CS"),
             Entry("SP0099", "M:Sample.Impure", "src/Sample.cs"),
             Entry("SP0002", "M:Sample.Other", "src/Sample.cs"),
             Entry("SP0002", "M:Sample.Impure", "src/Renamed.cs")));

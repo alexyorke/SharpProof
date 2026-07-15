@@ -117,9 +117,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Tools - Baseline / Corpus / Vsix
 
-### Duplicated key/comparer for `Id`/`Symbol`/`Path` - `SharpProofBaseline.cs:222-245` vs `:605-663`
-Same `hash = hash*397 ^ ...` for Id/Symbol/Path. **Recommendation:** Reusable `IdentityKey` + comparer; `BaselineKey` composes it.
-
 ### Minor: duplicate `Increment` dictionary helper - `SarifCorpusReport.cs:206,211`
 **Recommendation:** Generic `Increment<TKey>`.
 
