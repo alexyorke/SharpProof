@@ -13,54 +13,40 @@ internal delegate bool SymbolicInvocationTermLowerer(
 
 internal delegate ITypeSymbol? SymbolicInvocationTermTypeResolver(InvocationExpressionSyntax invocation);
 
-internal sealed class SymbolicLoweringContext
+internal sealed class SymbolicLoweringContext(
+    SemanticModel semanticModel,
+    CancellationToken cancellationToken,
+    Func<ISymbol, int>? getSymbolVersion = null,
+    SmtAnalysisService? smtAnalysis = null,
+    SymbolicInvocationTermLowerer? invocationTermLowerer = null,
+    SymbolicTerm? implicitThis = null,
+    int inlineDepth = 0,
+    IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null,
+    SymbolicInvocationTermTypeResolver? invocationTermTypeResolver = null)
 {
     internal const int MaxSourcePredicateInlineDepth = 8;
 
-    public SymbolicLoweringContext(
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion = null,
-        SmtAnalysisService? smtAnalysis = null,
-        SymbolicInvocationTermLowerer? invocationTermLowerer = null,
-        SymbolicTerm? implicitThis = null,
-        int inlineDepth = 0,
-        IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null,
-        SymbolicInvocationTermTypeResolver? invocationTermTypeResolver = null)
-    {
-        SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
-        Compilation = semanticModel.Compilation;
-        CancellationToken = cancellationToken;
-        GetSymbolVersion = getSymbolVersion;
-        SmtAnalysis = smtAnalysis;
-        InvocationTermLowerer = invocationTermLowerer;
-        ImplicitThis = implicitThis ?? new SymbolicVariableTerm(
-            SymbolicStateValueFacts.ImplicitThisVariableName,
-            SmtValueKind.Reference);
-        InlineDepth = inlineDepth;
-        SymbolSubstitutions = symbolSubstitutions;
-        InvocationTermTypeResolver = invocationTermTypeResolver;
-    }
+    public SemanticModel SemanticModel { get; } = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
 
-    public SemanticModel SemanticModel { get; }
+    public Compilation Compilation { get; } = semanticModel.Compilation;
 
-    public Compilation Compilation { get; }
+    public CancellationToken CancellationToken { get; } = cancellationToken;
 
-    public CancellationToken CancellationToken { get; }
+    public Func<ISymbol, int>? GetSymbolVersion { get; } = getSymbolVersion;
 
-    public Func<ISymbol, int>? GetSymbolVersion { get; }
+    public SmtAnalysisService? SmtAnalysis { get; } = smtAnalysis;
 
-    public SmtAnalysisService? SmtAnalysis { get; }
+    public SymbolicInvocationTermLowerer? InvocationTermLowerer { get; } = invocationTermLowerer;
 
-    public SymbolicInvocationTermLowerer? InvocationTermLowerer { get; }
+    public SymbolicTerm ImplicitThis { get; } = implicitThis ?? new SymbolicVariableTerm(
+        SymbolicStateValueFacts.ImplicitThisVariableName,
+        SmtValueKind.Reference);
 
-    public SymbolicTerm ImplicitThis { get; }
+    public int InlineDepth { get; } = inlineDepth;
 
-    public int InlineDepth { get; }
+    public IReadOnlyDictionary<ISymbol, SymbolicTerm>? SymbolSubstitutions { get; } = symbolSubstitutions;
 
-    public IReadOnlyDictionary<ISymbol, SymbolicTerm>? SymbolSubstitutions { get; }
-
-    public SymbolicInvocationTermTypeResolver? InvocationTermTypeResolver { get; }
+    public SymbolicInvocationTermTypeResolver? InvocationTermTypeResolver { get; } = invocationTermTypeResolver;
 
     public bool TryGetSubstitution(ISymbol symbol, out SymbolicTerm term)
     {

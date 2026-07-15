@@ -141,19 +141,12 @@ internal static class SmtFormulaVersionRewriter
         return value is '.' or '[' or ']';
     }
 
-    private readonly struct SmtVersionRewrite
+    private readonly struct SmtVersionRewrite(string prefix, int fromVersion, int toVersion)
     {
-        public SmtVersionRewrite(string prefix, int fromVersion, int toVersion)
-        {
-            Prefix = prefix;
-            FromVersion = fromVersion;
-            ToVersion = toVersion;
-        }
+        public string Prefix { get; } = prefix;
 
-        public string Prefix { get; }
+        public int FromVersion { get; } = fromVersion;
 
-        public int FromVersion { get; }
-
-        public int ToVersion { get; }
+        public int ToVersion { get; } = toVersion;
     }
 }

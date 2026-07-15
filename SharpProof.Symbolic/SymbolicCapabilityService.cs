@@ -749,50 +749,34 @@ internal sealed class SymbolicCapabilityService
         }
     }
 
-    private sealed class ResolvedCapabilityTarget
+    private sealed class ResolvedCapabilityTarget(
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        string methodName,
+        string methodDisplayName,
+        string declarationKind)
     {
-        public ResolvedCapabilityTarget(
-            SyntaxNode declaration,
-            SemanticModel semanticModel,
-            string methodName,
-            string methodDisplayName,
-            string declarationKind)
-        {
-            Declaration = declaration;
-            SemanticModel = semanticModel;
-            MethodName = methodName;
-            MethodDisplayName = methodDisplayName;
-            DeclarationKind = declarationKind;
-        }
+        public SyntaxNode Declaration { get; } = declaration;
 
-        public SyntaxNode Declaration { get; }
+        public SemanticModel SemanticModel { get; } = semanticModel;
 
-        public SemanticModel SemanticModel { get; }
+        public string MethodName { get; } = methodName;
 
-        public string MethodName { get; }
+        public string MethodDisplayName { get; } = methodDisplayName;
 
-        public string MethodDisplayName { get; }
-
-        public string DeclarationKind { get; }
+        public string DeclarationKind { get; } = declarationKind;
     }
 
-    private sealed class CapabilitySummary
+    private sealed class CapabilitySummary(
+        SharpProofCapability capabilities,
+        ImmutableArray<CapabilitySiteData> sites,
+        ImmutableArray<SymbolicCapabilityUnknownReason> unknownReasons)
     {
-        public CapabilitySummary(
-            SharpProofCapability capabilities,
-            ImmutableArray<CapabilitySiteData> sites,
-            ImmutableArray<SymbolicCapabilityUnknownReason> unknownReasons)
-        {
-            Capabilities = capabilities;
-            Sites = sites;
-            UnknownReasons = unknownReasons;
-        }
+        public SharpProofCapability Capabilities { get; } = capabilities;
 
-        public SharpProofCapability Capabilities { get; }
+        public ImmutableArray<CapabilitySiteData> Sites { get; } = sites;
 
-        public ImmutableArray<CapabilitySiteData> Sites { get; }
-
-        public ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
+        public ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons { get; } = unknownReasons;
 
         public static CapabilitySummary FromSites(
             IReadOnlyList<CapabilitySiteData> sites,

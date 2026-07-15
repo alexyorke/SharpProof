@@ -879,17 +879,11 @@ public sealed class SymbolicConditionProofSummary
         };
     }
 
-    private readonly struct ProofReasonKey
+    private readonly struct ProofReasonKey(SymbolicTruthValue truthValue, string? reason)
     {
-        public ProofReasonKey(SymbolicTruthValue truthValue, string? reason)
-        {
-            TruthValue = truthValue;
-            Reason = reason ?? string.Empty;
-        }
+        public SymbolicTruthValue TruthValue { get; } = truthValue;
 
-        public SymbolicTruthValue TruthValue { get; }
-
-        public string Reason { get; }
+        public string Reason { get; } = reason ?? string.Empty;
     }
 
     private sealed class ProofReasonKeyComparer : IEqualityComparer<ProofReasonKey>

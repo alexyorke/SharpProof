@@ -94,38 +94,24 @@ internal static class SymbolicSourceLocation
     }
 }
 
-internal readonly struct LineColumn
+internal readonly struct LineColumn(int line, int column)
 {
-    public LineColumn(int line, int column)
-    {
-        Line = line;
-        Column = column;
-    }
+    public int Line { get; } = line;
 
-    public int Line { get; }
-
-    public int Column { get; }
+    public int Column { get; } = column;
 }
 
-internal readonly struct NodeSourceSpan
+internal readonly struct NodeSourceSpan(
+    int startLine,
+    int startColumn,
+    int endLine,
+    int endColumn)
 {
-    public NodeSourceSpan(
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn)
-    {
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-    }
+    public int StartLine { get; } = startLine;
 
-    public int StartLine { get; }
+    public int StartColumn { get; } = startColumn;
 
-    public int StartColumn { get; }
+    public int EndLine { get; } = endLine;
 
-    public int EndLine { get; }
-
-    public int EndColumn { get; }
+    public int EndColumn { get; } = endColumn;
 }

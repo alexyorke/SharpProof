@@ -103,25 +103,17 @@ internal static class SmtPathConditionMerger
     }
 }
 
-internal readonly struct SmtPathConditionMergeOptions
+internal readonly struct SmtPathConditionMergeOptions(
+    int maxMergedPathConditions,
+    int maxFactsPerTargetPerState,
+    int maxFactChoiceCombinationsPerTarget,
+    int maxGuardFactsPerTargetPerState)
 {
-    public SmtPathConditionMergeOptions(
-        int maxMergedPathConditions,
-        int maxFactsPerTargetPerState,
-        int maxFactChoiceCombinationsPerTarget,
-        int maxGuardFactsPerTargetPerState)
-    {
-        MaxMergedPathConditions = maxMergedPathConditions;
-        MaxFactsPerTargetPerState = maxFactsPerTargetPerState;
-        MaxFactChoiceCombinationsPerTarget = maxFactChoiceCombinationsPerTarget;
-        MaxGuardFactsPerTargetPerState = maxGuardFactsPerTargetPerState;
-    }
+    public int MaxMergedPathConditions { get; } = maxMergedPathConditions;
 
-    public int MaxMergedPathConditions { get; }
+    public int MaxFactsPerTargetPerState { get; } = maxFactsPerTargetPerState;
 
-    public int MaxFactsPerTargetPerState { get; }
+    public int MaxFactChoiceCombinationsPerTarget { get; } = maxFactChoiceCombinationsPerTarget;
 
-    public int MaxFactChoiceCombinationsPerTarget { get; }
-
-    public int MaxGuardFactsPerTargetPerState { get; }
+    public int MaxGuardFactsPerTargetPerState { get; } = maxGuardFactsPerTargetPerState;
 }

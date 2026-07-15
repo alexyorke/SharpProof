@@ -1042,27 +1042,19 @@ internal sealed class SymbolicSourceQueryService
             query.Analysis.Truncation);
     }
 
-    private sealed class ProgramPointQueryContext
+    private sealed class ProgramPointQueryContext(
+        SemanticModel semanticModel,
+        int position,
+        SyntaxNode node,
+        SymbolicProgramPointAnalysis analysis)
     {
-        public ProgramPointQueryContext(
-            SemanticModel semanticModel,
-            int position,
-            SyntaxNode node,
-            SymbolicProgramPointAnalysis analysis)
-        {
-            SemanticModel = semanticModel;
-            Position = position;
-            Node = node;
-            Analysis = analysis;
-        }
+        public SemanticModel SemanticModel { get; } = semanticModel;
 
-        public SemanticModel SemanticModel { get; }
+        public int Position { get; } = position;
 
-        public int Position { get; }
+        public SyntaxNode Node { get; } = node;
 
-        public SyntaxNode Node { get; }
-
-        public SymbolicProgramPointAnalysis Analysis { get; }
+        public SymbolicProgramPointAnalysis Analysis { get; } = analysis;
     }
 
     private sealed class QueryNodeIndex

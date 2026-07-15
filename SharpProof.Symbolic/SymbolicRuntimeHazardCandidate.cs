@@ -3,17 +3,11 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
-internal readonly struct RuntimeHazardCandidate
+internal readonly struct RuntimeHazardCandidate(SyntaxNode site, SymbolicHazardOperation operation)
 {
-    public RuntimeHazardCandidate(SyntaxNode site, SymbolicHazardOperation operation)
-    {
-        Site = site;
-        Operation = operation ?? throw new ArgumentNullException(nameof(operation));
-    }
+    public SyntaxNode Site { get; } = site;
 
-    public SyntaxNode Site { get; }
-
-    public SymbolicHazardOperation Operation { get; }
+    public SymbolicHazardOperation Operation { get; } = operation ?? throw new ArgumentNullException(nameof(operation));
 
     public SymbolicRuntimeHazardKind Kind => Operation.HazardKind;
 }

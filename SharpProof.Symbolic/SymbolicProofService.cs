@@ -498,23 +498,16 @@ internal sealed class SymbolicProofService
         bool IsContradictory,
         TContext Context);
 
-    private sealed class SafeDivisorProofStrategy<TContext>
+    private sealed class SafeDivisorProofStrategy<TContext>(
+        Func<SymbolicTerm, TContext, SyntaxNode, bool> isTermProvablyNonZero,
+        Func<TContext, SymbolicCondition, bool, SafeDivisorAssumption<TContext>> assumeCondition,
+        bool refineShortCircuitConditions)
     {
-        public SafeDivisorProofStrategy(
-            Func<SymbolicTerm, TContext, SyntaxNode, bool> isTermProvablyNonZero,
-            Func<TContext, SymbolicCondition, bool, SafeDivisorAssumption<TContext>> assumeCondition,
-            bool refineShortCircuitConditions)
-        {
-            IsTermProvablyNonZero = isTermProvablyNonZero;
-            AssumeCondition = assumeCondition;
-            RefineShortCircuitConditions = refineShortCircuitConditions;
-        }
+        public Func<SymbolicTerm, TContext, SyntaxNode, bool> IsTermProvablyNonZero { get; } = isTermProvablyNonZero;
 
-        public Func<SymbolicTerm, TContext, SyntaxNode, bool> IsTermProvablyNonZero { get; }
+        public Func<TContext, SymbolicCondition, bool, SafeDivisorAssumption<TContext>> AssumeCondition { get; } = assumeCondition;
 
-        public Func<TContext, SymbolicCondition, bool, SafeDivisorAssumption<TContext>> AssumeCondition { get; }
-
-        public bool RefineShortCircuitConditions { get; }
+        public bool RefineShortCircuitConditions { get; } = refineShortCircuitConditions;
     }
 
     public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)

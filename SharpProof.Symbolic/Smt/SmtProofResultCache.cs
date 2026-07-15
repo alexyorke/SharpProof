@@ -117,22 +117,15 @@ internal sealed class SmtProofResultCache
                queryKey;
     }
 
-    internal sealed class SharedFlightLease
+    internal sealed class SharedFlightLease(
+        string key,
+        Lazy<PurityProofResult> result,
+        bool ownsFlight)
     {
-        public SharedFlightLease(
-            string key,
-            Lazy<PurityProofResult> result,
-            bool ownsFlight)
-        {
-            Key = key;
-            Result = result;
-            OwnsFlight = ownsFlight;
-        }
+        public string Key { get; } = key;
 
-        public string Key { get; }
+        public Lazy<PurityProofResult> Result { get; } = result;
 
-        public Lazy<PurityProofResult> Result { get; }
-
-        public bool OwnsFlight { get; }
+        public bool OwnsFlight { get; } = ownsFlight;
     }
 }

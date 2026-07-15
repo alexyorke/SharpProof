@@ -424,43 +424,31 @@ public enum SymbolicInvariantMergeKind
     ConservativeFactMerge
 }
 
-internal sealed class SymbolicProgramPointQueryResult
+internal sealed class SymbolicProgramPointQueryResult(
+    string filePath,
+    int line,
+    int column,
+    int position,
+    int nodeSpanStart,
+    string nodeKind,
+    SymbolicProgramPointAnalysis analysis,
+    string? programPointKind = null)
 {
-    public SymbolicProgramPointQueryResult(
-        string filePath,
-        int line,
-        int column,
-        int position,
-        int nodeSpanStart,
-        string nodeKind,
-        SymbolicProgramPointAnalysis analysis,
-        string? programPointKind = null)
-    {
-        FilePath = filePath;
-        Line = line;
-        Column = column;
-        Position = position;
-        NodeSpanStart = nodeSpanStart;
-        NodeKind = nodeKind;
-        ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
-        Analysis = analysis ?? throw new ArgumentNullException(nameof(analysis));
-    }
+    public string FilePath { get; } = filePath;
 
-    public string FilePath { get; }
+    public int Line { get; } = line;
 
-    public int Line { get; }
+    public int Column { get; } = column;
 
-    public int Column { get; }
+    public int Position { get; } = position;
 
-    public int Position { get; }
+    public int NodeSpanStart { get; } = nodeSpanStart;
 
-    public int NodeSpanStart { get; }
+    public string NodeKind { get; } = nodeKind;
 
-    public string NodeKind { get; }
+    public string ProgramPointKind { get; } = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
 
-    public string ProgramPointKind { get; }
-
-    public SymbolicProgramPointAnalysis Analysis { get; }
+    public SymbolicProgramPointAnalysis Analysis { get; } = analysis ?? throw new ArgumentNullException(nameof(analysis));
 
     public IReadOnlyList<string> Facts => Analysis.Facts;
 
