@@ -591,15 +591,16 @@ public sealed class SymbolicOperationTransferModelTests
         var assignment = fixture.Root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
             .Single();
-        var operation = fixture.SemanticModel.GetOperation(assignment)!;
-        var symbolic = SymbolicOperationTransferAdapter.Apply(
-            new SymbolicState(),
-            operation,
-            fixture.SemanticModel,
-            CancellationToken.None);
-        var purity = PurityOperationTransferAdapter.Apply(
+        var operation = (Microsoft.CodeAnalysis.Operations.IAssignmentOperation)
+            fixture.SemanticModel.GetOperation(assignment)!;
+        var context = new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None);
+        var symbolic = SymbolicOperationTransferAdapter.ApplyLowering(
+            new SymbolicState(), SymbolicOperationLowerer.Lower(operation, context, context));
+        var target = ((Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation)operation.Target).Local;
+        var purity = PurityOperationTransferAdapter.ApplyAssignment(
             PurityAnalysisEngine.PurityAnalysisState.Pure,
-            operation,
+            target,
+            operation.Value,
             fixture.SemanticModel,
             CancellationToken.None,
             PurityAnalysisEngine.PurityAnalysisState.Pure,
