@@ -1,10 +1,8 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionSources = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionSources;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
 namespace SharpProof.Analyzer;
@@ -35,17 +33,10 @@ internal static partial class ExceptionFlowQuery
             cancellationToken,
             methodSymbol,
             smtAnalysis);
-        var provenRuntimeHazards = runtimeHazards
-            .Where(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Proven)
-            .ToArray();
+        var provenRuntimeHazardSites = ProjectProvenRuntimeHazardSites(methodNode, runtimeHazards);
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind is SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static hazard => hazard.Descriptor.ExceptionType,
-                     static hazard => hazard.Descriptor.Category,
-                     static _ => ExceptionSources.Throw,
+                     provenRuntimeHazardSites.Where(static site => site.BeforeCallees),
                      siteContext))
             yield return entry;
 
@@ -93,246 +84,23 @@ internal static partial class ExceptionFlowQuery
         }
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.DivideByZero),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.DivideByZeroException,
-                     ExceptionCategories.DefiniteDivideByZero,
-                     ExceptionSources.BinaryOperator))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.CheckedIntegralOverflow),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static _ => ExceptionTypes.OverflowException,
-                     static _ => ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is CastExpressionSyntax
-                         ? ExceptionSources.CheckedConversion
-                         : ExceptionSources.CheckedOperator,
-                     siteContext))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.NegativeArrayLength),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.OverflowException,
-                     ExceptionCategories.DefiniteNegativeArrayLength,
-                     ExceptionSources.ArrayLength))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.NegativeStackAllocLength),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.OverflowException,
-                     ExceptionCategories.DefiniteNegativeStackAllocLength,
-                     ExceptionSources.StackAllocLength))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.NullDereference &&
-                         ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is
-                             MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or
-                             InvocationExpressionSyntax or AwaitExpressionSyntax),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static _ => ExceptionTypes.NullReferenceException,
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is AwaitExpressionSyntax
-                         ? ExceptionCategories.DefiniteAwaitNull
-                         : ExceptionCategories.DefiniteNullDereference,
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is AwaitExpressionSyntax
-                         ? ExceptionSources.AwaitExpression
-                         : ExceptionSources.NullReceiver,
-                     siteContext))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentNull &&
-                         string.Equals(hazard.Category, ExceptionCategories.DefiniteLockNull,
-                             StringComparison.Ordinal)),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.ArgumentNullException,
-                     ExceptionCategories.DefiniteLockNull,
-                     ExceptionSources.LockReceiver))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.DynamicNullBinding),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static hazard => hazard.ExceptionType,
-                     static hazard => hazard.Category,
-                     static hazard => GetDynamicNullBindingHazardSource(hazard.Category),
-                     siteContext))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.NullableValueWithoutValue),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.InvalidOperationException,
-                     ExceptionCategories.DefiniteNullableValueWithoutValue,
-                     ExceptionSources.NullableValue))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.UnboxNull),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.NullReferenceException,
-                     ExceptionCategories.DefiniteUnboxNull,
-                     ExceptionSources.Cast))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.InvalidCast),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.InvalidCastException,
-                     ExceptionCategories.DefiniteInvalidCast,
-                     ExceptionSources.Cast))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.ArrayTypeMismatch),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.ArrayTypeMismatchException,
-                     ExceptionCategories.DefiniteArrayTypeMismatch,
-                     ExceptionSources.ArrayStore))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.IndexOutOfRange &&
-                         string.Equals(hazard.Category, ExceptionCategories.DefiniteIndexOutOfRange,
-                             StringComparison.Ordinal)),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.IndexOutOfRangeException,
-                     ExceptionCategories.DefiniteIndexOutOfRange,
-                     ExceptionSources.ArrayIndex))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.IndexOutOfRange &&
-                         string.Equals(hazard.Category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                             StringComparison.Ordinal)),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.IndexOutOfRangeException,
-                     ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                     ExceptionSources.ArrayGetValue))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
-                         (string.Equals(hazard.Category, ExceptionCategories.DefiniteRangeOutOfRange,
-                              StringComparison.Ordinal) ||
-                          string.Equals(hazard.Category, ExceptionCategories.DefiniteSliceOutOfRange,
-                              StringComparison.Ordinal))),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static _ => ExceptionTypes.ArgumentOutOfRangeException,
-                     static _ => ExceptionCategories.DefiniteRangeOutOfRange,
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax
-                         ? ExceptionSources.SpanSlice
-                         : ExceptionSources.RangeSlice,
-                     siteContext))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
-                         string.Equals(
-                             hazard.Category,
-                             ExceptionCategories.DefiniteCountIndexOutOfRange,
-                             StringComparison.Ordinal)),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.ArgumentOutOfRangeException,
-                     ExceptionCategories.DefiniteCountIndexOutOfRange,
-                     ExceptionSources.CountIndex))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.SwitchExpressionNoMatch),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.SwitchExpressionException,
-                     ExceptionCategories.DefiniteSwitchExpressionNoMatch,
-                     ExceptionSources.SwitchExpression))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         hazard.Kind == SymbolicRuntimeHazardKind.InvalidCollectionCardinality),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     siteContext,
-                     ExceptionTypes.InvalidOperationException,
-                     ExceptionCategories.DefiniteInvalidCollectionCardinality,
-                     ExceptionSources.CollectionOperation))
-            yield return entry;
-
-        foreach (var entry in CreateProvenExceptionSiteEntries(
-                     provenRuntimeHazards.Where(static hazard =>
-                         (hazard.Kind is SymbolicRuntimeHazardKind.IndexOutOfRange or
-                             SymbolicRuntimeHazardKind.NullDereference) &&
-                         IsAnalyzerOnlySymbolicHazardCategory(hazard.Category)),
-                     hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
-                     static hazard => hazard.ExceptionType,
-                     static hazard => hazard.Category,
-                     static hazard => GetAnalyzerOnlySymbolicHazardSource(hazard.Category),
+                     provenRuntimeHazardSites.Where(static site => !site.BeforeCallees),
                      siteContext))
             yield return entry;
     }
 
-    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
-        IEnumerable<TCandidate> candidates,
-        Func<TCandidate, SyntaxNode> getSite,
-        ExceptionSiteCollectionContext context,
-        string exceptionMetadataName,
-        string category,
-        string source)
-    {
-        return CreateProvenExceptionSiteEntries(
-            candidates,
-            getSite,
-            _ => exceptionMetadataName,
-            _ => category,
-            _ => source,
-            context);
-    }
-
-    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
-        IEnumerable<TCandidate> candidates,
-        Func<TCandidate, SyntaxNode> getSite,
-        Func<TCandidate, string> getExceptionMetadataName,
-        Func<TCandidate, string> getCategory,
-        Func<TCandidate, string> getSource,
+    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries(
+        IEnumerable<ProvenRuntimeHazardSite> sites,
         ExceptionSiteCollectionContext context)
     {
-        foreach (var candidate in candidates)
+        foreach (var site in sites)
         {
             var entry = TryCreateProvenExceptionSiteEntry(
-                getSite(candidate),
+                site.Site,
                 context,
-                getExceptionMetadataName(candidate),
-                getCategory(candidate),
-                getSource(candidate));
+                site.Hazard.ExceptionType,
+                site.Category,
+                site.Source);
             if (entry != null) yield return entry;
         }
     }
