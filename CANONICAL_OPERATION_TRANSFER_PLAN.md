@@ -221,6 +221,7 @@ transfer policy after its slice is complete.
 | Reference assignment postconditions | `7b236a37` | 108,137 | +461 |
 | Reference-backed projection deletion | `3504ebd9` | 108,070 | +394 |
 | Nullable assignment postconditions | `6d46d6a8` | 108,085 | +409 |
+| Canonical assignment snapshots | `b7478495` | 108,097 | +421 |
 
 ## Validation Ledger
 
@@ -249,19 +250,20 @@ transfer policy after its slice is complete.
 | Phase 2 reference assignment postconditions | Commit `7b236a37` moves reference equality, conditional-reference flow, and definite null/non-null facts into canonical assignment lowering and centralizes exact-null classification. The focused reproduction exposed that null-forgiving syntax can lack a direct Roslyn `IOperation`; removing that unnecessary lowerer dependency restored both definite-null diagnostics. Reproductions: 4 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Total temporary migration scaffolding fell to +461 production LOC. |
 | Phase 2 reference-backed projection deletion | Commit `3504ebd9` replaces the legacy length, exact-list-count, string-content, and multidimensional-array assignment builders with one canonical projection builder consumed by locals and current-instance members. Three Span/Memory regressions exposed a drifted reference-like taxonomy; Symbolic type lowering, state facts, and operation lowering now share one definition. Focused projection tests: 171 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Total temporary migration scaffolding fell to +394 production LOC. |
 | Phase 2 nullable assignment postconditions | Commit `6d46d6a8` teaches canonical assignment lowering to represent `Nullable<T>` as ordered HasValue/value postconditions, moves nullable term identity into the nullable lowerer, and deletes the legacy state-mutating builder. The normalized-state differential fixture and three focused nullable proofs pass; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. This correctness-sensitive two-target support temporarily raises scaffolding to +409 production LOC and must be repaid by the next deletions. |
+| Phase 2 canonical assignment snapshots | Commit `b7478495` makes explicitly marked canonical bindings propagate direct-source facts through substitution, routes scalar/reference and tuple-element snapshots through that policy, and leaves only the nullable source-shape adapter outside the kernel. Focused state/tuple/path tests: 136 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. The reusable closure policy temporarily raises scaffolding to +421 production LOC and must enable larger legacy deletions. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: assignment, declaration, nullable/reference/null flow,
-  reference-backed projections, alias/borrow, invalidation, ownership, and
-  resource lifetime families share canonical events; purity symbolic facts are
-  now query-only.
-- Last confirmed fact: the nullable normalized-state differential and three
-  focused proofs pass, MainSmtOracle passes 573/573, and MainSmtAnalyzer passes
-  487/487 after deleting the legacy nullable assignment builder.
-- Next cheapest step: make canonical direct-symbol bindings own assignment
-  snapshot propagation, then delete the scalar/reference snapshot copier while
-  retaining only nullable or tuple source-shape adapters not yet represented.
+- State: assignment, declaration, direct-source snapshots,
+  nullable/reference/null flow, reference-backed projections, alias/borrow,
+  invalidation, ownership, and resource lifetime families share canonical
+  events; purity symbolic facts are now query-only.
+- Last confirmed fact: focused snapshot/tuple/path tests pass 136/136,
+  MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487 after moving
+  direct-source snapshot propagation into explicitly marked bindings.
+- Next cheapest step: canonicalize finite-array element and tuple-element
+  assignment projections together so their duplicated string, length,
+  non-null, and dimension builders can be deleted as one net-negative slice.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
