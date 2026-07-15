@@ -226,6 +226,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
 - [ ] Introduce one CFG/`IOperation` program-point state collector whose block
   transfer, branch assumptions, merge, completion, and fixed-point behavior is
   expressed by canonical operation descriptors and transition results.
+  - [x] Route straight-line local/parameter declarations and simple assignments
+    through the CFG collector and canonical assignment transition; return typed
+    `Unsupported` for branch, cycle, target, or operation shapes that have not
+    migrated, preserving the structural collector as the fallback.
+  - [ ] Add canonical successor assumptions, state merging, bounded revisits,
+    completion edges, and finally continuations.
 - [ ] Move pattern binding, finite-domain, loop-bound, framework-postcondition,
   and source-provenance discovery behind typed lowering results; discovery may
   retain Roslyn syntax, but it may not mutate `SymbolicState` directly.
@@ -364,6 +370,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Central compact SMT diagnostics projection | `2562ff6f` | 105,707 | -1,969 |
 | Resolved invariant scope-adapter finding | `cee2af96` | 105,707 | -1,969 |
 | Semantic-search residual adapter deletion | `6773fdc0` | 105,585 | -2,091 |
+| Phase 7 straight-line CFG collector | `1b67e81a` | 105,762 | -1,914 |
 
 ## Validation Ledger
 
@@ -490,6 +497,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 6 intentional SMT semantic dispatch | Commit `30750190` removes a mixed stale/false-positive entry. `SmtFormulaTraversal` already owns child enumeration, mapping, bottom-up rewrite, and rebuilding; alias normalization and syntactic scans consume it. Structural keys must encode node-specific operators/payloads, while Z3 encoding must map each node to distinct solver semantics. A visitor would retain those cases as one method per node and add interface/dispatch plumbing. Traversal, classifier, structural-key, and encoder fixtures pass 183/183. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 duplicate-report completion | Every remaining merged-audit item now has a green implementation or an evidence-backed intentional/stale disposition in this ledger. The empty `POTENTIAL_DUPS.md` scaffolding is deleted. Production LOC remains 105,631, or -2,045 from the rewrite start; tracked test LOC remains 142,478. |
 | Phase 6 bounded semantic-search stop gate | Two `colgrep --force-cpu` batches were inspected against production code. Batch 1 found 46 safely removable lines in two generic operation wrappers; commit `6773fdc0` deletes them and keeps the same characterization on the direct lowerer-plus-kernel path, with all 40 operation-transfer model fixtures green. Batch 2 found no >=50-line safe deletion: the catalog hits are required data, option parsing is already registry-driven, and the remaining Analyzer/encoder switches carry distinct policy. Production LOC fell to 105,585, or -2,091 from the rewrite start; tracked test LOC is 142,479. |
+| Phase 7 straight-line CFG collector | Commit `1b67e81a` adds a production-routed CFG/`IOperation` collector for direct local/parameter declarations and simple assignments. It returns typed `Unsupported` for unmigrated control-flow and operation shapes, so the structural engine remains the conservative fallback. Four normalized-state differential cases plus the explicit branch-fallback case pass; the complete program-point and operation-transfer batch passes 120/120. Release Symbolic warning-as-error build: zero warnings. This first migration scaffold raises production LOC to 105,762, or -1,914 from the rewrite start, and test LOC to 142,534. |
 
 ## Current Checkpoint
 
@@ -552,13 +560,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   50 safely removable production lines; their only accepted residual wrappers
   are deleted, so the plan's secondary-work stop condition is met.
 - Last confirmed fact: all 8,583 lines in the legacy deletion-map family are
-  reachable. The 7,315-line structural Symbolic plus purity transfer/merge/CFG
-  surface is the first replacement pool; 1,268 lines are read-only queries,
-  source discovery, or evidence projection. Test LOC is 142,479; production LOC
-  is 105,585, or -2,091 from the rewrite start.
-- Next cheapest step: introduce the canonical CFG/operation program-point
-  collector behind the existing reachability boundary and shadow-compare its
-  straight-line declaration/assignment states before migrating branch and loop
-  edges.
+  reachable. Commit `1b67e81a` now production-routes the first straight-line
+  declaration/assignment slice with conservative fallback. The 120-case focused
+  gate and warning-as-error Symbolic build pass. Test LOC is 142,534; production
+  LOC is 105,762, or -1,914 from the rewrite start; the 177-line scaffold must be
+  repaid when structural transfer paths are deleted.
+- Next cheapest step: add successor branch assumptions and bounded CFG state
+  merging, first for acyclic `if`/conditional flow, with normalized-state parity
+  before routing those sites away from the structural collector.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
