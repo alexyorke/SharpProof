@@ -100,14 +100,23 @@ internal static class SymbolicCfgProgramPointStateCollector
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
                     if (includeCurrentStatementCompletionFacts &&
-                        !TryApplyCurrentCompletion(
-                            ref state,
-                            site,
-                            operation,
-                            currentPath.Guard,
-                            targetIsInsideBranch,
-                            semanticModel,
-                            cancellationToken))
+                        !(site is LocalDeclarationStatementSyntax declaration
+                            ? TryApplyCurrentDeclarationCompletion(
+                                ref state,
+                                declaration,
+                                block.Operations,
+                                currentPath.Guard,
+                                targetIsInsideBranch,
+                                semanticModel,
+                                cancellationToken)
+                            : TryApplyCurrentCompletion(
+                                ref state,
+                                site,
+                                operation,
+                                currentPath.Guard,
+                                targetIsInsideBranch,
+                                semanticModel,
+                                cancellationToken)))
                         return Unsupported(site, "current-completion");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
@@ -823,17 +832,6 @@ internal static class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (site is LocalDeclarationStatementSyntax localDeclaration &&
-            (localDeclaration.Declaration.Variables.Count != 1 ||
-             localDeclaration.Declaration.Variables[0] is not { Initializer: not null } declarator ||
-             operation is not ISimpleAssignmentOperation
-             {
-                 IsImplicit: true,
-                 Syntax: VariableDeclaratorSyntax operationDeclarator
-             } ||
-             !ReferenceEquals(declarator, operationDeclarator)))
-            return false;
-
         if (!TryApplyOperation(
                 ref state,
                 operation,
@@ -843,15 +841,6 @@ internal static class SymbolicCfgProgramPointStateCollector
                 cancellationToken,
                 out _))
             return false;
-
-        if (site is LocalDeclarationStatementSyntax completedDeclaration)
-            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                ref state,
-                completedDeclaration.Declaration.Variables[0].Initializer!.Value,
-                completedDeclaration,
-                false,
-                semanticModel,
-                cancellationToken);
 
         if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
@@ -863,6 +852,44 @@ internal static class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken);
 
+        return true;
+    }
+
+    private static bool TryApplyCurrentDeclarationCompletion(
+        ref SymbolicState state,
+        LocalDeclarationStatementSyntax declaration,
+        ImmutableArray<IOperation> blockOperations,
+        SymbolicCondition? guard,
+        bool allowGuardedReferenceAssignments,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var completedState = state;
+        foreach (var declarator in declaration.Declaration.Variables)
+        {
+            if (declarator.Initializer is not { } initializer ||
+                blockOperations.FirstOrDefault(candidate => ReferenceEquals(candidate.Syntax, declarator)) is not
+                    { } operation ||
+                !TryApplyOperation(
+                    ref completedState,
+                    operation,
+                    guard,
+                    allowGuardedReferenceAssignments,
+                    semanticModel,
+                    cancellationToken,
+                    out _))
+                return false;
+
+            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+                ref completedState,
+                initializer.Value,
+                declaration,
+                false,
+                semanticModel,
+                cancellationToken);
+        }
+
+        state = completedState;
         return true;
     }
 

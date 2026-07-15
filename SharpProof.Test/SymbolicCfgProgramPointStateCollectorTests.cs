@@ -109,16 +109,47 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
-    [TestCase(
-        "static class C { static int M() { int first = 1, second = 2; return first + second; } }")]
+    [Test]
+    public void MultiDeclaratorCompletion_MatchesStructuralCollector()
+    {
+        const string source =
+            "static class C { static int M(int[] values) { int first = values[0], second = first + 2; return second; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(MultiDeclaratorCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
     [TestCase(
         "static class C { static string M(string? input) { string value = input ?? throw new System.Exception(); return value; } }")]
-    public void DeclarationCompletionShapesWithoutParity_RemainConservativeFallback(string source)
+    [TestCase(
+        "static class C { static string M(string? input) { int first = 1; string value = input ?? throw new System.Exception(), copy = value; return copy; } }")]
+    public void ThrowGuardedDeclarationCompletion_RemainsConservativeFallback(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(DeclarationCompletionShapesWithoutParity_RemainConservativeFallback));
-        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+            nameof(ThrowGuardedDeclarationCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Last();
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
