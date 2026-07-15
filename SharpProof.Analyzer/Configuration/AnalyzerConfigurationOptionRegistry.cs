@@ -249,17 +249,6 @@ internal static class AnalyzerConfigurationOptionRegistry
         return OptionsByKey[key];
     }
 
-    public static bool TryGet(string key, out AnalyzerConfigurationOption option)
-    {
-        if (OptionsByKey.TryGetValue(key, out var found))
-        {
-            option = found;
-            return true;
-        }
-
-        option = null!;
-        return false;
-    }
 
     internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode)
     {
@@ -406,6 +395,7 @@ internal readonly record struct AnalyzerConfigurationDefault
         var formatted = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return Unit.Length == 0 ? formatted : formatted + " " + Unit;
     }
+
 }
 
 [Flags]

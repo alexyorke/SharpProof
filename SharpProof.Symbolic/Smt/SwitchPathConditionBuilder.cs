@@ -8,26 +8,6 @@ namespace SharpProof.Symbolic.Smt;
 
 internal static class SwitchPathConditionBuilder
 {
-    public static bool TryCreateSwitchStatementSectionCondition(
-        ExpressionSyntax governingExpression,
-        SwitchSectionSyntax section,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula formula,
-        Func<ISymbol, int>? getSymbolVersion = null,
-        bool includePatternBindings = true)
-    {
-        formula = null!;
-        return TryCreateCanonicalSwitchStatementSectionCondition(
-                   governingExpression,
-                   section,
-                   semanticModel,
-                   cancellationToken,
-                   out var canonicalCondition,
-                   getSymbolVersion) &&
-               SymbolicIrFormulaEncoder.TryEncode(canonicalCondition, out formula);
-    }
-
     internal static bool TryCreateSwitchStatementSectionSymbolicCondition(
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,
@@ -59,25 +39,6 @@ internal static class SwitchPathConditionBuilder
             out condition,
             context.GetSymbolVersion,
             context);
-    }
-
-    public static bool TryCreateSwitchExpressionArmCondition(
-        ExpressionSyntax governingExpression,
-        SwitchExpressionArmSyntax arm,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula formula,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
-        formula = null!;
-        return TryCreateCanonicalSwitchExpressionArmCondition(
-                   governingExpression,
-                   arm,
-                   semanticModel,
-                   cancellationToken,
-                   out var canonicalCondition,
-                   getSymbolVersion) &&
-               SymbolicIrFormulaEncoder.TryEncode(canonicalCondition, out formula);
     }
 
     internal static bool TryCreateSwitchExpressionArmSymbolicCondition(

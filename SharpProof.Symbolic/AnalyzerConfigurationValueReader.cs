@@ -17,17 +17,6 @@ internal static class AnalyzerConfigurationValueReader
             : fallback;
     }
 
-    internal static int GetInteger(
-        AnalyzerConfigOptions options,
-        string key,
-        int fallback,
-        int minimum)
-    {
-        return options.TryGetValue(key, out var value) &&
-               TryParseInteger(value, minimum, out var parsed)
-            ? parsed
-            : fallback;
-    }
 
     internal static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value)
     {

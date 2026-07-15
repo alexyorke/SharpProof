@@ -49,16 +49,6 @@ internal sealed class SymbolicLoweringResult<T>
             SymbolicUnknownReason.None);
     }
 
-    internal static SymbolicLoweringResult<T> Approximate(
-        T value,
-        SymbolicLoweringProvenance provenance)
-    {
-        return new SymbolicLoweringResult<T>(
-            SymbolicLoweringSupport.Approximate,
-            value ?? throw new ArgumentNullException(nameof(value)),
-            ImmutableArray.Create(provenance),
-            SymbolicUnknownReason.None);
-    }
 
     internal static SymbolicLoweringResult<T> Unsupported(SymbolicLoweringProvenance provenance)
     {

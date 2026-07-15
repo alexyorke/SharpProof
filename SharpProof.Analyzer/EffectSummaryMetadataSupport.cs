@@ -352,14 +352,6 @@ internal sealed class SummaryAssemblyIdentity
         !string.IsNullOrWhiteSpace(AssemblySha256) &&
         !string.IsNullOrWhiteSpace(ModuleVersionId);
 
-    public bool Matches(ActualAssemblyIdentity actualAssemblyIdentity)
-    {
-        return string.Equals(AssemblyName, actualAssemblyIdentity.AssemblyName, StringComparison.Ordinal) &&
-               string.Equals(AssemblySha256, actualAssemblyIdentity.AssemblySha256,
-                   StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(ModuleVersionId, actualAssemblyIdentity.ModuleVersionId,
-                   StringComparison.OrdinalIgnoreCase);
-    }
 
     public EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity? actualAssemblyIdentity)
     {
@@ -433,25 +425,7 @@ internal sealed class SummaryMethodIdentity
                string.Equals(MetadataToken, actualMethodIdentity.MetadataToken, StringComparison.OrdinalIgnoreCase);
     }
 
-    public bool IsCompleteEnoughFor(ActualMethodIdentity? actualMethodIdentity)
-    {
-        if (!MatchesMetadataToken(actualMethodIdentity)) return false;
 
-        if (!actualMethodIdentity!.HasMethodBody) return true;
-
-        return !string.IsNullOrWhiteSpace(MethodBodySha256);
-    }
-
-    public bool Matches(ActualMethodIdentity actualMethodIdentity)
-    {
-        if (!string.Equals(MetadataToken, actualMethodIdentity.MetadataToken, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        if (actualMethodIdentity.MethodBodySha256 == null) return true;
-
-        return string.Equals(MethodBodySha256, actualMethodIdentity.MethodBodySha256,
-            StringComparison.OrdinalIgnoreCase);
-    }
 
     public EffectSummaryCompatibility GetCompatibility(ActualMethodIdentity? actualMethodIdentity)
     {

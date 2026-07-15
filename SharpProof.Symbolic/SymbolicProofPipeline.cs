@@ -32,62 +32,6 @@ internal sealed class SymbolicProofPipeline
         return SymbolicIrProofResult.FromImplication(result, budgetFactory(), support);
     }
 
-    internal SymbolicIrProofResult ClassifyConditionTruth(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        Func<SymbolicBudgetInfo?> budgetFactory,
-        SymbolicProofSupport support)
-    {
-        if (conditionFormula == null) throw new ArgumentNullException(nameof(conditionFormula));
-
-        var normalizedPath = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        var trueProof = ClassifyRawImplication(normalizedPath, conditionFormula);
-        if (TryCreateConditionTruthResult(
-                trueProof,
-                SymbolicProofStatus.ProvenTrue,
-                budgetFactory,
-                support,
-                out var result))
-            return result;
-
-        var falseProof = ClassifyRawImplication(
-            normalizedPath,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
-        if (TryCreateConditionTruthResult(
-                falseProof,
-                SymbolicProofStatus.ProvenFalse,
-                budgetFactory,
-                support,
-                out result))
-            return result;
-
-        return SymbolicIrProofResult.FromConditionTruth(
-            falseProof,
-            SymbolicProofStatus.Unknown,
-            budgetFactory(),
-            support);
-    }
-
-    private static bool TryCreateConditionTruthResult(
-        PurityProofResult proof,
-        SymbolicProofStatus provenStatus,
-        Func<SymbolicBudgetInfo?> budgetFactory,
-        SymbolicProofSupport support,
-        out SymbolicIrProofResult result)
-    {
-        if (proof.Outcome != PurityProofOutcome.ProvablyPure)
-        {
-            result = null!;
-            return false;
-        }
-
-        var status = string.Equals(proof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
-            ? SymbolicProofStatus.Unreachable
-            : provenStatus;
-        result = SymbolicIrProofResult.FromConditionTruth(proof, status, budgetFactory(), support);
-        return true;
-    }
-
     internal PurityProofResult ClassifyRawImplication(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula factFormula)
@@ -97,16 +41,6 @@ internal sealed class SymbolicProofPipeline
         return Execute(service => service.ClassifyImplication(pathConditions, factFormula));
     }
 
-    internal PurityProofResult ClassifyBranchReachability(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula branchCondition)
-    {
-        if (branchCondition == null) throw new ArgumentNullException(nameof(branchCondition));
-
-        return Execute(service => service.Classify(new PurityProofQuery(
-            pathConditions.ToArray(),
-            new PurityHazard(PurityHazardKind.BranchReachability, branchCondition))));
-    }
 
     internal PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions)
     {

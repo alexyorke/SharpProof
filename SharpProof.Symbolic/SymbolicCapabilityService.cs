@@ -743,10 +743,6 @@ internal sealed class SymbolicCapabilityService
             return false;
         }
 
-        private static bool ContainsAny(string text, params string[] values)
-        {
-            return values.Any(value => text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0);
-        }
     }
 
     private sealed class ResolvedCapabilityTarget(

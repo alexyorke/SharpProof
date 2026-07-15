@@ -28,11 +28,4 @@ internal static class CompilationSyntaxAccess
         return GetSemanticModel(anchorModel, node).GetConstantValue(node, cancellationToken);
     }
 
-    internal static TypeInfo GetTypeInfo(
-        SemanticModel anchorModel,
-        SyntaxNode node,
-        CancellationToken cancellationToken)
-    {
-        return GetSemanticModel(anchorModel, node).GetTypeInfo(node, cancellationToken);
-    }
 }

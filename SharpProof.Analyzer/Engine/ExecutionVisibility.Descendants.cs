@@ -14,10 +14,6 @@ internal static partial class ExecutionVisibility
                 yield return operation;
     }
 
-    public static bool IsCallableBoundary(SyntaxNode node)
-    {
-        return CSharpSyntaxFacts.IsCallableBoundary(node);
-    }
 
     private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation)
     {

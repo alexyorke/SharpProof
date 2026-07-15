@@ -29,17 +29,6 @@ internal static partial class SymbolicIrLowerer
             : null;
     }
 
-    internal static SymbolicCondition? LowerPatternCondition(
-        SymbolicTerm value,
-        PatternSyntax pattern,
-        SyntaxNode source,
-        SymbolicLoweringContext context)
-    {
-        return SymbolicPatternLowerer.TryLowerPatternCondition(value, pattern, source, context, out var condition)
-            ? condition
-            : null;
-    }
-
     internal static SymbolicTerm? LowerReferenceTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
         return SymbolicReferenceLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null;

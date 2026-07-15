@@ -542,18 +542,6 @@ internal static class SymbolicSemanticPipeline
             "pattern");
     }
 
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerPatternCondition(
-        SymbolicTerm value,
-        PatternSyntax pattern,
-        SyntaxNode source,
-        SymbolicLoweringContext context)
-    {
-        return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerPatternCondition(value, pattern, source, context),
-            source,
-            "pattern");
-    }
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerConversion(
         ExpressionSyntax expression,
         SymbolicLoweringContext context)

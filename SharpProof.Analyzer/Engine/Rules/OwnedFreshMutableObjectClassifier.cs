@@ -6,17 +6,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class OwnedFreshMutableObjectClassifier
 {
-    internal static bool IsOwnedFreshMutableObjectReference(
-        IOperation? operation,
-        SyntaxNode observationSyntax,
-        PurityAnalysisContext context)
-    {
-        return IsOwnedFreshMutableObjectReference(
-            operation,
-            observationSyntax,
-            context,
-            null);
-    }
 
     internal static bool IsOwnedFreshMutableObjectReference(
         IOperation? operation,

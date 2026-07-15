@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 
@@ -131,30 +130,6 @@ internal static class RequiresContractHelpers
 
         var antecedent = string.Join(" && ", validConditions.Select(static condition => "(" + condition + ")"));
         return "!(" + antecedent + ") || (" + consequent + ")";
-    }
-
-    internal static bool TryRewriteForArguments(
-        string conditionText,
-        IMethodSymbol methodSymbol,
-        ImmutableArray<IArgumentOperation> arguments,
-        out string rewrittenCondition)
-    {
-        var replacements = new Dictionary<string, ExpressionSyntax>(StringComparer.Ordinal);
-        foreach (var argument in arguments)
-        {
-            if (argument.Parameter == null ||
-                argument.Value.Syntax is not ExpressionSyntax argumentExpression)
-                continue;
-
-            replacements[argument.Parameter.Name] = (ExpressionSyntax)argumentExpression.WithoutTrivia();
-        }
-
-        return TryRewriteForArguments(
-            conditionText,
-            methodSymbol,
-            methodSymbol,
-            replacements,
-            out rewrittenCondition);
     }
 
     internal static bool TryRewriteForArguments(

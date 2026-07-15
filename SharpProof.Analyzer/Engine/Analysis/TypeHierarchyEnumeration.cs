@@ -35,10 +35,6 @@ internal static class TypeHierarchyEnumeration
         }
     }
 
-    internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(INamedTypeSymbol type)
-    {
-        return EnumerateNestedTypes(type, CancellationToken.None);
-    }
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(
         INamedTypeSymbol type,

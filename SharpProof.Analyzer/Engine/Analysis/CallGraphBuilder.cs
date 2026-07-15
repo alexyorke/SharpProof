@@ -10,12 +10,6 @@ namespace SharpProof.Analyzer.Engine.Analysis;
 
 internal static class CallGraphBuilder
 {
-    public static ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>> Build(
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        return Build(compilation, tree => compilation.GetSemanticModel(tree), cancellationToken);
-    }
 
     public static ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>> Build(
         Compilation compilation,

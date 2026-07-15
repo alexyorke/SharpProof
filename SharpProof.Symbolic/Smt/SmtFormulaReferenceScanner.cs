@@ -24,11 +24,6 @@ internal static class SmtFormulaReferenceScanner
         return false;
     }
 
-    internal static bool ContainsVariableOrMember(SmtFormula formula, string variableName)
-    {
-        return ContainsVariable(formula,
-            candidateName => SymbolicFactFactory.MatchesVariableOrMemberName(candidateName, variableName));
-    }
 
     private static bool ContainsVariable(SmtFormula formula, Func<string, bool> matchVariableName)
     {

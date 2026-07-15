@@ -744,17 +744,6 @@ internal static class SymbolicPatternLowerer
         return TryLowerBinaryPatternCondition(expression.Expression, expression.Pattern, context, out condition);
     }
 
-    internal static bool TryLowerPatternCondition(
-        ExpressionSyntax expression,
-        PatternSyntax pattern,
-        SyntaxNode sourceNode,
-        SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
-        condition = null!;
-        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
-               TryLowerPatternCondition(value, pattern, sourceNode, context, out condition);
-    }
 
     internal static bool TryLowerBinaryPatternCondition(
         ExpressionSyntax expression,

@@ -438,22 +438,6 @@ internal static class SymbolicTypeFacts
         return fieldSymbol != null;
     }
 
-    public static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)
-    {
-        switch (memberSymbol)
-        {
-            case IPropertySymbol propertySymbol:
-                type = propertySymbol.Type;
-                return true;
-            case IFieldSymbol fieldSymbol:
-                type = fieldSymbol.Type;
-                return true;
-            default:
-                type = null!;
-                return false;
-        }
-    }
-
     public static bool IsSupportedTupleCarrierType(ITypeSymbol type)
     {
         if (type is not INamedTypeSymbol namedType) return false;

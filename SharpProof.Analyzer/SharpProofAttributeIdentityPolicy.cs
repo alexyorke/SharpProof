@@ -117,11 +117,6 @@ internal sealed class SharpProofAttributeIdentityPolicy
         return _acceptedNamespaces.Contains(GetNamespaceName(originalDefinition));
     }
 
-    internal bool IsUnrecognizedSharpProofLikeAttribute(
-        AttributeData attribute)
-    {
-        return IsUnrecognizedSharpProofLikeAttribute(attribute.AttributeClass);
-    }
 
     internal bool IsUnrecognizedSharpProofLikeAttribute(
         INamedTypeSymbol? attributeClass)

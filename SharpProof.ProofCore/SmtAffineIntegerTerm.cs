@@ -356,15 +356,7 @@ internal static class SmtIntegerArithmetic
         return remainder != 0 && dividend.Sign > 0 ? quotient + BigInteger.One : quotient;
     }
 
-    internal static long FloorDivide(long dividend, long positiveDivisor)
-    {
-        return (long)FloorDivide((BigInteger)dividend, positiveDivisor);
-    }
 
-    internal static long CeilingDivide(long dividend, long positiveDivisor)
-    {
-        return (long)CeilingDivide((BigInteger)dividend, positiveDivisor);
-    }
 
     private static bool TryBinary(long left, long right, Func<long, long, long> operation, out long value)
     {

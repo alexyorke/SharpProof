@@ -78,14 +78,6 @@ internal sealed class Z3FormulaEncoder : IDisposable
         return new SmtSatisfyingWitness(status, reason, assignments);
     }
 
-    public BoolExpr Negate(SmtFormula formula)
-    {
-        if (formula.Kind != SmtValueKind.Bool)
-            throw new InvalidOperationException("Only boolean SMT formulas can be negated.");
-
-        EnsureSafeRegexPolarity(formula, true);
-        return _context.MkNot((BoolExpr)Encode(formula));
-    }
 
     public bool ContainsApproximateRegex(SmtFormula formula)
     {

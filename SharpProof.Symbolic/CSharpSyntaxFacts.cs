@@ -327,50 +327,6 @@ internal static class CSharpSyntaxFacts
                     yield return sizeExpression;
     }
 
-    public static void GetListPatternLengthShape(
-        ListPatternSyntax listPattern,
-        out int minimumLength,
-        out bool exactLength)
-    {
-        minimumLength = 0;
-        exactLength = true;
-        foreach (var subpattern in listPattern.Patterns)
-        {
-            if (subpattern is SlicePatternSyntax slicePattern)
-            {
-                if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                {
-                    GetListPatternLengthShape(nestedListPattern, out var nestedMinimumLength,
-                        out var nestedExactLength);
-                    minimumLength += nestedMinimumLength;
-                    exactLength &= nestedExactLength;
-                }
-                else
-                {
-                    exactLength = false;
-                }
-
-                continue;
-            }
-
-            minimumLength++;
-        }
-    }
-
-    public static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
-    {
-        while (pattern is ParenthesizedPatternSyntax parenthesizedPattern) pattern = parenthesizedPattern.Pattern;
-
-        if (pattern is ListPatternSyntax candidate)
-        {
-            listPattern = candidate;
-            return true;
-        }
-
-        listPattern = null!;
-        return false;
-    }
-
     public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression)
     {
         while (true)

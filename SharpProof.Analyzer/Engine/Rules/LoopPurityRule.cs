@@ -207,8 +207,4 @@ internal class LoopPurityRule : IPurityRule
             reason);
     }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
-    {
-        return EnumeratorRuntimeMemberClassifier.EnumerateGetEnumeratorImplementations(collectionType);
-    }
 }

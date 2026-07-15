@@ -414,25 +414,13 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         return true;
     }
 
-    internal static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
-    }
 
-    internal static bool IsIntegralOrDecimalZero(object? value)
-    {
-        return SymbolicValueFacts.IsIntegralOrDecimalZero(value);
-    }
 
     internal static bool IsReferenceType(ITypeSymbol? typeSymbol)
     {
         return SymbolicTypeFacts.IsReferenceType(typeSymbol);
     }
 
-    internal static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsReferenceLikeType(typeSymbol);
-    }
 
     internal static bool IsDynamicExpression(
         ExpressionSyntax expression,

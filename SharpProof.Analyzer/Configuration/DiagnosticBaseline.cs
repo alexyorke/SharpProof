@@ -36,21 +36,6 @@ internal sealed class DiagnosticBaseline
         return builder.Count == 0 ? Empty : new DiagnosticBaseline(builder.ToImmutable());
     }
 
-    public bool IsSuppressed(string diagnosticId, ISymbol symbol, SyntaxTree syntaxTree)
-    {
-        if (_entries.IsDefaultOrEmpty) return false;
-
-        var symbolIds = GetSymbolIds(symbol);
-        var sourcePath = syntaxTree.FilePath ?? string.Empty;
-
-        foreach (var entry in _entries)
-            foreach (var symbolId in symbolIds)
-                if (entry.Matches(diagnosticId, symbolId, sourcePath))
-                    return true;
-
-        return false;
-    }
-
     public bool IsSuppressed(Diagnostic diagnostic)
     {
         if (_entries.IsDefaultOrEmpty) return false;

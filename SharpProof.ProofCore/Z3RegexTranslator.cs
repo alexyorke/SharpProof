@@ -46,10 +46,6 @@ internal sealed class Z3RegexTranslator
         _singleline = (options & RegexOptions.Singleline) != 0;
     }
 
-    public static bool TryTranslate(Context context, string pattern, out ReExpr regex, out bool isExact)
-    {
-        return TryTranslate(context, pattern, RegexOptions.None, out regex, out isExact);
-    }
 
     public static bool TryTranslate(Context context, string pattern, RegexOptions options, out ReExpr regex,
         out bool isExact)

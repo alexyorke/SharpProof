@@ -5,14 +5,6 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicIrVersionRewriter
 {
-    internal static SymbolicTerm RewriteToCurrentVersions(
-        SymbolicTerm term,
-        ImmutableDictionary<string, int> symbolVersions)
-    {
-        if (term == null) throw new ArgumentNullException(nameof(term));
-        return symbolVersions.IsEmpty ? term : new CurrentVersionRewriter(symbolVersions).Rewrite(term);
-    }
-
     internal static SymbolicCondition RewriteToCurrentVersions(
         SymbolicCondition condition,
         ImmutableDictionary<string, int> symbolVersions)

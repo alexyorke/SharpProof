@@ -47,18 +47,6 @@ internal sealed class SymbolicOperationTransitionResult
             truncation);
     }
 
-    internal static SymbolicOperationTransitionResult Approximate(
-        SymbolicState state,
-        IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
-        return Create(
-            state,
-            SymbolicLoweringSupport.Approximate,
-            SymbolicUnknownReason.None,
-            provenance,
-            truncation);
-    }
 
     internal static SymbolicOperationTransitionResult Unsupported(
         SymbolicState unchangedState,

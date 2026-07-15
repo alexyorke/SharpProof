@@ -18,22 +18,6 @@ internal static class SmtFormulaVersionRewriter
             : RewriteSymbolVersions(formula, rewrites);
     }
 
-    internal static ImmutableArray<SmtFormula> RewriteSymbolVersions(
-        ImmutableArray<SmtFormula> formulas,
-        ImmutableDictionary<ISymbol, int> sourceVersions,
-        ImmutableDictionary<ISymbol, int> targetVersions)
-    {
-        if (formulas.IsDefaultOrEmpty) return formulas;
-
-        var rewrites = CreateRewrites(sourceVersions, targetVersions);
-        if (rewrites.Length == 0) return formulas;
-
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>(formulas.Length);
-        foreach (var formula in formulas) builder.Add(RewriteSymbolVersions(formula, rewrites));
-
-        return builder.ToImmutable();
-    }
-
     private static ImmutableArray<SmtVersionRewrite> CreateRewrites(
         ImmutableDictionary<ISymbol, int> sourceVersions,
         ImmutableDictionary<ISymbol, int> targetVersions)

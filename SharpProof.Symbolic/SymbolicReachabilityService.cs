@@ -61,21 +61,6 @@ internal static class SymbolicReachabilityService
         return new SymbolicProofService(smtAnalysis).ClassifyReachability(state);
     }
 
-    internal static SymbolicIrProofResult ClassifyStateImplication(
-        SymbolicState state,
-        SymbolicFact fact,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, fact);
-    }
-
-    internal static SymbolicIrProofResult ClassifyStateImplication(
-        SymbolicState state,
-        SymbolicCondition condition,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, condition);
-    }
 
     internal static SymbolicIrProofResult ClassifyStateBranchFeasibility(
         SymbolicState state,

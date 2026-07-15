@@ -165,17 +165,6 @@ internal sealed class PurityProofSearch : IDisposable
         };
     }
 
-    public PurityProofResult ClassifyBranchReachability(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula branchReachabilityCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(
-            PurityHazardKind.BranchReachability,
-            pathConditions,
-            branchReachabilityCondition,
-            timeout);
-    }
 
     public PurityProofResult ClassifyImpureCallReachability(
         IEnumerable<SmtFormula> pathConditions,

@@ -192,15 +192,6 @@ internal static partial class ImpurityCatalog
         return TryGetConfiguredMember(symbol, configuration.ExtraKnownImpureMethods, out configuredValue);
     }
 
-    internal static bool TryGetConfiguredImpureBoundary(ISymbol symbol, out string source, out string configuredValue)
-    {
-        return TryGetConfiguredImpureBoundary(
-            symbol,
-            ExtraImpureTypes,
-            ExtraImpureNamespaces,
-            out source,
-            out configuredValue);
-    }
 
     internal static bool TryGetConfiguredImpureBoundary(
         ISymbol symbol,

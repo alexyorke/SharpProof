@@ -25,10 +25,6 @@ internal sealed class CompilationPurityService : IDisposable
     {
     }
 
-    public CompilationPurityService(Compilation compilation, SmtAnalysisOptions smtOptions)
-        : this(compilation, smtOptions, RequiresContractHelpers.OfficialAttributePolicy)
-    {
-    }
 
     public CompilationPurityService(
         Compilation compilation,

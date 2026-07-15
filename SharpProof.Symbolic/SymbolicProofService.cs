@@ -78,15 +78,6 @@ internal sealed class SymbolicProofService
         return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
     }
 
-    private static bool HasSafeIntegerDivisors(
-        SymbolicTerm term,
-        IReadOnlyCollection<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SymbolicProofPipeline proofPipeline)
-    {
-        var context = new FormulaSafeDivisorContext(pathConditions, proofPipeline);
-        return HasSafeIntegerDivisorsCore(term, context, sourceNode, FormulaSafeDivisorStrategy);
-    }
 
     private static bool IsTermProvablyNonZero(
         SymbolicTerm term,
@@ -171,17 +162,6 @@ internal sealed class SymbolicProofService
         return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
     }
 
-    internal static bool TryEncodeConditionWithPathState(
-        SymbolicCondition condition,
-        SymbolicState state,
-        out SmtFormula formula)
-    {
-        return TryEncodeConditionWithPathState(
-            condition,
-            state,
-            s_syntheticProofNode,
-            out formula);
-    }
 
     private static bool TryEncodeFactWithPathState(
         SymbolicFact fact,
@@ -199,13 +179,6 @@ internal sealed class SymbolicProofService
             out formula);
     }
 
-    private static bool HasSafeIntegerDivisors(
-        SymbolicTerm term,
-        SymbolicState state,
-        SyntaxNode sourceNode)
-    {
-        return HasSafeIntegerDivisorsCore(term, state, sourceNode, StateSafeDivisorStrategy);
-    }
 
     private static bool HasSafeIntegerDivisors(
         SymbolicCondition condition,
@@ -496,36 +469,6 @@ internal sealed class SymbolicProofService
             });
     }
 
-    public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)
-    {
-        if (TryClassifyConditionPreliminarily(
-                state,
-                condition,
-                ConditionClassificationMode.Implication,
-                out state,
-                out condition,
-                out var preliminaryResult))
-            return preliminaryResult;
-
-        return ClassifyWithIrCache(
-            "implication-condition:" + state.NormalizedProofKey + "\n" +
-            SymbolicState.CreateProofConditionKey(condition),
-            () =>
-            {
-                if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
-                    return SymbolicIrProofResult.Unknown(unknownReason);
-
-                if (!TryEncodeConditionWithPathState(condition, state, s_syntheticProofNode, out var formula))
-                    return SymbolicIrProofResult.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
-
-                return proofPipeline.ClassifyImplication(
-                    pathConditions,
-                    formula,
-                    CreateBudgetInfo,
-                    SymbolicProofSupport.Exact);
-            });
-    }
-
     public SymbolicIrProofResult ClassifyBranchFeasibility(SymbolicState state, SymbolicCondition branchCondition)
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
@@ -769,13 +712,6 @@ internal sealed class SymbolicProofService
     private static SymbolicState NormalizeState(SymbolicState state)
     {
         return state.Normalize();
-    }
-
-    private static SymbolicTerm RewriteQueryTermToCurrentVersions(SymbolicTerm term, SymbolicState state)
-    {
-        return state.SymbolVersions.Count == 0
-            ? term
-            : SymbolicIrVersionRewriter.RewriteToCurrentVersions(term, state.SymbolVersions);
     }
 
     private static SymbolicCondition RewriteQueryConditionToCurrentVersions(SymbolicCondition condition,

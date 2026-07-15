@@ -54,10 +54,6 @@ internal partial class PurityAnalysisEngine
         _attributePolicy = purityService.AttributePolicy;
     }
 
-    internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis)
-        : this(smtAnalysis, RequiresContractHelpers.OfficialAttributePolicy)
-    {
-    }
 
     internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis, SharpProofAttributeIdentityPolicy attributePolicy)
     {
@@ -379,15 +375,7 @@ internal partial class PurityAnalysisEngine
                 second.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value);
         }
 
-        public static bool operator ==(PurityAnalysisState left, PurityAnalysisState right)
-        {
-            return left.Equals(right);
-        }
 
-        public static bool operator !=(PurityAnalysisState left, PurityAnalysisState right)
-        {
-            return !(left == right);
-        }
 
         private PurityAnalysisState Copy(
             bool? hasPotentialImpurity = null,
@@ -412,16 +400,6 @@ internal partial class PurityAnalysisEngine
         }
 
 
-        public PurityAnalysisState WithImpurity(SyntaxNode node)
-        {
-            if (HasPotentialImpurity) return this;
-            return Copy(
-                true,
-                node,
-                true,
-                firstImpurityEvidence: PurityEvidence.Create("unsupported_operation", "UnsupportedOperation",
-                    syntaxNode: node));
-        }
 
         public PurityAnalysisState WithImpurity(PurityAnalysisResult result, SyntaxNode fallbackNode)
         {

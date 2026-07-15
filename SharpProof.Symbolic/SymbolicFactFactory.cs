@@ -14,12 +14,6 @@ internal static class SymbolicFactFactory
                candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
     }
 
-    internal static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
-    {
-        return left.Kind == right.Kind ||
-               (left is SmtNullConstant && right.Kind == SmtValueKind.Reference) ||
-               (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
-    }
 
     internal static string GetSmtVariableName(ISymbol symbol)
     {

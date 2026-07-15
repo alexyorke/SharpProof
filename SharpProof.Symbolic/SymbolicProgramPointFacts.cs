@@ -543,12 +543,6 @@ internal static class SymbolicProgramPointFacts
             cancellationToken);
     }
 
-    private static PatternSyntax UnwrapPattern(PatternSyntax pattern)
-    {
-        while (pattern is ParenthesizedPatternSyntax parenthesizedPattern) pattern = parenthesizedPattern.Pattern;
-
-        return pattern;
-    }
 
     internal static bool StatementInvalidatesSymbolValue(
         StatementSyntax statement,
