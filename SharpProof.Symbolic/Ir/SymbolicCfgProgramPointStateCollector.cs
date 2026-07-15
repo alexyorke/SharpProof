@@ -12,7 +12,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SymbolicState? initialState = null)
+        SymbolicState? initialState = null,
+        bool includeCurrentStatementCompletionFacts = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(
@@ -89,6 +90,16 @@ internal static class SymbolicCfgProgramPointStateCollector
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
+                    if (includeCurrentStatementCompletionFacts &&
+                        !TryApplyCurrentCompletion(
+                            ref state,
+                            site,
+                            operation,
+                            currentPath.Guard,
+                            targetIsInsideBranch,
+                            semanticModel,
+                            cancellationToken))
+                        return Unsupported(site, "current-completion");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (currentPath.Guard == null || targetIsInsideBranch)
                         targetState = observedState;
@@ -783,6 +794,37 @@ internal static class SymbolicCfgProgramPointStateCollector
                    compoundIsChecked,
                    "ir.path.prior-statement.compound-assignment",
                    out guardInvalidated);
+    }
+
+    private static bool TryApplyCurrentCompletion(
+        ref SymbolicState state,
+        SyntaxNode site,
+        IOperation operation,
+        SymbolicCondition? guard,
+        bool allowGuardedReferenceAssignments,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!TryApplyOperation(
+                ref state,
+                operation,
+                guard,
+                allowGuardedReferenceAssignments,
+                semanticModel,
+                cancellationToken,
+                out _))
+            return false;
+
+        if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
+            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+                ref state,
+                assignment.Right,
+                statement,
+                includeThrowGuardFacts: false,
+                semanticModel,
+                cancellationToken);
+
+        return true;
     }
 
     private static bool TryApplyComputedUpdate(

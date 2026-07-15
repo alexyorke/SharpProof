@@ -48,6 +48,37 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void CurrentStatementCompletion_MatchesStructuralCollector()
+    {
+        const string source =
+            "static class C { static int M(int value) { value = 7; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CurrentStatementCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
     public void ConditionalControlFlow_MatchesStructuralCollector()
     {
         const string source = "static class C { static int M(bool condition) { int value = 0; if (condition) value = 1; return value; } }";

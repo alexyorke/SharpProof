@@ -31,16 +31,12 @@ internal static class SymbolicReachabilityService
                 includeCurrentStatementCompletionFacts);
 
         var key = new PathStateCacheKey(
-            site.SpanStart,
-            site.Span.Length,
-            site.RawKind,
-            includeCurrentStatementCompletionFacts);
+            site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
         var methodCaches = s_structuralPathStateCache.GetOrCreateValue(semanticModel);
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
-        var cache = methodCaches.ByExecutionRoot.GetValue(
-            executionRoot,
-            static _ => new StructuralPathStateCache(StructuralPathStateCacheEntryLimit));
-        if (!cache.Values.TryGetValue(key, out var state))
+        var cache = methodCaches.ByExecutionRoot.GetValue(executionRoot, static _ =>
+            new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(StructuralPathStateCacheEntryLimit));
+        if (!cache.TryGetValue(key, out var state))
         {
             state = BuildStructuralPathStateSnapshot(
                 site,
@@ -48,7 +44,7 @@ internal static class SymbolicReachabilityService
                 cancellationToken,
                 null,
                 includeCurrentStatementCompletionFacts);
-            cache.Values.TryAdd(key, state);
+            cache.TryAdd(key, state);
         }
 
         return state;
@@ -119,10 +115,10 @@ internal static class SymbolicReachabilityService
             return new SymbolicCacheInfo(0, 0, 0, 0);
 
         return new SymbolicCacheInfo(
-            cache.Values.HitCount,
-            cache.Values.MissCount,
-            cache.Values.Count,
-            cache.Values.EvictionCount);
+            cache.HitCount,
+            cache.MissCount,
+            cache.Count,
+            cache.EvictionCount);
     }
 
     private static SymbolicState BuildStructuralPathStateSnapshot(
@@ -132,13 +128,16 @@ internal static class SymbolicReachabilityService
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts)
     {
-        if (!includeCurrentStatementCompletionFacts)
+        if (!includeCurrentStatementCompletionFacts ||
+            site is AssignmentExpressionSyntax ||
+            site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax })
         {
             var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
                 site,
                 semanticModel,
                 cancellationToken,
-                initialState);
+                initialState,
+                includeCurrentStatementCompletionFacts);
             if (cfgState is { IsExact: true, Value: { } exactState })
                 return exactState;
         }
@@ -159,61 +158,10 @@ internal static class SymbolicReachabilityService
 
     private sealed class StructuralPathStateCaches
     {
-        internal ConditionalWeakTable<SyntaxNode, StructuralPathStateCache> ByExecutionRoot { get; } = new();
+        internal ConditionalWeakTable<SyntaxNode, BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>
+            ByExecutionRoot { get; } = new();
     }
 
-    private sealed class StructuralPathStateCache
-    {
-        internal StructuralPathStateCache(int capacity)
-        {
-            Values = new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(capacity);
-        }
-
-        internal BoundedConcurrentCache<PathStateCacheKey, SymbolicState> Values { get; }
-    }
-
-    private readonly struct PathStateCacheKey : IEquatable<PathStateCacheKey>
-    {
-        internal PathStateCacheKey(
-            int siteStart,
-            int siteLength,
-            int siteRawKind,
-            bool includeCurrentStatementCompletionFacts)
-        {
-            SiteStart = siteStart;
-            SiteLength = siteLength;
-            SiteRawKind = siteRawKind;
-            IncludeCurrentStatementCompletionFacts = includeCurrentStatementCompletionFacts;
-        }
-
-        private int SiteStart { get; }
-        private int SiteLength { get; }
-        private int SiteRawKind { get; }
-        private bool IncludeCurrentStatementCompletionFacts { get; }
-
-        public bool Equals(PathStateCacheKey other)
-        {
-            return SiteStart == other.SiteStart &&
-                   SiteLength == other.SiteLength &&
-                   SiteRawKind == other.SiteRawKind &&
-                   IncludeCurrentStatementCompletionFacts == other.IncludeCurrentStatementCompletionFacts;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is PathStateCacheKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hash = SiteStart;
-                hash = (hash * 397) ^ SiteLength;
-                hash = (hash * 397) ^ SiteRawKind;
-                hash = (hash * 397) ^ (IncludeCurrentStatementCompletionFacts ? 1 : 0);
-                return hash;
-            }
-        }
-    }
+    private readonly record struct PathStateCacheKey(
+        int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);
 }
