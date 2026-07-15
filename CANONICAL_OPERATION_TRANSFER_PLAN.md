@@ -212,6 +212,7 @@ transfer policy after its slice is complete.
 | Alias and invalidation migration | `fc40894c` | 108,501 | +825 |
 | Ownership lifetime migration | `cf2fa67c` | 108,401 | +725 |
 | Tracked assignment deletion | `6fc4e26f` | 108,321 | +645 |
+| Purity symbolic query boundary | `fa94a63f` | 108,314 | +638 |
 
 ## Validation Ledger
 
@@ -231,15 +232,16 @@ transfer policy after its slice is complete.
 | Phase 2 alias and invalidation | Commit `fc40894c` makes mutation events own variable-prefix and member-path invalidation, centralizes idempotent definition-version calculation, and routes Analyzer reference aliases and ref-local shared/mutable borrows through lifetime events. Focused ref/out, alias, mutation, version, and program-point tests: 35 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +825 production LOC. |
 | Phase 2 ownership lifetime | Commit `cf2fa67c` routes fresh ownership, disposable acquisition, return, disposal, release, flow-capture ownership, preserved-alias lifetime, and caller-visible mutation facts through canonical events. The superseded 127-line ownership fact factory was deleted. Focused symbolic IR, resource, disposal, using, return, alias, and transfer tests: 221 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +725 production LOC. |
 | Phase 2 tracked assignment deletion | Commit `6fc4e26f` folds reference, length, collection, string, null-equivalence, and `as` postconditions into canonical assignment lowering and deletes the 168-line legacy tracked-assignment interpreter. A disposal-alias ordering regression was reproduced and fixed by applying alias evidence after target invalidation. Focused assignment/program-point/alias/resource tests: 140 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +645 production LOC. |
+| Phase 2 purity symbolic query boundary | Commit `fa94a63f` moves the final assignment, alias, and ref-borrow mutations out of `PuritySymbolicStateFacts`, shares one reference-relationship event adapter, and removes a duplicate declaration-alias application. `PuritySymbolicStateFacts` is now read-only. Focused alias/borrow/resource/purity tests: 66 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +638 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
 - State: assignment, alias/borrow, invalidation, ownership, and resource lifetime
-  families now share canonical events or their common ordered plans.
-- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after deleting the old
-  tracked-assignment interpreter and preserving post-invalidation alias ordering.
-- Next cheapest step: delete superseded assignment and Analyzer purity-state
-  implementations, retaining only source/evidence adapters.
+  families share canonical events; purity symbolic facts are now query-only.
+- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after removing the last
+  state-mutating methods from `PuritySymbolicStateFacts`.
+- Next cheapest step: finish deleting superseded resource/assignment transition
+  helpers while retaining only source discovery and evidence adapters.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
