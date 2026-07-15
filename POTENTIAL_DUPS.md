@@ -258,9 +258,6 @@ Same 8 members over `_smtDiagnostics`. **Recommendation:** Expose from `Symbolic
 ### Near-duplicated per-scope dispatch - `SymbolicCliInvariantResultAdapter.TryCreate:46-85`
 Four point/line/span/file `case` blocks structurally identical. **Recommendation:** Generic `Build<T>(...)` / reuse `SelectScope`.
 
-### Repeated `ToCompactResult`/`ToInvariantQueryResult` scope wrappers - `SymbolicCliJsonProjectionExtensions.cs:60-100` (+ adapter, model factories)
-**Recommendation:** Centralize scope->factory mapping once.
-
 ### Repeated `string.Equals(Kind,"span",...)` - `SymbolicCompactQueryModels.cs:438-450` (7 properties)
 **Recommendation:** `IsSpanScope` computed once.
 

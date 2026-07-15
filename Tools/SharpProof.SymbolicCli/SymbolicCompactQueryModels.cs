@@ -306,56 +306,26 @@ internal sealed record SymbolicCompactQueryScope(
     int? RequestedPositionDistance = null,
     bool? ContainsRequestedPosition = null)
 {
-    internal static SymbolicCompactQueryScope FromPoint(SymbolicProgramPointResult result)
-    {
-        return new SymbolicCompactQueryScope(
-            "point",
-            result.FilePath,
-            Line: result.Line,
-            Column: result.Column,
-            Position: result.Position,
-            NodeKind: result.NodeKind,
-            MethodName: result.MethodName,
-            ProgramPointKind: result.ProgramPointKind,
-            NodeSpanStart: result.NodeSpanStart,
-            NodeSpanEnd: result.NodeSpanEnd,
-            NodeSpanLength: result.NodeSpanLength,
-            NodeStartLine: result.NodeStartLine,
-            NodeStartColumn: result.NodeStartColumn,
-            NodeEndLine: result.NodeEndLine,
-            NodeEndColumn: result.NodeEndColumn,
-            PointReachability: result.Reachability.ToString(),
-            ReachabilityReason: result.ReachabilityReason,
-            RequestedLine: result.RequestedLine,
-            RequestedColumn: result.RequestedColumn,
-            RequestedPosition: result.RequestedPosition,
-            RequestedPositionDistance: result.RequestedPositionDistance,
-            ContainsRequestedPosition: result.ContainsRequestedPosition);
-    }
-
-    internal static SymbolicCompactQueryScope FromLine(SymbolicLineQueryResult result)
-    {
-        return new SymbolicCompactQueryScope("line", result.FilePath, Line: result.Line);
-    }
-
-    internal static SymbolicCompactQueryScope FromSpan(SymbolicSpanQueryResult result)
-    {
-        return new SymbolicCompactQueryScope(
-            "span",
-            result.FilePath,
-            NodeSpanStart: result.SpanStart,
-            NodeSpanEnd: result.SpanEnd,
-            NodeSpanLength: result.SpanLength,
-            NodeStartLine: result.StartLine,
-            NodeStartColumn: result.StartColumn,
-            NodeEndLine: result.EndLine,
-            NodeEndColumn: result.EndColumn);
-    }
-
-    internal static SymbolicCompactQueryScope FromFile(SymbolicFileQueryResult result)
-    {
-        return new SymbolicCompactQueryScope("file", result.FilePath);
-    }
+    internal static SymbolicCompactQueryScope FromResult(SymbolicQueryResult result) => result.SelectScope(
+        file => new SymbolicCompactQueryScope("file", file.FilePath),
+        line => new SymbolicCompactQueryScope("line", line.FilePath, Line: line.Line),
+        span => new SymbolicCompactQueryScope(
+            "span", span.FilePath,
+            NodeSpanStart: span.SpanStart, NodeSpanEnd: span.SpanEnd, NodeSpanLength: span.SpanLength,
+            NodeStartLine: span.StartLine, NodeStartColumn: span.StartColumn,
+            NodeEndLine: span.EndLine, NodeEndColumn: span.EndColumn),
+        point => new SymbolicCompactQueryScope(
+            "point", point.FilePath,
+            Line: point.Line, Column: point.Column, Position: point.Position,
+            NodeKind: point.NodeKind, MethodName: point.MethodName, ProgramPointKind: point.ProgramPointKind,
+            NodeSpanStart: point.NodeSpanStart, NodeSpanEnd: point.NodeSpanEnd,
+            NodeSpanLength: point.NodeSpanLength, NodeStartLine: point.NodeStartLine,
+            NodeStartColumn: point.NodeStartColumn, NodeEndLine: point.NodeEndLine,
+            NodeEndColumn: point.NodeEndColumn, PointReachability: point.Reachability.ToString(),
+            ReachabilityReason: point.ReachabilityReason, RequestedLine: point.RequestedLine,
+            RequestedColumn: point.RequestedColumn, RequestedPosition: point.RequestedPosition,
+            RequestedPositionDistance: point.RequestedPositionDistance,
+            ContainsRequestedPosition: point.ContainsRequestedPosition));
 }
 
 public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
@@ -492,8 +462,29 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         SymbolicCompactQueryOptions? options = null)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
+        return FromResult(SymbolicQueryResult.From(result), options);
+    }
+
+    internal static SymbolicCompactQueryResult FromResult(
+        SymbolicQueryResult result,
+        SymbolicCompactQueryOptions? options = null)
+    {
+        if (result == null) throw new ArgumentNullException(nameof(result));
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+        var scope = SymbolicCompactQueryScope.FromResult(result);
+        return result.SelectScope(
+            file => FromAggregate(scope, file, normalizedOptions, file.Lines),
+            line => FromAggregate(scope, line, normalizedOptions),
+            span => FromAggregate(scope, span, normalizedOptions),
+            point => FromPoint(scope, point, normalizedOptions));
+    }
+
+    private static SymbolicCompactQueryResult FromPoint(
+        SymbolicCompactQueryScope scope,
+        SymbolicProgramPointResult result,
+        SymbolicCompactQueryOptions options)
+    {
         var sourcePoints = new[] { result };
         var projection = SymbolicCompactScopeProjection.Create(
             SymbolicInvariantResult.FromFacts(result.Facts),
@@ -506,11 +497,11 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             SymbolicConditionProofSummary.FromProgramPoints(sourcePoints),
             sourcePoints,
             result.SmtDiagnostics,
-            normalizedOptions,
-            normalizedOptions.MaxProgramPoints);
+            options,
+            options.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
-            SymbolicCompactQueryScope.FromPoint(result),
+            scope,
             null,
             1,
             1,
@@ -519,35 +510,24 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             result.AnalysisTruncation);
     }
 
-    internal static SymbolicCompactQueryResult FromLine(
-        SymbolicLineQueryResult result,
-        SymbolicCompactQueryOptions? options = null)
+    private static SymbolicCompactQueryResult FromAggregate(
+        SymbolicCompactQueryScope scope,
+        SymbolicScopedQueryAggregate result,
+        SymbolicCompactQueryOptions options,
+        IReadOnlyList<SymbolicLineQueryResult>? sourceLines = null)
     {
-        if (result == null) throw new ArgumentNullException(nameof(result));
+        var lineResults = new List<SymbolicCompactLineResult>();
+        var remainingProgramPoints = options.MaxProgramPoints;
+        foreach (var line in sourceLines ?? Array.Empty<SymbolicLineQueryResult>())
+        {
+            if (lineResults.Count >= options.MaxLines) break;
 
-        var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
-        var lineResult = SymbolicCompactLineResult.FromResult(
-            result,
-            normalizedOptions,
-            normalizedOptions.MaxProgramPoints);
+            var pointLimit = remainingProgramPoints;
+            lineResults.Add(SymbolicCompactLineResult.FromResult(line, options, pointLimit));
+            if (remainingProgramPoints > 0) remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
+        }
 
-        return new SymbolicCompactQueryResult(
-            SymbolicCompactQueryScope.FromLine(result),
-            null,
-            result.ProgramPoints.Count == 0 ? 0 : 1,
-            result.ProgramPoints.Count,
-            lineResult.Projection,
-            Array.Empty<SymbolicCompactLineResult>(),
-            result.AnalysisTruncation);
-    }
-
-    internal static SymbolicCompactQueryResult FromSpan(
-        SymbolicSpanQueryResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-
-        var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+        var isFile = sourceLines != null;
         var projection = SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
             result.Facts,
@@ -557,69 +537,36 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             result.Reachability,
             result.ProgramPointSummary,
             result.ConditionProofs,
-            result.ProgramPoints,
+            isFile ? Array.Empty<SymbolicProgramPointResult>() : result.ProgramPoints,
             result.SmtDiagnostics,
-            normalizedOptions,
-            normalizedOptions.MaxProgramPoints);
+            options,
+            isFile ? 0 : options.MaxProgramPoints);
+        var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
+        if (isFile)
+            projection = projection with
+            {
+                Truncation = SymbolicCompactOutputTruncation.Combine(
+                    new SymbolicCompactOutputTruncation(
+                        sourceLines!.Count > lineResults.Count,
+                        result.ProgramPointCount > selectedProgramPointCount,
+                        false, false, false),
+                    projection.Truncation,
+                    SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)))
+            };
 
+        var lineCount = result is SymbolicFileQueryResult fileResult ? fileResult.LineCount : (int?)null;
+        var linesWithProgramPoints = result switch
+        {
+            SymbolicFileQueryResult file => file.LinesWithProgramPoints,
+            SymbolicSpanQueryResult span => span.LinesWithProgramPoints,
+            _ => result.ProgramPointCount == 0 ? 0 : 1
+        };
         return new SymbolicCompactQueryResult(
-            SymbolicCompactQueryScope.FromSpan(result),
-            null,
-            result.LinesWithProgramPoints,
+            scope,
+            lineCount,
+            linesWithProgramPoints,
             result.ProgramPointCount,
             projection,
-            Array.Empty<SymbolicCompactLineResult>(),
-            result.AnalysisTruncation);
-    }
-
-    internal static SymbolicCompactQueryResult FromFile(
-        SymbolicFileQueryResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-
-        var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
-        var lineResults = new List<SymbolicCompactLineResult>();
-        var remainingProgramPoints = normalizedOptions.MaxProgramPoints;
-        foreach (var line in result.Lines)
-        {
-            if (lineResults.Count >= normalizedOptions.MaxLines) break;
-
-            var pointLimit = remainingProgramPoints;
-            lineResults.Add(SymbolicCompactLineResult.FromResult(line, normalizedOptions, pointLimit));
-            if (remainingProgramPoints > 0) remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
-        }
-
-        var projection = SymbolicCompactScopeProjection.Create(
-            result.ObservedInvariant,
-            result.ObservedFacts,
-            result.MergedInvariant,
-            result.MergedPathFacts,
-            result.InvariantQuery,
-            result.Reachability,
-            result.ProgramPointSummary,
-            result.ConditionProofs,
-            Array.Empty<SymbolicProgramPointResult>(),
-            result.SmtDiagnostics,
-            normalizedOptions,
-            0);
-        var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
-        var truncation = SymbolicCompactOutputTruncation.Combine(
-            new SymbolicCompactOutputTruncation(
-                result.Lines.Count > lineResults.Count,
-                result.ProgramPointCount > selectedProgramPointCount,
-                false,
-                false,
-                false),
-            projection.Truncation,
-            SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)));
-
-        return new SymbolicCompactQueryResult(
-            SymbolicCompactQueryScope.FromFile(result),
-            result.LineCount,
-            result.LinesWithProgramPoints,
-            result.ProgramPointCount,
-            projection with { Truncation = truncation },
             lineResults,
             result.AnalysisTruncation);
     }
@@ -689,42 +636,21 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions? options = null)
     {
-        var normalizedOptions = NormalizeOptions(options);
-        return FromCompactResult(SymbolicCompactQueryResult.FromPoint(result, normalizedOptions), normalizedOptions);
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        return FromResult(SymbolicQueryResult.From(result), options);
     }
 
-    internal static SymbolicInvariantQueryResult FromLine(
-        SymbolicLineQueryResult result,
+    internal static SymbolicInvariantQueryResult FromResult(
+        SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
+        if (result == null) throw new ArgumentNullException(nameof(result));
         var normalizedOptions = NormalizeOptions(options);
-        return FromCompactResult(SymbolicCompactQueryResult.FromLine(result, normalizedOptions), normalizedOptions);
-    }
-
-    internal static SymbolicInvariantQueryResult FromSpan(
-        SymbolicSpanQueryResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        var normalizedOptions = NormalizeOptions(options);
-        return FromCompactResult(SymbolicCompactQueryResult.FromSpan(result, normalizedOptions), normalizedOptions);
-    }
-
-    internal static SymbolicInvariantQueryResult FromFile(
-        SymbolicFileQueryResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        var normalizedOptions = NormalizeOptions(options);
-        return FromCompactResult(SymbolicCompactQueryResult.FromFile(result, normalizedOptions), normalizedOptions);
-    }
-
-    private static SymbolicInvariantQueryResult FromCompactResult(
-        SymbolicCompactQueryResult result,
-        SymbolicCompactQueryOptions options)
-    {
+        var compactResult = SymbolicCompactQueryResult.FromResult(result, normalizedOptions);
         return new SymbolicInvariantQueryResult(
-            result,
-            SymbolicInvariantQuerySummary.FromCompactResult(result, options),
-            SymbolicInvariantQueryFocus.FromCompactResult(result));
+            compactResult,
+            SymbolicInvariantQuerySummary.FromCompactResult(compactResult, normalizedOptions),
+            SymbolicInvariantQueryFocus.FromCompactResult(compactResult));
     }
 
     private static SymbolicCompactQueryOptions NormalizeOptions(SymbolicCompactQueryOptions? options)
