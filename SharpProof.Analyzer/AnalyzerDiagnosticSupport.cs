@@ -40,23 +40,64 @@ internal static class AnalyzerDiagnosticReporter
 
 internal static class ContractDiagnosticSupport
 {
-    internal static ImmutableDictionary<string, string?> AddBaselineProperties(
-        ImmutableDictionary<string, string?> properties,
+    internal enum EvidenceFamily
+    {
+        Requires,
+        Ensures
+    }
+
+    internal static ImmutableDictionary<string, string?> CreateProofProperties(
+        EvidenceFamily family,
         IMethodSymbol methodSymbol,
         string operationKind,
-        string contractText,
-        string evidenceKey)
+        string condition,
+        string proofStatus,
+        string failureReason,
+        string evidenceKey,
+        Location? location,
+        string explainUnknownReason,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
+        string? diagnosticUnknownReason = null,
+        string? callee = null,
+        SymbolicUnknownReasonInfo? structuredUnknownReason = null)
     {
-        var syntaxTree = methodSymbol.Locations.FirstOrDefault(location => location.SourceTree != null)?.SourceTree;
-        return syntaxTree == null
-            ? properties
-            : BaselineDiagnosticProperties.Add(
-                properties,
-                methodSymbol,
-                syntaxTree,
-                operationKind,
-                contractText,
-                evidenceKey);
+        var properties = family switch
+        {
+            EvidenceFamily.Requires => ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
+                .Add(SharpProofDiagnostics.RequiresProofStatusProperty, proofStatus)
+                .Add(SharpProofDiagnostics.RequiresFailureReasonProperty, failureReason)
+                .Add(SharpProofDiagnostics.RequiresCalleeProperty, callee),
+            EvidenceFamily.Ensures => ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
+                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proofStatus)
+                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, failureReason),
+            _ => throw new ArgumentOutOfRangeException(nameof(family), family, null)
+        };
+
+        if (diagnosticUnknownReason != null)
+            properties = properties.Add(
+                family == EvidenceFamily.Requires
+                    ? SharpProofDiagnostics.RequiresUnknownReasonProperty
+                    : SharpProofDiagnostics.EnsuresUnknownReasonProperty,
+                diagnosticUnknownReason);
+
+        if (structuredUnknownReason?.IsUnknown == true)
+            properties = UnknownReasonDiagnosticProperties.Add(properties, structuredUnknownReason);
+        properties = AnalysisTruncationDiagnosticProperties.Add(properties, analysisTruncation);
+        var syntaxTree = methodSymbol.Locations.FirstOrDefault(candidate => candidate.SourceTree != null)?.SourceTree;
+        return AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+            properties,
+            methodSymbol,
+            syntaxTree,
+            operationKind,
+            condition,
+            evidenceKey,
+            location,
+            condition,
+            proofStatus,
+            explainUnknownReason,
+            condition);
     }
 
     internal static string FormatUnknownReason(
@@ -78,28 +119,6 @@ internal static class ContractDiagnosticSupport
         };
     }
 
-    internal static ImmutableDictionary<string, string?> AddProofEvidenceProperties(
-        ImmutableDictionary<string, string?> properties,
-        Location? location,
-        string condition,
-        string proofStatus,
-        string unknownReason,
-        SymbolicAnalysisTruncationInfo analysisTruncation,
-        SymbolicUnknownReasonInfo? structuredUnknownReason = null)
-    {
-        if (structuredUnknownReason?.IsUnknown == true)
-            properties = UnknownReasonDiagnosticProperties.Add(properties, structuredUnknownReason);
-
-        properties = AnalysisTruncationDiagnosticProperties.Add(properties, analysisTruncation);
-        return ExplainDiagnosticProperties.Add(
-            properties,
-            location,
-            condition,
-            proofStatus,
-            unknownReason,
-            condition);
-    }
-
     internal static string FormatLocationKey(Location? location)
     {
         return location == null
@@ -114,24 +133,25 @@ internal static class AnalyzerDiagnosticProperties
 {
     internal static ImmutableDictionary<string, string?> AddBaselineAndExplain(
         ImmutableDictionary<string, string?> properties,
-        IMethodSymbol methodSymbol,
-        SyntaxTree syntaxTree,
+        ISymbol? symbol,
+        SyntaxTree? syntaxTree,
         string operationKind,
         string? baselineContractText,
         string evidenceKey,
-        Location location,
+        Location? location,
         string explainContractText,
         string proofStatus,
         string? unknownReason = null,
         string? impliedConditionText = null)
     {
-        properties = BaselineDiagnosticProperties.Add(
-            properties,
-            methodSymbol,
-            syntaxTree,
-            operationKind,
-            baselineContractText,
-            evidenceKey);
+        if (symbol != null && syntaxTree != null)
+            properties = BaselineDiagnosticProperties.Add(
+                properties,
+                symbol,
+                syntaxTree,
+                operationKind,
+                baselineContractText,
+                evidenceKey);
         return ExplainDiagnosticProperties.Add(
             properties,
             location,

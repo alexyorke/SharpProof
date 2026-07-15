@@ -365,23 +365,18 @@ internal static class MethodRequiresAnalyzer
         SymbolicConditionProofResult proof)
     {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ContractDiagnosticSupport.AddBaselineProperties(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.RequiresProofStatusProperty, proof.Proof.Status.ToString())
-                .Add(SharpProofDiagnostics.RequiresFailureReasonProperty, proof.Reason)
-                .Add(SharpProofDiagnostics.RequiresCalleeProperty, callee),
+        var properties = ContractDiagnosticSupport.CreateProofProperties(
+            ContractDiagnosticSupport.EvidenceFamily.Requires,
             methodSymbol,
             "RequiresCallSite",
             condition,
-            RequiresContractHelpers.CreateEvidenceKey("not_proven", condition, location, proof.Reason));
-        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
-            properties,
-            location,
-            condition,
             proof.Proof.Status.ToString(),
+            proof.Reason,
+            RequiresContractHelpers.CreateEvidenceKey("not_proven", condition, location, proof.Reason),
+            location,
             ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
-            proof.AnalysisTruncation);
+            proof.AnalysisTruncation,
+            callee: callee);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.RequiresNotProvenRule,
@@ -401,24 +396,19 @@ internal static class MethodRequiresAnalyzer
         SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ContractDiagnosticSupport.AddBaselineProperties(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.RequiresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
-                .Add(SharpProofDiagnostics.RequiresUnknownReasonProperty, reason)
-                .Add(SharpProofDiagnostics.RequiresFailureReasonProperty, reason)
-                .Add(SharpProofDiagnostics.RequiresCalleeProperty, callee),
+        var properties = ContractDiagnosticSupport.CreateProofProperties(
+            ContractDiagnosticSupport.EvidenceFamily.Requires,
             methodSymbol,
             "RequiresUnsupported",
             condition,
-            RequiresContractHelpers.CreateEvidenceKey("unsupported", condition, location, reason));
-        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
-            properties,
-            location,
-            condition,
             SymbolicProofStatus.Unknown.ToString(),
             reason,
-            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
+            RequiresContractHelpers.CreateEvidenceKey("unsupported", condition, location, reason),
+            location,
+            reason,
+            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None,
+            reason,
+            callee);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.RequiresUnsupportedRule,

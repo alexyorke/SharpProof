@@ -572,14 +572,16 @@ internal static class MethodEnsuresAnalyzer
         Location? contractLocation,
         SymbolicConditionProofResult proof)
     {
-        var properties = ContractDiagnosticSupport.AddBaselineProperties(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proof.Proof.Status.ToString())
-                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, proof.Reason),
+        var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
+            proof.Reason,
+            proof.Proof.UnknownReason);
+        var properties = ContractDiagnosticSupport.CreateProofProperties(
+            ContractDiagnosticSupport.EvidenceFamily.Ensures,
             methodSymbol,
             "EnsuresReturnSite",
             condition,
+            proof.Proof.Status.ToString(),
+            proof.Reason,
             "not_proven:" +
             condition +
             "@" +
@@ -589,18 +591,11 @@ internal static class MethodEnsuresAnalyzer
             "|" +
             proof.Proof.Status +
             "|" +
-            proof.Reason);
-        var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
             proof.Reason,
-            proof.Proof.UnknownReason);
-        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
-            properties,
             completionSite.Location,
-            condition,
-            proof.Proof.Status.ToString(),
             ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
             proof.AnalysisTruncation,
-            unknownReasonInfo);
+            structuredUnknownReason: unknownReasonInfo);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.EnsuresNotProvenRule,
@@ -620,24 +615,19 @@ internal static class MethodEnsuresAnalyzer
         IEnumerable<Location>? additionalLocations,
         SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
-        var properties = ContractDiagnosticSupport.AddBaselineProperties(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
-                .Add(SharpProofDiagnostics.EnsuresUnknownReasonProperty, reason)
-                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, reason),
+        var properties = ContractDiagnosticSupport.CreateProofProperties(
+            ContractDiagnosticSupport.EvidenceFamily.Ensures,
             methodSymbol,
             "EnsuresUnsupported",
             condition,
-            "unsupported:" + condition + "@" + ContractDiagnosticSupport.FormatLocationKey(location) + "|" + reason);
-        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
-            properties,
-            location,
-            condition,
             SymbolicProofStatus.Unknown.ToString(),
             reason,
+            "unsupported:" + condition + "@" + ContractDiagnosticSupport.FormatLocationKey(location) + "|" + reason,
+            location,
+            reason,
             analysisTruncation ?? SymbolicAnalysisTruncationInfo.None,
-            SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
+            reason,
+            structuredUnknownReason: SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
 
         return Diagnostic.Create(
             SharpProofDiagnostics.EnsuresUnsupportedRule,

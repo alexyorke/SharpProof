@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Analyzer;
 
@@ -19,17 +18,13 @@ internal static class InvalidContractArgumentDiagnostics
             .Add(SharpProofDiagnostics.ContractArgumentProperty, argument)
             .Add(SharpProofDiagnostics.ContractInvalidReasonProperty, reason);
 
-        if (baselineSymbol != null && syntaxTree != null)
-            properties = BaselineDiagnosticProperties.Add(
-                properties,
-                baselineSymbol,
-                syntaxTree,
-                "InvalidContractArgument",
-                argument,
-                attributeName + ":" + argument + ":" + reason);
-
-        properties = ExplainDiagnosticProperties.Add(
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
+            baselineSymbol,
+            syntaxTree,
+            "InvalidContractArgument",
+            argument,
+            attributeName + ":" + argument + ":" + reason,
             location,
             argument,
             "invalid",

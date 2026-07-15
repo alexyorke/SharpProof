@@ -380,15 +380,13 @@ internal static class InferredContractSuggestionAnalyzer
             .Add(SharpProofDiagnostics.SuggestedContractAttributeProperty, attributeExpression)
             .Add(SharpProofDiagnostics.SuggestedContractConfidenceProperty, confidenceText)
             .Add(SharpProofDiagnostics.SuggestedContractEvidenceProperty, evidence);
-        properties = BaselineDiagnosticProperties.Add(
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             context.MethodSymbol,
             context.Node.SyntaxTree,
             "InferredContract",
             displayAttribute,
-            kind + "|" + attributeExpression);
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            kind + "|" + attributeExpression,
             location,
             displayAttribute,
             "suggested",
