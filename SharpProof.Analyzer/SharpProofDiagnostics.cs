@@ -202,39 +202,25 @@ public static class SharpProofDiagnostics
 
     public const string MisplacedExceptionContractAttributeId = "SP0031";
 
-
     public const string MisplacedAttributeId = "SP0003";
-
 
     public const string MissingEnforcePureAttributeId = "SP0004";
 
-
     public const string ConflictingPurityAttributesId = "SP0005";
-
 
     public const string AllowSynchronizationWithoutPurityAttributeId = "SP0006";
 
-
     public const string MisplacedAllowSynchronizationAttributeId = "SP0007";
 
-
     public const string RedundantAllowSynchronizationId = "SP0008";
-    private static readonly LocalizableString PurityNotVerifiedTitle = "Purity Not Proven";
-
-    private static readonly LocalizableString PurityNotVerifiedMessageFormat =
-        "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure";
-
-    private static readonly LocalizableString PurityNotVerifiedDescription =
-        "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the symbolic proof evidence.";
 
     public static readonly DiagnosticDescriptor PurityNotVerifiedRule = CreateDescriptor(
         PurityNotVerifiedId,
-        PurityNotVerifiedTitle,
-        PurityNotVerifiedMessageFormat,
+        "Purity Not Proven",
+        "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure",
         "Purity",
         DiagnosticSeverity.Error,
-        true,
-        PurityNotVerifiedDescription);
+        "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the symbolic proof evidence.");
 
     public static readonly DiagnosticDescriptor NullableReturnContractViolationRule = CreateDescriptor(
         NullableReturnContractViolationId,
@@ -242,7 +228,6 @@ public static class SharpProofDiagnostics
         "Method '{0}' can return null despite contract '{1}'",
         "Nullability",
         DiagnosticSeverity.Warning,
-        true,
         "Reports a reachable normal return that violates the declared nullable return contract.");
 
     public static readonly DiagnosticDescriptor NullableParameterPostconditionViolationRule = CreateDescriptor(
@@ -251,7 +236,6 @@ public static class SharpProofDiagnostics
         "Method '{0}' can complete with parameter '{1}' null despite contract '{2}'",
         "Nullability",
         DiagnosticSeverity.Warning,
-        true,
         "Reports a reachable normal completion that violates a nullable parameter postcondition.");
 
     public static readonly DiagnosticDescriptor NullableMemberContractViolationRule = CreateDescriptor(
@@ -260,7 +244,6 @@ public static class SharpProofDiagnostics
         "Method '{0}' can complete with member '{1}' null despite contract '{2}'",
         "Nullability",
         DiagnosticSeverity.Warning,
-        true,
         "Reports a reachable normal completion that violates a member-not-null contract.");
 
     public static readonly DiagnosticDescriptor UnsafeNullForgivingOperatorRule = CreateDescriptor(
@@ -269,7 +252,6 @@ public static class SharpProofDiagnostics
         "Null-forgiving operator can suppress a feasible null value for '{0}'",
         "Nullability",
         DiagnosticSeverity.Warning,
-        true,
         "Reports a null-forgiving operator reached by a proven null execution.");
 
     public static readonly DiagnosticDescriptor UnnecessaryNullForgivingOperatorRule = CreateDescriptor(
@@ -278,7 +260,6 @@ public static class SharpProofDiagnostics
         "Null-forgiving operator is unnecessary because '{0}' is proven non-null",
         "Nullability",
         DiagnosticSeverity.Info,
-        true,
         "Reports a null-forgiving operator whose operand is already proven non-null.");
 
     public static readonly DiagnosticDescriptor SuggestNullableContractRule = CreateDescriptor(
@@ -287,7 +268,6 @@ public static class SharpProofDiagnostics
         "Method '{0}' satisfies nullable contract '{1}'",
         "Nullability",
         DiagnosticSeverity.Info,
-        true,
         "Suggests a nullable contract proved by every relevant completion path.");
 
     public static readonly DiagnosticDescriptor NullableVerificationInconclusiveRule = CreateDescriptor(
@@ -296,110 +276,57 @@ public static class SharpProofDiagnostics
         "Nullable contract '{1}' on '{0}' could not be verified: {2}",
         "Nullability",
         DiagnosticSeverity.Info,
-        true,
         "Reports bounded nullable proofs that ended as unsupported or unknown.");
-
-    private static readonly LocalizableString BclFallbackGuessTitle = "BCL Purity Fallback Guess";
-
-    private static readonly LocalizableString
-        BclFallbackGuessMessageFormat = "BCL purity fallback for '{0}': {1} ({2})";
-
-    private static readonly LocalizableString BclFallbackGuessDescription =
-        "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with sharpproof_emit_explanations or sharpproof_report_bcl_fallback_guesses.";
 
     public static readonly DiagnosticDescriptor BclFallbackGuessRule = CreateDescriptor(
         BclFallbackGuessId,
-        BclFallbackGuessTitle,
-        BclFallbackGuessMessageFormat,
+        "BCL Purity Fallback Guess",
+        "BCL purity fallback for '{0}': {1} ({2})",
         "Purity",
         DiagnosticSeverity.Info,
-        true,
-        BclFallbackGuessDescription);
-
-    private static readonly LocalizableString AllocationInZeroAllocationMethodTitle =
-        "Allocation In [ZeroAllocations] Method";
-
-    private static readonly LocalizableString AllocationInZeroAllocationMethodMessageFormat =
-        "Method '{1}' is marked [ZeroAllocations], but operation '{0}' allocates";
-
-    private static readonly LocalizableString AllocationInZeroAllocationMethodDescription =
-        "Reports direct source-visible allocation sites inside methods annotated with [ZeroAllocations].";
+        "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with sharpproof_emit_explanations or sharpproof_report_bcl_fallback_guesses.");
 
     public static readonly DiagnosticDescriptor AllocationInZeroAllocationMethodRule = CreateDescriptor(
         AllocationInZeroAllocationMethodId,
-        AllocationInZeroAllocationMethodTitle,
-        AllocationInZeroAllocationMethodMessageFormat,
+        "Allocation In [ZeroAllocations] Method",
+        "Method '{1}' is marked [ZeroAllocations], but operation '{0}' allocates",
         "Allocation",
         DiagnosticSeverity.Warning,
-        true,
-        AllocationInZeroAllocationMethodDescription);
-
-    private static readonly LocalizableString PurityExplanationTitle = "Purity Diagnostic Explanation";
-    private static readonly LocalizableString PurityExplanationMessageFormat = "Purity analysis for '{0}': {1}";
-
-    private static readonly LocalizableString PurityExplanationDescription =
-        "Provides structured explanation data for a purity diagnostic.";
+        "Reports direct source-visible allocation sites inside methods annotated with [ZeroAllocations].");
 
     public static readonly DiagnosticDescriptor PurityExplanationRule = CreateDescriptor(
         PurityExplanationId,
-        PurityExplanationTitle,
-        PurityExplanationMessageFormat,
+        "Purity Diagnostic Explanation",
+        "Purity analysis for '{0}': {1}",
         "Purity",
         DiagnosticSeverity.Info,
-        true,
-        PurityExplanationDescription);
-
-    private static readonly LocalizableString ExceptionSummaryTitle = "Method May Throw Exceptions";
-    private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
-
-    private static readonly LocalizableString ExceptionSummaryDescription =
-        "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
+        "Provides structured explanation data for a purity diagnostic.");
 
     public static readonly DiagnosticDescriptor ExceptionSummaryRule = CreateDescriptor(
         ExceptionSummaryId,
-        ExceptionSummaryTitle,
-        ExceptionSummaryMessageFormat,
+        "Method May Throw Exceptions",
+        "Method '{0}' can throw: {1}",
         "ExceptionFlow",
         DiagnosticSeverity.Info,
-        true,
-        ExceptionSummaryDescription);
-
-    private static readonly LocalizableString UncaughtExceptionSiteTitle = "Operation May Throw Uncaught Exceptions";
-
-    private static readonly LocalizableString UncaughtExceptionSiteMessageFormat =
-        "Operation '{0}' may throw uncaught exceptions: {1}";
-
-    private static readonly LocalizableString UncaughtExceptionSiteDescription =
-        "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all/sites-and-unknowns/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.";
+        "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.");
 
     public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = CreateDescriptor(
         UncaughtExceptionSiteId,
-        UncaughtExceptionSiteTitle,
-        UncaughtExceptionSiteMessageFormat,
+        "Operation May Throw Uncaught Exceptions",
+        "Operation '{0}' may throw uncaught exceptions: {1}",
         "ExceptionFlow",
         DiagnosticSeverity.Warning,
-        true,
-        UncaughtExceptionSiteDescription);
-
-    private static readonly LocalizableString UnknownRuntimeHazardTitle =
-        "Runtime Hazard Candidate Could Not Be Proven";
-
-    private static readonly LocalizableString UnknownRuntimeHazardMessageFormat =
-        "Runtime hazard candidate '{0}' at operation '{1}' could not be proven: {2}";
-
-    private static readonly LocalizableString UnknownRuntimeHazardDescription =
-        "Reports bounded runtime-hazard candidates whose trigger could not be proven or rejected. " +
-        "Enable with sharpproof_runtime_hazard_mode = unknowns, sites-and-unknowns, or all-and-unknowns. " +
-        "The diagnostic is informational by default and carries stable proof, reason, trigger, and baseline metadata.";
+        "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all/sites-and-unknowns/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.");
 
     public static readonly DiagnosticDescriptor UnknownRuntimeHazardRule = CreateDescriptor(
         UnknownRuntimeHazardId,
-        UnknownRuntimeHazardTitle,
-        UnknownRuntimeHazardMessageFormat,
+        "Runtime Hazard Candidate Could Not Be Proven",
+        "Runtime hazard candidate '{0}' at operation '{1}' could not be proven: {2}",
         "ExceptionFlow",
         DiagnosticSeverity.Info,
-        true,
-        UnknownRuntimeHazardDescription);
+        "Reports bounded runtime-hazard candidates whose trigger could not be proven or rejected. " +
+        "Enable with sharpproof_runtime_hazard_mode = unknowns, sites-and-unknowns, or all-and-unknowns. " +
+        "The diagnostic is informational by default and carries stable proof, reason, trigger, and baseline metadata.");
 
     private static readonly LocalizableString InferredContractSuggestionMessageFormat =
         "Method '{0}' has {1}; consider adding {2} ({3} confidence)";
@@ -438,39 +365,21 @@ public static class SharpProofDiagnostics
         "ZeroAllocations",
         "allocation");
 
-    private static readonly LocalizableString CapabilityViolationTitle = "Disallowed Capability Use";
-
-    private static readonly LocalizableString CapabilityViolationMessageFormat =
-        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' requires capabilities: {2}";
-
-    private static readonly LocalizableString CapabilityViolationDescription =
-        "Reports source-visible operations or proven transitive callees that exceed the method's declared allowed capability set.";
-
     public static readonly DiagnosticDescriptor CapabilityViolationRule = CreateDescriptor(
         CapabilityViolationId,
-        CapabilityViolationTitle,
-        CapabilityViolationMessageFormat,
+        "Disallowed Capability Use",
+        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' requires capabilities: {2}",
         "Capabilities",
         DiagnosticSeverity.Warning,
-        true,
-        CapabilityViolationDescription);
-
-    private static readonly LocalizableString CapabilityUnknownTitle = "Capability Contract Not Proven";
-
-    private static readonly LocalizableString CapabilityUnknownMessageFormat =
-        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}";
-
-    private static readonly LocalizableString CapabilityUnknownDescription =
-        "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the capability proof evidence.";
+        "Reports source-visible operations or proven transitive callees that exceed the method's declared allowed capability set.");
 
     public static readonly DiagnosticDescriptor CapabilityUnknownRule = CreateDescriptor(
         CapabilityUnknownId,
-        CapabilityUnknownTitle,
-        CapabilityUnknownMessageFormat,
+        "Capability Contract Not Proven",
+        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}",
         "Capabilities",
         DiagnosticSeverity.Warning,
-        true,
-        CapabilityUnknownDescription);
+        "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the capability proof evidence.");
 
     public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule =
         CreateMisplacedGetterAliasingAttributeDescriptor(
@@ -478,39 +387,21 @@ public static class SharpProofDiagnostics
         "AllowedCapabilities",
         "capability");
 
-    private static readonly LocalizableString EnsuresNotProvenTitle = "Postcondition Not Proven";
-
-    private static readonly LocalizableString EnsuresNotProvenMessageFormat =
-        "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'";
-
-    private static readonly LocalizableString EnsuresNotProvenDescription =
-        "Reports return sites that contradict a declared [Ensures] postcondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence for each return site.";
-
     public static readonly DiagnosticDescriptor EnsuresNotProvenRule = CreateDescriptor(
         EnsuresNotProvenId,
-        EnsuresNotProvenTitle,
-        EnsuresNotProvenMessageFormat,
+        "Postcondition Not Proven",
+        "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'",
         "Contracts",
         DiagnosticSeverity.Warning,
-        true,
-        EnsuresNotProvenDescription);
-
-    private static readonly LocalizableString EnsuresUnsupportedTitle = "Postcondition Could Not Be Verified";
-
-    private static readonly LocalizableString EnsuresUnsupportedMessageFormat =
-        "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}";
-
-    private static readonly LocalizableString EnsuresUnsupportedDescription =
-        "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
+        "Reports return sites that contradict a declared [Ensures] postcondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence for each return site.");
 
     public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = CreateDescriptor(
         EnsuresUnsupportedId,
-        EnsuresUnsupportedTitle,
-        EnsuresUnsupportedMessageFormat,
+        "Postcondition Could Not Be Verified",
+        "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}",
         "Contracts",
         DiagnosticSeverity.Warning,
-        true,
-        EnsuresUnsupportedDescription);
+        "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.");
 
     public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule =
         CreateMisplacedGetterAliasingAttributeDescriptor(
@@ -518,40 +409,21 @@ public static class SharpProofDiagnostics
         "Ensures",
         "symbolic postcondition");
 
-    private static readonly LocalizableString ComplexityExceededTitle = "Declared Complexity Exceeded";
-
-    private static readonly LocalizableString ComplexityExceededMessageFormat =
-        "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound";
-
-    private static readonly LocalizableString ComplexityExceededDescription =
-        "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity proof evidence.";
-
     public static readonly DiagnosticDescriptor ComplexityExceededRule = CreateDescriptor(
         ComplexityExceededId,
-        ComplexityExceededTitle,
-        ComplexityExceededMessageFormat,
+        "Declared Complexity Exceeded",
+        "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound",
         "Complexity",
         DiagnosticSeverity.Warning,
-        true,
-        ComplexityExceededDescription);
-
-    private static readonly LocalizableString ComplexityCouldNotBeVerifiedTitle =
-        "Declared Complexity Could Not Be Verified";
-
-    private static readonly LocalizableString ComplexityCouldNotBeVerifiedMessageFormat =
-        "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}";
-
-    private static readonly LocalizableString ComplexityCouldNotBeVerifiedDescription =
-        "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity analysis details.";
+        "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity proof evidence.");
 
     public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = CreateDescriptor(
         ComplexityCouldNotBeVerifiedId,
-        ComplexityCouldNotBeVerifiedTitle,
-        ComplexityCouldNotBeVerifiedMessageFormat,
+        "Declared Complexity Could Not Be Verified",
+        "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}",
         "Complexity",
         DiagnosticSeverity.Warning,
-        true,
-        ComplexityCouldNotBeVerifiedDescription);
+        "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity analysis details.");
 
     public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule =
         CreateMisplacedGetterAliasingAttributeDescriptor(
@@ -559,283 +431,133 @@ public static class SharpProofDiagnostics
         "ExpectedComplexity",
         "complexity");
 
-    private static readonly LocalizableString InvalidContractArgumentTitle = "Invalid SharpProof Contract Argument";
-
-    private static readonly LocalizableString InvalidContractArgumentMessageFormat =
-        "SharpProof contract '{0}' has invalid argument '{1}': {2}";
-
-    private static readonly LocalizableString InvalidContractArgumentDescription =
-        "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.";
-
     public static readonly DiagnosticDescriptor InvalidContractArgumentRule = CreateDescriptor(
         InvalidContractArgumentId,
-        InvalidContractArgumentTitle,
-        InvalidContractArgumentMessageFormat,
+        "Invalid SharpProof Contract Argument",
+        "SharpProof contract '{0}' has invalid argument '{1}': {2}",
         "Usage",
         DiagnosticSeverity.Error,
-        true,
-        InvalidContractArgumentDescription);
-
-    private static readonly LocalizableString InvalidAnalyzerConfigurationTitle =
-        "Invalid SharpProof Analyzer Configuration";
-
-    private static readonly LocalizableString InvalidAnalyzerConfigurationMessageFormat =
-        "SharpProof analyzer option '{0}' has invalid value '{1}': {2}";
-
-    private static readonly LocalizableString InvalidAnalyzerConfigurationDescription =
-        "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.";
+        "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.");
 
     public static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = CreateDescriptor(
         InvalidAnalyzerConfigurationId,
-        InvalidAnalyzerConfigurationTitle,
-        InvalidAnalyzerConfigurationMessageFormat,
+        "Invalid SharpProof Analyzer Configuration",
+        "SharpProof analyzer option '{0}' has invalid value '{1}': {2}",
         "Configuration",
         DiagnosticSeverity.Warning,
-        true,
-        InvalidAnalyzerConfigurationDescription);
-
-    private static readonly LocalizableString
-        InvalidAdditionalFileTitle = "Invalid SharpProof Analyzer Additional File";
-
-    private static readonly LocalizableString InvalidAdditionalFileMessageFormat =
-        "SharpProof analyzer input file '{0}' is invalid: {1}";
-
-    private static readonly LocalizableString InvalidAdditionalFileDescription =
-        "Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles instead of silently dropping their data.";
+        "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.");
 
     public static readonly DiagnosticDescriptor InvalidAdditionalFileRule = CreateDescriptor(
         InvalidAdditionalFileId,
-        InvalidAdditionalFileTitle,
-        InvalidAdditionalFileMessageFormat,
+        "Invalid SharpProof Analyzer Additional File",
+        "SharpProof analyzer input file '{0}' is invalid: {1}",
         "Configuration",
         DiagnosticSeverity.Warning,
-        true,
-        InvalidAdditionalFileDescription);
-
-    private static readonly LocalizableString TrustedBoundaryReviewTitle = "Trusted Purity Boundary Review";
-
-    private static readonly LocalizableString TrustedBoundaryReviewMessageFormat =
-        "Purity trust source '{0}' for '{1}' was {2}{3}";
-
-    private static readonly LocalizableString TrustedBoundaryReviewDescription =
-        "Reports structured, opt-in audit evidence for applied and overridden purity trust shortcuts.";
+        "Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles instead of silently dropping their data.");
 
     public static readonly DiagnosticDescriptor TrustedBoundaryReviewRule = CreateDescriptor(
         TrustedBoundaryReviewId,
-        TrustedBoundaryReviewTitle,
-        TrustedBoundaryReviewMessageFormat,
+        "Trusted Purity Boundary Review",
+        "Purity trust source '{0}' for '{1}' was {2}{3}",
         "Review",
         DiagnosticSeverity.Info,
-        true,
-        TrustedBoundaryReviewDescription);
-
-    private static readonly LocalizableString UnrecognizedAttributeIdentityTitle =
-        "Unrecognized SharpProof Attribute Identity";
-
-    private static readonly LocalizableString UnrecognizedAttributeIdentityMessageFormat =
-        "Attribute '{0}' looks like a SharpProof contract, but type '{1}' is not in an accepted SharpProof attribute namespace";
-
-    private static readonly LocalizableString UnrecognizedAttributeIdentityDescription =
-        "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.";
+        "Reports structured, opt-in audit evidence for applied and overridden purity trust shortcuts.");
 
     public static readonly DiagnosticDescriptor UnrecognizedAttributeIdentityRule = CreateDescriptor(
         UnrecognizedAttributeIdentityId,
-        UnrecognizedAttributeIdentityTitle,
-        UnrecognizedAttributeIdentityMessageFormat,
+        "Unrecognized SharpProof Attribute Identity",
+        "Attribute '{0}' looks like a SharpProof contract, but type '{1}' is not in an accepted SharpProof attribute namespace",
         "Usage",
         DiagnosticSeverity.Warning,
-        true,
-        UnrecognizedAttributeIdentityDescription);
-
-    private static readonly LocalizableString RequiresNotProvenTitle = "Precondition Not Proven";
-
-    private static readonly LocalizableString RequiresNotProvenMessageFormat =
-        "Call to '{0}' does not prove precondition '{1}'";
-
-    private static readonly LocalizableString RequiresNotProvenDescription =
-        "Reports calls whose current path facts contradict a declared [Requires] precondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence.";
+        "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.");
 
     public static readonly DiagnosticDescriptor RequiresNotProvenRule = CreateDescriptor(
         RequiresNotProvenId,
-        RequiresNotProvenTitle,
-        RequiresNotProvenMessageFormat,
+        "Precondition Not Proven",
+        "Call to '{0}' does not prove precondition '{1}'",
         "Contracts",
         DiagnosticSeverity.Warning,
-        true,
-        RequiresNotProvenDescription);
-
-    private static readonly LocalizableString RequiresUnsupportedTitle = "Precondition Could Not Be Verified";
-
-    private static readonly LocalizableString RequiresUnsupportedMessageFormat =
-        "Precondition '{1}' for '{0}' could not be verified: {2}";
-
-    private static readonly LocalizableString RequiresUnsupportedDescription =
-        "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
+        "Reports calls whose current path facts contradict a declared [Requires] precondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence.");
 
     public static readonly DiagnosticDescriptor RequiresUnsupportedRule = CreateDescriptor(
         RequiresUnsupportedId,
-        RequiresUnsupportedTitle,
-        RequiresUnsupportedMessageFormat,
+        "Precondition Could Not Be Verified",
+        "Precondition '{1}' for '{0}' could not be verified: {2}",
         "Contracts",
         DiagnosticSeverity.Warning,
-        true,
-        RequiresUnsupportedDescription);
-
-    private static readonly LocalizableString MisplacedRequiresAttributeTitle = "Misplaced [Requires] Attribute";
-
-    private static readonly LocalizableString MisplacedRequiresAttributeMessageFormat =
-        "The [Requires] attribute can only be applied to method-like declarations";
-
-    private static readonly LocalizableString MisplacedRequiresAttributeDescription =
-        "[Requires] configures symbolic call-site precondition analysis for a method-like declaration. On a property or indexer, place it on the explicit get accessor.";
+        "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.");
 
     public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = CreateDescriptor(
         MisplacedRequiresAttributeId,
-        MisplacedRequiresAttributeTitle,
-        MisplacedRequiresAttributeMessageFormat,
+        "Misplaced [Requires] Attribute",
+        "The [Requires] attribute can only be applied to method-like declarations",
         "Usage",
         DiagnosticSeverity.Error,
-        true,
-        MisplacedRequiresAttributeDescription);
-
-    private static readonly LocalizableString ExceptionContractViolationTitle = "Exception Contract Violated";
-
-    private static readonly LocalizableString ExceptionContractViolationMessageFormat =
-        "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}";
-
-    private static readonly LocalizableString ExceptionContractViolationDescription =
-        "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
+        "[Requires] configures symbolic call-site precondition analysis for a method-like declaration. On a property or indexer, place it on the explicit get accessor.");
 
     public static readonly DiagnosticDescriptor ExceptionContractViolationRule = CreateDescriptor(
         ExceptionContractViolationId,
-        ExceptionContractViolationTitle,
-        ExceptionContractViolationMessageFormat,
+        "Exception Contract Violated",
+        "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}",
         "ExceptionFlow",
         DiagnosticSeverity.Warning,
-        true,
-        ExceptionContractViolationDescription);
-
-    private static readonly LocalizableString MisplacedExceptionContractAttributeTitle =
-        "Misplaced Exception Contract Attribute";
-
-    private static readonly LocalizableString MisplacedExceptionContractAttributeMessageFormat =
-        "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedExceptionContractAttributeDescription =
-        "[DoesNotThrow] and [AllowedExceptions] configure exception analysis for method-like declarations or alias the getter of a getter-bearing property or indexer.";
+        "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.");
 
     public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = CreateDescriptor(
         MisplacedExceptionContractAttributeId,
-        MisplacedExceptionContractAttributeTitle,
-        MisplacedExceptionContractAttributeMessageFormat,
+        "Misplaced Exception Contract Attribute",
+        "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
         "Usage",
         DiagnosticSeverity.Error,
-        true,
-        MisplacedExceptionContractAttributeDescription);
-
-    private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";
-
-    private static readonly LocalizableString MisplacedAttributeMessageFormat =
-        "The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers";
-
-    private static readonly LocalizableString MisplacedAttributeDescription =
-        "[EnforcePure] and [Pure] configure purity analysis for a method-like declaration or alias the getter of a getter-bearing property or indexer.";
+        "[DoesNotThrow] and [AllowedExceptions] configure exception analysis for method-like declarations or alias the getter of a getter-bearing property or indexer.");
 
     public static readonly DiagnosticDescriptor MisplacedAttributeRule = CreateDescriptor(
         MisplacedAttributeId,
-        MisplacedAttributeTitle,
-        MisplacedAttributeMessageFormat,
+        "Misplaced [EnforcePure] Attribute",
+        "The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
         "Usage",
         DiagnosticSeverity.Error,
-        true,
-        MisplacedAttributeDescription);
-
-    private static readonly LocalizableString MissingEnforcePureAttributeTitle = "Missing [EnforcePure] Attribute";
-
-    private static readonly LocalizableString MissingEnforcePureAttributeMessageFormat =
-        "Method '{0}' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.";
-
-    private static readonly LocalizableString MissingEnforcePureAttributeDescription =
-        "This method seems to only contain operations considered pure, but it lacks the [EnforcePure] attribute. Adding the attribute helps ensure its purity is maintained and communicates intent.";
+        "[EnforcePure] and [Pure] configure purity analysis for a method-like declaration or alias the getter of a getter-bearing property or indexer.");
 
     public static readonly DiagnosticDescriptor MissingEnforcePureAttributeRule = CreateDescriptor(
         MissingEnforcePureAttributeId,
-        MissingEnforcePureAttributeTitle,
-        MissingEnforcePureAttributeMessageFormat,
+        "Missing [EnforcePure] Attribute",
+        "Method '{0}' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.",
         "Purity",
         DiagnosticSeverity.Warning,
-        true,
-        MissingEnforcePureAttributeDescription);
-
-    private static readonly LocalizableString ConflictingPurityAttributesTitle = "Conflicting purity attributes";
-
-    private static readonly LocalizableString ConflictingPurityAttributesMessageFormat =
-        "Method '{0}' has conflicting purity attributes applied";
-
-    private static readonly LocalizableString ConflictingPurityAttributesDescription =
-        "Apply one purity contract to a method. Combining enforcing, trusted-external, and explicit-impure attributes is contradictory or confusing.";
+        "This method seems to only contain operations considered pure, but it lacks the [EnforcePure] attribute. Adding the attribute helps ensure its purity is maintained and communicates intent.");
 
     public static readonly DiagnosticDescriptor ConflictingPurityAttributesRule = CreateDescriptor(
         ConflictingPurityAttributesId,
-        ConflictingPurityAttributesTitle,
-        ConflictingPurityAttributesMessageFormat,
+        "Conflicting purity attributes",
+        "Method '{0}' has conflicting purity attributes applied",
         "Usage",
         DiagnosticSeverity.Warning,
-        true,
-        ConflictingPurityAttributesDescription);
-
-    private static readonly LocalizableString AllowSyncWithoutPurityTitle =
-        "[AllowSynchronization] requires a purity attribute";
-
-    private static readonly LocalizableString AllowSyncWithoutPurityMessageFormat =
-        "Method '{0}' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]";
-
-    private static readonly LocalizableString AllowSyncWithoutPurityDescription =
-        "[AllowSynchronization] only affects methods participating in purity analysis. Apply [EnforcePure] or [Pure] for it to have effect.";
+        "Apply one purity contract to a method. Combining enforcing, trusted-external, and explicit-impure attributes is contradictory or confusing.");
 
     public static readonly DiagnosticDescriptor AllowSynchronizationWithoutPurityAttributeRule = CreateDescriptor(
         AllowSynchronizationWithoutPurityAttributeId,
-        AllowSyncWithoutPurityTitle,
-        AllowSyncWithoutPurityMessageFormat,
+        "[AllowSynchronization] requires a purity attribute",
+        "Method '{0}' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]",
         "Usage",
         DiagnosticSeverity.Warning,
-        true,
-        AllowSyncWithoutPurityDescription);
-
-    private static readonly LocalizableString MisplacedAllowSynchronizationTitle =
-        "Misplaced [AllowSynchronization] Attribute";
-
-    private static readonly LocalizableString MisplacedAllowSynchronizationMessageFormat =
-        "The [AllowSynchronization] attribute can only be applied to method declarations";
-
-    private static readonly LocalizableString MisplacedAllowSynchronizationDescription =
-        "[AllowSynchronization] configures analyzer behavior for a method and should not be used on non-method declarations.";
+        "[AllowSynchronization] only affects methods participating in purity analysis. Apply [EnforcePure] or [Pure] for it to have effect.");
 
     public static readonly DiagnosticDescriptor MisplacedAllowSynchronizationAttributeRule = CreateDescriptor(
         MisplacedAllowSynchronizationAttributeId,
-        MisplacedAllowSynchronizationTitle,
-        MisplacedAllowSynchronizationMessageFormat,
+        "Misplaced [AllowSynchronization] Attribute",
+        "The [AllowSynchronization] attribute can only be applied to method declarations",
         "Usage",
         DiagnosticSeverity.Error,
-        true,
-        MisplacedAllowSynchronizationDescription);
-
-    private static readonly LocalizableString RedundantAllowSynchronizationTitle = "Redundant [AllowSynchronization]";
-
-    private static readonly LocalizableString RedundantAllowSynchronizationMessageFormat =
-        "Method '{0}' is marked with [AllowSynchronization] but contains no synchronization constructs";
-
-    private static readonly LocalizableString RedundantAllowSynchronizationDescription =
-        "Remove [AllowSynchronization] when the method does not use synchronization (e.g., lock).";
+        "[AllowSynchronization] configures analyzer behavior for a method and should not be used on non-method declarations.");
 
     public static readonly DiagnosticDescriptor RedundantAllowSynchronizationRule = CreateDescriptor(
         RedundantAllowSynchronizationId,
-        RedundantAllowSynchronizationTitle,
-        RedundantAllowSynchronizationMessageFormat,
+        "Redundant [AllowSynchronization]",
+        "Method '{0}' is marked with [AllowSynchronization] but contains no synchronization constructs",
         "Usage",
         DiagnosticSeverity.Info,
-        true,
-        RedundantAllowSynchronizationDescription);
+        "Remove [AllowSynchronization] when the method does not use synchronization (e.g., lock).");
 
     public static readonly DiagnosticDescriptor AwaitNullConditionalRule = CreateCommonBugDescriptor(
         AwaitNullConditionalId,
@@ -1075,6 +797,17 @@ public static class SharpProofDiagnostics
         LocalizableString messageFormat,
         string category,
         DiagnosticSeverity defaultSeverity,
+        LocalizableString description)
+    {
+        return CreateDescriptor(id, title, messageFormat, category, defaultSeverity, true, description);
+    }
+
+    private static DiagnosticDescriptor CreateDescriptor(
+        string id,
+        LocalizableString title,
+        LocalizableString messageFormat,
+        string category,
+        DiagnosticSeverity defaultSeverity,
         bool isEnabledByDefault,
         LocalizableString description)
     {
@@ -1112,7 +845,6 @@ public static class SharpProofDiagnostics
             $"The [{attributeName}] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
             "Usage",
             DiagnosticSeverity.Error,
-            true,
             $"[{attributeName}] configures {analysisKind} analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.");
     }
 
@@ -1124,7 +856,6 @@ public static class SharpProofDiagnostics
             InferredContractSuggestionMessageFormat,
             "Suggestions",
             DiagnosticSeverity.Info,
-            true,
             InferredContractSuggestionDescription);
     }
 }
