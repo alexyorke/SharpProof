@@ -7,7 +7,7 @@
   "totalHandwrittenLines": 259909,
   "minimumReduction": 20000,
   "stretchReduction": 35000,
-  "passingTests": 5778,
+  "passingTests": 6070,
   "skippedTests": 2,
   "testRoots": [
     "SharpProof.Test/",

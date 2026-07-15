@@ -3053,7 +3053,7 @@ public sealed class ArchitectureReductionTests
             production.GetProperty("lines").GetInt32() + tests.GetProperty("lines").GetInt32(),
             Is.EqualTo(total.GetProperty("lines").GetInt32()));
         Assert.That(tests.GetProperty("roots").GetArrayLength(), Is.EqualTo(2));
-        Assert.That(root.GetProperty("testBaseline").GetProperty("passing").GetInt32(), Is.EqualTo(5778));
+        Assert.That(root.GetProperty("testBaseline").GetProperty("passing").GetInt32(), Is.EqualTo(6070));
         Assert.That(root.GetProperty("testBaseline").GetProperty("skipped").GetInt32(), Is.EqualTo(2));
     }
 
