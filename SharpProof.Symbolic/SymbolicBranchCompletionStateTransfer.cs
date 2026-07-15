@@ -89,8 +89,7 @@ internal static class SymbolicBranchCompletionStateTransfer
                 out var falseBranchState))
             return;
 
-        AddCommonBranchStateFacts(ref state, new[] { trueBranchState, falseBranchState });
-
+        var completedStates = new[] { trueBranchState, falseBranchState };
         if (SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
                 ifStatement.Condition,
                 ifStatement.Statement,
@@ -114,14 +113,17 @@ internal static class SymbolicBranchCompletionStateTransfer
                 semanticModel,
                 cancellationToken,
                 out var falseCondition))
+        {
+            state = SymbolicStateMerger.MergeCommonStates(state, completedStates);
             return;
+        }
 
-        AddConditionalBranchStateFacts(
-            ref state,
+        state = SymbolicStateMerger.MergeGuardedStates(
+            state,
             new[]
             {
-                new GuardedBranchState(trueCondition, trueBranchState),
-                new GuardedBranchState(falseCondition, falseBranchState)
+                new SymbolicStateMerger.GuardedState(trueCondition, trueBranchState),
+                new SymbolicStateMerger.GuardedState(falseCondition, falseBranchState)
             },
             ifStatement,
             SymbolicAnalysisLimitKind.IfElseFactMerge,
@@ -305,15 +307,18 @@ internal static class SymbolicBranchCompletionStateTransfer
 
         if (branches.Count == 0) return;
 
-        AddCommonBranchStateFacts(ref state, branches.Select(static branch => branch.State).ToArray());
+        var completedStates = branches.Select(static branch => branch.State).ToArray();
         if (branches.All(static branch => !branch.ConditionSymbolsMutated))
-            AddConditionalBranchStateFacts(
-                ref state,
-                branches.Select(static branch => new GuardedBranchState(branch.Condition, branch.State)).ToArray(),
+            state = SymbolicStateMerger.MergeGuardedStates(
+                state,
+                branches.Select(static branch =>
+                    new SymbolicStateMerger.GuardedState(branch.Condition, branch.State)).ToArray(),
                 switchStatement,
                 SymbolicAnalysisLimitKind.SwitchFactMerge,
                 SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts,
                 "program_point.switch_state_fact_merge");
+        else
+            state = SymbolicStateMerger.MergeCommonStates(state, completedStates);
     }
 
     private static void AddCompletedSwitchExitExclusionStateFacts(
@@ -337,103 +342,6 @@ internal static class SymbolicBranchCompletionStateTransfer
 
             state = state.AddPathCondition(new SymbolicNotCondition(sectionCondition));
         }
-    }
-
-    private static void AddCommonBranchStateFacts(
-        ref SymbolicState state,
-        IReadOnlyList<SymbolicState> branches)
-    {
-        var (factKeys, conditionKeys) = GetCommonBranchStateKeys(branches);
-        foreach (var fact in branches[0].Facts)
-            if (factKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
-                state = state.AddFact(fact);
-        foreach (var condition in branches[0].PathConditions)
-            if (conditionKeys.Contains(SymbolicState.CreateProofConditionKey(condition)))
-                state = state.AddPathCondition(condition);
-    }
-
-    private static void AddConditionalBranchStateFacts(
-        ref SymbolicState state,
-        IReadOnlyList<GuardedBranchState> branches,
-        SyntaxNode source,
-        SymbolicAnalysisLimitKind limitKind,
-        int limit,
-        string provenance)
-    {
-        var (commonFactKeys, commonConditionKeys) =
-            GetCommonBranchStateKeys(branches.Select(static branch => branch.State).ToArray());
-        var addedCount = 0;
-        foreach (var branch in branches)
-        {
-            foreach (var fact in branch.State.Facts)
-                if (!commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)) &&
-                    !TryAddGuardedBranchFact(
-                        ref state,
-                        branch.Condition,
-                        new SymbolicFactCondition(fact),
-                        source,
-                        limitKind,
-                        limit,
-                        provenance,
-                        ref addedCount))
-                    return;
-
-            var branchConditionKey = SymbolicState.CreateProofConditionKey(branch.Condition);
-            foreach (var condition in branch.State.PathConditions)
-            {
-                var conditionKey = SymbolicState.CreateProofConditionKey(condition);
-                if (commonConditionKeys.Contains(conditionKey) ||
-                    string.Equals(conditionKey, branchConditionKey, StringComparison.Ordinal))
-                    continue;
-                if (!TryAddGuardedBranchFact(
-                        ref state,
-                        branch.Condition,
-                        condition,
-                        source,
-                        limitKind,
-                        limit,
-                        provenance,
-                        ref addedCount))
-                    return;
-            }
-        }
-    }
-
-    private static (HashSet<string> FactKeys, HashSet<string> ConditionKeys) GetCommonBranchStateKeys(
-        IReadOnlyList<SymbolicState> branches)
-    {
-        var factKeys = new HashSet<string>(branches[0].Facts.Select(SymbolicState.CreateProofFactKey), StringComparer.Ordinal);
-        var conditionKeys = new HashSet<string>(
-            branches[0].PathConditions.Select(SymbolicState.CreateProofConditionKey),
-            StringComparer.Ordinal);
-        for (var index = 1; index < branches.Count; index++)
-        {
-            factKeys.IntersectWith(branches[index].Facts.Select(SymbolicState.CreateProofFactKey));
-            conditionKeys.IntersectWith(branches[index].PathConditions.Select(SymbolicState.CreateProofConditionKey));
-        }
-
-        return (factKeys, conditionKeys);
-    }
-
-    private static bool TryAddGuardedBranchFact(
-        ref SymbolicState state,
-        SymbolicCondition branchCondition,
-        SymbolicCondition branchFact,
-        SyntaxNode source,
-        SymbolicAnalysisLimitKind limitKind,
-        int limit,
-        string provenance,
-        ref int addedCount)
-    {
-        if (addedCount >= limit)
-        {
-            SymbolicAnalysisLimitContext.Record(limitKind, limit, addedCount + 1, source, provenance);
-            return false;
-        }
-
-        state = state.AddPathCondition(SymbolicStateMerger.CreateGuardedChoice(branchCondition, branchFact));
-        addedCount++;
-        return true;
     }
 
     private static bool SwitchStatementHasDefaultOrExhaustiveBooleanLabels(
@@ -680,8 +588,6 @@ internal static class SymbolicBranchCompletionStateTransfer
 
         return false;
     }
-
-    private sealed record GuardedBranchState(SymbolicCondition Condition, SymbolicState State);
 
     private sealed record SwitchBranchState(
         SymbolicCondition Condition,
