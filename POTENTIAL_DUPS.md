@@ -10,9 +10,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Tooling and build scripts
 
-20. **Line-scanning collectors** - `scripts/Get-SharpProofRawSmtHotspots.ps1:123-182,231-292,354-423`
-    Six functions enumerate source files, read lines with a counter, and emit path/line/text records; only roots and matching predicates differ. Extract a generic source-line scanner with predicates/needles.
-
 21. **Compact CLI result location/schema forwarding** - `Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs:16-118`
     Complexity and capability result types duplicate constructor validation, evidence-schema properties, and method/source/span forwarding. A shared immutable base or descriptor would protect the compact contract from location/schema drift.
 

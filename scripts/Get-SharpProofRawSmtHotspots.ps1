@@ -30,6 +30,50 @@ function Get-ProductionSourceFiles
         -SearchRoot (Join-Path $repoRoot $RelativeRoot)
 }
 
+function Find-SourceLineMatches
+{
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Files,
+        [string[]]$AllNeedles = @(),
+        [scriptblock]$Classify
+    )
+
+    $matches = @()
+    foreach ($file in $Files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            $matched = $true
+            foreach ($needle in $AllNeedles)
+            {
+                if ($line.IndexOf($needle, [StringComparison]::Ordinal) -ge 0) { continue }
+
+                $matched = $false
+                break
+            }
+            if (-not $matched) { continue }
+
+            $extraProperties = if ($Classify) { & $Classify $line } else { [ordered]@{} }
+            if ($null -eq $extraProperties) { continue }
+
+            $properties = [ordered]@{
+                path = $file.RepoPath
+                line = $lineNumber
+            }
+            foreach ($entry in $extraProperties.GetEnumerator())
+            {
+                $properties[$entry.Key] = $entry.Value
+            }
+            $properties.text = $line.Trim()
+            $matches += [pscustomobject]$properties
+        }
+    }
+
+    return @($matches)
+}
+
 $categories = @(
     [pscustomobject]@{
         name = 'condition-translator'
@@ -113,53 +157,16 @@ function Get-AnalyzerHotspots
 
 function Get-AnalyzerTranslatorShimUsage
 {
-    $files = Get-ProductionSourceFiles 'SharpProof.Analyzer'
-
-    $usages = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('CSharpSmtFormulaTranslator.', [System.StringComparison]::Ordinal) -ge 0)
-            {
-                $usages += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    text = $line.Trim()
-                }
-            }
-        }
-    }
-
-    return @($usages)
+    return @(Find-SourceLineMatches `
+        -Files (Get-ProductionSourceFiles 'SharpProof.Analyzer') `
+        -AllNeedles 'CSharpSmtFormulaTranslator.')
 }
 
 function Get-SymbolicPublicFormulaSurfaces
 {
-    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic'
-
-    $surfaces = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('public', [System.StringComparison]::Ordinal) -ge 0 -and
-                $line.IndexOf('SmtFormula', [System.StringComparison]::Ordinal) -ge 0)
-            {
-                $surfaces += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    text = $line.Trim()
-                }
-            }
-        }
-    }
-
-    return @($surfaces)
+    return @(Find-SourceLineMatches `
+        -Files (Get-ProductionSourceFiles 'SharpProof.Symbolic') `
+        -AllNeedles @('public', 'SmtFormula'))
 }
 
 function Get-SymbolicCompatibilitySurfaces
@@ -169,41 +176,13 @@ function Get-SymbolicCompatibilitySurfaces
             $_.RepoPath -notmatch '^SharpProof\.Symbolic/Ir/'
         }
 
-    $patterns = @(
-        [pscustomobject]@{
-            category = 'formula-metadata'
-            regex = '\b(HasSmtFormula|FormulaKind|FormulaText)\b'
-        }
-    )
+    return @(Find-SourceLineMatches -Files $files -AllNeedles 'public' -Classify {
+        param($line)
 
-    $surfaces = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('public', [System.StringComparison]::Ordinal) -lt 0)
-            {
-                continue
-            }
+        if ($line -notmatch '\b(HasSmtFormula|FormulaKind|FormulaText)\b') { return $null }
 
-            foreach ($pattern in $patterns)
-            {
-                if ($line -match $pattern.regex)
-                {
-                    $surfaces += [pscustomobject]@{
-                        path = $file.RepoPath
-                        line = $lineNumber
-                        category = $pattern.category
-                        text = $line.Trim()
-                    }
-                }
-            }
-        }
-    }
-
-    return @($surfaces)
+        return [ordered]@{ category = 'formula-metadata' }
+    })
 }
 
 function Get-SymbolicDirectTranslatorUsage
@@ -214,25 +193,7 @@ function Get-SymbolicDirectTranslatorUsage
                 $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
         }
 
-    $usages = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('CSharpConditionToFormula.', [System.StringComparison]::Ordinal) -ge 0)
-            {
-                $usages += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    text = $line.Trim()
-                }
-            }
-        }
-    }
-
-    return @($usages)
+    return @(Find-SourceLineMatches -Files $files -AllNeedles 'CSharpConditionToFormula.')
 }
 
 function Get-SymbolicTranslatorShimUsage
@@ -243,25 +204,7 @@ function Get-SymbolicTranslatorShimUsage
                 $_.RepoPath -notmatch '^SharpProof\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
         }
 
-    $usages = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('CSharpSmtFormulaTranslator.', [System.StringComparison]::Ordinal) -ge 0)
-            {
-                $usages += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    text = $line.Trim()
-                }
-            }
-        }
-    }
-
-    return @($usages)
+    return @(Find-SourceLineMatches -Files $files -AllNeedles 'CSharpSmtFormulaTranslator.')
 }
 
 function Get-SymbolicTranslatorShimFamilies
@@ -325,35 +268,21 @@ function Get-SymbolicTranslatorShimFamilies
 
 function Get-IrKnownApiLoweringLocations
 {
-    $files = Get-ProductionSourceFiles 'SharpProof.Symbolic\Ir'
+    return @(Find-SourceLineMatches `
+        -Files (Get-ProductionSourceFiles 'SharpProof.Symbolic\Ir') `
+        -Classify {
+            param($line)
 
-    $locations = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            $descriptorKind = $null
-            if ($line -match
+            if ($line -notmatch
                 '(?:new|private static readonly) KnownApiLoweringDescriptor<(SymbolicCondition|SymbolicTerm)>')
             {
-                $descriptorKind = if ($Matches[1] -eq 'SymbolicCondition') { 'condition' } else { 'term' }
+                return $null
             }
 
-            if ($descriptorKind)
-            {
-                $locations += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    kind = $descriptorKind
-                    text = $line.Trim()
-                }
+            return [ordered]@{
+                kind = if ($Matches[1] -eq 'SymbolicCondition') { 'condition' } else { 'term' }
             }
-        }
-    }
-
-    return @($locations)
+        })
 }
 
 function Get-RuntimeHazardFormulaFallbackLocations
@@ -364,26 +293,9 @@ function Get-RuntimeHazardFormulaFallbackLocations
                 $_.RepoPath -eq 'SharpProof.Symbolic/SymbolicReachabilityService.cs'
         }
 
-    $locations = @()
-    foreach ($file in $files)
-    {
-        $lineNumber = 0
-        foreach ($line in Get-Content -LiteralPath $file.FullName)
-        {
-            $lineNumber++
-            if ($line.IndexOf('ir.runtime-hazard.', [System.StringComparison]::Ordinal) -ge 0 -and
-                $line.IndexOf('formula-fallback', [System.StringComparison]::Ordinal) -ge 0)
-            {
-                $locations += [pscustomobject]@{
-                    path = $file.RepoPath
-                    line = $lineNumber
-                    text = $line.Trim()
-                }
-            }
-        }
-    }
-
-    return @($locations)
+    return @(Find-SourceLineMatches `
+        -Files $files `
+        -AllNeedles @('ir.runtime-hazard.', 'formula-fallback'))
 }
 
 Push-Location $repoRoot
