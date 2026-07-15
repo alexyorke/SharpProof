@@ -295,6 +295,7 @@ transfer policy after its slice is complete.
 | ProofCore primary-constructor carriers | `0c2c7b2b` | 105,910 | -1,766 |
 | Symbolic primary-constructor carriers and gate | `18dac9b5` | 105,767 | -1,909 |
 | Resolved contract-diagnostic duplicate finding | `62d26b2d` | 105,767 | -1,909 |
+| Intentional exception-diagnostic policy finding | `68f26259` | 105,767 | -1,909 |
 
 ## Validation Ledger
 
@@ -378,19 +379,21 @@ transfer policy after its slice is complete.
 | Phase 6 ProofCore primary-constructor carriers | Commit `0c2c7b2b` converts six private readonly regex/fact-preprocessing structs selected by IDE0290 to C# primary constructors. Their struct value semantics and public property shapes remain unchanged; the touched files are LF/no-BOM. Release ProofCore build: zero warnings; focused ProofCore Z3, SMT service, and string reasoning fixtures: 244 passed. Production LOC fell by 36 lines to 105,910, or -1,766 from the rewrite start. |
 | Phase 6 Symbolic primary-constructor carriers and gate | Commit `18dac9b5` converts 18 internal/private immutable carriers selected by IDE0290 while preserving each class/readonly-struct kind, reference/value equality behavior, property shape, validation, and construction sites. The residual IDE0290 inventory contains only public contract models or mutable builders, budgets, pools, analysis sessions, and services, so the bounded carrier scope is exhausted. Release Symbolic build: zero warnings; focused invariant/source-query, capability, indexing/hazard, proof, IR, and SMT-cache fixtures: 493 passed. All touched files are LF/no-BOM. Production LOC fell to 105,767, or -1,909 from the rewrite start. |
 | Phase 6 resolved Requires/Ensures duplicate finding | Commit `62d26b2d` removes the stale first `POTENTIAL_DUPS.md` entry. `ContractDiagnosticSupport.CreateProofProperties` already owns the shared Requires/Ensures baseline, proof, structured-unknown, truncation, and explain envelope; rule selection, locations, message arguments, and `Diagnostic.Create` remain intentionally local diagnostic policy. Focused Requires, Ensures, explain, baseline, truncation, and unknown-reason fixtures: 86 passed. Production LOC remains 105,767, or -1,909 from the rewrite start. |
+| Phase 6 intentional exception-diagnostic policy finding | Commit `68f26259` removes the stale exception-envelope report entry. All four paths already share `AnalyzerDiagnosticProperties.AddBaselineAndExplain` and `AnalyzerDiagnosticReporter.ReportIfNotSuppressed`; their descriptors, evidence keys, additional locations, proof/unknown metadata, and message arguments are distinct policy, and another wrapper would add parameter plumbing without centralizing new semantics. Focused summary, unknown-hazard, reachability, propagation, handling, contract, explain, baseline, and authoring fixtures: 194 passed. Production LOC remains 105,767, or -1,909 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
 - State: Phases 2 through 5 and the first three Phase 6 items are gated. The
-  `POTENTIAL_DUPS.md` cleanup is in progress; its stale Requires/Ensures
-  diagnostic-envelope finding is removed after confirming the shared evidence
-  projector already owns the common policy.
-- Last confirmed fact: focused Requires, Ensures, explain, baseline,
-  truncation, and unknown-reason fixtures pass 86/86. Production LOC remains
-  105,767, or -1,909 from the rewrite start.
-- Next cheapest step: adjudicate the exception-flow diagnostic-envelope finding,
-  centralizing only common evidence/reporting mechanics if current code still
-  duplicates them.
+  `POTENTIAL_DUPS.md` cleanup is in progress; its Requires/Ensures and
+  exception-flow diagnostic-envelope findings are removed after confirming the
+  common evidence/reporting mechanics are already centralized.
+- Last confirmed fact: focused exception summary, unknown-hazard, reachability,
+  propagation, handling, contract, explain, baseline, and authoring fixtures
+  pass 194/194. Production LOC remains 105,767, or -1,909 from the rewrite
+  start.
+- Next cheapest step: adjudicate the switch condition proof-pipeline finding and
+  share only a net-negative proof core that preserves the statement-only goto
+  exemption.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
