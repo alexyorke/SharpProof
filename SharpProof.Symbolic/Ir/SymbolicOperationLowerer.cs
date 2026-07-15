@@ -45,9 +45,8 @@ internal static class SymbolicOperationLowerer
 
         const string provenance = "ir.runtime-hazard.divide-by-zero";
         var zero = SymbolicSemanticPipeline.LowerNumericZeroCondition(divisor, context);
-        var confidence = SymbolicFactConfidence.Exact;
         SymbolicTerm? subject = null;
-        SymbolicCondition trigger;
+        SymbolicCondition? trigger = null;
         if (zero is { IsExact: true, Value: { } zeroCondition })
         {
             trigger = zeroCondition;
@@ -58,24 +57,16 @@ internal static class SymbolicOperationLowerer
                 ? left
                 : null;
         }
-        else
-        {
-            confidence = SymbolicFactConfidence.Unsupported;
-            trigger = CreateUnsupportedHazardCondition(site, provenance + ".unsupported");
-        }
 
-        var operationProvenance = confidence == SymbolicFactConfidence.Exact
-            ? provenance
-            : provenance + ".unsupported";
-        hazard = new SymbolicHazardOperation(
+        hazard = CreateHazard(
+            site,
             SymbolicRuntimeHazardKind.DivideByZero,
             SymbolicExceptionPreconditionKind.DivideByZero,
             subject,
             trigger,
-            confidence,
             ExceptionTypes.DivideByZeroException,
             isRemainder ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero,
-            new SymbolicOperationOrigin(site.Span, 0, operationProvenance));
+            provenance);
         return true;
     }
 
@@ -94,6 +85,78 @@ internal static class SymbolicOperationLowerer
             IConversionOperation conversion => TryLowerCheckedConversionOverflow(conversion, context, out hazard),
             _ => NoHazard(out hazard)
         };
+    }
+
+    internal static bool TryLowerReferenceNullHazard(
+        ExpressionSyntax subjectExpression,
+        SymbolicRuntimeHazardKind hazardKind,
+        SymbolicExceptionPreconditionKind preconditionKind,
+        string exceptionType,
+        string category,
+        string provenance,
+        SymbolicLoweringContext context,
+        bool suppressDefinitelyNotNull,
+        out SymbolicHazardOperation hazard)
+    {
+        if (suppressDefinitelyNotNull &&
+            NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                subjectExpression, context.SemanticModel, context.CancellationToken))
+            return NoHazard(out hazard);
+
+        var lowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
+        var subject = lowering is
+            {
+                IsExact: true,
+                Value: { } value
+            } && (value.Kind == SmtValueKind.Reference || value is SymbolicNullTerm)
+                ? value
+                : null;
+        var trigger = subject == null
+            ? null
+            : SymbolicIrLowerer.CreateReferenceNullCondition(
+                subject, true, subjectExpression, provenance + ".trigger");
+        hazard = CreateHazard(
+            subjectExpression,
+            hazardKind,
+            preconditionKind,
+            subject,
+            trigger,
+            exceptionType,
+            category,
+            provenance);
+        return true;
+    }
+
+    internal static bool TryLowerNullableValueHazard(
+        ExpressionSyntax nullableExpression,
+        string exceptionType,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        const string provenance = "ir.runtime-hazard.nullable-value.without-value";
+        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableExpression, context);
+        SymbolicTerm? subject = null;
+        SymbolicCondition? trigger = null;
+        if (lowering is { IsExact: true, Value: SymbolicNullableHasValueTerm hasValue })
+        {
+            subject = new SymbolicVariableTerm(hasValue.NullableName, SmtValueKind.Reference);
+            trigger = new SymbolicNotCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(hasValue),
+                nullableExpression,
+                "ir.runtime-hazard.nullable-value.has-value")));
+        }
+
+        hazard = CreateHazard(
+            nullableExpression,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+            subject,
+            trigger,
+            exceptionType,
+            category,
+            provenance);
+        return true;
     }
 
     private static bool TryLowerCheckedBinaryOverflow(
@@ -289,6 +352,25 @@ internal static class SymbolicOperationLowerer
         SymbolicCondition? trigger,
         string provenance,
         string category)
+        => CreateHazard(
+            site,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            subject,
+            trigger,
+            ExceptionTypes.OverflowException,
+            category,
+            provenance);
+
+    private static SymbolicHazardOperation CreateHazard(
+        SyntaxNode site,
+        SymbolicRuntimeHazardKind hazardKind,
+        SymbolicExceptionPreconditionKind preconditionKind,
+        SymbolicTerm? subject,
+        SymbolicCondition? trigger,
+        string exceptionType,
+        string category,
+        string provenance)
     {
         var confidence = trigger == null ? SymbolicFactConfidence.Unsupported : SymbolicFactConfidence.Exact;
         if (trigger == null)
@@ -299,12 +381,12 @@ internal static class SymbolicOperationLowerer
         }
 
         return new SymbolicHazardOperation(
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            hazardKind,
+            preconditionKind,
             subject,
             trigger,
             confidence,
-            ExceptionTypes.OverflowException,
+            exceptionType,
             category,
             new SymbolicOperationOrigin(site.Span, 0, provenance));
     }

@@ -94,6 +94,111 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [TestCase(
+        "string",
+        SymbolicRuntimeHazardKind.NullDereference,
+        (int)SymbolicExceptionPreconditionKind.NullDereference)]
+    [TestCase(
+        "object",
+        SymbolicRuntimeHazardKind.ArgumentNull,
+        (int)SymbolicExceptionPreconditionKind.ArgumentNull)]
+    [TestCase(
+        "dynamic",
+        SymbolicRuntimeHazardKind.DynamicNullBinding,
+        (int)SymbolicExceptionPreconditionKind.DynamicNullBinding)]
+    public void ReferenceNullHazardLowering_EmitsExactTypedOperation(
+        string parameterType,
+        SymbolicRuntimeHazardKind hazardKind,
+        int preconditionKindValue)
+    {
+        var preconditionKind = (SymbolicExceptionPreconditionKind)preconditionKindValue;
+        var source = $"static class C {{ static object M({parameterType} value) => value; }}";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ReferenceNullHazardLowering_EmitsExactTypedOperation));
+        var expression = fixture.Root.DescendantNodes().OfType<ArrowExpressionClauseSyntax>().Single().Expression;
+
+        var lowered = SymbolicOperationLowerer.TryLowerReferenceNullHazard(
+            expression,
+            hazardKind,
+            preconditionKind,
+            "TestException",
+            "test_category",
+            "test.reference-null",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            suppressDefinitelyNotNull: false,
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.HazardKind, Is.EqualTo(hazardKind));
+            Assert.That(hazard.PreconditionKind, Is.EqualTo(preconditionKind));
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
+            Assert.That(hazard.Origin.Provenance, Is.EqualTo("test.reference-null"));
+        });
+    }
+
+    [Test]
+    public void ReferenceNullHazardLowering_PreservesUnsupportedTrigger()
+    {
+        const string source = "static class C { static object Get() => new(); static object M() => Get(); }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ReferenceNullHazardLowering_PreservesUnsupportedTrigger));
+        var expression = fixture.Root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+
+        var lowered = SymbolicOperationLowerer.TryLowerReferenceNullHazard(
+            expression,
+            SymbolicRuntimeHazardKind.NullDereference,
+            SymbolicExceptionPreconditionKind.NullDereference,
+            "TestException",
+            "test_category",
+            "test.reference-null",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            suppressDefinitelyNotNull: false,
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
+            Assert.That(hazard.Subject, Is.Null);
+            Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
+            Assert.That(hazard.Origin.Provenance, Is.EqualTo("test.reference-null.unsupported"));
+        });
+    }
+
+    [Test]
+    public void NullableValueHazardLowering_EmitsExactTypedOperation()
+    {
+        const string source = "static class C { static int M(int? value) => value.Value; }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NullableValueHazardLowering_EmitsExactTypedOperation));
+        var expression = fixture.Root.DescendantNodes().OfType<MemberAccessExpressionSyntax>().Single().Expression;
+
+        var lowered = SymbolicOperationLowerer.TryLowerNullableValueHazard(
+            expression,
+            "System.InvalidOperationException",
+            "definite_nullable_value_without_value",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.HazardKind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+            Assert.That(hazard.PreconditionKind,
+                Is.EqualTo(SymbolicExceptionPreconditionKind.NullableValueWithoutValue));
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(hazard.Trigger, Is.TypeOf<SymbolicNotCondition>());
+        });
+    }
+
     [Test]
     public void OperationDescriptors_KeepTypedPayloadAndEvaluationSequence()
     {

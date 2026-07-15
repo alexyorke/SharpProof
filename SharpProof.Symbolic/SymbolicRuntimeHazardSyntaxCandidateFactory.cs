@@ -383,25 +383,18 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
             return false;
 
-        var trigger = TryCreateUnboxNullTrigger(
+        return TryCreateOperationReferenceNullCandidate(
+            castExpression,
             castExpression.Expression,
+            SymbolicRuntimeHazardKind.UnboxNull,
+            SymbolicExceptionPreconditionKind.UnboxNull,
+            ExceptionTypes.NullReferenceException,
+            ExceptionCategories.DefiniteUnboxNull,
+            "ir.runtime-hazard.unbox-null",
             semanticModel,
             cancellationToken,
-            out var unboxNullTrigger)
-            ? unboxNullTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                castExpression,
-                SymbolicExceptionPreconditionKind.UnboxNull,
-                null,
-                "ir.runtime-hazard.unbox-null.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
-            castExpression,
-            SymbolicRuntimeHazardKind.UnboxNull,
-            trigger,
-            ExceptionTypes.NullReferenceException,
-            ExceptionCategories.DefiniteUnboxNull);
-        return true;
+            suppressDefinitelyNotNull: false,
+            out candidate);
     }
 
     internal static bool TryCreateNullableValueCastCandidate(
@@ -417,21 +410,17 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 cancellationToken,
                 out _,
                 out var targetType) ||
-            !IsNullableValueCastShape(castExpression, targetType, semanticModel, cancellationToken) ||
-            !TryCreateNullableValueWithoutValueTrigger(
-                castExpression.Expression,
-                semanticModel,
-                cancellationToken,
-                out var trigger))
+            !IsNullableValueCastShape(castExpression, targetType, semanticModel, cancellationToken))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateOperationNullableValueCandidate(
             castExpression,
-            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-            trigger,
+            castExpression.Expression,
             ExceptionTypes.InvalidOperationException,
-            ExceptionCategories.DefiniteNullableValueWithoutValue);
-        return true;
+            ExceptionCategories.DefiniteNullableValueWithoutValue,
+            semanticModel,
+            cancellationToken,
+            out candidate);
     }
 
     internal static bool TryCreateInvalidCastCandidate(
@@ -655,18 +644,21 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
     {
         candidate = default;
         var receiverType = CSharpSyntaxFacts.GetExpressionType(receiver, semanticModel, cancellationToken);
-        if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-            !IsReferenceType(receiverType) ||
-            !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
+        if (IsDynamicExpression(receiver, semanticModel, cancellationToken) || !IsReferenceType(receiverType))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateOperationReferenceNullCandidate(
             site,
+            receiver,
             SymbolicRuntimeHazardKind.NullDereference,
-            trigger,
+            SymbolicExceptionPreconditionKind.NullDereference,
             ExceptionTypes.NullReferenceException,
-            category);
-        return true;
+            category,
+            "ir.runtime-hazard.null-dereference",
+            semanticModel,
+            cancellationToken,
+            suppressDefinitelyNotNull: true,
+            out candidate);
     }
 
     internal static bool TryCreateArgumentNullCandidate(
@@ -679,18 +671,21 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
     {
         candidate = default;
         var expressionType = CSharpSyntaxFacts.GetExpressionType(expression, semanticModel, cancellationToken);
-        if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
-            !IsReferenceType(expressionType) ||
-            !TryCreateArgumentNullTrigger(expression, semanticModel, cancellationToken, out var trigger))
+        if (IsDynamicExpression(expression, semanticModel, cancellationToken) || !IsReferenceType(expressionType))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateOperationReferenceNullCandidate(
             site,
+            expression,
             SymbolicRuntimeHazardKind.ArgumentNull,
-            trigger,
+            SymbolicExceptionPreconditionKind.ArgumentNull,
             ExceptionTypes.ArgumentNullException,
-            category);
-        return true;
+            category,
+            "ir.runtime-hazard.argument-null",
+            semanticModel,
+            cancellationToken,
+            suppressDefinitelyNotNull: false,
+            out candidate);
     }
 
     internal static bool TryCreateDynamicInvocationNullBindingCandidate(
@@ -727,17 +722,21 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-            !TryCreateDynamicNullBindingTrigger(receiver, semanticModel, cancellationToken, out var trigger))
+        if (!IsDynamicExpression(receiver, semanticModel, cancellationToken))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateOperationReferenceNullCandidate(
             site,
+            receiver,
             SymbolicRuntimeHazardKind.DynamicNullBinding,
-            trigger,
+            SymbolicExceptionPreconditionKind.DynamicNullBinding,
             SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
-            category);
-        return true;
+            category,
+            "ir.runtime-hazard.dynamic-null-binding",
+            semanticModel,
+            cancellationToken,
+            suppressDefinitelyNotNull: false,
+            out candidate);
     }
 
     internal static bool TryCreateNullableValueCandidate(
@@ -750,37 +749,86 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         if (!SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken))
             return false;
 
-        RuntimeHazardTrigger trigger;
         if (HasLaterLoopAssignmentOfMissingNullableValue(
                 memberAccess.Expression,
                 memberAccess,
                 semanticModel,
                 cancellationToken))
         {
-            if (!TryCreateIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
-                    null,
-                    new SymbolicConstantCondition(true),
-                    memberAccess,
-                    "ir.runtime-hazard.nullable-value.loop-carried",
-                    out trigger))
-                return false;
-        }
-        else if (!TryCreateNullableValueWithoutValueTrigger(
-                     memberAccess.Expression,
-                     semanticModel,
-                     cancellationToken,
-                     out trigger))
-        {
-            return false;
+            candidate = new RuntimeHazardCandidate(memberAccess, new SymbolicHazardOperation(
+                SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+                SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+                null,
+                new SymbolicConstantCondition(true),
+                SymbolicFactConfidence.Exact,
+                ExceptionTypes.InvalidOperationException,
+                ExceptionCategories.DefiniteNullableValueWithoutValue,
+                new SymbolicOperationOrigin(
+                    memberAccess.Span,
+                    0,
+                    "ir.runtime-hazard.nullable-value.loop-carried")));
+            return true;
         }
 
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateOperationNullableValueCandidate(
             memberAccess,
-            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-            trigger,
+            memberAccess.Expression,
             ExceptionTypes.InvalidOperationException,
-            ExceptionCategories.DefiniteNullableValueWithoutValue);
+            ExceptionCategories.DefiniteNullableValueWithoutValue,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateOperationReferenceNullCandidate(
+        SyntaxNode site,
+        ExpressionSyntax subject,
+        SymbolicRuntimeHazardKind hazardKind,
+        SymbolicExceptionPreconditionKind preconditionKind,
+        string exceptionType,
+        string category,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool suppressDefinitelyNotNull,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!SymbolicOperationLowerer.TryLowerReferenceNullHazard(
+                subject,
+                hazardKind,
+                preconditionKind,
+                exceptionType,
+                category,
+                provenance,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                suppressDefinitelyNotNull,
+                out var hazard))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(site, hazard);
+        return true;
+    }
+
+    private static bool TryCreateOperationNullableValueCandidate(
+        SyntaxNode site,
+        ExpressionSyntax subject,
+        string exceptionType,
+        string category,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!SymbolicOperationLowerer.TryLowerNullableValueHazard(
+                subject,
+                exceptionType,
+                category,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(site, hazard);
         return true;
     }
 
