@@ -278,6 +278,15 @@ internal static class SymbolicCfgProgramPointStateCollector
                     out path))
                 return false;
         }
+        else if (!TryApplyLoopExit(
+                     source,
+                     branch.Destination,
+                     path,
+                     loopPlans,
+                     out path))
+        {
+            return false;
+        }
 
         var destination = branch.Destination;
         if (!incoming.TryGetValue(destination.Ordinal, out var states))
@@ -331,6 +340,36 @@ internal static class SymbolicCfgProgramPointStateCollector
         return transition.IsExact;
     }
 
+    private static bool TryApplyLoopExit(
+        BasicBlock source,
+        BasicBlock destination,
+        CfgPathState path,
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans,
+        out CfgPathState exitPath)
+    {
+        var plan = loopPlans
+            .Where(candidate => candidate.Loop is DoStatementSyntax &&
+                BlockIsWithinLoop(source, candidate.Loop) &&
+                !BlockIsWithinLoop(destination, candidate.Loop))
+            .OrderBy(static candidate => candidate.Loop.Span.Length)
+            .FirstOrDefault();
+        if (plan == null)
+        {
+            exitPath = path;
+            return true;
+        }
+
+        var transition = SymbolicOperationTransferKernel.Invalidate(
+            path.State,
+            plan.BackEdgeInvalidations,
+            plan.Loop.Span,
+            "cfg-program-point.loop-exit");
+        exitPath = transition.IsExact
+            ? path with { State = transition.State }
+            : default;
+        return transition.IsExact;
+    }
+
     private static bool BlockIsWithinLoop(BasicBlock block, StatementSyntax loop) =>
         block.Operations.Any(operation => loop.Span.Contains(operation.Syntax.Span)) ||
         block.BranchValue != null && loop.Span.Contains(block.BranchValue.Syntax.Span);
@@ -357,7 +396,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 plans = Array.Empty<SymbolicLoopTransferPlan>();
                 return false;
             }
-            if (plan.Loop is not WhileStatementSyntax ||
+            if (plan.Loop is not (WhileStatementSyntax or DoStatementSyntax) ||
                 plan.BackEdgeInvalidations.Any(target =>
                     SymbolicIrReferenceScanner.ContainsVariableOrMember(
                         plan.EntryCondition,

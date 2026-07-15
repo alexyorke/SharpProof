@@ -205,8 +205,6 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [TestCase(
-        "static class C { static int M(bool keepGoing) { int value = 0; do value = 1; while (keepGoing); return value; } }")]
-    [TestCase(
         "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value = index; return value; } }")]
     public void AdditionalLoopShapes_RemainFallbackUntilExitParityMigrates(string source)
     {
@@ -219,5 +217,30 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
             CancellationToken.None);
 
         Assert.That(result.IsUnsupported, Is.True);
+    }
+
+    [Test]
+    public void DoLoopAfterState_MatchesStructuralCollector()
+    {
+        const string source = "static class C { static int M(bool keepGoing) { int value = 0; do value = 1; while (keepGoing); return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(DoLoopAfterState_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
     }
 }
