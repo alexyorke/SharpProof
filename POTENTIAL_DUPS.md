@@ -32,9 +32,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Code fixes, attributes, and test infrastructure
 
-14. **Code-fix action registration** - `SharpProof.CodeFixes/SharpProofCodeFixProvider.cs:70-164,443-476`
-    Several branches repeat target lookup and `CodeAction` registration for remove-misplaced, remove-matching, and add-`[EnforcePure]` fixes. Add narrowly scoped registration helpers, preserving deliberate differences between all-matches and diagnostic-specific removal behavior.
-
 16. **Tooling-test temporary source lifecycle** - `SharpProof.ToolingTest/SymbolicCapabilityQueryTests.cs:24-201`; `SharpProof.ToolingTest/SymbolicComplexityQueryTests.cs:26-208`; `SharpProof.ToolingTest/StandaloneCompilationProfileTests.cs:23-60`
     Tests repeatedly create GUID paths, write source, run in `try/finally`, and delete. A disposable `TemporarySourceFile` fixture would standardize naming and cleanup.
 

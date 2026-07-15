@@ -21,6 +21,65 @@ namespace SharpProof
     [Shared]
     public sealed class SharpProofCodeFixProvider : CodeFixProvider
     {
+        private static readonly ImmutableDictionary<string, SimpleRemovalRegistration> SimpleRemovalRegistrations =
+            ImmutableArray.Create(
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.PurityNotVerifiedId,
+                        "Remove [EnforcePure] and [Pure] attributes", SimpleRemovalOperation.DeclarationAndAccessors,
+                        nameof(RemoveAttributesMatchingAsync) + "SP0002", "EnforcePureAttribute", "PureAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAttributeId,
+                        "Remove misplaced purity attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync)),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.ConflictingPurityAttributesId,
+                        "Remove conflicting purity boundary attributes", SimpleRemovalOperation.DeclarationAndAccessors,
+                        nameof(RemoveAttributesMatchingAsync) + "SP0005", "PureAttribute", "PureExternalAttribute",
+                        "ImpureAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
+                        "Remove misplaced [AllowSynchronization] attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync) + "SP0007"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.RedundantAllowSynchronizationId,
+                        "Remove [AllowSynchronization] attribute", SimpleRemovalOperation.DeclarationAndAccessors,
+                        nameof(RemoveAttributesMatchingAsync) + "SP0008", "AllowSynchronizationAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
+                        "Remove [ZeroAllocations] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + "SP0013", "ZeroAllocationsAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
+                        "Remove misplaced [ZeroAllocations] attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync) + "SP0014"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.CapabilityViolationId,
+                        "Remove [AllowedCapabilities] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.CapabilityViolationId,
+                        "AllowedCapabilitiesAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.CapabilityUnknownId,
+                        "Remove [AllowedCapabilities] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.CapabilityUnknownId,
+                        "AllowedCapabilitiesAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
+                        "Remove misplaced [AllowedCapabilities] attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync) + "SP0017"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.EnsuresNotProvenId,
+                        "Remove [Ensures] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.EnsuresNotProvenId,
+                        "EnsuresAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.EnsuresUnsupportedId,
+                        "Remove [Ensures] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.EnsuresUnsupportedId,
+                        "EnsuresAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedEnsuresAttributeId,
+                        "Remove misplaced [Ensures] attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync) + "SP0020"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.ComplexityExceededId,
+                        "Remove [ExpectedComplexity] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.ComplexityExceededId,
+                        "ExpectedComplexityAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
+                        "Remove [ExpectedComplexity] attribute", SimpleRemovalOperation.DiagnosticContract,
+                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
+                        "ExpectedComplexityAttribute"),
+                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId,
+                        "Remove misplaced [ExpectedComplexity] attribute", SimpleRemovalOperation.MisplacedAttribute,
+                        nameof(RemoveMisplacedAttributeAsync) + "SP0023"))
+                .ToImmutableDictionary(static registration => registration.DiagnosticId, StringComparer.Ordinal);
+
         public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
             SharpProofDiagnostics.PurityNotVerifiedId,
             SharpProofDiagnostics.MisplacedAttributeId,
@@ -65,32 +124,20 @@ namespace SharpProof
             var configuration = AnalyzerConfiguration.FromOptions(document.Project.AnalyzerOptions);
             var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
 
+            if (SimpleRemovalRegistrations.TryGetValue(diagnostic.Id, out var simpleRemoval))
+            {
+                RegisterSimpleRemovalCodeFix(
+                    context,
+                    document,
+                    root,
+                    diagnostic,
+                    attributePolicy,
+                    simpleRemoval);
+                return;
+            }
+
             switch (diagnostic.Id)
             {
-                case SharpProofDiagnostics.PurityNotVerifiedId:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declImpure))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove [EnforcePure] and [Pure] attributes",
-                                c => RemoveAttributesMatchingAsync(document, root, declImpure,
-                                    AcceptedAttribute(
-                                        attributePolicy,
-                                        "EnforcePureAttribute",
-                                        "PureAttribute"), c),
-                                nameof(RemoveAttributesMatchingAsync) + "SP0002"),
-                            diagnostic);
-                    break;
-
-                case SharpProofDiagnostics.MisplacedAttributeId:
-                    if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedPurity))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove misplaced purity attribute",
-                                c => RemoveMisplacedAttributeAsync(document, root, misplacedPurity, c),
-                                nameof(RemoveMisplacedAttributeAsync)),
-                            diagnostic);
-                    break;
-
                 case SharpProofDiagnostics.MissingEnforcePureAttributeId:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declMissing))
                     {
@@ -104,22 +151,6 @@ namespace SharpProof
                             diagnostic);
                     }
 
-                    break;
-
-                case SharpProofDiagnostics.ConflictingPurityAttributesId:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start,
-                            out var declConflict))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove conflicting purity boundary attributes",
-                                c => RemoveAttributesMatchingAsync(document, root, declConflict,
-                                    AcceptedAttribute(
-                                        attributePolicy,
-                                        "PureAttribute",
-                                        "PureExternalAttribute",
-                                        "ImpureAttribute"), c),
-                                nameof(RemoveAttributesMatchingAsync) + "SP0005"),
-                            diagnostic);
                     break;
 
                 case SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId:
@@ -140,115 +171,6 @@ namespace SharpProof
                             diagnostic);
                     }
 
-                    break;
-
-                case SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId:
-                    if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAllow))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove misplaced [AllowSynchronization] attribute",
-                                c => RemoveMisplacedAttributeAsync(document, root, misplacedAllow, c),
-                                nameof(RemoveMisplacedAttributeAsync) + "SP0007"),
-                            diagnostic);
-                    break;
-
-                case SharpProofDiagnostics.RedundantAllowSynchronizationId:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start,
-                            out var declRedundant))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove [AllowSynchronization] attribute",
-                                c => RemoveAttributesMatchingAsync(document, root, declRedundant,
-                                    AcceptedAttribute(attributePolicy, "AllowSynchronizationAttribute"), c),
-                                nameof(RemoveAttributesMatchingAsync) + "SP0008"),
-                            diagnostic);
-                    break;
-
-                case SharpProofDiagnostics.AllocationInZeroAllocationMethodId:
-                    RegisterRemoveContractAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove [ZeroAllocations] attribute",
-                        AcceptedAttribute(attributePolicy, "ZeroAllocationsAttribute"),
-                        "SP0013");
-                    break;
-
-                case SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId:
-                    RegisterRemoveMisplacedAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove misplaced [ZeroAllocations] attribute",
-                        "SP0014");
-                    break;
-
-                case SharpProofDiagnostics.CapabilityViolationId:
-                case SharpProofDiagnostics.CapabilityUnknownId:
-                    RegisterRemoveContractAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove [AllowedCapabilities] attribute",
-                        AcceptedAttribute(attributePolicy, "AllowedCapabilitiesAttribute"),
-                        diagnostic.Id);
-                    break;
-
-                case SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId:
-                    RegisterRemoveMisplacedAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove misplaced [AllowedCapabilities] attribute",
-                        "SP0017");
-                    break;
-
-                case SharpProofDiagnostics.EnsuresNotProvenId:
-                case SharpProofDiagnostics.EnsuresUnsupportedId:
-                    RegisterRemoveContractAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove [Ensures] attribute",
-                        AcceptedAttribute(attributePolicy, "EnsuresAttribute"),
-                        diagnostic.Id);
-                    break;
-
-                case SharpProofDiagnostics.MisplacedEnsuresAttributeId:
-                    RegisterRemoveMisplacedAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove misplaced [Ensures] attribute",
-                        "SP0020");
-                    break;
-
-                case SharpProofDiagnostics.ComplexityExceededId:
-                case SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId:
-                    RegisterRemoveContractAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove [ExpectedComplexity] attribute",
-                        AcceptedAttribute(attributePolicy, "ExpectedComplexityAttribute"),
-                        diagnostic.Id);
-                    break;
-
-                case SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId:
-                    RegisterRemoveMisplacedAttributeCodeFix(
-                        context,
-                        document,
-                        root,
-                        diagnostic,
-                        "Remove misplaced [ExpectedComplexity] attribute",
-                        "SP0023");
                     break;
 
                 case SharpProofDiagnostics.MisplacedRequiresAttributeId:
@@ -440,39 +362,68 @@ namespace SharpProof
             return document.WithSyntaxRoot(root.ReplaceNode(parameter, updatedParameter));
         }
 
-        private void RegisterRemoveMisplacedAttributeCodeFix(
+        private void RegisterSimpleRemovalCodeFix(
             CodeFixContext context,
             Document document,
             SyntaxNode root,
             Diagnostic diagnostic,
-            string title,
-            string equivalenceKeySuffix)
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            SimpleRemovalRegistration registration)
         {
-            if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAttribute))
+            if (registration.Operation == SimpleRemovalOperation.MisplacedAttribute)
+            {
+                if (!TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAttribute)) return;
+
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        title,
+                        registration.Title,
                         c => RemoveMisplacedAttributeAsync(document, root, misplacedAttribute, c),
-                        nameof(RemoveMisplacedAttributeAsync) + equivalenceKeySuffix),
+                        registration.EquivalenceKey),
                     diagnostic);
+                return;
+            }
+
+            if (!TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration)) return;
+
+            var shouldRemoveType = AcceptedAttribute(attributePolicy, registration.AttributeTypeNames);
+            Func<CancellationToken, Task<Document>> apply = registration.Operation ==
+                SimpleRemovalOperation.DeclarationAndAccessors
+                ? c => RemoveAttributesMatchingAsync(document, root, declaration, shouldRemoveType, c)
+                : c => RemoveContractAttributeAsync(
+                    document, root, diagnostic, declaration, shouldRemoveType, c);
+            context.RegisterCodeFix(
+                CodeAction.Create(registration.Title, apply, registration.EquivalenceKey),
+                diagnostic);
         }
 
-        private void RegisterRemoveContractAttributeCodeFix(
-            CodeFixContext context,
-            Document document,
-            SyntaxNode root,
-            Diagnostic diagnostic,
-            string title,
-            Func<INamedTypeSymbol?, bool> shouldRemoveType,
-            string equivalenceKeySuffix)
+        private enum SimpleRemovalOperation
         {
-            if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration))
-                context.RegisterCodeFix(
-                    CodeAction.Create(
-                        title,
-                        c => RemoveContractAttributeAsync(document, root, diagnostic, declaration, shouldRemoveType, c),
-                        nameof(RemoveContractAttributeAsync) + equivalenceKeySuffix),
-                    diagnostic);
+            MisplacedAttribute,
+            DeclarationAndAccessors,
+            DiagnosticContract
+        }
+
+        private sealed class SimpleRemovalRegistration
+        {
+            internal SimpleRemovalRegistration(
+                string diagnosticId,
+                string title,
+                SimpleRemovalOperation operation,
+                string equivalenceKey,
+                params string[] attributeTypeNames)
+            {
+                DiagnosticId = diagnosticId;
+                Title = title;
+                Operation = operation;
+                EquivalenceKey = equivalenceKey;
+                AttributeTypeNames = attributeTypeNames;
+            }
+
+            internal string DiagnosticId { get; }
+            internal string Title { get; }
+            internal SimpleRemovalOperation Operation { get; }
+            internal string EquivalenceKey { get; }
+            internal string[] AttributeTypeNames { get; }
         }
 
         private static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)
