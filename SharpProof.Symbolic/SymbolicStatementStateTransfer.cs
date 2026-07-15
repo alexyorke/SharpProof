@@ -72,26 +72,11 @@ internal static class SymbolicStatementStateTransfer
             !ReferenceEquals(forStatement.Statement, block))
             return;
 
-        foreach (var symbol in GetForLoopInitializerAssignedSymbols(forStatement, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
-    }
-
-    private static IEnumerable<ISymbol> GetForLoopInitializerAssignedSymbols(
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (forStatement.Declaration != null)
-            foreach (var declarator in forStatement.Declaration.Variables)
-                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
-                    yield return localSymbol.OriginalDefinition;
-
-        foreach (var initializer in forStatement.Initializers)
-            if (initializer is AssignmentExpressionSyntax assignment &&
-                assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } assignedSymbol &&
-                assignedSymbol is ILocalSymbol or IParameterSymbol)
-                yield return assignedSymbol.OriginalDefinition;
+        SymbolicLoopStateTransfer.InvalidateForLoopInitializerTargets(
+            ref state,
+            forStatement,
+            semanticModel,
+            cancellationToken);
     }
 
     internal static void AddCatchBodyEntryStateFacts(
