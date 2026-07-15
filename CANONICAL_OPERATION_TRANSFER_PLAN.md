@@ -130,7 +130,7 @@ transfer policy after its slice is complete.
   and coalesce assignment.
 - [x] Migrate tuple/deconstruction assignment and evaluation order.
 - [x] Migrate `ref`/`out`, ref-local aliases, invalidation, and version updates.
-- [ ] Migrate freshness, ownership, borrowing, escape, disposal, and resource
+- [x] Migrate freshness, ownership, borrowing, escape, disposal, and resource
   release transitions.
 - [ ] Delete superseded assignment and Analyzer purity-state implementations.
 - [ ] Gate: assignment/lifetime differential suite and affected Analyzer lane are
@@ -210,6 +210,7 @@ transfer policy after its slice is complete.
 | Computed assignment migration | `38ea0509` | 108,350 | +674 |
 | Tuple/deconstruction migration | `611b4e17` | 108,393 | +717 |
 | Alias and invalidation migration | `fc40894c` | 108,501 | +825 |
+| Ownership lifetime migration | `cf2fa67c` | 108,401 | +725 |
 
 ## Validation Ledger
 
@@ -227,15 +228,16 @@ transfer policy after its slice is complete.
 | Phase 2 computed assignments | Commit `38ea0509` routes compound assignments, checked/unchecked increment and decrement, and unknown coalesce postconditions through typed assignment/mutation events. The old coalesce interpreter was deleted. Focused transfer/program-point/invariant tests: 113 passed; full MainSmtOracle lane: 573 passed. Total temporary migration scaffolding is +674 production LOC. |
 | Phase 2 tuple/deconstruction | Commit `611b4e17` gives Symbolic and Analyzer one nested target/pairing plan, removes both independent target walkers, and routes tuple-local equalities as one ordered binding batch. It also restores legacy provenance/evidence fields on canonical scalar bindings. Focused tuple/program-point/transfer/invariant tests: 119 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +717 production LOC. |
 | Phase 2 alias and invalidation | Commit `fc40894c` makes mutation events own variable-prefix and member-path invalidation, centralizes idempotent definition-version calculation, and routes Analyzer reference aliases and ref-local shared/mutable borrows through lifetime events. Focused ref/out, alias, mutation, version, and program-point tests: 35 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding is +825 production LOC. |
+| Phase 2 ownership lifetime | Commit `cf2fa67c` routes fresh ownership, disposable acquisition, return, disposal, release, flow-capture ownership, preserved-alias lifetime, and caller-visible mutation facts through canonical events. The superseded 127-line ownership fact factory was deleted. Focused symbolic IR, resource, disposal, using, return, alias, and transfer tests: 221 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +725 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: scalar, computed, tuple, deconstruction, alias/borrow, and invalidation
+- State: assignment, alias/borrow, invalidation, ownership, and resource lifetime
   families now share canonical events or their common ordered plans.
-- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after routing ref/out
-  invalidation, definition versions, and ref-local borrow facts through the kernel.
-- Next cheapest step: migrate freshness, ownership, borrowing, escape, disposal,
-  and resource release transitions into lifetime events.
+- Last confirmed fact: all 487 MainSmtAnalyzer tests pass after deleting the old
+  ownership fact factory and routing resource transitions through the kernel.
+- Next cheapest step: delete superseded assignment and Analyzer purity-state
+  implementations, retaining only source/evidence adapters.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
