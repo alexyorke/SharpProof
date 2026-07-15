@@ -318,16 +318,7 @@ internal sealed class ExceptionSummaryCatalog
         {
             if (!TryGetExceptionTypeAndSourcePath(valueElement, out var exceptionType, out var sourcePath)) continue;
 
-            exceptionTypes.Add(exceptionType);
-            if (sourcePath == null) continue;
-
-            if (!exceptionSources.TryGetValue(exceptionType, out var sources))
-            {
-                sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                exceptionSources.Add(exceptionType, sources);
-            }
-
-            sources.Add(sourcePath);
+            AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, sourcePath);
         }
     }
 
@@ -363,19 +354,8 @@ internal sealed class ExceptionSummaryCatalog
         {
             if (!TryGetExceptionType(valueElement, out var exceptionType)) continue;
 
-            exceptionTypes.Add(exceptionType);
-
             var sourcePath = GetEdgeSourcePath(valueElement);
-            if (sourcePath != null)
-            {
-                if (!exceptionSources.TryGetValue(exceptionType, out var sources))
-                {
-                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                    exceptionSources.Add(exceptionType, sources);
-                }
-
-                sources.Add(sourcePath);
-            }
+            AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, sourcePath);
 
             if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
             {
@@ -391,6 +371,24 @@ internal sealed class ExceptionSummaryCatalog
                 TryGetOptionalInt32(valueElement, "Depth"));
             edgeMap[edge] = edge;
         }
+    }
+
+    private static void AddExceptionSource(
+        ImmutableSortedSet<string>.Builder exceptionTypes,
+        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+        string exceptionType,
+        string? sourcePath)
+    {
+        exceptionTypes.Add(exceptionType);
+        if (sourcePath == null) return;
+
+        if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+        {
+            sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+            exceptionSources.Add(exceptionType, sources);
+        }
+
+        sources.Add(sourcePath);
     }
 
     private static void AddExceptionEdgeFacts(

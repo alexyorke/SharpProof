@@ -4,9 +4,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Analyzer
 
-6. **Exception summary catalog parsing** - `SharpProof.Analyzer/ExceptionSummaryCatalog.cs:311-418`
-   `AddExceptionSources`/`AddExceptionEdges` repeat source registration, while `AddExceptionSourceFacts`/`AddExceptionEdgeFacts` repeat JSON parse/project/deduplicate loops. Small helpers for source registration and fact ingestion would preserve matching malformed-input behavior.
-
 ## Symbolic and proof core
 
 7. **Path-state encoding wrappers** - `SharpProof.Symbolic/SymbolicProofService.cs:192-253`
