@@ -158,6 +158,14 @@ internal static class SymbolicOperationTransferKernel
         ref SymbolicState state,
         SymbolicLifetimeOperation lifetime)
     {
+        if (lifetime.LifetimeKind is SymbolicLifetimeOperationKind.Return or
+            SymbolicLifetimeOperationKind.Dispose)
+            state = RemoveExclusiveLifetimeFacts(
+                state,
+                lifetime.Subject,
+                lifetime.Symbol,
+                removeDisposal: lifetime.LifetimeKind == SymbolicLifetimeOperationKind.Dispose);
+
         var atoms = lifetime.LifetimeKind switch
         {
             SymbolicLifetimeOperationKind.Alias when lifetime.RelatedSubject != null =>
@@ -201,6 +209,30 @@ internal static class SymbolicOperationTransferKernel
                 lifetime.Symbol,
                 lifetime.EvidenceKey));
         return true;
+    }
+
+    private static SymbolicState RemoveExclusiveLifetimeFacts(
+        SymbolicState state,
+        SymbolicTerm resource,
+        Microsoft.CodeAnalysis.ISymbol? symbol,
+        bool removeDisposal)
+    {
+        var facts = state.Facts.Where(fact => fact.Atom switch
+        {
+            SymbolicDisposalAtom disposal when removeDisposal =>
+                !Equals(disposal.Resource, resource) && !MatchesSymbol(fact.Symbol, symbol),
+            SymbolicResourceLifetimeAtom lifetime =>
+                !Equals(lifetime.Resource, resource) && !MatchesSymbol(fact.Symbol, symbol),
+            _ => true
+        });
+        return new SymbolicState(facts, state.PathConditions, state.SymbolVersions);
+    }
+
+    private static bool MatchesSymbol(
+        Microsoft.CodeAnalysis.ISymbol? left,
+        Microsoft.CodeAnalysis.ISymbol? right)
+    {
+        return right != null && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(left, right);
     }
 
     private static ImmutableArray<(SymbolicAtom Atom, string Provenance)> CreateOwnedAtoms(

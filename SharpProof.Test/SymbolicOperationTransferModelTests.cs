@@ -384,6 +384,45 @@ public sealed class SymbolicOperationTransferModelTests
         Assert.That(result.State.Facts, Is.EqualTo(legacyFacts));
     }
 
+    [TestCase(false, 3)]
+    [TestCase(true, 2)]
+    public void TransferKernel_LifetimeTransitionReplacesExclusiveResourceState(
+        bool dispose,
+        int expectedFactCount)
+    {
+        var source = SyntaxFactory.ParseExpression("resource");
+        var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+        var initial = new SymbolicState(new[]
+        {
+            Exact(
+                new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned),
+                source,
+                "test.owned"),
+            Exact(
+                new SymbolicDisposalAtom(resource, SymbolicDisposalState.NotDisposed),
+                source,
+                "test.not-disposed")
+        });
+
+        var result = SymbolicOperationTransferKernel.TransitionLifetime(
+            initial,
+            resource,
+            dispose ? SymbolicLifetimeOperationKind.Dispose : SymbolicLifetimeOperationKind.Return,
+            source.Span,
+            "test.transition");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.State.Facts.Length, Is.EqualTo(expectedFactCount));
+            Assert.That(result.State.Facts.Any(static fact =>
+                fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned }), Is.False);
+            Assert.That(result.State.Facts.Any(fact => fact.Atom is SymbolicDisposalAtom
+                {
+                    State: SymbolicDisposalState.NotDisposed
+                }), Is.EqualTo(!dispose));
+        });
+    }
+
     private static SymbolicAssignmentOperation Assignment(
         SymbolicTerm target,
         long value,

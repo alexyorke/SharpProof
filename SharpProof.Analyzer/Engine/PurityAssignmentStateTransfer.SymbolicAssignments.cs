@@ -162,7 +162,7 @@ internal static partial class PurityAssignmentStateTransfer
             var provenance = aliasState == PreservedAliasState.OwnedDisposable
                 ? "analyzer.resource.alias-preserve"
                 : "analyzer.resource.alias-preserve.disposed";
-            nextState = PurityResourceStateFacts.ApplyLifetime(
+            nextState = PurityOperationTransferAdapter.ApplyLifetime(
                 nextState,
                 aliasTerm,
                 kind,

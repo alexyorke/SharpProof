@@ -31,14 +31,8 @@ internal static partial class PurityResourceStateFacts
             return nextState;
 
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
-        var pathState = RemoveExclusiveResourceStateFacts(
-            nextState.PathState,
-            term,
-            resourceSymbol,
-            removeDisposal: false,
-            removeLifetime: true);
-        return ApplyLifetime(
-            nextState.WithPathState(pathState),
+        return PurityOperationTransferAdapter.ApplyLifetime(
+            nextState,
             term,
             SymbolicLifetimeOperationKind.Return,
             returnedValue.Syntax,
@@ -142,44 +136,14 @@ internal static partial class PurityResourceStateFacts
         string provenance,
         string evidenceKey)
     {
-        var pathState = RemoveExclusiveResourceStateFacts(
-            nextState.PathState,
-            term,
-            resourceSymbol,
-            removeDisposal: true,
-            removeLifetime: true);
-        return ApplyLifetime(
-            nextState.WithPathState(pathState),
+        return PurityOperationTransferAdapter.ApplyLifetime(
+            nextState,
             term,
             SymbolicLifetimeOperationKind.Dispose,
             syntax,
             provenance,
             resourceSymbol,
             evidenceKey);
-    }
-
-    private static SymbolicState RemoveExclusiveResourceStateFacts(
-        SymbolicState pathState,
-        SymbolicTerm resource,
-        ISymbol resourceSymbol,
-        bool removeDisposal,
-        bool removeLifetime)
-    {
-        var facts = pathState.Facts
-            .Where(fact => fact.Atom switch
-            {
-                SymbolicDisposalAtom disposal when removeDisposal =>
-                    !Equals(disposal.Resource, resource) &&
-                    !SymbolEqualityComparer.Default.Equals(fact.Symbol, resourceSymbol),
-                SymbolicResourceLifetimeAtom lifetime when removeLifetime =>
-                    !Equals(lifetime.Resource, resource) &&
-                    !SymbolEqualityComparer.Default.Equals(fact.Symbol, resourceSymbol),
-                _ => true
-            })
-            .ToArray();
-        return facts.Length == pathState.Facts.Length
-            ? pathState
-            : new SymbolicState(facts, pathState.PathConditions, pathState.SymbolVersions);
     }
 
     internal static PurityAnalysisState AddCallerVisibleMutationFact(
@@ -305,7 +269,7 @@ internal static partial class PurityResourceStateFacts
         IOperation valueOperation)
     {
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        return ApplyLifetime(
+        return PurityOperationTransferAdapter.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.CreateOwnedValue,
@@ -326,7 +290,7 @@ internal static partial class PurityResourceStateFacts
             return nextState;
 
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        return ApplyLifetime(
+        return PurityOperationTransferAdapter.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.CreateOwnedValue,
@@ -347,7 +311,7 @@ internal static partial class PurityResourceStateFacts
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
         if (HasReleasedResourceFact(term, nextState)) return nextState;
 
-        nextState = ApplyLifetime(
+        nextState = PurityOperationTransferAdapter.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.AcquireDisposable,
@@ -366,25 +330,6 @@ internal static partial class PurityResourceStateFacts
             "evidence.resource.acquire.not-null"));
 
         return nextState.WithPathState(pathState);
-    }
-
-    internal static PurityAnalysisState ApplyLifetime(
-        PurityAnalysisState state,
-        SymbolicTerm subject,
-        SymbolicLifetimeOperationKind kind,
-        SyntaxNode source,
-        string provenance,
-        ISymbol? symbol,
-        string? evidenceKey)
-    {
-        return state.WithPathState(SymbolicOperationTransferKernel.TransitionLifetime(
-            state.PathState,
-            subject,
-            kind,
-            source.Span,
-            provenance,
-            symbol,
-            evidenceKey).State);
     }
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)

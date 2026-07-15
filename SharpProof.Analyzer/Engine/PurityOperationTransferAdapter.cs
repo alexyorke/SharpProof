@@ -148,6 +148,25 @@ internal static class PurityOperationTransferAdapter
         return state.WithPathState(transition.State);
     }
 
+    internal static PurityAnalysisState ApplyLifetime(
+        PurityAnalysisState state,
+        SymbolicTerm subject,
+        SymbolicLifetimeOperationKind kind,
+        SyntaxNode source,
+        string provenance,
+        ISymbol? symbol,
+        string? evidenceKey)
+    {
+        return state.WithPathState(SymbolicOperationTransferKernel.TransitionLifetime(
+            state.PathState,
+            subject,
+            kind,
+            source.Span,
+            provenance,
+            symbol,
+            evidenceKey).State);
+    }
+
     private static ISymbol? TryResolveRefInitializerSymbol(
         SyntaxNode initializerSyntax,
         SemanticModel semanticModel,
