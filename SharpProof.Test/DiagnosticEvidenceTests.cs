@@ -403,32 +403,6 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task Sp0002_StringFormat_UsesGeneratedPuritySummarySource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string TestMethod(int value)
-    {
-        return string.Format(""{0:D}"", value);
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
-            Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("Format"));
-    }
-
-    [Test]
     public async Task Sp0002_ConfiguredKnownImpureMethod_IncludesConfigCatalogSource()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -3649,30 +3623,6 @@ public class TestClass
             "Generated purity catalog should resolve ClaimsPrincipal.IsInRole(string).");
         Assert.That(resolution.Classification, Is.EqualTo("impure"),
             "ClaimsPrincipal.IsInRole(string) should remain generated impure because it traverses claims identity state through impure callees.");
-    }
-
-    [Test]
-    public async Task Sp0002_ProcessGetCurrentProcess_UsesGeneratedPuritySummarySource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Diagnostics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Process TestMethod()
-    {
-        return Process.GetCurrentProcess();
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Diagnostics.Process.GetCurrentProcess"));
     }
 
     [Test]
@@ -9736,34 +9686,6 @@ public class TestClass
     }
 
     [Test]
-    public async Task Sp0002_MonitorExit_UsesThreadingSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Threading;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(object gate)
-    {
-        Monitor.Exit(gate);
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("synchronization"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
-            Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("threading_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Threading.Monitor.Exit"));
-    }
-
-    [Test]
     public async Task Sp0002_TimerStart_UsesTypeFallbackAfterMemberCatalogRemoval()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -11779,63 +11701,6 @@ public class TestClass
         Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty), Is.False);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Type.TypeHandle"));
-    }
-
-    [Test]
-    public async Task Sp0002_AssemblyLoadContextDefault_UsesSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Runtime.Loader;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public AssemblyLoadContext TestMethod()
-    {
-        return AssemblyLoadContext.Default;
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("reflection_environment_source"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
-            Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("assembly_load_context_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Runtime.Loader.AssemblyLoadContext.Default"));
-    }
-
-    [Test]
-    public async Task Sp0002_AssemblyLoadContextLoadFromAssemblyPath_UsesSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Reflection;
-using System.Runtime.Loader;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Assembly TestMethod(AssemblyLoadContext context, string path)
-    {
-        return context.LoadFromAssemblyPath(path);
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("reflection_environment_source"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
-            Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("assembly_load_context_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyPath"));
     }
 
     [Test]

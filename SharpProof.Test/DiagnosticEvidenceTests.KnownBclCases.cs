@@ -90,6 +90,24 @@ public partial class DiagnosticEvidenceTests
     [TestCase("using System.IO;", "void", "StringWriter writer", "writer.Write(\"text\");", "catalog_hit",
         null, "io_stream_text_semantic_rule", "System.IO.StringWriter.Write", true,
         TestName = "Sp0002_StringWriterWrite_UsesIoStreamTextSemanticRuleSource")]
+    [TestCase("using System;", "string", "int value", "return string.Format(\"{0:D}\", value);",
+        "impure_callee", "MethodInvocationPurityRule", "generated_purity_summary", "Format", false,
+        TestName = "Sp0002_StringFormat_UsesGeneratedPuritySummarySource")]
+    [TestCase("using System.Diagnostics;", "Process", "", "return Process.GetCurrentProcess();", null, null,
+        "generated_purity_summary", "System.Diagnostics.Process.GetCurrentProcess", false,
+        TestName = "Sp0002_ProcessGetCurrentProcess_UsesGeneratedPuritySummarySource")]
+    [TestCase("using System.Threading;", "void", "object gate", "Monitor.Exit(gate);", "synchronization",
+        "MethodInvocationPurityRule", "threading_semantic_rule", "System.Threading.Monitor.Exit", false,
+        TestName = "Sp0002_MonitorExit_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Runtime.Loader;", "AssemblyLoadContext", "", "return AssemblyLoadContext.Default;",
+        "reflection_environment_source", "PropertyReferencePurityRule", "assembly_load_context_semantic_rule",
+        "System.Runtime.Loader.AssemblyLoadContext.Default", false,
+        TestName = "Sp0002_AssemblyLoadContextDefault_UsesSemanticRuleSource")]
+    [TestCase("using System.Reflection;\nusing System.Runtime.Loader;", "Assembly",
+        "AssemblyLoadContext context, string path", "return context.LoadFromAssemblyPath(path);",
+        "reflection_environment_source", "MethodInvocationPurityRule", "assembly_load_context_semantic_rule",
+        "System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyPath", false,
+        TestName = "Sp0002_AssemblyLoadContextLoadFromAssemblyPath_UsesSemanticRuleSource")]
     public async Task Sp0002_KnownBclSemanticEvidence(
         string usings,
         string returnType,
