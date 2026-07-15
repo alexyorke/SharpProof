@@ -58,8 +58,18 @@ internal readonly record struct SymbolicOperationOrigin(
 internal abstract record SymbolicOperationDescriptor(SymbolicOperationOrigin Origin);
 
 internal sealed record SymbolicAssignmentBinding(
+    string TargetKey,
     SymbolicTerm Target,
     SymbolicTerm? Source);
+
+internal sealed record SymbolicOperationSequence(
+    ImmutableArray<SymbolicOperationDescriptor> Operations)
+{
+    internal static SymbolicOperationSequence Single(SymbolicOperationDescriptor operation)
+    {
+        return new SymbolicOperationSequence(ImmutableArray.Create(operation));
+    }
+}
 
 internal sealed record SymbolicAssignmentOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,

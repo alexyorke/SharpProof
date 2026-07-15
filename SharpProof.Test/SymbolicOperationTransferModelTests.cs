@@ -18,7 +18,7 @@ public sealed class SymbolicOperationTransferModelTests
         var source = new SymbolicIntegerConstantTerm(42);
         var origin = new SymbolicOperationOrigin(new TextSpan(10, 5), 3, "test.assignment");
         SymbolicOperationDescriptor descriptor = new SymbolicAssignmentOperation(
-            ImmutableArray.Create(new SymbolicAssignmentBinding(target, source)),
+            ImmutableArray.Create(new SymbolicAssignmentBinding("target", target, source)),
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
             origin);
@@ -35,6 +35,93 @@ public sealed class SymbolicOperationTransferModelTests
             Assert.That(assignment.Origin.SourceSpan, Is.EqualTo(new TextSpan(10, 5)));
             Assert.That(assignment.Origin.Provenance, Is.EqualTo("test.assignment"));
         });
+    }
+
+    [Test]
+    public void LocalDeclarationLoweringAndTransfer_MatchesLegacyState()
+    {
+        const string source = "static class C { static void M(int input) { int value = input; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(LocalDeclarationLoweringAndTransfer_MatchesLegacyState));
+        var declarator = fixture.Root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>().Single();
+        var declaration = (Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclarationSyntax)declarator.Parent!;
+        var statement = (Microsoft.CodeAnalysis.CSharp.Syntax.LocalDeclarationStatementSyntax)declaration.Parent!;
+        var operation = fixture.SemanticModel.GetOperation(declarator)!;
+        var context = new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None);
+        var lowered = SymbolicOperationLowerer.Lower(operation, context, context);
+        Assert.That(lowered.IsExact, Is.True);
+
+        var legacyState = new SymbolicState();
+        SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts(
+            ref legacyState,
+            declaration,
+            statement,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            "operation-lowering.declaration");
+        var canonical = SymbolicOperationTransferKernel.Apply(new SymbolicState(), lowered.Value!);
+        var expected = SymbolicStateDifferentialHarness.Capture(
+            legacyState,
+            canonical.Support,
+            canonical.UnknownReason,
+            canonical.Provenance,
+            canonical.Truncation);
+        var actual = SymbolicStateDifferentialHarness.Capture(
+            canonical.State,
+            canonical.Support,
+            canonical.UnknownReason,
+            canonical.Provenance,
+            canonical.Truncation);
+
+        SymbolicStateDifferentialHarness.AssertEquivalent(expected, actual, "local declaration");
+    }
+
+    [Test]
+    public void SimpleAssignmentLoweringAndTransfer_MatchesLegacyState()
+    {
+        const string source = "static class C { static void M(int input) { int value = 0; value = input + 1; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(SimpleAssignmentLoweringAndTransfer_MatchesLegacyState));
+        var assignment = fixture.Root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
+            .Single();
+        var operation = fixture.SemanticModel.GetOperation(assignment)!;
+        var targetSymbol = fixture.SemanticModel.GetSymbolInfo(assignment.Left).Symbol!;
+        var context = new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None);
+        var lowered = SymbolicOperationLowerer.Lower(operation, context, context);
+        Assert.That(lowered.IsExact, Is.True);
+        var initialState = new SymbolicState(pathConditions: new[]
+        {
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(targetSymbol), SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(0)),
+                assignment,
+                "test.initial"))
+        });
+
+        var legacyState = initialState;
+        SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
+            ref legacyState,
+            targetSymbol,
+            assignment.Right,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            "operation-lowering.assignment");
+        var canonical = SymbolicOperationTransferKernel.Apply(initialState, lowered.Value!);
+        var expected = SymbolicStateDifferentialHarness.Capture(
+            legacyState,
+            canonical.Support,
+            canonical.UnknownReason,
+            canonical.Provenance,
+            canonical.Truncation);
+        var actual = SymbolicStateDifferentialHarness.Capture(
+            canonical.State,
+            canonical.Support,
+            canonical.UnknownReason,
+            canonical.Provenance,
+            canonical.Truncation);
+
+        SymbolicStateDifferentialHarness.AssertEquivalent(expected, actual, "simple assignment");
     }
 
     [Test]

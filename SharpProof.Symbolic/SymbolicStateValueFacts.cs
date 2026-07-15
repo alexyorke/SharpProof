@@ -11,6 +11,11 @@ internal static class SymbolicStateValueFacts
     internal static SymbolicState RemoveReferences(SymbolicState state, ISymbol symbol)
     {
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+        return RemoveReferences(state, symbolName);
+    }
+
+    internal static SymbolicState RemoveReferences(SymbolicState state, string symbolName)
+    {
         return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
     }
 
