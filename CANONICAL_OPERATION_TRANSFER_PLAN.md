@@ -156,7 +156,7 @@ transfer policy after its slice is complete.
   remains a canonical lifetime transition: arbitrary member use has no sound
   universal `ObjectDisposedException` precondition.
 - [x] Emit indexing, range, collection-cardinality, and array preconditions.
-- [ ] Emit cast, switch-no-match, argument, direct-throw, and framework-model
+- [x] Emit cast, switch-no-match, argument, direct-throw, and framework-model
   preconditions.
 - [ ] Migrate query, suppressor, and exception-flow consumers to the canonical
   descriptors.
@@ -252,6 +252,7 @@ transfer policy after its slice is complete.
 | Canonical slicing bounds hazards | `2b86726f` | 107,029 | -647 |
 | Canonical runtime-type hazards | `39e7368a` | 106,918 | -758 |
 | Canonical throw and switch hazards | `5fb606aa` | 106,923 | -753 |
+| Canonical framework hazards and trigger deletion | `8742afc6` | 106,658 | -1,018 |
 
 ## Validation Ledger
 
@@ -309,20 +310,21 @@ transfer policy after its slice is complete.
 | Phase 4 canonical slicing bounds hazards | Commit `2b86726f` moves slicing and `Index` construction argument-range semantics into canonical hazard operations. Together with the relational and indexing slices, all indexing, range, collection-cardinality, negative-length, and array-bounds preconditions now have typed operation owners; array-store mismatch remains correctly grouped with the following cast/type-compatibility family. Focused tests: 259 passed; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The completed bounds batch is net -67 lines from its 107,096 checkpoint; production LOC is 107,029, or -647 from the rewrite start. |
 | Phase 4 canonical runtime-type hazards | Commit `39e7368a` moves invalid reference casts, unboxing mismatches, and covariant array-store mismatches into canonical operation lowering while preserving exact runtime-type checks, null behavior, unsupported subjects, bounds guards, and evidence provenance. The three legacy trigger/candidate semantic blocks were deleted. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. Production LOC fell by 111 lines to 106,918, or -758 from the rewrite start. |
 | Phase 4 canonical throw and switch hazards | Commit `5fb606aa` moves direct throw, rethrow, throw-null partitioning, and switch-expression no-match into canonical operation lowering and deletes both legacy trigger owners. The focused gate exposed and fixed an immutable-builder capacity bug in single-hazard throws before commit. Focused runtime-hazard, semantic-oracle, exception, authoring, and unknown tests: 258 passed. The five-line bridge raises production LOC to 106,923, or -753 from the rewrite start, and must be repaid by final framework-model and trigger-factory deletion. |
+| Phase 4 canonical framework hazards and trigger deletion | Commit `8742afc6` moves `Math.Abs`, `Math.Clamp`, and known argument-guard preconditions into canonical operation lowering, relocates the remaining array shape adapter, and deletes both legacy trigger-factory files plus the obsolete trigger carrier. Exact search confirms every `RuntimeHazardCandidate` now projects from `SymbolicHazardOperation`. Focused hazard tests: 258 passed; Release test build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. The slice removes 265 production lines, bringing production LOC to 106,658, or -1,018 from the rewrite start; the complete fourth Phase 4 item removes 371 lines from its 107,029 checkpoint. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phases 2 and 3 are gated. The first three Phase 4 items are complete;
-  arithmetic, null-family, and all bounds/cardinality hazards emit typed
-  operations. Cast/type compatibility, switch-no-match, direct throw, and
-  rethrow are canonical; remaining argument/framework models use legacy paths.
-- Last confirmed fact: throw/switch migration passes 258 focused tests after a
-  pre-commit builder-capacity fix. Production LOC is 106,923, or -753 from the
-  rewrite start; the preceding full lanes remain Oracle 573/573, Analyzer
-  487/487, and Flow 256 plus only the documented SP0010 baseline failure.
-- Next cheapest step: inventory the residual legacy trigger calls, group the
-  remaining argument/framework models by relational, null, and type policy,
-  migrate them, and delete any now-empty trigger owners.
+- State: Phases 2 and 3 are gated. The first four Phase 4 items are complete;
+  every runtime-hazard family emits typed operations and both legacy trigger
+  factories are deleted. Query, suppressor, and exception-flow consumers still
+  require canonical-descriptor migration and adapter cleanup.
+- Last confirmed fact: framework migration and trigger deletion pass 258
+  focused tests, Oracle 573/573, Analyzer 487/487, and Flow 256 plus only the
+  documented SP0010 baseline failure. Production LOC is 106,658, or -1,018
+  from the rewrite start.
+- Next cheapest step: inventory query, suppressor, and exception-flow reads of
+  projected trigger facts; expose canonical descriptor data through the query
+  result and migrate the largest shared consumer without changing schemas.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
