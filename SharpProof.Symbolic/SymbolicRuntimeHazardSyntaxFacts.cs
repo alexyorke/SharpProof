@@ -13,6 +13,54 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardSyntaxFacts
 {
+    internal static bool HasLaterLoopAssignmentOfMissingNullableValue(
+        ExpressionSyntax nullableExpression,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        nullableExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(nullableExpression);
+        if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
+                nullableExpression,
+                semanticModel,
+                cancellationToken,
+                out var symbol) ||
+            !SymbolicTypeFacts.IsNullableType(SymbolicFactFactory.GetTrackedSymbolType(symbol)) ||
+            CSharpSyntaxFacts.GetContainingLoopBody(useNode) is not { } loopBody)
+            return false;
+
+        return CSharpSyntaxFacts.DescendantNodesInExecution(loopBody, includeSelf: false)
+            .OfType<AssignmentExpressionSyntax>()
+            .Any(assignment =>
+                assignment.SpanStart > useNode.SpanStart &&
+                assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                SymbolMutationFacts.ExpressionMatchesSymbol(
+                    assignment.Left,
+                    symbol,
+                    semanticModel,
+                    cancellationToken) &&
+                IsMissingNullableValueExpression(assignment.Right, semanticModel, cancellationToken));
+    }
+
+    private static bool IsMissingNullableValueExpression(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        if (!SymbolicTypeFacts.IsNullableType(
+                CSharpSyntaxFacts.GetExpressionType(expression, semanticModel, cancellationToken)))
+            return false;
+
+        if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true, Value: null })
+            return true;
+
+        return expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+               expression is DefaultExpressionSyntax ||
+               expression is ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0 } ||
+               expression is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0 };
+    }
+
     internal static bool IsBuiltInSequenceElementAccess(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,

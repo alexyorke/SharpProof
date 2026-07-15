@@ -925,13 +925,33 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
-            !TryCreateNullableValueWithoutValueTrigger(
-                memberAccess.Expression,
-                semanticModel,
-                cancellationToken,
-                out var trigger))
+        if (!SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken))
             return false;
+
+        RuntimeHazardTrigger trigger;
+        if (HasLaterLoopAssignmentOfMissingNullableValue(
+                memberAccess.Expression,
+                memberAccess,
+                semanticModel,
+                cancellationToken))
+        {
+            if (!TryCreateIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+                    null,
+                    new SymbolicConstantCondition(true),
+                    memberAccess,
+                    "ir.runtime-hazard.nullable-value.loop-carried",
+                    out trigger))
+                return false;
+        }
+        else if (!TryCreateNullableValueWithoutValueTrigger(
+                     memberAccess.Expression,
+                     semanticModel,
+                     cancellationToken,
+                     out trigger))
+        {
+            return false;
+        }
 
         candidate = new RuntimeHazardCandidate(
             memberAccess,

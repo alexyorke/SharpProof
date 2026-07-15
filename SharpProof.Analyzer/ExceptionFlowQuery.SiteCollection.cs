@@ -279,8 +279,10 @@ internal static partial class ExceptionFlowQuery
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazards.Where(static hazard =>
                          hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
-                         string.Equals(hazard.Category, ExceptionCategories.DefiniteRangeOutOfRange,
-                             StringComparison.Ordinal)),
+                         (string.Equals(hazard.Category, ExceptionCategories.DefiniteRangeOutOfRange,
+                              StringComparison.Ordinal) ||
+                          string.Equals(hazard.Category, ExceptionCategories.DefiniteSliceOutOfRange,
+                              StringComparison.Ordinal))),
                      hazard => ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard),
                      static _ => ExceptionTypes.ArgumentOutOfRangeException,
                      static _ => ExceptionCategories.DefiniteRangeOutOfRange,

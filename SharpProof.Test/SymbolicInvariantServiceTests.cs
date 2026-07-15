@@ -229,6 +229,7 @@ public class TestClass
         divisor += 1;
         return 10 / divisor;
     }
+
 }";
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
@@ -244,6 +245,73 @@ public class TestClass
             hazard.Status,
             Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable),
             hazard.StatusReason);
+    }
+
+    [Test]
+    public void RuntimeHazards_ProveMemorySliceOutOfRangeThroughLengthAlias()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public Memory<int> TestMethod(Memory<int> values, int start)
+    {
+        var copy = values;
+        if (start > copy.Length)
+        {
+            return values.Slice(start);
+        }
+
+        return values.Slice(0, 0);
+    }
+}";
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var result = new SymbolicRuntimeHazardQueryService().QuerySourceRuntimeHazards(
+            source,
+            "SymbolicMemorySliceAliasHazard.cs",
+            smtAnalysis,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            options: new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+        var hazard = result.Hazards.Single(candidate =>
+            candidate.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
+            candidate.OperationText.Contains("values.Slice(start)", StringComparison.Ordinal));
+
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven), hazard.StatusReason);
+    }
+
+    [Test]
+    public void RuntimeHazards_RetainNullableLoopCarriedMissingValue()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool repeat)
+    {
+        int? value = 1;
+        var result = 0;
+        while (repeat)
+        {
+            result = value.Value;
+            value = null;
+        }
+
+        return result;
+    }
+}";
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var result = new SymbolicRuntimeHazardQueryService().QuerySourceRuntimeHazards(
+            source,
+            "SymbolicNullableLoopHazard.cs",
+            smtAnalysis,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            options: new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+        var hazard = result.Hazards.Single(candidate =>
+            candidate.Kind == SymbolicRuntimeHazardKind.NullableValueWithoutValue);
+
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven), hazard.StatusReason);
     }
 
     [Test]
