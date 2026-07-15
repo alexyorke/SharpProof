@@ -31,8 +31,7 @@ internal static class PurityAnalysisStateMerger
             MergeDelegateTargetMapsAcrossAll(states.Select(static state => state.DelegateTargetMap)),
             MergeFlowCaptureMapsAcrossAll(states.Select(static state => state.FlowCaptures)),
             MergeFlowCaptureTargetMapsAcrossAll(states.Select(static state => state.FlowCaptureTargets)),
-            IntersectOwnedLocalArraySymbolsAcrossAll(states.Select(static state => state.OwnedLocalArraySymbols)),
-            IntersectOwnedLocalArraySymbolsAcrossAll(states.Select(static state => state.DefinitelyNullLocalSymbols)),
+            IntersectSymbolSetsAcrossAll(states.Select(static state => state.DefinitelyNullLocalSymbols)),
             firstImpurityEvidence,
             IntersectLocalConcreteTypesAcrossAll(states.Select(static state => state.LocalConcreteTypes)),
             IntersectFlowCaptureConcreteTypesAcrossAll(states.Select(static state => state.FlowCaptureConcreteTypes)),
@@ -82,7 +81,7 @@ internal static class PurityAnalysisStateMerger
             IntersectDelegateTargetMaps);
     }
 
-    private static ImmutableHashSet<ISymbol> IntersectOwnedLocalArraySymbols(
+    private static ImmutableHashSet<ISymbol> IntersectSymbolSets(
         ImmutableHashSet<ISymbol> first,
         ImmutableHashSet<ISymbol> second)
     {
@@ -91,13 +90,13 @@ internal static class PurityAnalysisStateMerger
             first.Intersect(second, SymbolEqualityComparer.Default));
     }
 
-    private static ImmutableHashSet<ISymbol> IntersectOwnedLocalArraySymbolsAcrossAll(
+    private static ImmutableHashSet<ISymbol> IntersectSymbolSetsAcrossAll(
         IEnumerable<ImmutableHashSet<ISymbol>> symbolSets)
     {
         return AggregateAcrossAll(
             symbolSets,
             ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default),
-            IntersectOwnedLocalArraySymbols);
+            IntersectSymbolSets);
     }
 
     private static ImmutableHashSet<CaptureId> IntersectOwnedArrayFlowCaptures(

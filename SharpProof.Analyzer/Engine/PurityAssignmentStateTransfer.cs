@@ -154,7 +154,6 @@ internal static partial class PurityAssignmentStateTransfer
                     {
                         nextState = nextState
                             .WithoutLocalConcreteType(writtenLocalSymbol)
-                            .WithoutOwnedLocalArray(writtenLocalSymbol)
                             .WithoutDefinitelyNullLocal(writtenLocalSymbol)
                             .WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
 

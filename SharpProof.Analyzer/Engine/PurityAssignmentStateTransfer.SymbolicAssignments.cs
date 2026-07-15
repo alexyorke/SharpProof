@@ -58,15 +58,10 @@ internal static partial class PurityAssignmentStateTransfer
 
             if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
             {
-                nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
                 nextState = PurityResourceStateFacts.AddOwnedLocalArrayFacts(
                     nextState,
                     writtenLocalSymbol,
                     valueOperation);
-            }
-            else
-            {
-                nextState = nextState.WithoutOwnedLocalArray(writtenLocalSymbol);
             }
 
             nextState = PurityResourceStateFacts.AddOwnedDisposableLocalFacts(
