@@ -224,6 +224,7 @@ transfer policy after its slice is complete.
 | Canonical assignment snapshots | `b7478495` | 108,097 | +421 |
 | Tuple and finite-array projections | `77237b02` | 108,046 | +370 |
 | Kernel-derived assignment bounds | `5e144264` | 107,990 | +314 |
+| Nullable snapshot operations | `0b1cfa4c` | 107,987 | +311 |
 
 ## Validation Ledger
 
@@ -255,20 +256,20 @@ transfer policy after its slice is complete.
 | Phase 2 canonical assignment snapshots | Commit `b7478495` makes explicitly marked canonical bindings propagate direct-source facts through substitution, routes scalar/reference and tuple-element snapshots through that policy, and leaves only the nullable source-shape adapter outside the kernel. Focused state/tuple/path tests: 136 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. The reusable closure policy temporarily raises scaffolding to +421 production LOC and must enable larger legacy deletions. |
 | Phase 2 tuple and finite-array projections | Commit `77237b02` moves tuple literal/source and finite-array element postconditions into canonical assignment lowering, reuses the reference-backed projection builder for tuple string/length/dimension facts, and deletes the parallel state-mutating interpreters and tuple identity helpers. Focused transfer/path/program-point tests: 164 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 108,046, or +370 from the rewrite start. |
 | Phase 2 kernel-derived assignment bounds | Commit `5e144264` makes canonical bindings derive positive, nonnegative, and remainder bounds from the pre-state, routes self-referential integer updates through the same binding path, moves the not-null-if-not-null implication into canonical lowering, and deletes the parallel post-assignment proof walkers. Focused nullability/range/self-reference tests: 189 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,990, or +314 from the rewrite start. |
+| Phase 2 nullable snapshot operations | Commit `0b1cfa4c` represents nullable source/target term pairs as assignment-operation propagations and removes the final post-kernel nullable snapshot mutator. Focused nullable/path/transfer tests: 155 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,987, or +311 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: assignment, declaration, source snapshots, tuple/array projections,
+- State: assignment, declaration, scalar/reference/nullable source snapshots, tuple/array projections,
   null flow, integer/remainder bounds, alias/borrow, invalidation, ownership,
   and resource lifetime families share canonical events; purity symbolic facts
   are now query-only.
-- Last confirmed fact: focused nullability/range/self-reference tests pass
-  189/189, MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487 after
-  deleting the legacy range proof walkers and null implication mutator.
-- Next cheapest step: represent nullable snapshot term pairs in assignment
-  operations, then route current-instance member and element assignments through
-  canonical postconditions/bindings so the remaining assignment owner contains
-  only source order, throw-guard, switch, and deconstruction adapters.
+- Last confirmed fact: focused nullable/path/transfer tests pass 155/155,
+  MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487 after removing
+  the final post-kernel nullable snapshot mutation.
+- Next cheapest step: route current-instance member and element assignments
+  through canonical postconditions/bindings, then classify the remaining source
+  order, throw-guard, switch, and deconstruction code as Phase 3 adapters.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
