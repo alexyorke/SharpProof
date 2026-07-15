@@ -177,8 +177,8 @@ internal static partial class SmtSyntacticClassifier
         private const int MaxConditionalBranchEvaluationDepth = 4;
         private const int MaxFormulaReferenceDepth = 256;
         private const int MaxSyntacticWorkItems = 1048576;
-        private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
-        private readonly Dictionary<SmtFormula, BooleanEquivalenceParent> _booleanEquivalences = new();
+        private readonly Dictionary<SmtFormula, (SmtFormula Parent, bool Differs)> _aliases = new();
+        private readonly Dictionary<SmtFormula, (SmtFormula Parent, bool Differs)> _booleanEquivalences = new();
         private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
         private readonly Dictionary<SmtFormula, string> _exactStrings = new();
         private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
@@ -202,8 +202,8 @@ internal static partial class SmtSyntacticClassifier
             _excludedStrings = new Dictionary<SmtFormula, ImmutableHashSet<string>>(source._excludedStrings);
             _referenceNullStates = new Dictionary<SmtFormula, bool>(source._referenceNullStates);
             _exactBooleans = new Dictionary<SmtFormula, bool>(source._exactBooleans);
-            _aliases = new Dictionary<SmtFormula, SmtFormula>(source._aliases);
-            _booleanEquivalences = new Dictionary<SmtFormula, BooleanEquivalenceParent>(source._booleanEquivalences);
+            _aliases = new Dictionary<SmtFormula, (SmtFormula, bool)>(source._aliases);
+            _booleanEquivalences = new Dictionary<SmtFormula, (SmtFormula, bool)>(source._booleanEquivalences);
             _workBudget = source._workBudget;
             _booleanEvaluationDepth = source._booleanEvaluationDepth;
             _booleanFactInferenceDepth = source._booleanFactInferenceDepth;
@@ -562,9 +562,7 @@ internal static partial class SmtSyntacticClassifier
             hasContradiction = false;
             if (left.Equals(right)) return false;
 
-            var leftText = left.ToString();
-            var rightText = right.ToString();
-            var canonical = string.CompareOrdinal(leftText, rightText) <= 0 ? left : right;
+            var canonical = SelectCanonical(left, right);
             var alias = canonical.Equals(left) ? right : left;
             hasContradiction = RegisterAlias(alias, canonical);
             return true;
@@ -572,7 +570,7 @@ internal static partial class SmtSyntacticClassifier
 
         private bool RegisterAlias(SmtFormula alias, SmtFormula canonical)
         {
-            _aliases[alias] = canonical;
+            _aliases[alias] = (canonical, false);
             MergeIntegerFacts(canonical, alias, out var integerContradiction);
             MergeStringFacts(canonical, alias, out var stringContradiction);
             MergeReferenceFacts(canonical, alias, out var referenceContradiction);
@@ -581,12 +579,31 @@ internal static partial class SmtSyntacticClassifier
 
         private SmtFormula FindCanonical(SmtFormula formula)
         {
-            if (!_aliases.TryGetValue(formula, out var parent)) return formula;
+            return FindCanonical(_aliases, formula, out _);
+        }
 
-            var canonical = FindCanonical(parent);
-            if (!canonical.Equals(parent)) _aliases[formula] = canonical;
+        private static SmtFormula FindCanonical(
+            Dictionary<SmtFormula, (SmtFormula Parent, bool Differs)> equivalences,
+            SmtFormula formula,
+            out bool differsFromCanonical)
+        {
+            if (!equivalences.TryGetValue(formula, out var parent))
+            {
+                differsFromCanonical = false;
+                return formula;
+            }
+
+            var canonical = FindCanonical(equivalences, parent.Parent, out var parentDiffers);
+            differsFromCanonical = parent.Differs ^ parentDiffers;
+            if (!canonical.Equals(parent.Parent))
+                equivalences[formula] = (canonical, differsFromCanonical);
 
             return canonical;
+        }
+
+        private static SmtFormula SelectCanonical(SmtFormula left, SmtFormula right)
+        {
+            return string.CompareOrdinal(left.ToString(), right.ToString()) <= 0 ? left : right;
         }
 
         private void MergeIntegerFacts(

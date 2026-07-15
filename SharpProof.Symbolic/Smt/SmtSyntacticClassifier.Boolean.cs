@@ -472,29 +472,16 @@ internal static partial class SmtSyntacticClassifier
                 return hasContradiction;
             }
 
-            var leftText = leftRoot.ToString();
-            var rightText = rightRoot.ToString();
-            var canonical = string.CompareOrdinal(leftText, rightText) <= 0 ? leftRoot : rightRoot;
+            var canonical = SelectCanonical(leftRoot, rightRoot);
             var alias = canonical.Equals(leftRoot) ? rightRoot : leftRoot;
-            _booleanEquivalences[alias] = new BooleanEquivalenceParent(canonical, rootDiffers);
+            _booleanEquivalences[alias] = (canonical, rootDiffers);
             MergeBooleanFacts(canonical, alias, rootDiffers, out hasContradiction);
             return true;
         }
 
         private SmtFormula FindBooleanCanonical(SmtFormula formula, out bool isNegatedFromCanonical)
         {
-            if (!_booleanEquivalences.TryGetValue(formula, out var parent))
-            {
-                isNegatedFromCanonical = false;
-                return formula;
-            }
-
-            var canonical = FindBooleanCanonical(parent.Parent, out var parentNegated);
-            isNegatedFromCanonical = parent.IsNegatedFromParent ^ parentNegated;
-            if (!canonical.Equals(parent.Parent))
-                _booleanEquivalences[formula] = new BooleanEquivalenceParent(canonical, isNegatedFromCanonical);
-
-            return canonical;
+            return FindCanonical(_booleanEquivalences, formula, out isNegatedFromCanonical);
         }
 
         private void MergeBooleanFacts(
@@ -792,18 +779,6 @@ internal static partial class SmtSyntacticClassifier
                 ? areEqual
                 : !areEqual;
             return true;
-        }
-
-        private readonly struct BooleanEquivalenceParent
-        {
-            internal BooleanEquivalenceParent(SmtFormula parent, bool isNegatedFromParent)
-            {
-                Parent = parent;
-                IsNegatedFromParent = isNegatedFromParent;
-            }
-
-            internal SmtFormula Parent { get; }
-            internal bool IsNegatedFromParent { get; }
         }
 
     }
