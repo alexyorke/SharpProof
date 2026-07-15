@@ -3024,6 +3024,35 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public async Task RefactoringMetricsScript_UsesStableTrackedHandwrittenBaseline()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        using var document = await RunPowerShellJsonScriptAsync(
+            repositoryRoot,
+            "Get-SharpProofRefactoringMetrics.ps1");
+        var root = document.RootElement;
+        var production = root.GetProperty("production");
+        var tests = root.GetProperty("tests");
+        var total = root.GetProperty("total");
+
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("baseline").GetString(),
+            Is.EqualTo("scripts/refactoring-baseline.json"));
+        Assert.That(root.GetProperty("baselineCommit").GetString(), Has.Length.EqualTo(40));
+        Assert.That(production.GetProperty("baselineLines").GetInt32(), Is.EqualTo(109391));
+        Assert.That(tests.GetProperty("baselineLines").GetInt32(), Is.EqualTo(150518));
+        Assert.That(total.GetProperty("baselineLines").GetInt32(), Is.EqualTo(259909));
+        Assert.That(total.GetProperty("minimumReduction").GetInt32(), Is.EqualTo(20000));
+        Assert.That(total.GetProperty("stretchReduction").GetInt32(), Is.EqualTo(35000));
+        Assert.That(
+            production.GetProperty("lines").GetInt32() + tests.GetProperty("lines").GetInt32(),
+            Is.EqualTo(total.GetProperty("lines").GetInt32()));
+        Assert.That(tests.GetProperty("roots").GetArrayLength(), Is.EqualTo(2));
+        Assert.That(root.GetProperty("testBaseline").GetProperty("passing").GetInt32(), Is.EqualTo(5778));
+        Assert.That(root.GetProperty("testBaseline").GetProperty("skipped").GetInt32(), Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task CloneInventoryScript_ReportsOnlyCrossFileProductionClones()
     {
         var repositoryRoot = FindRepositoryRoot();

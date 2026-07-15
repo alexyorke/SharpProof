@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "commit": "72e7cadbd75aeca6be30ac4ddb5989aee424ae59",
+  "capturedAt": "2026-07-14T18:36:41-07:00",
+  "productionHandwrittenLines": 109391,
+  "testHandwrittenLines": 150518,
+  "totalHandwrittenLines": 259909,
+  "minimumReduction": 20000,
+  "stretchReduction": 35000,
+  "passingTests": 5778,
+  "skippedTests": 2,
+  "testRoots": [
+    "SharpProof.Test/",
+    "SharpProof.ToolingTest/"
+  ]
+}
