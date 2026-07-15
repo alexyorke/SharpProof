@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -34,7 +35,7 @@ internal static class SymbolicStateInvalidator
                     cancellationToken);
 
             foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
-                state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
+                InvalidateSymbol(ref state, receiverSymbol, node);
         }
     }
 
@@ -44,15 +45,40 @@ internal static class SymbolicStateInvalidator
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        var invalidations = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
         var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
         if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-            state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
+            invalidations.Add(ForSymbol(mutatedSymbol));
         else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
                  IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
+            invalidations.Add(new SymbolicInvalidationTarget(
+                SymbolicStateValueFacts.ImplicitThisVariableName + "." + mutatedSymbol.Name,
+                SymbolicInvalidationMatchKind.VariableOrMember));
 
         foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
+            invalidations.Add(ForSymbol(receiverSymbol));
+
+        if (invalidations.Count != 0)
+            state = SymbolicOperationTransferKernel.Invalidate(
+                state,
+                invalidations.ToImmutable(),
+                mutatedExpression.Span,
+                "operation-transfer.mutation-invalidation").State;
+    }
+
+    private static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
+    {
+        state = SymbolicOperationTransferKernel.Invalidate(
+            state,
+            ImmutableArray.Create(ForSymbol(symbol)),
+            source.Span,
+            "operation-transfer.reference-invalidation").State;
+    }
+
+    private static SymbolicInvalidationTarget ForSymbol(ISymbol symbol)
+    {
+        return new SymbolicInvalidationTarget(
+            SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition));
     }
 
     private static ISymbol? GetMutatedSymbol(

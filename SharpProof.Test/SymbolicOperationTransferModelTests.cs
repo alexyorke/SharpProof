@@ -256,6 +256,74 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [Test]
+    public void TransferKernel_InvalidationRemovesVersionedReferencesOnly()
+    {
+        var state = new SymbolicState(new[]
+        {
+            Relation("value@v3", 3),
+            Relation("other", 4)
+        });
+
+        var result = SymbolicOperationTransferKernel.Invalidate(
+            state,
+            ImmutableArray.Create(new SymbolicInvalidationTarget("value")),
+            default,
+            "test.invalidate");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(result.State.Facts.Length, Is.EqualTo(1));
+            Assert.That(result.State.Facts.Single().Atom,
+                Is.EqualTo(Relation("other", 4).Atom));
+        });
+    }
+
+    [TestCase(0, 2)]
+    [TestCase(17, 36)]
+    public void TransferKernel_DefinitionVersionsAreStableEvenValues(int spanStart, int expectedVersion)
+    {
+        var span = new TextSpan(spanStart, 1);
+
+        Assert.That(SymbolicOperationTransferKernel.GetDefinitionVersion(span), Is.EqualTo(expectedVersion));
+    }
+
+    [TestCase(0, typeof(SymbolicAliasAtom))]
+    [TestCase(1, typeof(SymbolicBorrowAtom))]
+    [TestCase(2, typeof(SymbolicBorrowAtom))]
+    public void TransferKernel_AppliesAliasAndBorrowLifetimeEvents(
+        int kindValue,
+        Type expectedAtomType)
+    {
+        var kind = kindValue switch
+        {
+            0 => SymbolicLifetimeOperationKind.Alias,
+            1 => SymbolicLifetimeOperationKind.BorrowShared,
+            _ => SymbolicLifetimeOperationKind.BorrowMutable
+        };
+        var operation = new SymbolicLifetimeOperation(
+            new SymbolicVariableTerm("owner", SmtValueKind.Reference),
+            kind,
+            new SymbolicVariableTerm("related", SmtValueKind.Reference),
+            SymbolicEscapeKind.RefAlias,
+            null,
+            "test.evidence",
+            new SymbolicOperationOrigin(default, 0, "test.lifetime"));
+
+        var result = SymbolicOperationTransferKernel.Apply(
+            new SymbolicState(),
+            SymbolicOperationSequence.Single(operation));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(result.State.Facts.Single().Atom, Is.TypeOf(expectedAtomType));
+            Assert.That(result.State.Facts.Single().Provenance, Is.EqualTo("test.lifetime"));
+            Assert.That(result.State.Facts.Single().EvidenceKey, Is.EqualTo("test.evidence"));
+        });
+    }
+
     private static SymbolicAssignmentOperation Assignment(
         SymbolicTerm target,
         long value,
@@ -271,5 +339,20 @@ public sealed class SymbolicOperationTransferModelTests
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
             new SymbolicOperationOrigin(default, sequence, provenance));
+    }
+
+    private static SymbolicFact Relation(string name, long value)
+    {
+        return new SymbolicFact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                new SymbolicVariableTerm(name, SmtValueKind.Int),
+                new SymbolicIntegerConstantTerm(value)),
+            true,
+            SymbolicFactConfidence.Exact,
+            "test.relation",
+            default,
+            null,
+            null);
     }
 }

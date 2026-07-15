@@ -31,7 +31,10 @@ internal static class SymbolicOperationTransferKernel
                 TryApplyAssignment(ref state, assignment))
                 continue;
             if (operation is SymbolicMutationOperation mutation &&
-                TryApplyBindings(ref state, mutation.Bindings, mutation.Origin))
+                TryApplyMutation(ref state, mutation))
+                continue;
+            if (operation is SymbolicLifetimeOperation lifetime &&
+                TryApplyLifetime(ref state, lifetime))
                 continue;
 
             return SymbolicOperationTransitionResult.Unsupported(
@@ -43,6 +46,32 @@ internal static class SymbolicOperationTransferKernel
         return SymbolicOperationTransitionResult.Exact(state, provenance);
     }
 
+    internal static SymbolicOperationTransitionResult Invalidate(
+        SymbolicState state,
+        ImmutableArray<SymbolicInvalidationTarget> targets,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance)
+    {
+        var operation = new SymbolicMutationOperation(
+            ImmutableArray<SymbolicAssignmentBinding>.Empty,
+            targets,
+            SymbolicMutationOperationKind.Invalidate,
+            IsChecked: false,
+            CallerVisible: false,
+            new SymbolicOperationOrigin(sourceSpan, 0, provenance));
+        return Apply(state, SymbolicOperationSequence.Single(operation));
+    }
+
+    internal static int GetDefinitionVersion(Microsoft.CodeAnalysis.Text.TextSpan sourceSpan)
+    {
+        var spanStart = Math.Max(0, sourceSpan.Start);
+        // Definition versions are even; CFG join (phi) versions are odd. Using the
+        // syntax position keeps reprocessing the same block idempotent.
+        return spanStart <= (int.MaxValue - 2) / 2
+            ? (spanStart + 1) * 2
+            : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
+    }
+
     private static bool TryApplyAssignment(
         ref SymbolicState state,
         SymbolicAssignmentOperation assignment)
@@ -50,6 +79,44 @@ internal static class SymbolicOperationTransferKernel
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
             state = state.AddPathCondition(postcondition);
+        return true;
+    }
+
+    private static bool TryApplyMutation(
+        ref SymbolicState state,
+        SymbolicMutationOperation mutation)
+    {
+        foreach (var target in mutation.Invalidations)
+            state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
+                ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
+                : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
+        return TryApplyBindings(ref state, mutation.Bindings, mutation.Origin);
+    }
+
+    private static bool TryApplyLifetime(
+        ref SymbolicState state,
+        SymbolicLifetimeOperation lifetime)
+    {
+        SymbolicAtom? atom = lifetime.LifetimeKind switch
+        {
+            SymbolicLifetimeOperationKind.Alias when lifetime.RelatedSubject != null =>
+                new SymbolicAliasAtom(lifetime.Subject, lifetime.RelatedSubject, true),
+            SymbolicLifetimeOperationKind.BorrowShared when lifetime.RelatedSubject != null =>
+                new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Shared),
+            SymbolicLifetimeOperationKind.BorrowMutable when lifetime.RelatedSubject != null =>
+                new SymbolicBorrowAtom(lifetime.Subject, lifetime.RelatedSubject, SymbolicBorrowKind.Mutable),
+            _ => null
+        };
+        if (atom == null) return false;
+
+        state = state.AddFact(new SymbolicFact(
+            atom,
+            true,
+            SymbolicFactConfidence.Exact,
+            lifetime.Origin.Provenance,
+            lifetime.Origin.SourceSpan,
+            lifetime.Symbol,
+            lifetime.EvidenceKey));
         return true;
     }
 

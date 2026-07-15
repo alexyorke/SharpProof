@@ -120,6 +120,7 @@ internal static class SymbolicOperationLowerer
                 origin),
             _ => new SymbolicMutationOperation(
                 bindings,
+                System.Collections.Immutable.ImmutableArray<SymbolicInvalidationTarget>.Empty,
                 updateKind == SymbolicComputedUpdateKind.Increment
                     ? SymbolicMutationOperationKind.Increment
                     : SymbolicMutationOperationKind.Decrement,

@@ -700,17 +700,15 @@ internal partial class PurityAnalysisEngine
         public PurityAnalysisState WithSmtSymbolDefinitionVersion(ISymbol symbol, SyntaxNode definitionSyntax)
         {
             var originalDefinition = symbol.OriginalDefinition;
-            var spanStart = Math.Max(0, definitionSyntax.SpanStart);
-            // Definition versions are even; CFG join (phi) versions are odd. The syntax position
-            // makes reprocessing the same block idempotent, including loop backedges.
-            var nextVersion = spanStart <= (int.MaxValue - 2) / 2
-                ? (spanStart + 1) * 2
-                : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
+            var nextVersion = SymbolicOperationTransferKernel.GetDefinitionVersion(definitionSyntax.Span);
             return Copy(
                 smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
-                pathState: SymbolicIrReferenceScanner.RemoveVariableReferences(
+                pathState: SymbolicOperationTransferKernel.Invalidate(
                     PathState,
-                    SymbolicFactFactory.GetSmtVariableName(originalDefinition)));
+                    ImmutableArray.Create(new SymbolicInvalidationTarget(
+                        SymbolicFactFactory.GetSmtVariableName(originalDefinition))),
+                    definitionSyntax.Span,
+                    "analyzer.version-update").State);
         }
 
         private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)

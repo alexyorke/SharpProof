@@ -29,6 +29,16 @@ internal enum SymbolicComputedUpdateKind
     Decrement
 }
 
+internal enum SymbolicInvalidationMatchKind
+{
+    VariablePrefix,
+    VariableOrMember
+}
+
+internal readonly record struct SymbolicInvalidationTarget(
+    string Key,
+    SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix);
+
 internal enum SymbolicLoopEdgeKind
 {
     Entry,
@@ -48,6 +58,7 @@ internal enum SymbolicCompletionKind
 
 internal enum SymbolicLifetimeOperationKind
 {
+    Alias,
     CreateOwned,
     BorrowShared,
     BorrowMutable,
@@ -89,6 +100,7 @@ internal sealed record SymbolicAssignmentOperation(
 
 internal sealed record SymbolicMutationOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
+    ImmutableArray<SymbolicInvalidationTarget> Invalidations,
     SymbolicMutationOperationKind MutationKind,
     bool IsChecked,
     bool CallerVisible,
@@ -124,6 +136,8 @@ internal sealed record SymbolicLifetimeOperation(
     SymbolicLifetimeOperationKind LifetimeKind,
     SymbolicTerm? RelatedSubject,
     SymbolicEscapeKind EscapeKind,
+    ISymbol? Symbol,
+    string? EvidenceKey,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicHazardOperation(

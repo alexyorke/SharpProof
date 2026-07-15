@@ -348,17 +348,22 @@ internal static class PuritySymbolicStateFacts
 
         var sourceTerm = CreateSymbolicReferenceTerm(sourceSymbol, valueState);
         var targetTerm = CreateSymbolicReferenceTerm(targetSymbol, currentState);
-        var aliasFact = SymbolicOwnershipFactFactory.CreateAlias(
+        var operation = new SymbolicLifetimeOperation(
             sourceTerm,
+            SymbolicLifetimeOperationKind.Alias,
             targetTerm,
-            true,
-            valueOperation.Syntax,
-            "analyzer.assignment.alias",
+            SymbolicEscapeKind.RefAlias,
             targetSymbol,
-            "evidence.assignment.alias");
+            "evidence.assignment.alias",
+            new SymbolicOperationOrigin(
+                valueOperation.Syntax.Span,
+                0,
+                "analyzer.assignment.alias"));
 
         return currentState.WithPathState(
-            currentState.PathState.AddFact(aliasFact));
+            SymbolicOperationTransferKernel.Apply(
+                currentState.PathState,
+                SymbolicOperationSequence.Single(operation)).State);
     }
 
     internal static PurityAnalysisState AddDeclaredBorrowFact(
@@ -385,17 +390,24 @@ internal static class PuritySymbolicStateFacts
             : SymbolicBorrowKind.Mutable;
         var sourceTerm = CreateSymbolicReferenceTerm(sourceSymbol, currentState);
         var borrowTerm = CreateSymbolicReferenceTerm(declaredSymbol, currentState);
-        var borrowFact = SymbolicOwnershipFactFactory.CreateBorrow(
+        var operation = new SymbolicLifetimeOperation(
             sourceTerm,
+            borrowKind == SymbolicBorrowKind.Shared
+                ? SymbolicLifetimeOperationKind.BorrowShared
+                : SymbolicLifetimeOperationKind.BorrowMutable,
             borrowTerm,
-            borrowKind,
-            initializerValue.Syntax,
-            "analyzer.declaration.borrow",
+            SymbolicEscapeKind.RefAlias,
             declaredSymbol,
-            "evidence.declaration.borrow");
+            "evidence.declaration.borrow",
+            new SymbolicOperationOrigin(
+                initializerValue.Syntax.Span,
+                0,
+                "analyzer.declaration.borrow"));
 
         return currentState.WithPathState(
-            currentState.PathState.AddFact(borrowFact));
+            SymbolicOperationTransferKernel.Apply(
+                currentState.PathState,
+                SymbolicOperationSequence.Single(operation)).State);
     }
 
     private static ISymbol? TryResolveRefInitializerSymbol(
