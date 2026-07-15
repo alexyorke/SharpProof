@@ -215,6 +215,7 @@ transfer policy after its slice is complete.
 | Purity symbolic query boundary | `fa94a63f` | 108,314 | +638 |
 | Exclusive lifetime policy migration | `fc30d99e` | 108,308 | +632 |
 | `as` assignment interpreter deletion | `c9b46a46` | 108,251 | +575 |
+| String and length assignment deletion | `1ac96cbe` | 108,228 | +552 |
 
 ## Validation Ledger
 
@@ -237,16 +238,19 @@ transfer policy after its slice is complete.
 | Phase 2 purity symbolic query boundary | Commit `fa94a63f` moves the final assignment, alias, and ref-borrow mutations out of `PuritySymbolicStateFacts`, shares one reference-relationship event adapter, and removes a duplicate declaration-alias application. `PuritySymbolicStateFacts` is now read-only. Focused alias/borrow/resource/purity tests: 66 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +638 production LOC. |
 | Phase 2 exclusive lifetime policy | Commit `fc30d99e` makes the kernel remove superseded ownership/disposal facts before return and dispose transitions; Analyzer resource code no longer filters symbolic facts. Focused transfer/resource/disposal tests: 62 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +632 production LOC. |
 | Phase 2 `as` assignment deletion | Commit `c9b46a46` routes Symbolic `as` assignments through the canonical runtime-type/null-condition pipeline with byte-stable provenance and deletes the 68-line syntax interpreter. Focused `as` query/analyzer tests: 28 passed; full MainSmtOracle lane: 573 passed. Total temporary migration scaffolding fell to +575 production LOC. |
+| Phase 2 string and length assignment deletion | Commit `1ac96cbe` gives canonical assignment lowering a Symbolic evidence profile, routes string null/equality and collection lower-bound facts through it, and deletes the redundant string and assigned-length interpreters. Focused transfer/program-point tests: 122 passed; full MainSmtOracle lane: 573 passed; full MainSmtAnalyzer lane: 487 passed. Total temporary migration scaffolding fell to +552 production LOC. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-14.
-- State: assignment, alias/borrow, invalidation, ownership, and resource lifetime
-  families share canonical events; purity symbolic facts are now query-only.
-- Last confirmed fact: MainSmtAnalyzer passes 487/487 after centralizing exclusive
-  lifetime replacement, and MainSmtOracle passes 573/573 after deleting the `as`
-  assignment interpreter.
-- Next cheapest step: delete the next canonicalized reference/string/length
-  assignment branch while preserving its existing provenance and evidence keys.
+- State: assignment, alias/borrow, invalidation, ownership, resource lifetime,
+  string, and collection lower-bound families share canonical events; purity
+  symbolic facts are now query-only.
+- Last confirmed fact: focused assignment tests pass 122/122, MainSmtOracle
+  passes 573/573, and MainSmtAnalyzer passes 487/487 after deleting the legacy
+  string and assigned-length paths.
+- Next cheapest step: inventory the remaining mutation policy in
+  `SymbolicAssignmentStateTransfer` and the Analyzer purity-state partials, then
+  delete the smallest already-canonicalized branch.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
