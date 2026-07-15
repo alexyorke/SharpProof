@@ -10,7 +10,7 @@ internal partial class PropertyReferencePurityRule
         return propertySymbol.ContainingType?.TypeKind == TypeKind.Interface ||
                propertySymbol.IsAbstract ||
                (propertySymbol.GetMethod != null &&
-                DispatchedMemberResolution.IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation));
+                 DispatchedMemberResolution.IsPotentiallyDispatchedMethod(propertySymbol.GetMethod, compilation));
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedGetterPurity(

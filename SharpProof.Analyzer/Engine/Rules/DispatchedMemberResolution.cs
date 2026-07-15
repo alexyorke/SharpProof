@@ -11,37 +11,9 @@ internal static class DispatchedMemberResolution
         bool hasStableConcreteReceiver,
         Compilation compilation)
     {
-        if (propertySymbol.GetMethod == null) return null;
-
-        if (!IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation))
-            return propertySymbol.GetMethod.OriginalDefinition;
-
-        if (receiverType == null || !hasStableConcreteReceiver) return null;
-
-        if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
-        {
-            var implementation = receiverType.FindImplementationForInterfaceMember(propertySymbol) ??
-                                 receiverType.FindImplementationForInterfaceMember(propertySymbol.GetMethod);
-            return implementation switch
-            {
-                IPropertySymbol implementationProperty when implementationProperty.GetMethod != null =>
-                    implementationProperty.GetMethod.OriginalDefinition,
-                IMethodSymbol implementationMethod => implementationMethod.OriginalDefinition,
-                _ => null
-            };
-        }
-
-        var rootProperty = GetRootOverriddenProperty(propertySymbol);
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(receiverType))
-            foreach (var member in current.GetMembers(rootProperty.Name))
-                if (member is IPropertySymbol candidate &&
-                    (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition,
-                         rootProperty.OriginalDefinition) ||
-                     OverridesProperty(candidate, rootProperty)) &&
-                    candidate.GetMethod != null)
-                    return candidate.GetMethod.OriginalDefinition;
-
-        return propertySymbol.GetMethod.IsAbstract ? null : propertySymbol.GetMethod.OriginalDefinition;
+        return propertySymbol.GetMethod is { } getter
+            ? ResolveMethod(getter, receiverType, hasStableConcreteReceiver, compilation)
+            : null;
     }
 
     internal static IMethodSymbol? ResolveMethod(
@@ -137,20 +109,6 @@ internal static class DispatchedMemberResolution
         return receiverType;
     }
 
-    internal static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
-    {
-        if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-            getterSymbol.IsAbstract)
-            return true;
-
-        if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride) return false;
-
-        if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
-            return canBeOverridden;
-
-        return !getterSymbol.IsSealed;
-    }
-
     internal static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
     {
         if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
@@ -163,14 +121,6 @@ internal static class DispatchedMemberResolution
             return canBeOverridden;
 
         return !methodSymbol.IsSealed;
-    }
-
-    internal static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
-    {
-        var current = propertySymbol;
-        while (current.OverriddenProperty != null) current = current.OverriddenProperty;
-
-        return current.OriginalDefinition;
     }
 
     internal static IMethodSymbol GetRootOverriddenMethod(IMethodSymbol methodSymbol)

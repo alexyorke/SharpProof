@@ -162,10 +162,6 @@ Two switch arms (`List<T>`, `Array`) contain the identical 8-element method-name
 Three captured-escape checks inlined instead of reusing `CheckEscapingAnonymousFunction` (`:197`).
 **Recommendation:** Shared `CheckLocalFunctionCapturedEscape(...)`.
 
-### 4. Duplicated dispatch-resolution helpers - `DispatchedMemberResolution.cs`
-`IsPotentiallyDispatchedGetter` vs `IsPotentiallyDispatchedMethod`; `GetRootOverriddenProperty` vs `GetRootOverriddenMethod`;
-`ResolveGetter` vs `ResolveMethod` are getter/method pairs. **Recommendation:** Collapse via a generic parameterized helper.
-
 ### 5. Repeated base-type instance-method enumeration - `DisposalMemberClassifier.cs:25-31`, `EnumeratorRuntimeMemberClassifier.cs:133-138`, `DispatchedMemberResolution.cs:35-42,61-68`
 Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Recommendation:** Sibling helper `EnumerateBaseTypeInstanceMethods`.
 
