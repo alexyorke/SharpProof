@@ -109,10 +109,16 @@ public sealed class ScriptProcessOwnershipTests
                  })
         {
             var source = File.ReadAllText(Path.Combine(repositoryRoot, relativePath));
-            Assert.That(source, Does.Contain("DotnetSarifBuildRunner.RunAsync("), relativePath);
+            Assert.That(source, Does.Contain("using var materializedInputs = await " +
+                                             "DotnetSarifBuildRunner.MaterializeAsync("), relativePath);
+            Assert.That(source, Does.Not.Contain("DotnetSarifBuildRunner.RunAsync("), relativePath);
             Assert.That(source, Does.Not.Contain("Process.Start("), relativePath);
         }
 
+        Assert.That(runnerSource, Does.Contain("temporaryPaths.Add(sarifPath)"));
+        Assert.That(runnerSource, Does.Contain("catch"));
+        Assert.That(runnerSource, Does.Contain("DeleteAll(temporaryPaths)"));
+        Assert.That(runnerSource, Does.Contain("startInfo.ArgumentList.Add(\"--no-incremental\")"));
         Assert.That(runnerSource, Does.Contain("await process.WaitForExitAsync("));
         Assert.That(runnerSource, Does.Not.Contain("GetAwaiter().GetResult()"));
     }

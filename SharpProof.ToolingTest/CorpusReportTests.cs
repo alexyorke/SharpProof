@@ -477,6 +477,44 @@ public class CorpusReportTests
         Assert.That(result.StandardError, Does.Contain("Usage: SharpProof.CorpusReport"));
     }
 
+    [Test]
+    [NonParallelizable]
+    public async Task CorpusReportCli_ProjectAndSarifInputs_PreserveOrderAndCleanupMaterializedSarif()
+    {
+        var repositoryRoot = ReadmeExampleFixture.GetRepositoryRoot();
+        var projectPath = Path.Combine(repositoryRoot, "SharpProof.Attributes", "SharpProof.Attributes.csproj");
+        var sarifPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid() + ".sarif");
+        var temporarySarifBefore = Directory.GetFiles(Path.GetTempPath(), "sharpproof-*.sarif")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            File.WriteAllText(sarifPath, """
+                                             {
+                                               "version": "2.1.0",
+                                               "runs": [{ "results": [] }]
+                                             }
+                                             """);
+
+            var result = await RunCorpusReportCliAsync(sarifPath, projectPath);
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var report = JsonDocument.Parse(result.StandardOutput);
+            var inputs = report.RootElement.GetProperty("Inputs")
+                .EnumerateArray()
+                .Select(static input => input.GetString())
+                .ToArray();
+            Assert.That(inputs, Is.EqualTo(new[] { sarifPath, projectPath }));
+            Assert.That(
+                Directory.GetFiles(Path.GetTempPath(), "sharpproof-*.sarif")
+                    .Except(temporarySarifBefore, StringComparer.OrdinalIgnoreCase),
+                Is.Empty);
+        }
+        finally
+        {
+            File.Delete(sarifPath);
+        }
+    }
+
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunCorpusReportCliAsync(
         params string[] arguments)
     {

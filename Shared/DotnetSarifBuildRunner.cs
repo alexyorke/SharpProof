@@ -16,6 +16,7 @@ internal static class DotnetSarifBuildRunner
         };
         startInfo.ArgumentList.Add("build");
         startInfo.ArgumentList.Add(input);
+        startInfo.ArgumentList.Add("--no-incremental");
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("/p:ErrorLog=" + sarifPath);
 
@@ -55,14 +56,64 @@ internal static class DotnetSarifBuildRunner
                 output + Environment.NewLine + error);
     }
 
-    internal static void TryDelete(string path)
+    internal static async Task<MaterializedSarifInputs> MaterializeAsync(IEnumerable<string> inputs)
     {
+        var materialized = new List<MaterializedSarifInput>();
+        var temporaryPaths = new List<string>();
         try
         {
-            File.Delete(path);
+            foreach (var input in inputs)
+            {
+                if (!IsBuildInput(input))
+                {
+                    materialized.Add(new MaterializedSarifInput(input, input));
+                    continue;
+                }
+
+                var sarifPath = Path.Combine(Path.GetTempPath(),
+                    "sharpproof-" + Guid.NewGuid().ToString("N") + ".sarif");
+                temporaryPaths.Add(sarifPath);
+                await RunAsync(input, sarifPath);
+                materialized.Add(new MaterializedSarifInput(input, sarifPath));
+            }
+
+            return new MaterializedSarifInputs(materialized, temporaryPaths);
         }
         catch
         {
+            DeleteAll(temporaryPaths);
+            throw;
+        }
+    }
+
+    private static bool IsBuildInput(string input)
+    {
+        var extension = Path.GetExtension(input);
+        return string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static void DeleteAll(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+            }
         }
     }
 }
+
+internal sealed class MaterializedSarifInputs(IReadOnlyList<MaterializedSarifInput> inputs,
+    IReadOnlyList<string> temporaryPaths) : IDisposable
+{
+    internal IReadOnlyList<MaterializedSarifInput> Inputs { get; } = inputs;
+
+    public void Dispose() => DotnetSarifBuildRunner.DeleteAll(temporaryPaths);
+}
+
+internal readonly record struct MaterializedSarifInput(string InputName, string SarifPath);

@@ -20,40 +20,19 @@ if (options.ShowHelp || options.Inputs.Count == 0)
     return options.ShowHelp ? 0 : 1;
 }
 
-var sarifInputs = new List<SarifCorpusInput>();
-var temporaryFiles = new List<string>();
-try
-{
-    foreach (var input in options.Inputs)
-    {
-        var extension = Path.GetExtension(input);
-        if (string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase))
-        {
-            var sarifPath = Path.Combine(Path.GetTempPath(), "sharpproof-" + Guid.NewGuid().ToString("N") + ".sarif");
-            temporaryFiles.Add(sarifPath);
-            await DotnetSarifBuildRunner.RunAsync(input, sarifPath);
-            sarifInputs.Add(new SarifCorpusInput(input, sarifPath));
-        }
-        else
-        {
-            sarifInputs.Add(new SarifCorpusInput(input, input));
-        }
-    }
+using var materializedInputs = await DotnetSarifBuildRunner.MaterializeAsync(options.Inputs);
+var sarifInputs = materializedInputs.Inputs
+    .Select(static input => new SarifCorpusInput(input.InputName, input.SarifPath))
+    .ToArray();
 
-    var report = SarifCorpusReport.CreateFromSarifFiles(sarifInputs);
-    var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
-    if (options.OutputPath is null)
-        Console.WriteLine(json);
-    else
-        File.WriteAllText(options.OutputPath, json);
+var report = SarifCorpusReport.CreateFromSarifFiles(sarifInputs);
+var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+if (options.OutputPath is null)
+    Console.WriteLine(json);
+else
+    File.WriteAllText(options.OutputPath, json);
 
-    return 0;
-}
-finally
-{
-    foreach (var temporaryFile in temporaryFiles) DotnetSarifBuildRunner.TryDelete(temporaryFile);
-}
+return 0;
 
 static void WriteUsage()
 {
