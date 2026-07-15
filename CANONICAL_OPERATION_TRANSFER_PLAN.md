@@ -404,7 +404,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed loop transfer plan | `341eac5b` | 106,234 | -1,442 |
 | Phase 7 bounded while-loop revisits | `21ebedb1` | 106,324 | -1,352 |
 | Phase 7 bounded do-loop revisits | `f0a1f91d` | 106,361 | -1,315 |
-| Phase 7 bounded counted-for revisits | pending | 106,421 | -1,255 |
+| Phase 7 bounded counted-for revisits | `f596da0c` | 106,421 | -1,255 |
 
 ## Validation Ledger
 
@@ -539,7 +539,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed loop transfer plan | Commit `341eac5b` lowers while, do, and for entry/exit conditions, structural invariants, and local/parameter back-edge invalidation targets into one typed result. Foreach and unsupported mutation targets remain conservative fallbacks. Focused loop/program-point fixtures pass 153/153 and full MainSmtOracle passes 573/573. Production LOC is 106,234, or -1,442 from the rewrite start; test LOC is 142,691. |
 | Phase 7 bounded while-loop revisits | Commit `21ebedb1` consumes mutation-independent while-loop plans at backward CFG edges, invalidates every loop-carried target before merging, and terminates revisits on normalized state identity under a graph-size budget. Three broader reproductions exposed unsound abrupt-exit handling and two deliberate do/for invariant differences; those shapes now remain typed fallbacks. Focused loop/program-point/transfer fixtures pass 197/197, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,324, or -1,352 from the rewrite start; test LOC is 142,736. |
 | Phase 7 bounded do-loop revisits | Commit `f0a1f91d` routes mutation-independent do-loop back edges through the bounded worklist and invalidates loop-carried targets on the guaranteed-body exit edge, matching the structural collector's deliberately conservative state. Focused loop/program-point/transfer fixtures pass 197/197 and full MainSmtOracle passes 573/573. Production LOC is 106,361, or -1,315 from the rewrite start; test LOC is 142,756. |
-| Phase 7 bounded counted-for revisits | Pending commit reapplies typed monotonic initializer invariants after loop-carried invalidation and on exit, then routes counted-for back edges through the bounded worklist. The full Flow lane exposed two earlier acyclic parity leaks; nullable reassignment and guarded reference projection now return typed fallback, restoring the recorded 256-pass/1-baseline-failure result. Focused loop/program-point/transfer fixtures pass 199/199, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,421, or -1,255 from the rewrite start; test LOC is 142,780. |
+| Phase 7 bounded counted-for revisits | Commit `f596da0c` reapplies typed monotonic initializer invariants after loop-carried invalidation and on exit, then routes counted-for back edges through the bounded worklist. The full Flow lane exposed two earlier acyclic parity leaks; nullable reassignment and guarded reference projection now return typed fallback, restoring the recorded 256-pass/1-baseline-failure result. Focused loop/program-point/transfer fixtures pass 199/199, full MainSmtOracle passes 573/573, and the Release Symbolic warning-as-error build has zero warnings. Production LOC is 106,421, or -1,255 from the rewrite start; test LOC is 142,780. |
 
 ## Current Checkpoint
 
