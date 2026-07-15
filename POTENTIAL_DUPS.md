@@ -153,14 +153,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## Analyzer Engine - A-H
 
-### 1. Duplicated BCL delegate-invoking method-name lists - `DelegateInvocationPurity.cs:149-177`
-Two switch arms (`List<T>`, `Array`) contain the identical 8-element method-name list.
-**Recommendation:** Single `static readonly` set / `IsKnownDelegateInvokingBclMethodName`.
-
-### 2. Inlined captured-escape checks duplicate existing helper - `DelegateCreationPurityRule.cs:95-141` vs `:162-195`
-Three captured-escape checks inlined instead of reusing `CheckEscapingAnonymousFunction` (`:197`).
-**Recommendation:** Shared `CheckLocalFunctionCapturedEscape(...)`.
-
 ### 5. Repeated base-type instance-method enumeration - `DisposalMemberClassifier.cs:25-31`, `EnumeratorRuntimeMemberClassifier.cs:133-138`, `DispatchedMemberResolution.cs:35-42,61-68`
 Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Recommendation:** Sibling helper `EnumerateBaseTypeInstanceMethods`.
 

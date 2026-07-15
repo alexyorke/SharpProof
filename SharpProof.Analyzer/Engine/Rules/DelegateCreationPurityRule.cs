@@ -92,52 +92,30 @@ internal class DelegateCreationPurityRule : IPurityRule
                 var methodResult = PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, delegateCreation.Syntax, context);
                 if (!methodResult.IsPure) return methodResult;
 
-                if (IsEscapingDelegateCreation(delegateCreation) &&
-                    targetMethod.MethodKind == MethodKind.LocalFunction &&
-                    TryFindLocalFunctionCapturedLocalMutation(targetMethod, context, out var mutationSyntax,
+                if (targetMethod.MethodKind != MethodKind.LocalFunction) continue;
+
+                if (TryFindLocalFunctionCapturedLocalMutation(targetMethod, context, out var mutationSyntax,
                         out var mutatedLocal))
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        mutationSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            nameof(DelegateCreationPurityRule),
-                            delegateCreation,
-                            mutationSyntax,
-                            mutatedLocal,
-                            "escaping_closure_mutation"));
+                    return CreateMutableStateEscapeResult(
+                        delegateCreation, mutationSyntax, mutatedLocal, "escaping_closure_mutation");
 
-                if (IsEscapingDelegateCreation(delegateCreation) &&
-                    targetMethod.MethodKind == MethodKind.LocalFunction &&
-                    TryFindLocalFunctionCapturedOwnedLocalArray(targetMethod, context, currentState,
+                if (TryFindLocalFunctionCapturedOwnedLocalArray(targetMethod, context, currentState,
                         out var captureSyntax, out var capturedArrayLocal))
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        captureSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            nameof(DelegateCreationPurityRule),
-                            delegateCreation,
-                            captureSyntax,
-                            capturedArrayLocal,
-                            "escaping_closure_owned_array_capture"));
+                    return CreateMutableStateEscapeResult(
+                        delegateCreation, captureSyntax, capturedArrayLocal, "escaping_closure_owned_array_capture");
 
-                if (IsEscapingDelegateCreation(delegateCreation) &&
-                    targetMethod.MethodKind == MethodKind.LocalFunction &&
-                    TryFindLocalFunctionCapturedFreshMutableObject(
+                if (TryFindLocalFunctionCapturedFreshMutableObject(
                         targetMethod,
                         currentState,
                         delegateCreation.Syntax,
                         context,
                         out var objectCaptureSyntax,
                         out var capturedObjectLocal))
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        delegateCreation,
                         objectCaptureSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            nameof(DelegateCreationPurityRule),
-                            delegateCreation,
-                            objectCaptureSyntax,
-                            capturedObjectLocal,
-                            "escaping_closure_fresh_mutable_object_capture"));
+                        capturedObjectLocal,
+                        "escaping_closure_fresh_mutable_object_capture");
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;

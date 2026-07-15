@@ -149,9 +149,9 @@ internal static class DelegateInvocationPurity
     private static bool IsKnownDelegateInvokingBclMethod(IMethodSymbol methodSymbol)
     {
         var typeDefinition = methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
-        return typeDefinition switch
-        {
-            "System.Collections.Generic.List<T>" => methodSymbol.Name is
+        if (typeDefinition is not ("System.Collections.Generic.List<T>" or "System.Array")) return false;
+
+        return methodSymbol.Name is
                 "ConvertAll" or
                 "Exists" or
                 "Find" or
@@ -160,19 +160,7 @@ internal static class DelegateInvocationPurity
                 "FindLast" or
                 "FindLastIndex" or
                 "ForEach" or
-                "RemoveAll" or
-                "TrueForAll",
-            "System.Array" => methodSymbol.Name is
-                "ConvertAll" or
-                "Exists" or
-                "Find" or
-                "FindAll" or
-                "FindIndex" or
-                "FindLast" or
-                "FindLastIndex" or
-                "ForEach" or
-                "TrueForAll",
-            _ => false
-        };
+                "TrueForAll" ||
+               typeDefinition == "System.Collections.Generic.List<T>" && methodSymbol.Name == "RemoveAll";
     }
 }
