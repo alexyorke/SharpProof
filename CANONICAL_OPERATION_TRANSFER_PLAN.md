@@ -138,7 +138,7 @@ transfer policy after its slice is complete.
 
 ## Phase 3 - Branches, Loops, Merge, And Completion
 
-- [ ] Migrate boolean branch assumptions and conditional/coalesce flow.
+- [x] Migrate boolean branch assumptions and conditional/coalesce flow.
 - [ ] Migrate switch statement/expression branch selection and merging.
 - [ ] Migrate loop entry/back-edge/exit transitions and bounded fixed points.
 - [ ] Migrate try/catch/finally, exceptional completion, and reachability.
@@ -226,6 +226,7 @@ transfer policy after its slice is complete.
 | Kernel-derived assignment bounds | `5e144264` | 107,990 | +314 |
 | Nullable snapshot operations | `0b1cfa4c` | 107,987 | +311 |
 | Explicit-target assignment operations | `a92660db` | 107,986 | +310 |
+| Canonical branch assumptions | `d68de6ab` | 107,939 | +263 |
 
 ## Validation Ledger
 
@@ -259,19 +260,20 @@ transfer policy after its slice is complete.
 | Phase 2 kernel-derived assignment bounds | Commit `5e144264` makes canonical bindings derive positive, nonnegative, and remainder bounds from the pre-state, routes self-referential integer updates through the same binding path, moves the not-null-if-not-null implication into canonical lowering, and deletes the parallel post-assignment proof walkers. Focused nullability/range/self-reference tests: 189 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,990, or +314 from the rewrite start. |
 | Phase 2 nullable snapshot operations | Commit `0b1cfa4c` represents nullable source/target term pairs as assignment-operation propagations and removes the final post-kernel nullable snapshot mutator. Focused nullable/path/transfer tests: 155 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Production LOC fell to 107,987, or +311 from the rewrite start. |
 | Phase 2 explicit-target assignments and gate | Commit `a92660db` routes current-instance member and element writes through explicit-target assignment operations, preserves the caller-owned invalidation boundary, and deletes both legacy state mutators. Focused member/element/path/transfer tests: 183 passed; full MainSmtOracle: 573 passed; full MainSmtAnalyzer: 487 passed. Exact search finds no migrated assignment mutator or tracked-assignment interpreter. The Phase 2 peak of 108,501 fell by 515 production lines to 107,986; canonical scaffolding remains +310 from the rewrite start and must be repaid by later legacy-engine deletions. |
+| Phase 3 canonical branch assumptions | Commit `d68de6ab` routes generic Boolean and reference-null assumptions through `SymbolicBranchAssumptionOperation`, replaces branch-state lowering with one condition result, and removes the redundant null-feasibility probes from coalesce and conditional-access analysis. Focused CFG/null/path/operation tests: 105 passed; Release solution build: zero warnings; MainSmtOracle: 573 passed; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed and only the documented baseline SP0010 failure. Production LOC fell to 107,939, or +263 from the rewrite start. |
 
 ## Current Checkpoint
 
 - Last updated: 2026-07-15.
-- State: Phase 2 is gated. Assignment, aliasing, invalidation, and lifetime
-  mutations use canonical events; remaining assignment-file code is source
-  ordering, deconstruction pairing, self-reference lowering, or Phase 3
-  throw/switch completion. Purity symbolic facts are query-only.
-- Last confirmed fact: focused member/element/path/transfer tests pass 183/183,
-  MainSmtOracle passes 573/573, and MainSmtAnalyzer passes 487/487. No migrated
-  assignment mutator or tracked-assignment interpreter remains reachable.
-- Next cheapest step: migrate boolean branch assumptions and conditional/coalesce
-  flow into canonical branch-assumption operations, starting with the shared
-  condition-to-state transition used by Symbolic and Analyzer CFG consumers.
+- State: Phase 2 is gated, and Boolean/reference-null branch assumptions plus
+  conditional/coalesce flow use canonical branch events. Remaining assignment
+  code is source ordering, deconstruction pairing, self-reference lowering, or
+  Phase 3 throw/switch completion. Purity symbolic facts are query-only.
+- Last confirmed fact: focused CFG/null/path/operation tests pass 105/105,
+  MainSmtOracle passes 573/573, MainSmtAnalyzer passes 487/487, and MainSmtFlow
+  matches its 256-pass/one-baseline-failure result after canonical branch events.
+- Next cheapest step: migrate switch statement/expression branch selection and
+  merging, beginning with the duplicated conditional fact-choice builders in
+  assignment completion and switch completion.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
