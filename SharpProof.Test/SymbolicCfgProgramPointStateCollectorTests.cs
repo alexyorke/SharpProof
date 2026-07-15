@@ -137,6 +137,32 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [Test]
+    public void AllPathsComplete_MatchesStructuralUnreachableState()
+    {
+        const string source = "static class C { static int M(bool stop) { int value = 0; if (stop) return 1; else return 2; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AllPathsComplete_MatchesStructuralUnreachableState));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Last();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(actual.Value.IsContradictory, Is.True);
+    }
+
+    [Test]
     public void LoopBackEdge_RemainsConservativeFallback()
     {
         const string source = "static class C { static int M(int count) { int value = 0; while (count-- > 0) value = 1; return value; } }";

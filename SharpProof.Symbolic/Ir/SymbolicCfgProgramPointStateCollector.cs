@@ -52,6 +52,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         };
         var queue = new Queue<BasicBlock>();
         var queued = new HashSet<int> { 0 };
+        var completedPaths = new List<CfgPathState>();
         queue.Enqueue(graph.Blocks[0]);
         SymbolicState? targetState = null;
         SymbolicState? guardedTargetState = null;
@@ -116,11 +117,20 @@ internal static class SymbolicCfgProgramPointStateCollector
                     cancellationToken,
                     incoming,
                     queue,
-                    queued))
+                    queued,
+                    completedPaths))
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
         targetState ??= guardedTargetState;
+        if (targetState == null &&
+            queue.Count == 0 &&
+            completedPaths.Count != 0 &&
+            IsUnreachableTarget(graph, site))
+        {
+            var completedState = MergeIncomingStates(completedPaths, site).State;
+            targetState = SymbolicOperationTransferKernel.Complete(completedState, site.Span).State;
+        }
         return targetState == null || queue.Count != 0
             ? Unsupported(site, queue.Count == 0 ? "target-block" : "iteration-limit")
             : Exact(targetState, site);
@@ -133,7 +143,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         CancellationToken cancellationToken,
         IDictionary<int, List<CfgPathState>> incoming,
         Queue<BasicBlock> queue,
-        ISet<int> queued)
+        ISet<int> queued,
+        ICollection<CfgPathState> completedPaths)
     {
         if (block.ConditionKind != ControlFlowConditionKind.None)
         {
@@ -165,14 +176,16 @@ internal static class SymbolicCfgProgramPointStateCollector
                        new CfgPathState(conditionalState, path.State, conditionalGuard, false),
                        incoming,
                        queue,
-                       queued) &&
+                       queued,
+                       completedPaths) &&
                    TryPropagate(
                        block,
                        block.FallThroughSuccessor,
                        new CfgPathState(fallThroughState, path.State, fallThroughGuard, false),
                        incoming,
                        queue,
-                       queued);
+                       queued,
+                       completedPaths);
         }
 
         return TryPropagate(
@@ -181,14 +194,16 @@ internal static class SymbolicCfgProgramPointStateCollector
                    path,
                    incoming,
                    queue,
-                   queued) &&
+                   queued,
+                   completedPaths) &&
                TryPropagate(
                    block,
                    block.ConditionalSuccessor,
                    path,
                    incoming,
                    queue,
-                   queued);
+                   queued,
+                   completedPaths);
     }
 
     private static bool TryCreateBranchState(
@@ -228,8 +243,16 @@ internal static class SymbolicCfgProgramPointStateCollector
         CfgPathState path,
         IDictionary<int, List<CfgPathState>> incoming,
         Queue<BasicBlock> queue,
-        ISet<int> queued)
+        ISet<int> queued,
+        ICollection<CfgPathState> completedPaths)
     {
+        if (branch is { Semantics: not ControlFlowBranchSemantics.Regular })
+        {
+            if (!branch.FinallyRegions.IsDefaultOrEmpty)
+                return false;
+            completedPaths.Add(path);
+            return true;
+        }
         if (branch == null || branch.Destination == null)
             return true;
         if (!branch.FinallyRegions.IsDefaultOrEmpty || branch.Destination.Ordinal <= source.Ordinal)
@@ -256,6 +279,12 @@ internal static class SymbolicCfgProgramPointStateCollector
             queue.Enqueue(destination);
         return true;
     }
+
+    private static bool IsUnreachableTarget(ControlFlowGraph graph, SyntaxNode site) =>
+        graph.Blocks.Any(block =>
+            !block.IsReachable &&
+            (block.Operations.Any(operation => ContainsSite(operation.Syntax, site)) ||
+             block.BranchValue != null && ContainsSite(block.BranchValue.Syntax, site)));
 
     private static CfgPathState MergeIncomingStates(
         IReadOnlyList<CfgPathState> paths,
