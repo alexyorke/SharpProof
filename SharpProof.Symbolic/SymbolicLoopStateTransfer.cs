@@ -17,7 +17,7 @@ internal static class SymbolicLoopStateTransfer
         out SymbolicTerm bound,
         out IReadOnlyList<ISymbol> boundSymbols);
 
-    internal static void AddForLoopBodyInvariantStateFacts(
+    private static void AddForLoopBodyInvariantStateFacts(
         ref SymbolicState state,
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -59,7 +59,7 @@ internal static class SymbolicLoopStateTransfer
             cancellationToken);
     }
 
-    internal static void AddPreLoopBodyInvariantStateFacts(
+    private static void AddPreLoopBodyInvariantStateFacts(
         ref SymbolicState state,
         StatementSyntax loopStatement,
         StatementSyntax loopBody,
@@ -421,6 +421,83 @@ internal static class SymbolicLoopStateTransfer
             semanticModel,
             cancellationToken);
     }
+
+    internal static bool TryApplyLoopBodyEntryStateFacts(
+        ref SymbolicState state,
+        SyntaxNode candidate,
+        int? siteSpanStart,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        switch (candidate)
+        {
+            case WhileStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
+                if (!ReferencesAreAssignedBeforeSite(loop.Condition, loop.Statement, siteSpanStart, semanticModel, cancellationToken))
+                {
+                    SymbolicProgramPointFacts.AddReachabilityCondition(
+                        ref state, loop.Condition, true, semanticModel, cancellationToken);
+                    ApplyLoopBodyInvariantStateFacts(
+                        ref state, loop, SymbolicLoopEdgeKind.Entry, semanticModel, cancellationToken);
+                }
+                return true;
+            case DoStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
+                ApplyLoopBodyInvariantStateFacts(
+                    ref state, loop, SymbolicLoopEdgeKind.Entry, semanticModel, cancellationToken);
+                return true;
+            case ForStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
+                if (loop.Condition != null &&
+                    !ReferencesAreAssignedBeforeSite(loop.Condition, loop.Statement, siteSpanStart, semanticModel, cancellationToken))
+                    SymbolicProgramPointFacts.AddReachabilityCondition(
+                        ref state, loop.Condition, true, semanticModel, cancellationToken);
+                ApplyLoopBodyInvariantStateFacts(
+                    ref state, loop, SymbolicLoopEdgeKind.Entry, semanticModel, cancellationToken);
+                return true;
+            case ForEachStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
+                if (!ReferencesAreAssignedBeforeSite(loop.Expression, loop.Statement, siteSpanStart, semanticModel, cancellationToken))
+                    AddForeachBodyEntryStateFacts(
+                        ref state, loop.Expression, loop, loop.Statement, semanticModel, cancellationToken);
+                return true;
+            case ForEachVariableStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
+                if (!ReferencesAreAssignedBeforeSite(loop.Expression, loop.Statement, siteSpanStart, semanticModel, cancellationToken))
+                    AddForeachBodyEntryStateFacts(
+                        ref state, loop.Expression, loop, loop.Statement, semanticModel, cancellationToken);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    internal static void ApplyLoopBodyInvariantStateFacts(
+        ref SymbolicState state,
+        StatementSyntax loopStatement,
+        SymbolicLoopEdgeKind edgeKind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        foreach (var condition in CollectLoopBodyInvariantState(loopStatement, semanticModel, cancellationToken).PathConditions)
+            state = SymbolicOperationTransferKernel.TransitionLoopEdge(
+                state,
+                edgeKind,
+                condition,
+                loopStatement.Span,
+                "ir.path.loop-invariant").State;
+    }
+
+    private static bool ContainsSite(StatementSyntax body, int? siteSpanStart) =>
+        !siteSpanStart.HasValue || body.Span.Contains(siteSpanStart.Value);
+
+    private static bool ReferencesAreAssignedBeforeSite(
+        ExpressionSyntax expression,
+        StatementSyntax body,
+        int? siteSpanStart,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
+        siteSpanStart.HasValue && AnyReferencedSymbolAssignedBeforeUse(
+            expression,
+            body,
+            siteSpanStart.Value,
+            semanticModel,
+            cancellationToken);
 
     private static void AddFiniteForeachIterationStateFact(
         ref SymbolicState state,

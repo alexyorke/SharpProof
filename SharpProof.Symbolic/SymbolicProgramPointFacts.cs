@@ -263,88 +263,13 @@ internal static class SymbolicProgramPointFacts
                         cancellationToken);
                 }
             }
-            else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
-                     whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                         whileStatementSyntax.Condition,
-                         whileStatementSyntax.Statement,
+            else if (SymbolicLoopStateTransfer.TryApplyLoopBodyEntryStateFacts(
+                         ref state,
+                         ancestor,
                          syntaxNode.SpanStart,
                          semanticModel,
                          cancellationToken))
             {
-                AddReachabilityCondition(ref state, whileStatementSyntax.Condition, true, semanticModel,
-                    cancellationToken);
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    whileStatementSyntax,
-                    whileStatementSyntax.Statement,
-                    "ir.path.while-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is DoStatementSyntax doStatementSyntax &&
-                     doStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    doStatementSyntax,
-                    doStatementSyntax.Statement,
-                    "ir.path.do-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is ForStatementSyntax forStatementSyntax &&
-                     forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                if (forStatementSyntax.Condition != null &&
-                    !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                        forStatementSyntax.Condition,
-                        forStatementSyntax.Statement,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken))
-                    AddReachabilityCondition(ref state, forStatementSyntax.Condition, true, semanticModel,
-                        cancellationToken);
-
-                SymbolicLoopStateTransfer.AddForLoopBodyInvariantStateFacts(
-                    ref state,
-                    forStatementSyntax,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
-                     forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                         forEachStatementSyntax.Expression,
-                         forEachStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                SymbolicLoopStateTransfer.AddForeachBodyEntryStateFacts(
-                    ref state,
-                    forEachStatementSyntax.Expression,
-                    forEachStatementSyntax,
-                    forEachStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is ForEachVariableStatementSyntax forEachVariableStatementSyntax &&
-                     forEachVariableStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                         forEachVariableStatementSyntax.Expression,
-                         forEachVariableStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                SymbolicLoopStateTransfer.AddForeachBodyEntryStateFacts(
-                    ref state,
-                    forEachVariableStatementSyntax.Expression,
-                    forEachVariableStatementSyntax,
-                    forEachVariableStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
             }
             else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
             {

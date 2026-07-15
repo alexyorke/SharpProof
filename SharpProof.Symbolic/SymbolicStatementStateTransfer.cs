@@ -305,11 +305,10 @@ internal static class SymbolicStatementStateTransfer
                         cancellationToken))
                     return false;
 
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
+                SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
                     ref state,
                     whileStatement,
-                    whileStatement.Statement,
-                    "ir.path.while-loop-invariant",
+                    SymbolicLoopEdgeKind.Entry,
                     semanticModel,
                     cancellationToken);
                 return true;
@@ -323,9 +322,10 @@ internal static class SymbolicStatementStateTransfer
                         cancellationToken))
                     return false;
 
-                SymbolicLoopStateTransfer.AddForLoopBodyInvariantStateFacts(
+                SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
                     ref state,
                     forStatement,
+                    SymbolicLoopEdgeKind.Entry,
                     semanticModel,
                     cancellationToken);
                 return true;
@@ -376,6 +376,14 @@ internal static class SymbolicStatementStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (SymbolicLoopStateTransfer.TryApplyLoopBodyEntryStateFacts(
+                ref state,
+                block.Parent!,
+                siteSpanStart: null,
+                semanticModel,
+                cancellationToken))
+            return;
+
         switch (block.Parent)
         {
             case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
@@ -384,54 +392,6 @@ internal static class SymbolicStatementStateTransfer
             case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
                 when ReferenceEquals(statement, block):
                 SymbolicProgramPointFacts.AddReachabilityCondition(ref state, ifStatement.Condition, false, semanticModel, cancellationToken);
-                break;
-            case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
-                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, whileStatement.Condition, true, semanticModel, cancellationToken);
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    whileStatement,
-                    whileStatement.Statement,
-                    "ir.path.while-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case DoStatementSyntax doStatement when ReferenceEquals(doStatement.Statement, block):
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    doStatement,
-                    doStatement.Statement,
-                    "ir.path.do-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
-                if (forStatement.Condition != null)
-                    SymbolicProgramPointFacts.AddReachabilityCondition(ref state, forStatement.Condition, true, semanticModel, cancellationToken);
-
-                SymbolicLoopStateTransfer.AddForLoopBodyInvariantStateFacts(
-                    ref state,
-                    forStatement,
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case ForEachStatementSyntax forEachStatement when ReferenceEquals(forEachStatement.Statement, block):
-                SymbolicLoopStateTransfer.AddForeachBodyEntryStateFacts(
-                    ref state,
-                    forEachStatement.Expression,
-                    forEachStatement,
-                    forEachStatement.Statement,
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case ForEachVariableStatementSyntax forEachVariableStatement
-                when ReferenceEquals(forEachVariableStatement.Statement, block):
-                SymbolicLoopStateTransfer.AddForeachBodyEntryStateFacts(
-                    ref state,
-                    forEachVariableStatement.Expression,
-                    forEachVariableStatement,
-                    forEachVariableStatement.Statement,
-                    semanticModel,
-                    cancellationToken);
                 break;
         }
     }

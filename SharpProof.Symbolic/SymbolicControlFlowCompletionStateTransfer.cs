@@ -109,33 +109,13 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         ref SymbolicState state,
         StatementSyntax loopStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (loopStatement)
-        {
-            case ForStatementSyntax forStatement:
-                SymbolicLoopStateTransfer.AddForLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-                break;
-            case WhileStatementSyntax whileStatement:
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    whileStatement,
-                    whileStatement.Statement,
-                    "ir.path.while-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case DoStatementSyntax doStatement:
-                SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts(
-                    ref state,
-                    doStatement,
-                    doStatement.Statement,
-                    "ir.path.do-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-        }
-    }
+        CancellationToken cancellationToken) =>
+        SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
+            ref state,
+            loopStatement,
+            SymbolicLoopEdgeKind.Exit,
+            semanticModel,
+            cancellationToken);
 
     private static void AddCompletedForeachStatementStateFacts(
         ref SymbolicState state,
