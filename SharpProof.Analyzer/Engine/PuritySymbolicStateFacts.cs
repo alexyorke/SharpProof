@@ -298,38 +298,18 @@ internal static class PuritySymbolicStateFacts
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var nextState = AddAssignedAliasFact(
+        if (valueOperation?.Syntax is not ExpressionSyntax)
+            return AddAssignedAliasFact(currentState, targetSymbol, valueOperation, valueState);
+
+        var nextState = PurityOperationTransferAdapter.ApplyAssignment(
             currentState,
             targetSymbol,
             valueOperation,
-            valueState);
-        if (valueOperation?.Syntax is not ExpressionSyntax valueExpression) return nextState;
-        var trackedType = SymbolicFactFactory.GetTrackedSymbolType(targetSymbol);
-        if (trackedType != null &&
-            (trackedType.SpecialType == SpecialType.System_Boolean ||
-             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(trackedType)))
-        {
-            nextState = PurityOperationTransferAdapter.ApplyAssignment(
-                nextState,
-                targetSymbol,
-                valueOperation,
-                semanticModel,
-                cancellationToken,
-                valueState,
-                out _);
-        }
-
-        var pathState = nextState.PathState;
-        SymbolicTrackedAssignmentStateTransfer.AddFacts(
-            ref pathState,
-            targetSymbol,
-            valueExpression,
             semanticModel,
             cancellationToken,
-            currentState.GetSmtSymbolVersion,
-            valueState.GetSmtSymbolVersion,
-            "analyzer.assignment");
-        return nextState.WithPathState(pathState);
+            valueState,
+            out _);
+        return AddAssignedAliasFact(nextState, targetSymbol, valueOperation, valueState);
     }
 
     internal static PurityAnalysisState AddAssignedAliasFact(
