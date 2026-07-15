@@ -35,7 +35,7 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static INamedTypeSymbol? GetKnownReceiverType(IOperation? invocationInstance)
+    internal static INamedTypeSymbol? GetKnownReceiverType(IOperation? invocationInstance)
     {
         var current = invocationInstance;
 

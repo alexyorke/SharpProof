@@ -26,7 +26,7 @@ internal partial class PropertyReferencePurityRule
 
         var knownReceiverType = hasExactReceiverType
             ? exactReceiverType
-            : PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance);
+            : MethodInvocationPurityRule.GetKnownReceiverType(propertyReferenceOperation.Instance);
 
         if (hasExactReceiverType && knownReceiverType != null)
         {

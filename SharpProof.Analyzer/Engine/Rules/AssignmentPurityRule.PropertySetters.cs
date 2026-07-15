@@ -49,7 +49,7 @@ internal partial class AssignmentPurityRule : IPurityRule
             context,
             GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState,
                 context.SemanticModel.Compilation) ??
-            PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance),
+            MethodInvocationPurityRule.GetKnownReceiverType(propertyReferenceOperation.Instance),
             false,
             true,
             nameof(AssignmentPurityRule));

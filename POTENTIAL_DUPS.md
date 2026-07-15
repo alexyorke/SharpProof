@@ -173,17 +173,6 @@ Same `EnumerateBaseTypes` + `GetMembers` + `HashSet<IMethodSymbol>` dedupe. **Re
 
 ## Analyzer Engine - I-P
 
-### Dispatch-target resolution duplicated between method and property calls
-`MethodInvocationPurityRule.DispatchTargets.cs:9` (`ResolvePotentialDispatchTargets`) and
-`PropertyAccessorDispatchTargetResolver.cs:44` (`ResolvePotentialTargets`) implement the same type-hierarchy
-interface-impl/virtual-override algorithm twice.
-
-**Recommendation:** Single generic `DispatchTargetResolver.ResolveTargets(IMethodSymbol, SemanticModel, INamedTypeSymbol?, bool hasExactReceiverType, bool useSetter, CancellationToken)`.
-
-### Two `GetKnownReceiverType` helpers overlap
-`PropertyDispatchHelper.cs:8` is a stripped-down subset of `MethodInvocationPurityRule.DispatchReceivers.cs:38`.
-**Recommendation:** Keep one authoritative version; `PropertyDispatchHelper` delegates to it.
-
 ### Repeated "create term + add fresh-ownership facts" boilerplate - `PurityResourceStateFacts.cs:366,384,407`
 `AddOwnedLocalArrayFacts`/`AddFreshMutableObjectFacts`/`AddOwnedDisposableLocalFacts` repeat the same
 `CreateSymbolicReferenceTerm` -> `AddFact` loop -> `WithPathState`.
