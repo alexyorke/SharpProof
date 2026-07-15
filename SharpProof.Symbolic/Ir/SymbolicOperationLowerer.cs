@@ -51,7 +51,9 @@ internal static class SymbolicOperationLowerer
         SymbolicLoweringContext targetContext,
         SymbolicLoweringContext valueContext,
         int sequence,
-        string provenance)
+        string provenance,
+        string? bindingProvenance = null,
+        string? evidenceKey = null)
     {
         if (!TryCreateSymbolTerm(targetSymbol, targetContext, out var target) ||
             valueOperation.Syntax is not ExpressionSyntax valueExpression)
@@ -72,7 +74,9 @@ internal static class SymbolicOperationLowerer
                 new SymbolicAssignmentBinding(
                     SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
                     target,
-                    sourceTerm)),
+                    sourceTerm,
+                    bindingProvenance,
+                    evidenceKey)),
             System.Collections.Immutable.ImmutableArray<SymbolicCondition>.Empty,
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
@@ -103,7 +107,8 @@ internal static class SymbolicOperationLowerer
                 new SymbolicAssignmentBinding(
                     SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition),
                     target,
-                    sourceTerm));
+                    sourceTerm,
+                    provenance));
         var origin = new SymbolicOperationOrigin(source.Span, sequence, provenance);
         SymbolicOperationDescriptor operation = updateKind switch
         {

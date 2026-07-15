@@ -44,7 +44,9 @@ internal static class PurityOperationTransferAdapter
             cancellationToken,
             state.GetSmtSymbolVersion,
             valueState.GetSmtSymbolVersion,
-            provenance: "analyzer.assignment");
+            provenance: "analyzer.assignment",
+            bindingProvenance: "analyzer.assignment",
+            evidenceKey: "analyzer.assignment.value");
         return transition.IsUnsupported
             ? state
             : state.WithPathState(transition.State);

@@ -46,9 +46,6 @@ internal static class SymbolicExpressionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (SymbolicAssignmentStateTransfer.TryHandleTupleDeconstructionDeclarationState(ref state, assignment, semanticModel, cancellationToken))
-            return;
-
         if (SymbolicAssignmentStateTransfer.TryHandleTupleAssignmentState(ref state, assignment, semanticModel, cancellationToken)) return;
 
         var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;

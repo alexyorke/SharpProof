@@ -72,10 +72,10 @@ internal static class SymbolicOperationTransferKernel
                     binding.Source),
                 true,
                 SymbolicFactConfidence.Exact,
-                origin.Provenance + ".value",
+                binding.Provenance ?? origin.Provenance + ".value",
                 origin.SourceSpan,
                 null,
-                origin.Provenance + ".value")));
+                binding.EvidenceKey)));
         }
 
         return true;

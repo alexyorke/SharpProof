@@ -124,7 +124,8 @@ internal static class SymbolicAssignmentStateTransfer
                 effectiveValueExpression,
                 semanticModel,
                 cancellationToken,
-                provenance: provenanceRoot);
+                provenance: provenanceRoot,
+                bindingProvenance: provenanceRoot + ".assigned-value");
             if (transition.IsExact)
                 state = transition.State;
         }
@@ -1475,68 +1476,6 @@ internal static class SymbolicAssignmentStateTransfer
         }
     }
 
-    private static bool TryPrepareTupleDeconstructionDeclarationTargets(
-        AssignmentExpressionSyntax assignment,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out bool isDeconstructionDeclaration,
-        out List<ISymbol?> targetSymbols)
-    {
-        isDeconstructionDeclaration = false;
-        targetSymbols = new List<ISymbol?>();
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
-            declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation)
-            return false;
-
-        isDeconstructionDeclaration = true;
-        foreach (var variableDesignation in leftDesignation.Variables)
-        {
-            if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation) return false;
-
-            if (singleVariableDesignation.Identifier.ValueText == "_")
-            {
-                targetSymbols.Add(null);
-                continue;
-            }
-
-            if (semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol
-                localSymbol) return false;
-
-            targetSymbols.Add(localSymbol.OriginalDefinition);
-        }
-
-        var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
-        if (ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
-            return false;
-
-        return true;
-    }
-
-    internal static bool TryHandleTupleDeconstructionDeclarationState(
-        ref SymbolicState state,
-        AssignmentExpressionSyntax assignment,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!TryPrepareTupleDeconstructionDeclarationTargets(
-                assignment,
-                semanticModel,
-                cancellationToken,
-                out var isDeconstructionDeclaration,
-                out var targetSymbols))
-            return isDeconstructionDeclaration;
-
-        AddTupleElementTargetStateFacts(
-            ref state,
-            targetSymbols,
-            assignment.Right,
-            semanticModel,
-            cancellationToken,
-            "ir.path.prior-statement.tuple-target");
-        return true;
-    }
-
     internal static bool TryHandleTupleAssignmentState(
         ref SymbolicState state,
         AssignmentExpressionSyntax assignment,
@@ -1544,28 +1483,18 @@ internal static class SymbolicAssignmentStateTransfer
         CancellationToken cancellationToken)
     {
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is not TupleExpressionSyntax leftTuple)
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is not
+                (TupleExpressionSyntax or DeclarationExpressionSyntax))
             return false;
 
-        var targetSymbols = new List<ISymbol?>();
-        foreach (var argument in leftTuple.Arguments)
-        {
-            if (argument.Expression is IdentifierNameSyntax identifier &&
-                identifier.Identifier.ValueText == "_")
-            {
-                targetSymbols.Add(null);
-                continue;
-            }
-
-            var targetSymbol = semanticModel.GetSymbolInfo(argument.Expression, cancellationToken).Symbol;
-            if (targetSymbol is ILocalSymbol or IParameterSymbol)
-            {
-                targetSymbols.Add(targetSymbol.OriginalDefinition);
-                continue;
-            }
-
+        if (semanticModel.GetOperation(assignment, cancellationToken) is not IDeconstructionAssignmentOperation operation ||
+            !SymbolicDeconstructionPlan.TryCollectTargets(
+                operation.Target,
+                target => ResolveDeconstructionTarget(target, semanticModel, cancellationToken),
+                out var targets))
             return true;
-        }
+
+        var targetSymbols = targets.Select(static target => target.Symbol).ToArray();
 
         foreach (var targetSymbol in targetSymbols)
             if (targetSymbol != null)
@@ -1584,6 +1513,23 @@ internal static class SymbolicAssignmentStateTransfer
             cancellationToken,
             "ir.path.prior-statement.tuple-target");
         return true;
+    }
+
+    private static ISymbol? ResolveDeconstructionTarget(
+        IOperation operation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return operation switch
+        {
+            ILocalReferenceOperation local => local.Local,
+            IParameterReferenceOperation parameter => parameter.Parameter,
+            _ when operation.Syntax is SingleVariableDesignationSyntax designation =>
+                semanticModel.GetDeclaredSymbol(designation, cancellationToken),
+            _ when operation.Syntax is IdentifierNameSyntax identifier =>
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+            _ => null
+        };
     }
 
     private static void AddTupleElementTargetStateFacts(
@@ -1623,6 +1569,8 @@ internal static class SymbolicAssignmentStateTransfer
             !TryGetTupleElementStorageNames(sourceSymbol, targetSymbols.Count, out var sourceElementNames))
             return;
 
+        var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(targetSymbols.Count);
+        var substitutions = new List<(SymbolicTerm Source, SymbolicTerm Target)>();
         for (var index = 0; index < targetSymbols.Count; index++)
         {
             if (targetSymbols[index] == null ||
@@ -1631,15 +1579,26 @@ internal static class SymbolicAssignmentStateTransfer
                 !CanCompareIrTerms(targetTerm, sourceElementTerm))
                 continue;
 
-            AddSubstitutedStateFacts(ref state, sourceElementTerm, targetTerm);
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
+            bindings.Add(new SymbolicAssignmentBinding(
+                SymbolicFactFactory.GetSmtVariableName(targetSymbols[index]!),
                 targetTerm,
                 sourceElementTerm,
-                rightExpression,
-                provenanceRoot + ".assigned-value");
+                provenanceRoot + ".assigned-value"));
+            substitutions.Add((sourceElementTerm, targetTerm));
         }
+
+        if (bindings.Count == 0) return;
+        var transition = SymbolicOperationTransferAdapter.ApplyBindings(
+            state,
+            bindings.ToImmutable(),
+            rightExpression,
+            SymbolicAssignmentOperationKind.Deconstruction,
+            provenanceRoot);
+        if (!transition.IsExact) return;
+
+        state = transition.State;
+        foreach (var substitution in substitutions)
+            AddSubstitutedStateFacts(ref state, substitution.Source, substitution.Target);
     }
 
     private static void AddSwitchExpressionAssignedValueStateFacts(

@@ -43,7 +43,9 @@ internal static class SymbolicOperationTransferAdapter
         Func<ISymbol, int>? getTargetVersion = null,
         Func<ISymbol, int>? getValueVersion = null,
         int sequence = 0,
-        string provenance = "operation-lowering.assignment")
+        string provenance = "operation-lowering.assignment",
+        string? bindingProvenance = null,
+        string? evidenceKey = null)
     {
         var targetContext = new SymbolicLoweringContext(
             semanticModel,
@@ -60,7 +62,9 @@ internal static class SymbolicOperationTransferAdapter
             targetContext,
             valueContext,
             sequence,
-            provenance);
+            provenance,
+            bindingProvenance,
+            evidenceKey);
         return ApplyLowering(state, lowering);
     }
 
@@ -105,6 +109,24 @@ internal static class SymbolicOperationTransferAdapter
                 context,
                 sequence: 0,
                 provenance));
+    }
+
+    internal static SymbolicOperationTransitionResult ApplyBindings(
+        SymbolicState state,
+        System.Collections.Immutable.ImmutableArray<SymbolicAssignmentBinding> bindings,
+        SyntaxNode source,
+        SymbolicAssignmentOperationKind assignmentKind,
+        string provenance)
+    {
+        var operation = new SymbolicAssignmentOperation(
+            bindings,
+            System.Collections.Immutable.ImmutableArray<SymbolicCondition>.Empty,
+            assignmentKind,
+            IsChecked: false,
+            new SymbolicOperationOrigin(source.Span, 0, provenance));
+        return SymbolicOperationTransferKernel.Apply(
+            state,
+            SymbolicOperationSequence.Single(operation));
     }
 
     private static SymbolicOperationTransitionResult ApplyLowering(

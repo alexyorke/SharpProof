@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
+using SharpProof.Symbolic.Ir;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
@@ -340,53 +341,34 @@ internal static partial class PurityAssignmentStateTransfer
         PurityAnalysisState currentState,
         PurityAnalysisContext context)
     {
-        foreach (var assignment in EnumerateDeconstructionAssignments(
-                     deconstructionAssignmentOperation.Target,
-                     deconstructionAssignmentOperation.Value))
+        if (!SymbolicDeconstructionPlan.TryPair(
+                deconstructionAssignmentOperation.Target,
+                deconstructionAssignmentOperation.Value,
+                target => TryResolveDeconstructionTargetSymbol(
+                    target,
+                    currentState,
+                    context.SemanticModel,
+                    context.CancellationToken),
+                out var assignments))
+            return nextState;
+
+        foreach (var assignment in assignments)
         {
-            var targetSymbol = TryResolveDeconstructionTargetSymbol(
-                assignment.Target,
-                currentState,
-                context.SemanticModel,
-                context.CancellationToken);
+            if (assignment.Target.IsDiscard) continue;
             nextState = ApplyDefiniteAssignmentTargetStateUpdates(
                 nextState,
-                assignment.Target,
+                assignment.Target.Operation,
                 assignment.Value,
-                targetSymbol,
+                assignment.Target.Symbol,
                 currentState,
                 context,
-                assignment.Target.Syntax,
+                assignment.Target.Operation.Syntax,
                 deconstructionAssignmentOperation.Syntax,
                 "[ATF-DEL-DECONSTRUCT]",
                 "deconstructed value targets are unresolved");
         }
 
         return nextState;
-    }
-
-    private static IEnumerable<DeconstructionAssignmentElement> EnumerateDeconstructionAssignments(
-        IOperation target,
-        IOperation value)
-    {
-        target = SkipImplicitConversions(target) ?? target;
-        value = SkipImplicitConversions(value) ?? value;
-        if (target is IDeclarationExpressionOperation declarationExpression)
-            target = declarationExpression.Expression;
-        if (target is ITupleOperation targetTuple &&
-            value is ITupleOperation valueTuple)
-        {
-            var count = Math.Min(targetTuple.Elements.Length, valueTuple.Elements.Length);
-            for (var i = 0; i < count; i++)
-                foreach (var nested in EnumerateDeconstructionAssignments(
-                             targetTuple.Elements[i],
-                             valueTuple.Elements[i]))
-                    yield return nested;
-
-            yield break;
-        }
-
-        yield return new DeconstructionAssignmentElement(target, value);
     }
 
     private static ISymbol? TryResolveDeconstructionTargetSymbol(
@@ -420,16 +402,4 @@ internal static partial class PurityAssignmentStateTransfer
             : null;
     }
 
-    private readonly struct DeconstructionAssignmentElement
-    {
-        internal DeconstructionAssignmentElement(IOperation target, IOperation value)
-        {
-            Target = target;
-            Value = value;
-        }
-
-        internal IOperation Target { get; }
-
-        internal IOperation Value { get; }
-    }
 }

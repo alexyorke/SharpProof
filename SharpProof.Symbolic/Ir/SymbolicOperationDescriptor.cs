@@ -67,7 +67,9 @@ internal abstract record SymbolicOperationDescriptor(SymbolicOperationOrigin Ori
 internal sealed record SymbolicAssignmentBinding(
     string TargetKey,
     SymbolicTerm Target,
-    SymbolicTerm? Source);
+    SymbolicTerm? Source,
+    string? Provenance = null,
+    string? EvidenceKey = null);
 
 internal sealed record SymbolicOperationSequence(
     ImmutableArray<SymbolicOperationDescriptor> Operations)
