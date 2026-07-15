@@ -10,9 +10,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Tooling and build scripts
 
-21. **Compact CLI result location/schema forwarding** - `Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs:16-118`
-    Complexity and capability result types duplicate constructor validation, evidence-schema properties, and method/source/span forwarding. A shared immutable base or descriptor would protect the compact contract from location/schema drift.
-
 22. **Build-tool and MSBuild discovery wrappers** - `build.ps1:21-33,69-97,111-113`; `build-nuget.ps1:13-18,38-40`; `build-vsix.ps1:13-38`; `.github/workflows/ci.yml:56-60`
     Root entry points duplicate Job Object launches, MSBuild discovery, and package-project enumeration. Reuse `scripts/Invoke-SharpProofDotnet.ps1` or a shared helper/pack manifest so local and CI package coverage cannot diverge.
 
