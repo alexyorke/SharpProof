@@ -108,6 +108,53 @@ public partial class DiagnosticEvidenceTests
         "reflection_environment_source", "MethodInvocationPurityRule", "assembly_load_context_semantic_rule",
         "System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyPath", false,
         TestName = "Sp0002_AssemblyLoadContextLoadFromAssemblyPath_UsesSemanticRuleSource")]
+    [TestCase("using System.Threading;", "void", "object gate", "Monitor.Enter(gate);", "synchronization",
+        "MethodInvocationPurityRule", "threading_semantic_rule", "System.Threading.Monitor.Enter", true,
+        TestName = "Sp0002_MonitorEnter_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading;", "void", "", "Thread.Sleep(1);", "catalog_hit",
+        "MethodInvocationPurityRule", "threading_semantic_rule", "System.Threading.Thread.Sleep", true,
+        TestName = "Sp0002_ThreadSleep_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading;", "int", "Thread thread", "return thread.ManagedThreadId;", "catalog_hit",
+        "PropertyReferencePurityRule", "threading_semantic_rule", "System.Threading.Thread.ManagedThreadId", true,
+        TestName = "Sp0002_ThreadManagedThreadId_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System;\nusing System.Threading;", "CancellationTokenRegistration", "CancellationToken token",
+        "return token.Register(() => { });", "catalog_hit", "MethodInvocationPurityRule",
+        "threading_semantic_rule", "System.Threading.CancellationToken.Register", true,
+        TestName = "Sp0002_CancellationTokenRegister_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading;", "int", "AsyncLocal<int> state", "return state.Value;", "catalog_hit",
+        "PropertyReferencePurityRule", "threading_semantic_rule", "System.Threading.AsyncLocal", true,
+        TestName = "Sp0002_AsyncLocalValue_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading;", "Semaphore", "", "return new Semaphore(0, 1);", "synchronization",
+        "ObjectCreationPurityRule", "threading_semantic_rule", "System.Threading.Semaphore.Semaphore", true,
+        TestName = "Sp0002_SemaphoreConstructor_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading;", "int", "ThreadLocal<int> state", "return state.Value;", "catalog_hit",
+        "PropertyReferencePurityRule", "threading_semantic_rule", "System.Threading.ThreadLocal", true,
+        TestName = "Sp0002_ThreadLocalValue_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Threading.Channels;", "Channel<int>", "", "return Channel.CreateUnbounded<int>();",
+        "catalog_hit", "MethodInvocationPurityRule", "threading_semantic_rule",
+        "System.Threading.Channels.Channel.CreateUnbounded", true,
+        TestName = "Sp0002_ChannelCreateUnbounded_UsesThreadingSemanticRuleSource")]
+    [TestCase("using System.Diagnostics;", "ActivitySource", "", "return new ActivitySource(\"test\", \"1.0.0\");",
+        "catalog_hit", "ObjectCreationPurityRule", "diagnostics_tracing_semantic_rule",
+        "System.Diagnostics.ActivitySource.ActivitySource", true,
+        TestName = "Sp0002_ActivitySourceConstructor_UsesDiagnosticsTracingSemanticRuleSource")]
+    [TestCase("#nullable enable\nusing System.Diagnostics;", "Activity?", "", "return Activity.Current;",
+        "catalog_hit", "PropertyReferencePurityRule", "diagnostics_tracing_semantic_rule",
+        "System.Diagnostics.Activity.Current", true,
+        TestName = "Sp0002_ActivityCurrent_UsesDiagnosticsTracingSemanticRuleSource")]
+    [TestCase("using System.Diagnostics;", "void", "Activity activity", "activity.SetTag(\"key\", \"value\");",
+        "catalog_hit", "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule",
+        "System.Diagnostics.Activity.SetTag", true,
+        TestName = "Sp0002_ActivitySetTag_UsesDiagnosticsTracingSemanticRuleSource")]
+    [TestCase("using System.Diagnostics.Metrics;", "Counter<int>", "Meter meter",
+        "return meter.CreateCounter<int>(\"requests\", \"count\", \"Request count\");", "catalog_hit",
+        "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule",
+        "System.Diagnostics.Metrics.Meter.CreateCounter", true,
+        TestName = "Sp0002_MeterCreateCounter_UsesDiagnosticsTracingSemanticRuleSource")]
+    [TestCase("using System.Diagnostics.Metrics;", "void", "Counter<int> counter", "counter.Add(1);",
+        "catalog_hit", "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule",
+        "System.Diagnostics.Metrics.Counter", true,
+        TestName = "Sp0002_CounterAdd_UsesDiagnosticsTracingSemanticRuleSource")]
     public async Task Sp0002_KnownBclSemanticEvidence(
         string usings,
         string returnType,

@@ -366,42 +366,6 @@ public sealed class TestClass
             diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId));
     }
 
-    [TestCaseSource(nameof(GetThreadingSemanticRuleCases))]
-    public async Task Sp0002_ThreadingSemanticRules_UseThreadingSemanticRuleSource(
-        string source,
-        string category,
-        string rule,
-        string symbolSubstring)
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            source,
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(diagnostic, category, rule, "threading_semantic_rule", symbolSubstring);
-    }
-
-    [TestCaseSource(nameof(GetDiagnosticsTracingSemanticRuleCases))]
-    public async Task Sp0002_DiagnosticsTracingApi_UsesSemanticRuleSource(
-        string source,
-        string rule,
-        string symbol)
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(
-            source,
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(
-            diagnostic,
-            "catalog_hit",
-            rule,
-            "diagnostics_tracing_semantic_rule",
-            symbol);
-    }
-
     [Test]
     public async Task Sp0002_ConfiguredKnownImpureMethod_IncludesConfigCatalogSource()
     {
