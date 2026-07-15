@@ -841,20 +841,16 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 out var kind,
                 out var exceptionType,
                 out var category) ||
-            !TryCreateIndexOrRangeTrigger(
+            !SymbolicOperationLowerer.TryLowerElementAccessBoundsHazard(
                 elementAccess,
                 kind,
-                semanticModel,
-                cancellationToken,
-                out var trigger))
+                exceptionType,
+                category,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            elementAccess,
-            kind,
-            trigger,
-            exceptionType,
-            category);
+        candidate = new RuntimeHazardCandidate(elementAccess, hazard);
         return true;
     }
 
@@ -927,34 +923,17 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
             invocationOperation.Arguments.Length != arrayType.Rank)
             return false;
 
-        if (TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
+        if (!SymbolicOperationLowerer.TryLowerArrayGetValueBoundsHazard(
                 invocation,
                 invocationOperation,
                 receiverExpression,
                 arrayType,
-                semanticModel,
-                cancellationToken,
-                out var trigger))
-        {
-            candidate = new RuntimeHazardCandidate(
-                invocation,
-                SymbolicRuntimeHazardKind.IndexOutOfRange,
-                trigger,
-                ExceptionTypes.IndexOutOfRangeException,
-                ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
-            return true;
-        }
+                ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
+            return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.IndexOutOfRange,
-            CreateUnsupportedExceptionPreconditionTrigger(
-                invocation,
-                SymbolicExceptionPreconditionKind.IndexOutOfRange,
-                null,
-                "ir.runtime-hazard.array-get-value.index-out-of-range.unsupported"),
-            ExceptionTypes.IndexOutOfRangeException,
-            ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 

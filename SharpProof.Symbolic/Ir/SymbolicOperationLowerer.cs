@@ -239,6 +239,137 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerElementAccessBoundsHazard(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicRuntimeHazardKind hazardKind,
+        string exceptionType,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        SymbolicTerm? subject = null;
+        SymbolicCondition? trigger = null;
+        var provenance = "ir.runtime-hazard.index.out-of-range";
+        if (elementAccess.ArgumentList.Arguments.Count == 1)
+        {
+            var indexExpression = SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(
+                elementAccess.ArgumentList.Arguments[0].Expression);
+            if (indexExpression is InvocationExpressionSyntax absInvocation &&
+                CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
+                    absInvocation,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    out _,
+                    out var divisorExpression))
+            {
+                var sourceLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
+                    elementAccess.Expression, context);
+                var divisorLength = SymbolicSemanticPipeline.LowerTerm(divisorExpression, context);
+                if (sourceLength is { IsExact: true, Value: { Kind: SmtValueKind.Int } source } &&
+                    divisorLength is { IsExact: true, Value: { Kind: SmtValueKind.Int } divisor } &&
+                    Equals(source, divisor))
+                {
+                    trigger = new SymbolicConstantCondition(false);
+                    provenance = "ir.runtime-hazard.index.abs-modulo.same-length-unreachable";
+                }
+            }
+        }
+
+        if (trigger == null &&
+            CSharpSyntaxFacts.GetExpressionType(
+                elementAccess.Expression, context.SemanticModel, context.CancellationToken) is
+                IArrayTypeSymbol { Rank: > 1 } arrayType &&
+            elementAccess.ArgumentList.Arguments.Count == arrayType.Rank)
+        {
+            var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
+            var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
+                elementAccess.Expression,
+                elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
+                elementAccess,
+                context);
+            if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm } &&
+                bounds is { IsExact: true, Value: { } inRange })
+            {
+                subject = receiverTerm;
+                trigger = new SymbolicNotCondition(inRange);
+                provenance = "ir.runtime-hazard.index.multidimensional-out-of-range";
+            }
+        }
+        else if (trigger == null && elementAccess.ArgumentList.Arguments.Count == 1)
+        {
+            var bounds = SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition(
+                elementAccess, context);
+            if (bounds is { IsExact: true, Value: { } outOfRange })
+            {
+                trigger = outOfRange;
+                var index = SymbolicSemanticPipeline.LowerTerm(
+                    elementAccess.ArgumentList.Arguments[0].Expression, context);
+                if (index is { IsExact: true, Value: { } indexTerm })
+                    subject = indexTerm;
+                else if (SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context) is
+                         { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
+                    subject = receiver;
+            }
+        }
+
+        hazard = CreateHazard(
+            elementAccess,
+            hazardKind,
+            GetIndexPreconditionKind(hazardKind),
+            subject,
+            trigger,
+            exceptionType,
+            category,
+            provenance);
+        return true;
+    }
+
+    internal static bool TryLowerArrayGetValueBoundsHazard(
+        InvocationExpressionSyntax invocation,
+        IInvocationOperation invocationOperation,
+        ExpressionSyntax receiverExpression,
+        IArrayTypeSymbol arrayType,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        SymbolicTerm? subject = null;
+        SymbolicCondition? trigger = null;
+        var provenance = "ir.runtime-hazard.array-get-value.index-out-of-range";
+        if (arrayType.Rank > 0 &&
+            invocationOperation.Arguments.Length == arrayType.Rank &&
+            SymbolicValueFacts.TryGetInvocationArgumentExpressionsByOrdinal(
+                invocationOperation, arrayType.Rank, out var indexExpressions) &&
+            indexExpressions.All(expression =>
+                CSharpSyntaxFacts.GetExpressionType(
+                    expression, context.SemanticModel, context.CancellationToken)?.SpecialType ==
+                SpecialType.System_Int32))
+        {
+            var receiver = SymbolicSemanticPipeline.LowerTerm(receiverExpression, context);
+            var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
+                receiverExpression, indexExpressions, invocation, context);
+            if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm } &&
+                bounds is { IsExact: true, Value: { } inRange })
+            {
+                subject = receiverTerm;
+                trigger = new SymbolicNotCondition(inRange);
+                if (arrayType.Rank > 1)
+                    provenance = "ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range";
+            }
+        }
+
+        hazard = CreateHazard(
+            invocation,
+            SymbolicRuntimeHazardKind.IndexOutOfRange,
+            SymbolicExceptionPreconditionKind.IndexOutOfRange,
+            subject,
+            trigger,
+            ExceptionTypes.IndexOutOfRangeException,
+            category,
+            provenance);
+        return true;
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,
@@ -489,6 +620,12 @@ internal static class SymbolicOperationLowerer
         var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         return lowering is { IsExact: true, Value: { Kind: SmtValueKind.Int } value } ? value : null;
     }
+
+    private static SymbolicExceptionPreconditionKind GetIndexPreconditionKind(
+        SymbolicRuntimeHazardKind hazardKind) =>
+        hazardKind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+            : SymbolicExceptionPreconditionKind.IndexOutOfRange;
 
     private static bool TryGetCheckedIntegralRange(
         ExpressionSyntax expression,
