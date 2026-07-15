@@ -305,6 +305,7 @@ transfer policy after its slice is complete.
 | Shared compact CLI test contracts | `52f1b63c` | 105,746 | -1,930 |
 | Shared SARIF input materialization | `26b5b233` | 105,745 | -1,931 |
 | Shared production-source inventory | `2a7cce39` | 105,745 | -1,931 |
+| Unified raw-SMT line scanning | `c7ec8e42` | 105,745 | -1,931 |
 
 ## Validation Ledger
 
@@ -398,6 +399,7 @@ transfer policy after its slice is complete.
 | Phase 6 shared compact CLI test contracts | Commit `52f1b63c` centralizes compact JSON kind/schema/evidence assertions and capability/complexity `--all-lines` rejection checks while retaining the original test methods and feature-specific payload assertions. The shared envelope now also locks `schemaVersion`. Focused compact, capability, complexity, and source-query fixtures pass 108/108; Release ToolingTest build: zero warnings. Test LOC fell by 18 to 142,410; production LOC remains 105,746, or -1,930 from the rewrite start. |
 | Phase 6 shared SARIF input materialization | Commit `26b5b233` makes the linked `DotnetSarifBuildRunner` own ordered `.sln`/`.csproj` materialization and disposable temporary-file cleanup for Baseline and CorpusReport. The focused reproduction exposed that an up-to-date incremental build can skip compilation and produce no SARIF, so the shared runner now uses `--no-incremental`. A mixed direct-SARIF/project regression locks input order and zero leaked materialized files. Both Release tool builds have zero warnings; focused Baseline, CorpusReport, and process-ownership fixtures pass 28/28. Production LOC is 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,482 after the behavioral regression. |
 | Phase 6 shared production-source inventory | Commit `2a7cce39` makes one PowerShell helper own strict repository containment, normalized relative paths, and production C# exclusions for ProductionMetrics, RawSmtHotspots, and CloneInventory. This fixes CloneInventory's missing outside-root guard and replaces eight repeated module scans while retaining each report's narrower semantic filters. Complete JSON output from all three scripts matches the committed predecessors byte-for-byte by SHA-256; direct root/outside/test/build-output probes pass; focused process-ownership fixtures pass 9/9. The audit scripts remove 21 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC is 142,489. |
+| Phase 6 unified raw-SMT line scanning | Commit `c7ec8e42` replaces seven repeated file/read/line-counter/result loops with one ordinal needle-and-classifier scanner. Category and descriptor-kind decisions remain explicit at their call sites, while traversal, line numbers, property ordering, and trimmed evidence text have one owner. The complete RawSmtHotspots JSON is byte-identical to the committed predecessor by SHA-256; focused process-ownership fixtures pass 9/9. The script removes 85 net lines. Production LOC remains 105,745, or -1,931 from the rewrite start; tracked test LOC remains 142,489. |
 
 ## Current Checkpoint
 
@@ -411,13 +413,13 @@ transfer policy after its slice is complete.
   lifecycle, compact CLI test contracts, and project/solution-to-SARIF
   materialization are centralized. Up-to-date project builds now reliably emit
   the SARIF expected by both tools. Repository containment, relative paths, and
-  production-source discovery are now shared across the three audit scripts.
-- Last confirmed fact: all three audit-script JSON reports are byte-identical to
-  their predecessors; direct containment/policy probes pass; focused
-  process-ownership fixtures pass 9/9. Test LOC is 142,489; production LOC is
-  105,745, or -1,931 from the rewrite start.
-- Next cheapest step: adjudicate the repeated line-scanning collectors in
-  `Get-SharpProofRawSmtHotspots.ps1`, preserving category-specific predicates,
-  line numbers, ordering, and exact JSON bytes.
+  production-source discovery are now shared across the three audit scripts;
+  RawSmtHotspots also has one line-scanning owner.
+- Last confirmed fact: RawSmtHotspots JSON is byte-identical to its predecessor
+  and focused process-ownership fixtures pass 9/9. The scanner removes 85 script
+  lines. Test LOC is 142,489; production LOC is 105,745, or -1,931 from the
+  rewrite start.
+- Next cheapest step: adjudicate compact capability/complexity result location
+  and schema forwarding while preserving public types and serialized shapes.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
