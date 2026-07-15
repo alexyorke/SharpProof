@@ -688,24 +688,25 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsPureTypeAttributeFlagsWrapperMethod(string symbol)
     {
-        return string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsAnsiClass()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsAutoClass()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsAutoLayout()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsExplicitLayout()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsImport()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsLayoutSequential()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedAssembly()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedFamANDAssem()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedFamily()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedFamORAssem()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedPrivate()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNestedPublic()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsNotPublic()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsPublic()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsSpecialName()", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.get_IsUnicodeClass()", StringComparison.Ordinal);
+        return symbol is
+            "System.Type.get_IsAbstract()" or
+            "System.Type.get_IsAnsiClass()" or
+            "System.Type.get_IsAutoClass()" or
+            "System.Type.get_IsAutoLayout()" or
+            "System.Type.get_IsExplicitLayout()" or
+            "System.Type.get_IsImport()" or
+            "System.Type.get_IsLayoutSequential()" or
+            "System.Type.get_IsNestedAssembly()" or
+            "System.Type.get_IsNestedFamANDAssem()" or
+            "System.Type.get_IsNestedFamily()" or
+            "System.Type.get_IsNestedFamORAssem()" or
+            "System.Type.get_IsNestedPrivate()" or
+            "System.Type.get_IsNestedPublic()" or
+            "System.Type.get_IsNotPublic()" or
+            "System.Type.get_IsPublic()" or
+            "System.Type.get_IsSealed()" or
+            "System.Type.get_IsSpecialName()" or
+            "System.Type.get_IsUnicodeClass()";
     }
 
     internal static bool TryGetPureTypeSingleImplWrapperCall(string symbol, out string implCall)
@@ -726,89 +727,82 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsTypeIdentityWrapperMethod(string symbol)
     {
-        return string.Equals(symbol, "System.Type.Equals(System.Type)", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.Equals(object)", StringComparison.Ordinal) ||
-               string.Equals(symbol, "System.Type.GetHashCode()", StringComparison.Ordinal);
+        return symbol is
+            "System.Type.Equals(System.Type)" or
+            "System.Type.Equals(object)" or
+            "System.Type.GetHashCode()";
     }
 
     internal static bool IsTypeIdentityWrapperAnchorCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Type.Equals(System.Type)->bool", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Type.get_UnderlyingSystemType()->System.Type",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Reflection.MemberInfo.GetHashCode()->int", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "object.GetHashCode()->int", StringComparison.Ordinal);
+        return callSymbol is
+            "System.Type.Equals(System.Type)->bool" or
+            "System.Type.get_UnderlyingSystemType()->System.Type" or
+            "System.Reflection.MemberInfo.GetHashCode()->int" or
+            "object.GetHashCode()->int";
     }
 
     internal static bool IsTypeIdentityWrapperCall(string callSymbol)
     {
         return IsTypeIdentityWrapperAnchorCall(callSymbol) ||
-               string.Equals(callSymbol, "System.Type.op_Equality(System.Type, System.Type)->bool",
-                   StringComparison.Ordinal);
+               callSymbol is "System.Type.op_Equality(System.Type, System.Type)->bool";
     }
 
     internal static bool IsStringHashWrapperCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1",
-                   StringComparison.Ordinal);
+        return callSymbol is
+            "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int" or
+            "System.Marvin.get_DefaultSeed()->ulong" or
+            "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1";
     }
 
     internal static bool IsStringSubstringWrapperCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "string.InternalSubString(int, int)->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.ThrowSubstringArgumentOutOfRange(int, int)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+        return callSymbol is
+            "string.InternalSubString(int, int)->string" or
+            "string.ThrowSubstringArgumentOutOfRange(int, int)->void" or
+            "string.get_Length()->int";
     }
 
     internal static bool IsFreshAllocatedStringCopyCoreCall(string callSymbol)
     {
         return IsBufferMemmoveCall(callSymbol) ||
                IsFastAllocateStringCall(callSymbol) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0",
-                   StringComparison.Ordinal);
+               callSymbol is "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0";
     }
 
     internal static bool IsCharReplaceStringWrapperCall(string callSymbol)
     {
         return IsBufferMemmoveCall(callSymbol) ||
                IsFastAllocateStringCall(callSymbol) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.GetRawStringDataAsUInt16()->ref ushort", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.IndexOf(char)->int", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               callSymbol is
+                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0" or
+                   "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0" or
+                   "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool" or
+                   "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int" or
+                   "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void" or
+                   "string.GetRawStringDataAsUInt16()->ref ushort" or
+                   "string.IndexOf(char)->int" or
+                   "string.get_Length()->int";
     }
 
     internal static bool IsStringLengthCheckedConcatWrapperCall(string callSymbol)
     {
         return IsFastAllocateStringCall(callSymbol) ||
-               string.Equals(callSymbol, "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               callSymbol is
+                   "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void" or
+                   "string.CopyStringContent(string, int, string)->void" or
+                   "string.IsNullOrEmpty(string)->bool" or
+                   "string.get_Length()->int";
     }
 
     internal static bool IsStringArrayConcatWrapperCall(string callSymbol)
     {
         return IsStringLengthCheckedConcatWrapperCall(callSymbol) ||
-               string.Equals(callSymbol, "System.ArgumentNullException.ThrowIfNull(object, string)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Array.Clone()->object", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.Concat(string[])->string", StringComparison.Ordinal);
+               callSymbol is
+                   "System.ArgumentNullException.ThrowIfNull(object, string)->void" or
+                   "System.Array.Clone()->object" or
+                   "string.Concat(string[])->string";
     }
 
     internal static bool IsGuardedImmutableStringRewriteWrapperCall(string callSymbol)
@@ -816,14 +810,13 @@ internal static class EffectSummarySemanticWrapperRules
         return IsFastAllocateStringCall(callSymbol) ||
                IsBufferMemmoveCall(callSymbol) ||
                IsPureArgumentGuardWrapper(callSymbol) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Span`1<char>..ctor(ref !0, int)->void", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               (callSymbol is
+                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0" or
+                   "System.Span`1<char>..ctor(ref !0, int)->void" or
+                   "string.CopyStringContent(string, int, string)->void" or
+                   "string.get_Chars(int)->char" or
+                   "string.get_Length()->int");
     }
 
     internal static bool IsLocalScratchIndexBuilderCall(string callSymbol)
@@ -846,28 +839,27 @@ internal static class EffectSummarySemanticWrapperRules
                    StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.SpanHelpers.NonPackedIndexOfChar(", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Span`1<int>..ctor(void*, int)->void", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.Replace(char, char)->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               (callSymbol is
+                   "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0" or
+                   "System.Span`1<int>..ctor(void*, int)->void" or
+                   "string.Replace(char, char)->string" or
+                   "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string" or
+                   "string.get_Chars(int)->char" or
+                   "string.get_Length()->int");
     }
 
     internal static bool IsFastAllocateStringCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "string.FastAllocateString(int)->string", StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.String.FastAllocateString(int)->string", StringComparison.Ordinal);
+        return callSymbol is
+            "string.FastAllocateString(int)->string" or
+            "System.String.FastAllocateString(int)->string";
     }
 
     internal static bool IsBufferMemmoveCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void",
-                   StringComparison.Ordinal) ||
-               string.Equals(callSymbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)->void",
-                   StringComparison.Ordinal);
+        return callSymbol is
+            "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void" or
+            "System.Buffer.Memmove(ref byte, ref byte, nuint)->void";
     }
 
     internal static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
@@ -914,18 +906,20 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsDeterministicStringComparisonValue(string value)
     {
-        return string.Equals(value, "System.StringComparison.InvariantCulture", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparison.InvariantCultureIgnoreCase", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparison.Ordinal", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparison.OrdinalIgnoreCase", StringComparison.Ordinal);
+        return value is
+            "System.StringComparison.InvariantCulture" or
+            "System.StringComparison.InvariantCultureIgnoreCase" or
+            "System.StringComparison.Ordinal" or
+            "System.StringComparison.OrdinalIgnoreCase";
     }
 
     internal static bool IsDeterministicStringComparerValue(string value)
     {
-        return string.Equals(value, "System.StringComparer.Ordinal", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparer.OrdinalIgnoreCase", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparer.InvariantCulture", StringComparison.Ordinal) ||
-               string.Equals(value, "System.StringComparer.InvariantCultureIgnoreCase", StringComparison.Ordinal);
+        return value is
+            "System.StringComparer.Ordinal" or
+            "System.StringComparer.OrdinalIgnoreCase" or
+            "System.StringComparer.InvariantCulture" or
+            "System.StringComparer.InvariantCultureIgnoreCase";
     }
 
     internal static bool IsContextSensitiveStringComparisonMethod(string displayName)
