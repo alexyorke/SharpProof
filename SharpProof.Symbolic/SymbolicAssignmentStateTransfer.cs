@@ -410,19 +410,6 @@ internal static class SymbolicAssignmentStateTransfer
         return new SymbolicThrowGuardedValue(false, originalValueExpression, null, true, false);
     }
 
-    internal static bool TryCreateMemberDerivedTerm(
-        SymbolicTerm receiver,
-        ISymbol memberSymbol,
-        SmtValueKind kind,
-        out SymbolicTerm output)
-    {
-        output = null!;
-        if (receiver.Kind != SmtValueKind.Reference) return false;
-
-        output = new SymbolicMemberTerm(receiver, memberSymbol.Name, kind);
-        return true;
-    }
-
     internal static bool ExpressionReferencesAnySymbol(
         SyntaxNode root,
         IReadOnlyCollection<ISymbol> symbols,

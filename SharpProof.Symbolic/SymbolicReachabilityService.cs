@@ -54,11 +54,6 @@ internal static class SymbolicReachabilityService
         return state;
     }
 
-    internal static SymbolicState MergePathStates(SymbolicState left, SymbolicState right)
-    {
-        return SymbolicProgramPointFacts.MergeStates(left, right);
-    }
-
     internal static SymbolicIrProofResult ClassifyStateFeasibility(
         SymbolicState state,
         SmtAnalysisService? smtAnalysis)

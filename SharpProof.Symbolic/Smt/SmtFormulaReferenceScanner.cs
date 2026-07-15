@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
@@ -29,23 +28,6 @@ internal static class SmtFormulaReferenceScanner
     {
         return ContainsVariable(formula,
             candidateName => SymbolicFactFactory.MatchesVariableOrMemberName(candidateName, variableName));
-    }
-
-    internal static void RemoveFactsReferencingSymbol(IList<SmtFormula> facts, ISymbol symbol)
-    {
-        var variablePrefix = SymbolicFactFactory.GetSmtVariableName(symbol);
-        for (var index = facts.Count - 1; index >= 0; index--)
-            if (ContainsVariablePrefix(facts[index], variablePrefix))
-                facts.RemoveAt(index);
-    }
-
-    internal static void RemoveFormulasReferencingVariable(
-        ICollection<SmtFormula> formulas,
-        string variableName)
-    {
-        foreach (var formula in new List<SmtFormula>(formulas))
-            if (ContainsVariableOrMember(formula, variableName))
-                formulas.Remove(formula);
     }
 
     private static bool ContainsVariable(SmtFormula formula, Func<string, bool> matchVariableName)

@@ -529,26 +529,6 @@ internal static class SymbolicSemanticPipeline
             evidenceKey: provenance));
     }
 
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerPattern(
-        ExpressionSyntax valueExpression,
-        PatternSyntax pattern,
-        SymbolicLoweringContext context)
-    {
-        var value = LowerTerm(valueExpression, context);
-        if (value.IsExact &&
-            value.Value != null &&
-            SymbolicIrLowerer.LowerPatternCondition(
-                value.Value,
-                context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
-                context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type,
-                pattern,
-                pattern,
-                context) is { } condition)
-            return Exact(condition, pattern, "pattern");
-
-        return Unsupported<SymbolicCondition>(pattern, "pattern");
-    }
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerPatternCondition(
         SymbolicTerm value,
         ITypeSymbol? valueType,
@@ -572,19 +552,6 @@ internal static class SymbolicSemanticPipeline
             SymbolicIrLowerer.LowerPatternCondition(value, pattern, source, context),
             source,
             "pattern");
-    }
-
-    internal static SymbolicLoweringResult<SymbolicTerm> LowerMemberOrIndexAccess(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        if (expression is not MemberAccessExpressionSyntax and not ElementAccessExpressionSyntax)
-            return Unsupported<SymbolicTerm>(expression, "member-or-index");
-
-        return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerTerm(expression, context),
-            expression,
-            "member-or-index");
     }
 
     internal static SymbolicLoweringResult<SymbolicTerm> LowerConversion(
@@ -920,27 +887,6 @@ internal static class SymbolicSemanticPipeline
             "subsequence-in-range");
     }
 
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerIntegerInRangeCondition(
-        ExpressionSyntax expression,
-        long minValue,
-        long maxValue,
-        SymbolicLoweringContext context)
-    {
-        var lowering = LowerTerm(expression, context);
-        if (lowering is { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
-            return Exact<SymbolicCondition>(
-                SymbolicIrLowerer.CreateIntegerInRangeCondition(
-                    value,
-                    minValue,
-                    maxValue,
-                    expression,
-                    "ir.integer.in-range"),
-                expression,
-                "integer-in-range");
-
-        return Unsupported<SymbolicCondition>(expression, "integer-in-range");
-    }
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerIntegerBinaryInRangeCondition(
         ExpressionSyntax leftExpression,
         ExpressionSyntax rightExpression,
@@ -967,77 +913,6 @@ internal static class SymbolicSemanticPipeline
                 "integer-binary-in-range");
 
         return Unsupported<SymbolicCondition>(source, "integer-binary-in-range");
-    }
-
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerNegatedIntegerInRangeCondition(
-        ExpressionSyntax expression,
-        long minValue,
-        long maxValue,
-        SymbolicLoweringContext context)
-    {
-        var operand = LowerTerm(expression, context);
-        if (operand is { IsExact: true, Value: { Kind: SmtValueKind.Int } operandTerm })
-            return Exact(
-                SymbolicIrLowerer.CreateIntegerInRangeCondition(
-                    new SymbolicBinaryTerm(
-                        SymbolicBinaryTermOperator.Subtract,
-                        new SymbolicIntegerConstantTerm(0),
-                        operandTerm),
-                    minValue,
-                    maxValue,
-                    expression,
-                    "ir.integer.unary.in-range"),
-                expression,
-                "integer-unary-in-range");
-
-        return Unsupported<SymbolicCondition>(expression, "integer-unary-in-range");
-    }
-
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerIntegerUpdateInRangeCondition(
-        ExpressionSyntax expression,
-        SmtIntegerBinaryOperator smtOperator,
-        long minValue,
-        long maxValue,
-        SymbolicLoweringContext context)
-    {
-        var operand = LowerTerm(expression, context);
-        if (SymbolicIrLowerer.GetBinaryTermOperator(smtOperator) is { } binaryOperator &&
-            binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract &&
-            operand is { IsExact: true, Value: { Kind: SmtValueKind.Int } operandTerm })
-            return Exact(
-                SymbolicIrLowerer.CreateIntegerInRangeCondition(
-                    new SymbolicBinaryTerm(
-                        binaryOperator,
-                        operandTerm,
-                        new SymbolicIntegerConstantTerm(1)),
-                    minValue,
-                    maxValue,
-                    expression,
-                    "ir.integer.update.in-range"),
-                expression,
-                "integer-update-in-range");
-
-        return Unsupported<SymbolicCondition>(expression, "integer-update-in-range");
-    }
-
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerNegativeIntegerCondition(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        var operand = LowerTerm(expression, context);
-        if (operand is { IsExact: true, Value: { Kind: SmtValueKind.Int } operandTerm })
-            return Exact<SymbolicCondition>(
-                new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicRelationAtom(
-                        SymbolicRelationOperator.LessThan,
-                        operandTerm,
-                        new SymbolicIntegerConstantTerm(0)),
-                    expression,
-                    "ir.integer.negative")),
-                expression,
-                "integer-negative");
-
-        return Unsupported<SymbolicCondition>(expression, "integer-negative");
     }
 
     internal static SymbolicLoweringResult<SymbolicCondition> LowerNumericZeroCondition(
@@ -1081,23 +956,6 @@ internal static class SymbolicSemanticPipeline
                 "numeric-zero");
 
         return Unsupported<SymbolicCondition>(expression, "numeric-zero");
-    }
-
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerNullableHasValueCondition(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        var hasValue = LowerNullableHasValueTerm(expression, context);
-        if (hasValue is { IsExact: true, Value: { } term })
-            return Exact<SymbolicCondition>(
-                new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicTruthAtom(term),
-                    expression,
-                    "ir.nullable.has-value")),
-                expression,
-                "nullable-has-value-condition");
-
-        return Unsupported<SymbolicCondition>(expression, "nullable-has-value-condition");
     }
 
     private static SymbolicLoweringResult<T> LowerExactOrUnsupported<T>(

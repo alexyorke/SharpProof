@@ -119,12 +119,6 @@ internal sealed record SymbolicMutationOperation(
     string? EvidenceKey,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
-internal sealed record SymbolicInvocationOperation(
-    IMethodSymbol TargetMethod,
-    SymbolicTerm? Receiver,
-    ImmutableArray<SymbolicTerm> Arguments,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
-
 internal sealed record SymbolicBranchAssumptionOperation(
     SymbolicCondition Condition,
     bool AssumeTrue,

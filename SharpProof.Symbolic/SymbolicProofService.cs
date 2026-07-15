@@ -78,52 +78,6 @@ internal sealed class SymbolicProofService
         return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
     }
 
-    internal static bool TryEncodeTermWithPathState(
-        SymbolicTerm term,
-        SymbolicState state,
-        SyntaxNode sourceNode,
-        out SmtFormula formula)
-    {
-        if (term == null) throw new ArgumentNullException(nameof(term));
-
-        if (state == null) throw new ArgumentNullException(nameof(state));
-
-        if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
-
-        state = NormalizeState(state);
-        term = RewriteQueryTermToCurrentVersions(term, state);
-        if (state.IsContradictory) return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
-
-        if (!HasSafeIntegerDivisors(term, state, sourceNode))
-        {
-            formula = null!;
-            return false;
-        }
-
-        return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
-    }
-
-    internal static bool TryEncodeTermWithFormulaPathConditions(
-        SymbolicTerm term,
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        out SmtFormula formula)
-    {
-        if (term == null) throw new ArgumentNullException(nameof(term));
-        if (pathConditions == null) throw new ArgumentNullException(nameof(pathConditions));
-        if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
-
-        var normalizedPath = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        var proofPipeline = new SymbolicProofPipeline(smtAnalysis: null);
-        if (!HasSafeIntegerDivisors(term, normalizedPath, sourceNode, proofPipeline))
-        {
-            formula = null!;
-            return false;
-        }
-
-        return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
-    }
-
     private static bool HasSafeIntegerDivisors(
         SymbolicTerm term,
         IReadOnlyCollection<SmtFormula> pathConditions,

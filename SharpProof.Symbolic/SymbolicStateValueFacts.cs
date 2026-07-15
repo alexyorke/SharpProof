@@ -19,12 +19,6 @@ internal static class SymbolicStateValueFacts
         return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
     }
 
-    internal static SymbolicState RemoveImplicitThisMemberReferences(SymbolicState state, string memberName)
-    {
-        var variableName = ImplicitThisVariableName + "." + memberName;
-        return SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, variableName);
-    }
-
     internal static bool TryGetCurrentValue(
         SymbolicState state,
         ISymbol symbol,

@@ -168,13 +168,6 @@ internal partial class PurityAnalysisEngine
         out GeneratedPurityCatalog.PurityEntry purity)
         where TSymbol : class, ISymbol;
 
-    internal static bool HasTrustedGeneratedPurityCoverage(
-        IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
-        return TryGetTrustedGeneratedPurityCoverage(methodSymbol, compilation, out _);
-    }
-
     internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
         IMethodSymbol methodSymbol,
         Compilation compilation)

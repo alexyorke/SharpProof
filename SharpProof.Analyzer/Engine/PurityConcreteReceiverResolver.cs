@@ -290,30 +290,6 @@ internal static class PurityConcreteReceiverResolver
         return implementation as IMethodSymbol;
     }
 
-    internal static bool IsDefinitelyNullValue(
-        IOperation? valueOperation,
-        PurityAnalysisState currentState)
-    {
-        valueOperation = UnwrapConversionsAndParentheses(valueOperation);
-
-        if (valueOperation is ILiteralOperation literalOperation &&
-            literalOperation.ConstantValue.HasValue &&
-            literalOperation.ConstantValue.Value == null)
-            return true;
-
-        if (valueOperation is IDefaultValueOperation defaultValueOperation &&
-            defaultValueOperation.Type?.IsReferenceType == true)
-            return true;
-
-        if (valueOperation is ILocalReferenceOperation localReference)
-            return currentState.IsDefinitelyNullLocalSymbol(localReference.Local);
-
-        if (PurityAnalysisEngine.TryResolveTrackedSymbol(valueOperation, currentState) is ILocalSymbol capturedLocal)
-            return currentState.IsDefinitelyNullLocalSymbol(capturedLocal);
-
-        return false;
-    }
-
     private static IOperation? UnwrapConversionsAndParentheses(IOperation? operation)
     {
         while (true)
