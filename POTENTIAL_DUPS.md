@@ -4,9 +4,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Analyzer
 
-5. **Switch condition proof pipeline** - `SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchExpressions.cs:10-34`; `SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchStatements.cs:28-55`
-   Both locate the containing construct, build a symbolic condition, then prove it always false. Share the pipeline with callbacks for arm/section lookup, condition creation, and the statement-only goto exemption.
-
 6. **Exception summary catalog parsing** - `SharpProof.Analyzer/ExceptionSummaryCatalog.cs:311-418`
    `AddExceptionSources`/`AddExceptionEdges` repeat source registration, while `AddExceptionSourceFacts`/`AddExceptionEdgeFacts` repeat JSON parse/project/deduplicate loops. Small helpers for source registration and fact ingestion would preserve matching malformed-input behavior.
 
