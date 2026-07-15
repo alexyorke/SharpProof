@@ -200,6 +200,94 @@ public sealed class SymbolicOperationTransferModelTests
     }
 
     [Test]
+    public void NegativeLengthHazardLowering_AggregatesExactDimensions()
+    {
+        const string source = "static class C { static int[,] M(int rows, int columns) => new int[rows, columns]; }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NegativeLengthHazardLowering_AggregatesExactDimensions));
+        var creation = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
+
+        var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
+            creation,
+            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(creation),
+            SymbolicExceptionPreconditionKind.NegativeLength,
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
+            "ir.runtime-hazard.array.negative-length",
+            "definite_negative_array_length",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(hazard.Trigger, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(hazard.Origin.Provenance,
+                Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate"));
+        });
+    }
+
+    [Test]
+    public void NegativeLengthHazardLowering_PreservesUnsupportedAggregate()
+    {
+        const string source = "static class C { static int Size() => 1; static int[,] M(int rows) => new int[rows, Size()]; }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NegativeLengthHazardLowering_PreservesUnsupportedAggregate));
+        var creation = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
+
+        var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
+            creation,
+            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(creation),
+            SymbolicExceptionPreconditionKind.NegativeLength,
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
+            "ir.runtime-hazard.array.negative-length",
+            "definite_negative_array_length",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(hazard.Origin.Provenance,
+                Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported"));
+        });
+    }
+
+    [Test]
+    public void CollectionCardinalityHazardLowering_EmitsExactCountPrecondition()
+    {
+        const string source = "using System.Collections.Generic; static class C { static int M(Queue<int> values) => values.Peek(); }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CollectionCardinalityHazardLowering_EmitsExactCountPrecondition));
+        var receiver = fixture.Root.DescendantNodes().OfType<MemberAccessExpressionSyntax>().Single().Expression;
+
+        var lowered = SymbolicOperationLowerer.TryLowerInvalidCollectionCardinalityHazard(
+            receiver,
+            SymbolicRelationOperator.Equal,
+            0,
+            "definite_invalid_collection_cardinality",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowered, Is.True);
+            Assert.That(hazard.HazardKind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+            Assert.That(hazard.PreconditionKind,
+                Is.EqualTo(SymbolicExceptionPreconditionKind.InvalidCollectionCardinality));
+            Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
+            Assert.That(hazard.Subject, Is.TypeOf<SymbolicCountTerm>());
+            Assert.That(hazard.Origin.Provenance, Is.EqualTo("ir.runtime-hazard.collection-cardinality"));
+        });
+    }
+
+    [Test]
     public void OperationDescriptors_KeepTypedPayloadAndEvaluationSequence()
     {
         var target = new SymbolicVariableTerm("target", SmtValueKind.Int);

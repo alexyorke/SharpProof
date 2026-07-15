@@ -299,33 +299,28 @@ public sealed class SymbolicSemanticPipelineTests
     [Test]
     public void MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof()
     {
-        var site = SyntaxFactory.ParseExpression("new int[first, second]");
-        var subject = new SymbolicVariableTerm("first", SmtValueKind.Int);
-        var exactFact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.LessThan,
-                subject,
-                new SymbolicIntegerConstantTerm(0)),
+        const string source =
+            "static class C { static int Size() => 1; static int[,] M(int first) => new int[first, Size()]; }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof));
+        var site = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
+        var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
             site,
-            "test.exact-subset");
-        var exactSubset = new SymbolicFactCondition(exactFact);
-        var trigger = SymbolicRuntimeHazardTriggerFactory.CreateAggregateExceptionPreconditionTrigger(
-            site,
+            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(site),
             SymbolicExceptionPreconditionKind.NegativeLength,
-            subject,
-            exactSubset,
-            false,
-            "test.aggregate");
-        var precondition = trigger.Precondition;
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
+            "test.aggregate",
+            "test_category",
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
+            out var hazard);
 
-        Assert.That(precondition.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
-        Assert.That(precondition.Atom, Is.TypeOf<SymbolicExceptionPreconditionAtom>());
-        var atom = (SymbolicExceptionPreconditionAtom)precondition.Atom;
-        Assert.That(atom.Subject, Is.EqualTo(subject));
-        Assert.That(atom.Trigger, Is.TypeOf<SymbolicFactCondition>());
-        Assert.That(atom.Trigger, Is.Not.EqualTo(exactSubset));
-        Assert.That(((SymbolicFactCondition)atom.Trigger).Fact.Provenance,
-            Does.EndWith(".unsupported.trigger"));
+        Assert.That(lowered, Is.True);
+        Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
+        Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
+        Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
+        Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance,
+            Is.EqualTo("test.aggregate.aggregate.unsupported.trigger"));
     }
 
     [Test]

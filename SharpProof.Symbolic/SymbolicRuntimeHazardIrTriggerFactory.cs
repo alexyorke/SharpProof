@@ -235,33 +235,6 @@ internal static class SymbolicRuntimeHazardIrTriggerFactory
             out trigger);
     }
 
-    internal static bool TryCreateNegativeLengthTrigger(
-        ExpressionSyntax lengthExpression,
-        SymbolicExceptionPreconditionKind kind,
-        string provenance,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardTrigger trigger)
-    {
-        if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                kind,
-                lengthExpression,
-                SymbolicRelationOperator.LessThan,
-                new SymbolicIntegerConstantTerm(0),
-                provenance,
-                semanticModel,
-                cancellationToken,
-                out trigger))
-            return true;
-
-        trigger = CreateUnsupportedExceptionPreconditionTrigger(
-            lengthExpression,
-            kind,
-            null,
-            provenance + ".unsupported");
-        return true;
-    }
-
     internal static bool TryCreateCheckedEqualityOverflowTrigger(
         SyntaxNode site,
         ExpressionSyntax expression,
@@ -369,37 +342,6 @@ internal static class SymbolicRuntimeHazardIrTriggerFactory
             subject,
             "ir.runtime-hazard.invalid-cast.exact-mismatch.unsupported");
         return true;
-    }
-
-    internal static bool TryCreateInvalidCollectionCardinalityTrigger(
-        ExpressionSyntax receiver,
-        SymbolicRelationOperator relation,
-        long triggeringCount,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardTrigger trigger)
-    {
-        trigger = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(receiver, context);
-        if (lowering is not { IsExact: true, Value: { } count } ||
-            count.Kind != SmtValueKind.Int)
-            return false;
-
-        var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                relation,
-                count,
-                new SymbolicIntegerConstantTerm(triggeringCount)),
-            receiver,
-            "ir.runtime-hazard.collection-cardinality.trigger"));
-        return TryCreateIrExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind.InvalidCollectionCardinality,
-            count,
-            condition,
-            receiver,
-            "ir.runtime-hazard.collection-cardinality",
-            out trigger);
     }
 
     internal static bool TryCreateIrRelationalExceptionPreconditionTrigger(

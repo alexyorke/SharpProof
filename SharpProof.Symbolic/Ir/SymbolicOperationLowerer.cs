@@ -159,6 +159,86 @@ internal static class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerNegativeLengthHazard(
+        SyntaxNode site,
+        IEnumerable<ExpressionSyntax> lengthExpressions,
+        SymbolicExceptionPreconditionKind preconditionKind,
+        SymbolicRuntimeHazardKind hazardKind,
+        string provenance,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        SymbolicTerm? subject = null;
+        SymbolicCondition? trigger = null;
+        var hasExpression = false;
+        var allExact = true;
+        foreach (var expression in lengthExpressions)
+        {
+            hasExpression = true;
+            var length = LowerIntegerTerm(expression, context);
+            if (length == null)
+            {
+                allExact = false;
+                continue;
+            }
+
+            subject ??= length;
+            var negative = SymbolicIrLowerer.CreateRelationCondition(
+                SymbolicRelationOperator.LessThan,
+                length,
+                new SymbolicIntegerConstantTerm(0),
+                expression,
+                provenance + ".trigger");
+            trigger = trigger == null
+                ? negative
+                : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, trigger, negative);
+        }
+
+        if (!hasExpression) return NoHazard(out hazard);
+        hazard = CreateHazard(
+            site,
+            hazardKind,
+            preconditionKind,
+            subject,
+            allExact ? trigger : null,
+            ExceptionTypes.OverflowException,
+            category,
+            provenance + ".aggregate",
+            preserveUnsupportedSubject: true);
+        return true;
+    }
+
+    internal static bool TryLowerInvalidCollectionCardinalityHazard(
+        ExpressionSyntax receiver,
+        SymbolicRelationOperator relation,
+        long triggeringCount,
+        string category,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(receiver, context);
+        if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Int } count })
+            return NoHazard(out hazard);
+
+        const string provenance = "ir.runtime-hazard.collection-cardinality";
+        hazard = CreateHazard(
+            receiver,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
+            SymbolicExceptionPreconditionKind.InvalidCollectionCardinality,
+            count,
+            SymbolicIrLowerer.CreateRelationCondition(
+                relation,
+                count,
+                new SymbolicIntegerConstantTerm(triggeringCount),
+                receiver,
+                provenance + ".trigger"),
+            ExceptionTypes.InvalidOperationException,
+            category,
+            provenance);
+        return true;
+    }
+
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,
@@ -370,13 +450,14 @@ internal static class SymbolicOperationLowerer
         SymbolicCondition? trigger,
         string exceptionType,
         string category,
-        string provenance)
+        string provenance,
+        bool preserveUnsupportedSubject = false)
     {
         var confidence = trigger == null ? SymbolicFactConfidence.Unsupported : SymbolicFactConfidence.Exact;
         if (trigger == null)
         {
             provenance += ".unsupported";
-            subject = null;
+            if (!preserveUnsupportedSubject) subject = null;
             trigger = CreateUnsupportedHazardCondition(site, provenance);
         }
 

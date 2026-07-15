@@ -15,58 +15,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardTriggerFactory
 {
-    internal static RuntimeHazardTrigger CreateAggregateExceptionPreconditionTrigger(
-        SyntaxNode site,
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SymbolicCondition? triggerCondition,
-        bool allTriggersAreExact,
-        string provenance)
-    {
-        if (triggerCondition == null)
-            return CreateUnsupportedExceptionPreconditionTrigger(
-                site,
-                kind,
-                subject,
-                provenance + ".unsupported");
-
-        if (!allTriggersAreExact)
-            return CreateUnsupportedExceptionPreconditionTrigger(
-                site,
-                kind,
-                subject,
-                provenance + ".unsupported");
-
-        var precondition = new SymbolicFact(
-            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-            true,
-            SymbolicFactConfidence.Exact,
-            provenance,
-            site.Span,
-            null,
-            provenance);
-        if (!RuntimeHazardTrigger.TryCreate(precondition, out var trigger))
-            throw new InvalidOperationException("Could not encode aggregate runtime-hazard precondition.");
-
-        return trigger;
-    }
-
-    internal static bool TryGetExceptionPrecondition(
-        RuntimeHazardTrigger trigger,
-        SymbolicExceptionPreconditionKind kind,
-        out SymbolicExceptionPreconditionAtom precondition)
-    {
-        if (trigger.Precondition.Atom is SymbolicExceptionPreconditionAtom candidate &&
-            candidate.Kind == kind)
-        {
-            precondition = candidate;
-            return true;
-        }
-
-        precondition = null!;
-        return false;
-    }
-
     internal static bool TryCreateSwitchExpressionNoMatchCandidate(
         SwitchExpressionSyntax switchExpression,
         SemanticModel semanticModel,

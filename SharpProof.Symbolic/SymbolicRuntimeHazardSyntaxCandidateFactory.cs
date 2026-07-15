@@ -585,21 +585,16 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                 out var receiver,
                 out var relation,
                 out var triggeringCount) ||
-            !TryCreateInvalidCollectionCardinalityTrigger(
+            !SymbolicOperationLowerer.TryLowerInvalidCollectionCardinalityHazard(
                 receiver,
                 relation,
                 triggeringCount,
-                semanticModel,
-                cancellationToken,
-                out var trigger))
+                ExceptionCategories.DefiniteInvalidCollectionCardinality,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
             return false;
 
-        candidate = new RuntimeHazardCandidate(
-            invocation,
-            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
-            trigger,
-            ExceptionTypes.InvalidOperationException,
-            ExceptionCategories.DefiniteInvalidCollectionCardinality);
+        candidate = new RuntimeHazardCandidate(invocation, hazard);
         return true;
     }
 
@@ -1011,53 +1006,18 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var triggerCondition = default(SymbolicCondition);
-        var subject = default(SymbolicTerm);
-        var allTriggersAreExact = true;
-        var hasTrigger = false;
-        foreach (var lengthExpression in lengthExpressions)
-        {
-            if (!TryCreateNegativeLengthTrigger(
-                    lengthExpression,
-                    preconditionKind,
-                    provenance,
-                    semanticModel,
-                    cancellationToken,
-                    out var negativeLength))
-                continue;
-
-            hasTrigger = true;
-            if (TryGetExceptionPrecondition(
-                    negativeLength,
-                    preconditionKind,
-                    out var precondition))
-            {
-                triggerCondition = triggerCondition == null
-                    ? precondition.Trigger
-                    : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
-                subject ??= precondition.Subject;
-                allTriggersAreExact &= negativeLength.Precondition.Confidence == SymbolicFactConfidence.Exact;
-            }
-            else
-            {
-                allTriggersAreExact = false;
-            }
-        }
-
-        if (!hasTrigger) return false;
-
-        candidate = new RuntimeHazardCandidate(
+        if (!SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
             site,
-            hazardKind,
-            CreateAggregateExceptionPreconditionTrigger(
-                site,
+                lengthExpressions,
                 preconditionKind,
-                subject,
-                triggerCondition,
-                allTriggersAreExact,
-                provenance + ".aggregate"),
-            ExceptionTypes.OverflowException,
-            category);
+                hazardKind,
+                provenance,
+                category,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var hazard))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(site, hazard);
         return true;
     }
 }
