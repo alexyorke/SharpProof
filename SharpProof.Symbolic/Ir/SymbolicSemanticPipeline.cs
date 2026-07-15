@@ -31,26 +31,23 @@ internal static class SymbolicSemanticPipeline
             "condition");
     }
 
-    internal static SymbolicLoweringResult<SymbolicState> LowerBranchFacts(
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerBranchCondition(
         ExpressionSyntax expression,
         bool branchWhenTrue,
         SymbolicLoweringContext context)
     {
         if (TryLowerNotNullWhenBranchCondition(expression, branchWhenTrue, context, out var flowCondition) ||
             TryLowerMemberNotNullWhenBranchCondition(expression, branchWhenTrue, context, out flowCondition))
-            return Exact(
-                new SymbolicState(pathConditions: new[] { flowCondition }),
-                expression,
-                "branch-facts");
+            return Exact(flowCondition, expression, "branch-facts");
 
         var lowered = LowerCondition(expression, context);
         if (!lowered.IsExact || lowered.Value == null)
-            return Unsupported<SymbolicState>(expression, "branch-facts");
+            return Unsupported<SymbolicCondition>(expression, "branch-facts");
 
         var condition = branchWhenTrue
             ? lowered.Value
             : new SymbolicNotCondition(lowered.Value);
-        return Exact(new SymbolicState(pathConditions: new[] { condition }), expression, "branch-facts");
+        return Exact(condition, expression, "branch-facts");
     }
 
     internal static SymbolicLoweringResult<SymbolicCondition> LowerArrayLengthCountAliasCondition(

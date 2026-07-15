@@ -21,14 +21,6 @@ internal class CoalesceOperationPurityRule : IPurityRule
             coalesceOperation.Value.ConstantValue.Value != null)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityAnalysisEngine.TryGetKnownReferenceNullValueFromPathFacts(
-                currentState,
-                coalesceOperation.Value,
-                context.SmtAnalysis,
-                out var leftIsNull) &&
-            !leftIsNull)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         if (!PurityAnalysisEngine.TryCreateReferenceNullAssumptionState(
                 currentState,
                 coalesceOperation.Value,

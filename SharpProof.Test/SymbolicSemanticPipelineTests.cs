@@ -237,16 +237,15 @@ public sealed class SymbolicSemanticPipelineTests
     {
         var context = CreateExpressionContext("object value", "value is string");
 
-        var result = SymbolicSemanticPipeline.LowerBranchFacts(
+        var result = SymbolicSemanticPipeline.LowerBranchCondition(
             context.Expression,
             false,
             context.LoweringContext);
 
         Assert.That(result.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
-        Assert.That(result.Value!.PathConditions, Has.Length.EqualTo(1));
-        Assert.That(result.Value.PathConditions[0], Is.TypeOf<SymbolicNotCondition>());
+        Assert.That(result.Value, Is.TypeOf<SymbolicNotCondition>());
 
-        var negated = (SymbolicNotCondition)result.Value.PathConditions[0];
+        var negated = (SymbolicNotCondition)result.Value!;
         Assert.That(ContainsRuntimeTypeTest(negated.Operand), Is.True);
     }
 

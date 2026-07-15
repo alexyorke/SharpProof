@@ -114,19 +114,22 @@ internal static class SymbolicReachabilityService
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        var lowering = SymbolicSemanticPipeline.LowerBranchFacts(
+        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
             condition,
             branchWhenTrue,
             new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } branchFacts })
-            return lowering;
+        if (lowering is not { IsExact: true, Value: { } branchCondition })
+            return SymbolicLoweringResult<SymbolicState>.Unsupported(lowering.Provenance[0]);
 
-        var branchState = state;
-        foreach (var fact in branchFacts.Facts) branchState = branchState.AddFact(fact);
-        foreach (var pathCondition in branchFacts.PathConditions)
-            branchState = branchState.AddPathCondition(pathCondition);
-
-        return SymbolicLoweringResult<SymbolicState>.Exact(branchState, lowering.Provenance[0]);
+        var transition = SymbolicOperationTransferKernel.Assume(
+            state,
+            branchCondition,
+            assumeTrue: true,
+            condition.Span,
+            "operation-transfer.branch-assumption");
+        return transition.IsExact
+            ? SymbolicLoweringResult<SymbolicState>.Exact(transition.State, lowering.Provenance[0])
+            : SymbolicLoweringResult<SymbolicState>.Unsupported(lowering.Provenance[0]);
     }
 
     internal static bool IsForInitialEntryConditionAlwaysFalse(

@@ -38,6 +38,13 @@ internal static class SymbolicOperationTransferKernel
             if (operation is SymbolicLifetimeOperation lifetime &&
                 TryApplyLifetime(ref state, lifetime))
                 continue;
+            if (operation is SymbolicBranchAssumptionOperation branch)
+            {
+                state = state.AddPathCondition(branch.AssumeTrue
+                    ? branch.Condition
+                    : new SymbolicNotCondition(branch.Condition));
+                continue;
+            }
 
             return SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -120,6 +127,21 @@ internal static class SymbolicOperationTransferKernel
                 callerVisible,
                 symbol,
                 evidenceKey,
+                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
+    }
+
+    internal static SymbolicOperationTransitionResult Assume(
+        SymbolicState state,
+        SymbolicCondition condition,
+        bool assumeTrue,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        string provenance)
+    {
+        return Apply(
+            state,
+            SymbolicOperationSequence.Single(new SymbolicBranchAssumptionOperation(
+                condition,
+                assumeTrue,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     }
 

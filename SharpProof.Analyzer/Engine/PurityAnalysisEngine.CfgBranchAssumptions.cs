@@ -215,33 +215,9 @@ internal partial class PurityAnalysisEngine
 
         if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return true;
 
-        var nextPathState = TryCreateReferenceNullPathState(
-            currentState,
-            value,
-            valueTerm,
-            isNull,
-            out var symbolicNullState)
-            ? symbolicNullState
-            : currentState.PathState;
-        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, value?.Syntax))
-            return false;
-
-        branchState = currentState.WithPathState(nextPathState);
-        return true;
-    }
-
-    private static bool TryCreateReferenceNullPathState(
-        PurityAnalysisState currentState,
-        IOperation? value,
-        SymbolicTerm valueTerm,
-        bool isNull,
-        out SymbolicState pathState)
-    {
-        pathState = currentState.PathState;
-        value = SkipImplicitConversions(value);
         if (value?.Syntax is not ExpressionSyntax syntax ||
             valueTerm.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
-            return false;
+            return true;
 
         var fact = SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -251,56 +227,19 @@ internal partial class PurityAnalysisEngine
             syntax,
             "analyzer.null_assumption",
             evidenceKey: isNull ? "analyzer.path.null" : "analyzer.path.not_null");
-        pathState = currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact));
+        var transition = SymbolicOperationTransferKernel.Assume(
+            currentState.PathState,
+            new SymbolicFactCondition(fact),
+            assumeTrue: true,
+            syntax.Span,
+            "analyzer.null_assumption");
+        if (!transition.IsExact) return true;
+        var nextPathState = transition.State;
+        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, value?.Syntax))
+            return false;
+
+        branchState = currentState.WithPathState(nextPathState);
         return true;
-    }
-
-    internal static bool TryGetKnownReferenceNullValueFromPathFacts(
-        PurityAnalysisState currentState,
-        IOperation? value,
-        SmtAnalysisService smtAnalysis,
-        out bool isNull)
-    {
-        isNull = false;
-
-        value = SkipImplicitConversions(value);
-        if (value?.ConstantValue.HasValue == true)
-        {
-            isNull = value.ConstantValue.Value == null;
-            return true;
-        }
-
-        if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return false;
-
-        var nullPathState = TryCreateReferenceNullPathState(
-            currentState,
-            value,
-            valueTerm,
-            true,
-            out var symbolicNullProbeState)
-            ? symbolicNullProbeState
-            : currentState.PathState;
-        if (IsPathStateUnsatisfiable(currentState, nullPathState, smtAnalysis, value?.Syntax))
-        {
-            isNull = false;
-            return true;
-        }
-
-        var nonNullPathState = TryCreateReferenceNullPathState(
-            currentState,
-            value,
-            valueTerm,
-            false,
-            out var symbolicNonNullProbeState)
-            ? symbolicNonNullProbeState
-            : currentState.PathState;
-        if (IsPathStateUnsatisfiable(currentState, nonNullPathState, smtAnalysis, value?.Syntax))
-        {
-            isNull = true;
-            return true;
-        }
-
-        return false;
     }
 
     private static bool IsBranchAssumptionUnsatisfiable(

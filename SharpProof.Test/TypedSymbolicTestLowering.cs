@@ -170,18 +170,16 @@ internal static class TypedSymbolicTestLowering
         ICollection<SmtFormula> formulas,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        var lowering = SymbolicSemanticPipeline.LowerBranchFacts(
+        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
             expression,
             branchWhenTrue,
             new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } state }) return false;
+        if (lowering is not { IsExact: true, Value: { } condition } ||
+            !SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
+            return false;
 
-        var originalCount = formulas.Count;
-        foreach (var condition in state.PathConditions)
-            if (SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
-                formulas.Add(formula);
-
-        return formulas.Count > originalCount;
+        formulas.Add(formula);
+        return true;
     }
 
     internal static bool TryAddBranchConditionFacts(

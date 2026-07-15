@@ -182,8 +182,9 @@ internal static class SymbolicBranchCompletionStateTransfer
         CancellationToken cancellationToken,
         out SymbolicCondition branchCondition)
     {
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
+        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
             condition,
+            branchWhenTrue,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is not { IsExact: true, Value: { } loweredCondition })
         {
@@ -191,9 +192,7 @@ internal static class SymbolicBranchCompletionStateTransfer
             return false;
         }
 
-        branchCondition = branchWhenTrue
-            ? loweredCondition
-            : new SymbolicNotCondition(loweredCondition);
+        branchCondition = loweredCondition;
         return true;
     }
 

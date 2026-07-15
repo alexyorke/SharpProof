@@ -23,14 +23,6 @@ internal class ConditionalAccessPurityRule : IPurityRule
         if (receiver.ConstantValue.HasValue && receiver.ConstantValue.Value == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityAnalysisEngine.TryGetKnownReferenceNullValueFromPathFacts(
-                currentState,
-                receiver,
-                context.SmtAnalysis,
-                out var receiverIsNull) &&
-            receiverIsNull)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         if (!PurityAnalysisEngine.TryCreateReferenceNullAssumptionState(
                 currentState,
                 receiver,
