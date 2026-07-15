@@ -128,6 +128,43 @@ public sealed class SymbolicOperationTransferModelTests
     }
 
     [Test]
+    public void SymbolicReferenceAssignment_RecordsNullSuppressedLiteral()
+    {
+        const string source = "static class C { static void M() { string value = null!; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SymbolicReferenceAssignment_RecordsNullSuppressedLiteral));
+        var declarator = fixture.Root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>()
+            .Single();
+        var valueExpression = declarator.Initializer!.Value;
+        var target = fixture.SemanticModel.GetDeclaredSymbol(declarator)!;
+
+        var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            new SymbolicState(),
+            target,
+            valueExpression,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            provenance: "test.null-assignment",
+            postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(transition.IsExact, Is.True);
+            Assert.That(transition.State.PathConditions.Any(condition =>
+                condition is SymbolicFactCondition
+                {
+                    Fact.Atom: SymbolicRelationAtom
+                    {
+                        Operator: SymbolicRelationOperator.Equal,
+                        Right: SymbolicNullTerm
+                    }
+                }), Is.True);
+        });
+    }
+
+    [Test]
     public void TransitionResult_NormalizesStateAndCanonicalizesTruncation()
     {
         var source = SyntaxFactory.ParseExpression("value");

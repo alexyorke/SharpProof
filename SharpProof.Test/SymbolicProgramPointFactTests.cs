@@ -2041,6 +2041,26 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
     }
 
+    [Test]
+    public void ProgramPointFacts_NullForgivingNullInitializerRemainsNull()
+    {
+        const string source = """
+                              public class TestClass
+                              {
+                                  public int TestMethod()
+                                  {
+                                      string value = null!;
+                                      return value.Length;
+                                  }
+                              }
+                              """;
+
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value == null");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
+
     private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(

@@ -478,7 +478,7 @@ internal static class SymbolicLoopStateTransfer
 
             allReferenceElementsDefinitelyNonNull =
                 allReferenceElementsDefinitelyNonNull &&
-                SymbolicAssignmentStateTransfer.IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken);
+                NullableFlowFacts.IsDefinitelyNotNullReferenceValue(elementExpression, semanticModel, cancellationToken);
         }
 
         if (finiteDomain != null) state = state.AddPathCondition(finiteDomain);

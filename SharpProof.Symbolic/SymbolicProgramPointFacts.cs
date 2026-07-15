@@ -662,14 +662,14 @@ internal static class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         string? provenance = null)
     {
-        if (SymbolicAssignmentStateTransfer.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken))
+        if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken))
         {
             if (!isNull) state = MarkContradictory(state);
 
             return;
         }
 
-        if (SymbolicAssignmentStateTransfer.IsDefinitelyNonNullReferenceValue(expression, semanticModel, cancellationToken))
+        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken))
         {
             if (isNull) state = MarkContradictory(state);
 

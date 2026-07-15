@@ -40,7 +40,6 @@ internal static class PurityOperationTransferAdapter
         transition = SymbolicOperationTransferAdapter.ApplyAssignment(
             state.PathState,
             targetSymbol,
-            valueOperation,
             valueOperation.Syntax,
             semanticModel,
             cancellationToken,

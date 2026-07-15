@@ -115,16 +115,15 @@ internal static class SymbolicAssignmentStateTransfer
             effectiveValueExpression) is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(SyntaxKind.AsExpression);
         if (!isSelfReferential &&
-            (isAsExpression || assignedType?.SpecialType == SpecialType.System_String ||
+            (isAsExpression ||
              assignedType != null &&
-             (assignedType.SpecialType == SpecialType.System_Boolean ||
-              SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))) &&
-            semanticModel.GetOperation(effectiveValueExpression, cancellationToken) is { } valueOperation)
+             (SymbolicTypeFacts.IsReferenceType(assignedType) ||
+              assignedType.SpecialType == SpecialType.System_Boolean ||
+              SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
         {
             var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
                 state,
                 assignedSymbol,
-                valueOperation,
                 effectiveValueExpression,
                 semanticModel,
                 cancellationToken,
@@ -177,29 +176,6 @@ internal static class SymbolicAssignmentStateTransfer
                 context,
                 provenanceRoot);
 
-        if (!isSelfReferential &&
-            assignedType?.IsReferenceType == true &&
-            TryCreateSymbolTerm(assignedSymbol, out var assignedReferenceTarget) &&
-            assignedReferenceTarget.Kind == SmtValueKind.Reference &&
-            SymbolicSemanticPipeline.LowerReferenceTerm(effectiveValueExpression, context) is
-            { IsExact: true, Value: { } assignedReferenceValue } &&
-            CanCompareIrTerms(assignedReferenceTarget, assignedReferenceValue))
-        {
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                assignedReferenceTarget,
-                assignedReferenceValue,
-                effectiveValueExpression,
-                provenanceRoot + ".assigned-reference");
-            AddConditionalReferenceAssignmentStateFacts(
-                ref state,
-                assignedReferenceTarget,
-                assignedReferenceValue,
-                effectiveValueExpression,
-                provenanceRoot);
-        }
-
         if (isSelfReferential &&
                  TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
                  assignedValueTerm != null &&
@@ -213,20 +189,6 @@ internal static class SymbolicAssignmentStateTransfer
                 effectiveValueExpression,
                 provenanceRoot + ".assigned-value");
 
-        AddAssignedNonNullStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot);
-        AddAssignedNullStateFacts(
-            ref state,
-            assignedSymbol,
-            effectiveValueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot);
         AddNotNullIfNotNullAssignedStateFacts(
             ref state,
             assignedSymbol,
@@ -451,57 +413,6 @@ internal static class SymbolicAssignmentStateTransfer
             new SymbolicFactCondition(targetValueFact)));
     }
 
-    private static void AddConditionalReferenceAssignmentStateFacts(
-        ref SymbolicState state,
-        SymbolicTerm target,
-        SymbolicTerm assignedValue,
-        ExpressionSyntax valueExpression,
-        string provenanceRoot)
-    {
-        if (assignedValue is not SymbolicConditionalTerm conditional ||
-            target.Kind != SmtValueKind.Reference ||
-            conditional.WhenTrue.Kind != SmtValueKind.Reference ||
-            conditional.WhenFalse.Kind != SmtValueKind.Reference)
-            return;
-
-        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.NotEqual,
-                target,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".conditional-reference.target-non-null"));
-        var trueValueNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                conditional.WhenTrue,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".conditional-reference.true-value-null"));
-        var falseValueNull = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                conditional.WhenFalse,
-                new SymbolicNullTerm()),
-            valueExpression,
-            provenanceRoot + ".conditional-reference.false-value-null"));
-
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(conditional.Condition),
-            new SymbolicBinaryCondition(
-                SymbolicConditionOperator.Or,
-                targetNonNull,
-                trueValueNull)));
-        state = state.AddPathCondition(new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            conditional.Condition,
-            new SymbolicBinaryCondition(
-                SymbolicConditionOperator.Or,
-                targetNonNull,
-                falseValueNull)));
-    }
-
     internal static bool TryCreateNullableSymbolTerms(
         ISymbol symbol,
         out SymbolicTerm hasValue,
@@ -541,7 +452,7 @@ internal static class SymbolicAssignmentStateTransfer
                 effectiveValueExpression,
                 provenanceRoot + ".member.assigned-value");
 
-        AddAssignedNonNullStateFacts(
+        AddMemberNonNullStateFact(
             ref state,
             targetTerm,
             effectiveValueExpression,
@@ -614,7 +525,7 @@ internal static class SymbolicAssignmentStateTransfer
                 provenanceRoot + ".finite-array-element.from-end");
 
             if (elementKind == SmtValueKind.Reference &&
-                IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken))
+                NullableFlowFacts.IsDefinitelyNotNullReferenceValue(elementExpression, semanticModel, cancellationToken))
                 AddRelationPathFact(
                     ref state,
                     SymbolicRelationOperator.NotEqual,
@@ -688,59 +599,6 @@ internal static class SymbolicAssignmentStateTransfer
         return true;
     }
 
-    private static void AddAssignedNonNullStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference)) return;
-
-        AddAssignedNonNullStateFacts(
-            ref state,
-            targetReference,
-            valueExpression,
-            semanticModel,
-            cancellationToken,
-            provenanceRoot);
-    }
-
-    private static void AddAssignedNullStateFacts(
-        ref SymbolicState state,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenanceRoot)
-    {
-        if (!IsDefinitelyNullReferenceValue(valueExpression, semanticModel, cancellationToken) ||
-            !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            targetReference.Kind != SmtValueKind.Reference)
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.Equal,
-            targetReference,
-            new SymbolicNullTerm(),
-            valueExpression,
-            provenanceRoot + ".assigned-null");
-    }
-
-    internal static bool IsDefinitelyNullReferenceValue(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        var constant = semanticModel.GetConstantValue(expression, cancellationToken);
-        return constant is { HasValue: true, Value: null } &&
-               (semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(expression, cancellationToken).Type)?.IsReferenceType == true;
-    }
-
     private static void AddNotNullIfNotNullAssignedStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
@@ -775,25 +633,26 @@ internal static class SymbolicAssignmentStateTransfer
             provenanceRoot + ".not-null-if-not-null.result");
     }
 
-    private static void AddAssignedNonNullStateFacts(
+    private static void AddMemberNonNullStateFact(
         ref SymbolicState state,
-        SymbolicTerm targetReference,
+        SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string provenanceRoot)
+        string provenance)
     {
-        if (!IsDefinitelyNonNullReferenceValue(valueExpression, semanticModel, cancellationToken) ||
-            targetReference.Kind != SmtValueKind.Reference)
-            return;
-
-        AddRelationPathFact(
-            ref state,
-            SymbolicRelationOperator.NotEqual,
-            targetReference,
-            new SymbolicNullTerm(),
-            valueExpression,
-            provenanceRoot + ".assigned-non-null");
+        if (target.Kind == SmtValueKind.Reference &&
+            NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                valueExpression,
+                semanticModel,
+                cancellationToken))
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm(),
+                valueExpression,
+                provenance + ".assigned-non-null");
     }
 
     private static void AddAssignedReferenceBackedStateFacts(
@@ -824,7 +683,10 @@ internal static class SymbolicAssignmentStateTransfer
         string provenanceRoot)
     {
         if (targetReference.Kind != SmtValueKind.Reference ||
-            IsDefinitelyNullReferenceValue(valueExpression, semanticModel, context.CancellationToken))
+            NullableFlowFacts.IsDefinitelyNullReferenceValue(
+                valueExpression,
+                semanticModel,
+                context.CancellationToken))
             return;
 
         var valueType = semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
@@ -1210,7 +1072,7 @@ internal static class SymbolicAssignmentStateTransfer
                 valueExpression,
                 provenanceRoot + ".assigned-value");
 
-        if (IsDefinitelyNonNullReferenceValue(valueExpression, semanticModel, cancellationToken) &&
+        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(valueExpression, semanticModel, cancellationToken) &&
             targetTerm.Kind == SmtValueKind.Reference)
             AddRelationPathFact(
                 ref state,
@@ -1566,17 +1428,6 @@ internal static class SymbolicAssignmentStateTransfer
             SmtValueKind.Reference);
         term = new SymbolicMemberTerm(tuple, elementName, elementKind);
         return true;
-    }
-
-    internal static bool IsDefinitelyNonNullReferenceValue(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
-            expression,
-            semanticModel,
-            cancellationToken);
     }
 
     internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)

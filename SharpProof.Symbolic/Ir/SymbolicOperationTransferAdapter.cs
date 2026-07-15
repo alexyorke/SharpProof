@@ -36,8 +36,7 @@ internal static class SymbolicOperationTransferAdapter
     internal static SymbolicOperationTransitionResult ApplyAssignment(
         SymbolicState state,
         ISymbol targetSymbol,
-        IOperation valueOperation,
-        SyntaxNode source,
+        SyntaxNode valueSyntax,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getTargetVersion = null,
@@ -60,8 +59,7 @@ internal static class SymbolicOperationTransferAdapter
             getValueVersion);
         var lowering = SymbolicOperationLowerer.LowerSimpleAssignment(
             targetSymbol,
-            valueOperation,
-            source,
+            valueSyntax,
             targetContext,
             valueContext,
             sequence,
