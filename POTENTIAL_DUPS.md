@@ -100,9 +100,6 @@ No significant in-scope duplication found by the assigned agent.
 
 ## Symbolic Smt
 
-### Duplicated conditional-formula "known value" recursion - `SmtSyntacticClassifier.Numeric.cs:156-159`, `ReferenceString.cs:203-206,250-255,159-163`
-Same `conditionValue ? WhenTrue : WhenFalse` dispatch per kind. **Recommendation:** `TryGetConditionalKnownValue(...)` generic helper.
-
 ### Duplicated string-length-as-interval fact application - `SmtSyntacticClassifier.ReferenceString.cs:37,169-182`, `SmtSyntacticClassifier.cs:640`
 **Recommendation:** Route all through single `AddStringLengthFact`.
 
