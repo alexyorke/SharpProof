@@ -178,6 +178,17 @@ internal static class SymbolicReachabilityService
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts)
     {
+        if (!includeCurrentStatementCompletionFacts)
+        {
+            var cfgState = SymbolicCfgProgramPointStateCollector.CollectStraightLineState(
+                site,
+                semanticModel,
+                cancellationToken,
+                initialState);
+            if (cfgState is { IsExact: true, Value: { } exactState })
+                return exactState;
+        }
+
         var state = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
             site,
             semanticModel,
