@@ -24,7 +24,10 @@ internal sealed class SymbolicComplexityService
             "Complexity source kind is not supported.",
             "Complexity queries support point, position, line, or node targets only.",
             "Node complexity queries require a node target.",
-            IsMethodLikeDeclaration,
+            static node => SymbolicMethodLikeDeclaration.IsSupported(
+                node,
+                includeAnonymousFunctions: true,
+                includeDestructors: true),
             ResolveMethodLikeDeclaration,
             ExecuteAnalysis,
             cancellationToken);
@@ -48,7 +51,7 @@ internal sealed class SymbolicComplexityService
         if (bodyNode == null)
             throw new ArgumentException("The requested method-like declaration does not have a body.");
 
-        var symbol = GetMethodLikeSymbol(declaration, semanticModel, cancellationToken);
+        var symbol = SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken);
         if (symbol == null)
             throw new ArgumentException("Could not resolve the symbol for the requested method-like body.");
 
@@ -150,35 +153,6 @@ internal sealed class SymbolicComplexityService
         }
 
         return distinct;
-    }
-
-    private static bool IsMethodLikeDeclaration(SyntaxNode node)
-    {
-        return node is BaseMethodDeclarationSyntax ||
-               node is AccessorDeclarationSyntax ||
-               node is PropertyDeclarationSyntax ||
-               node is IndexerDeclarationSyntax ||
-               node is LocalFunctionStatementSyntax ||
-               node is AnonymousFunctionExpressionSyntax;
-    }
-
-    private static IMethodSymbol? GetMethodLikeSymbol(
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (declaration is AnonymousFunctionExpressionSyntax anonymousFunction)
-            return semanticModel.GetOperation(anonymousFunction, cancellationToken) is IAnonymousFunctionOperation
-                lambda
-                ? lambda.Symbol
-                : null;
-
-        return semanticModel.GetDeclaredSymbol(declaration, cancellationToken) switch
-        {
-            IMethodSymbol method => method,
-            IPropertySymbol property => property.GetMethod,
-            _ => null
-        };
     }
 
     private static string GetDeclarationKind(SyntaxNode declaration)

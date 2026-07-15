@@ -33,7 +33,7 @@ internal sealed class SymbolicCapabilityService
             "Capability source kind is not supported.",
             "Capability queries support point, position, line, or node targets only.",
             "Capability node queries require a node target.",
-            IsMethodLikeDeclaration,
+            static node => SymbolicMethodLikeDeclaration.IsSupported(node),
             ResolveMethodLikeDeclaration,
             ExecuteAnalysis,
             cancellationToken);
@@ -104,7 +104,7 @@ internal sealed class SymbolicCapabilityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var symbol = TryGetDeclaredSymbol(declaration, semanticModel, cancellationToken);
+        var symbol = semanticModel.GetDeclaredSymbol(declaration, cancellationToken);
         var methodName = symbol?.Name ?? string.Empty;
         var methodDisplayName = symbol?.ToDisplayString() ?? methodName;
         return new ResolvedCapabilityTarget(
@@ -112,62 +112,7 @@ internal sealed class SymbolicCapabilityService
             semanticModel,
             methodName,
             methodDisplayName,
-            GetDeclarationKind(declaration));
-    }
-
-    private static bool IsMethodLikeDeclaration(SyntaxNode node)
-    {
-        return node is MethodDeclarationSyntax ||
-               node is ConstructorDeclarationSyntax ||
-               node is AccessorDeclarationSyntax ||
-               node is PropertyDeclarationSyntax ||
-               node is IndexerDeclarationSyntax ||
-               node is LocalFunctionStatementSyntax ||
-               node is OperatorDeclarationSyntax ||
-               node is ConversionOperatorDeclarationSyntax;
-    }
-
-    private static string GetDeclarationKind(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
-            MethodDeclarationSyntax => nameof(MethodDeclarationSyntax),
-            ConstructorDeclarationSyntax => nameof(ConstructorDeclarationSyntax),
-            AccessorDeclarationSyntax => nameof(AccessorDeclarationSyntax),
-            PropertyDeclarationSyntax => nameof(PropertyDeclarationSyntax),
-            IndexerDeclarationSyntax => nameof(IndexerDeclarationSyntax),
-            LocalFunctionStatementSyntax => nameof(LocalFunctionStatementSyntax),
-            OperatorDeclarationSyntax => nameof(OperatorDeclarationSyntax),
-            ConversionOperatorDeclarationSyntax => nameof(ConversionOperatorDeclarationSyntax),
-            _ => declaration.GetType().Name
-        };
-    }
-
-    private static ISymbol? TryGetDeclaredSymbol(
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return declaration switch
-        {
-            MethodDeclarationSyntax methodDeclaration => semanticModel.GetDeclaredSymbol(methodDeclaration,
-                cancellationToken),
-            ConstructorDeclarationSyntax constructorDeclaration => semanticModel.GetDeclaredSymbol(
-                constructorDeclaration, cancellationToken),
-            AccessorDeclarationSyntax accessorDeclaration => semanticModel.GetDeclaredSymbol(accessorDeclaration,
-                cancellationToken),
-            PropertyDeclarationSyntax propertyDeclaration => semanticModel.GetDeclaredSymbol(propertyDeclaration,
-                cancellationToken),
-            IndexerDeclarationSyntax indexerDeclaration => semanticModel.GetDeclaredSymbol(indexerDeclaration,
-                cancellationToken),
-            LocalFunctionStatementSyntax localFunctionStatement => semanticModel.GetDeclaredSymbol(
-                localFunctionStatement, cancellationToken),
-            OperatorDeclarationSyntax operatorDeclaration => semanticModel.GetDeclaredSymbol(operatorDeclaration,
-                cancellationToken),
-            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => semanticModel.GetDeclaredSymbol(
-                conversionOperatorDeclaration, cancellationToken),
-            _ => null
-        };
+            declaration.GetType().Name);
     }
 
     private sealed class AnalysisSession
@@ -442,7 +387,7 @@ internal sealed class SymbolicCapabilityService
             return SymbolicMethodSourceResolver.TryResolve(
                 _compilation,
                 methodSymbol,
-                IsMethodLikeDeclaration,
+                static node => SymbolicMethodLikeDeclaration.IsSupported(node),
                 true,
                 _cancellationToken,
                 out declaration,
@@ -464,8 +409,7 @@ internal sealed class SymbolicCapabilityService
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var symbol = TryGetDeclaredSymbol(declaration, semanticModel, cancellationToken);
-            return symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
+            return SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken);
         }
 
         private static bool IsSourceMethod(IMethodSymbol methodSymbol)
