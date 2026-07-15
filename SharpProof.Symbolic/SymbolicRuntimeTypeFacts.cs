@@ -41,6 +41,29 @@ internal static class SymbolicRuntimeTypeFacts
 
         if (expressionType?.TypeKind == TypeKind.Dynamic) return false;
 
+        if (expression is ConditionalExpressionSyntax conditionalExpression)
+            return TryGetCommonExactRuntimeType(
+                conditionalExpression.WhenTrue,
+                conditionalExpression.WhenFalse,
+                useNode,
+                semanticModel,
+                cancellationToken,
+                out exactType,
+                inlineDepth);
+
+        if (expression is BinaryExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.CoalesceExpression
+            } coalesceExpression)
+            return TryGetCommonExactRuntimeType(
+                coalesceExpression.Left,
+                coalesceExpression.Right,
+                useNode,
+                semanticModel,
+                cancellationToken,
+                out exactType,
+                inlineDepth);
+
         if (expression is CastExpressionSyntax castExpression)
         {
             var targetType = CSharpSyntaxFacts.GetExpressionType(castExpression, semanticModel, cancellationToken);
@@ -110,6 +133,39 @@ internal static class SymbolicRuntimeTypeFacts
             return true;
         }
 
+        return false;
+    }
+
+    private static bool TryGetCommonExactRuntimeType(
+        ExpressionSyntax first,
+        ExpressionSyntax second,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ITypeSymbol exactType,
+        int inlineDepth)
+    {
+        if (TryGetExactRuntimeType(
+                first,
+                useNode,
+                semanticModel,
+                cancellationToken,
+                out var firstType,
+                inlineDepth + 1) &&
+            TryGetExactRuntimeType(
+                second,
+                useNode,
+                semanticModel,
+                cancellationToken,
+                out var secondType,
+                inlineDepth + 1) &&
+            SymbolEqualityComparer.Default.Equals(firstType, secondType))
+        {
+            exactType = firstType;
+            return true;
+        }
+
+        exactType = null!;
         return false;
     }
 

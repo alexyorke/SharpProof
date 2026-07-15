@@ -1139,9 +1139,11 @@ public class TestClass
 {
     public int TestMethod(bool chooseLeft)
     {
-        IValueSource source = chooseLeft
+        IValueSource conditional = chooseLeft
             ? new ThrowingValueSource()
             : new ThrowingValueSource();
+        IValueSource fallback = new ThrowingValueSource();
+        IValueSource source = conditional ?? fallback;
         return source.Value;
     }
 }", "TestMethod");

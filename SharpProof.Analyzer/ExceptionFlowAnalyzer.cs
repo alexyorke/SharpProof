@@ -328,10 +328,13 @@ internal static partial class ExceptionFlowAnalyzer
 
         foreach (var invocation in GetInvocationNodes(methodNode))
         {
-            var knownExactLocals = GetKnownExactLocalTypesBefore(invocation, semanticModel, cancellationToken);
             if (semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation)
             {
-                foreach (var invokedMethod in ResolveInvocationTargets(invocationOperation, knownExactLocals))
+                foreach (var invokedMethod in ResolveInvocationTargets(
+                             invocationOperation,
+                             invocation,
+                             semanticModel,
+                             cancellationToken))
                 {
                     if (invokedMethod.MethodKind == MethodKind.DelegateInvoke) continue;
 
@@ -344,7 +347,8 @@ internal static partial class ExceptionFlowAnalyzer
                         invocationOperation.TargetMethod,
                         invocationOperation,
                         invocationOperation.Instance,
-                        knownExactLocals,
+                        semanticModel,
+                        cancellationToken,
                         seen,
                         out var dynamicDispatchCandidate))
                     yield return dynamicDispatchCandidate;
@@ -370,14 +374,15 @@ internal static partial class ExceptionFlowAnalyzer
 
         foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
         {
-            var knownExactLocals = GetKnownExactLocalTypesBefore(propertyAccess, semanticModel, cancellationToken);
             if (semanticModel.GetOperation(propertyAccess, cancellationToken) is IPropertyReferenceOperation
                 propertyReferenceOperation)
             {
                 foreach (var getterMethod in ResolvePropertyAccessorTargets(
                              propertyReferenceOperation,
                              false,
-                             knownExactLocals))
+                             propertyAccess,
+                             semanticModel,
+                             cancellationToken))
                     if (seen.Add(CreateMethodCallSiteKey(propertyAccess, getterMethod)))
                         yield return new MethodCallCandidate(propertyAccess, getterMethod);
 
@@ -386,7 +391,8 @@ internal static partial class ExceptionFlowAnalyzer
                         propertyReferenceOperation.Property?.GetMethod,
                         propertyReferenceOperation,
                         propertyReferenceOperation.Instance,
-                        knownExactLocals,
+                        semanticModel,
+                        cancellationToken,
                         seen,
                         out var dynamicDispatchCandidate))
                     yield return dynamicDispatchCandidate;
@@ -402,14 +408,15 @@ internal static partial class ExceptionFlowAnalyzer
 
         foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
         {
-            var knownExactLocals = GetKnownExactLocalTypesBefore(propertyWrite, semanticModel, cancellationToken);
             if (semanticModel.GetOperation(propertyWrite, cancellationToken) is IPropertyReferenceOperation
                 propertyReferenceOperation)
             {
                 foreach (var setterMethod in ResolvePropertyAccessorTargets(
                              propertyReferenceOperation,
                              true,
-                             knownExactLocals))
+                             propertyWrite,
+                             semanticModel,
+                             cancellationToken))
                     if (seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
                         yield return new MethodCallCandidate(propertyWrite, setterMethod);
 
@@ -418,7 +425,8 @@ internal static partial class ExceptionFlowAnalyzer
                         propertyReferenceOperation.Property?.SetMethod,
                         propertyReferenceOperation,
                         propertyReferenceOperation.Instance,
-                        knownExactLocals,
+                        semanticModel,
+                        cancellationToken,
                         seen,
                         out var dynamicDispatchCandidate))
                     yield return dynamicDispatchCandidate;
@@ -472,14 +480,15 @@ internal static partial class ExceptionFlowAnalyzer
         IMethodSymbol? method,
         IOperation operation,
         IOperation? receiver,
-        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
         HashSet<string> seen,
         out MethodCallCandidate candidate)
     {
         candidate = null!;
         if (method == null ||
             !IsSourceDispatchSlot(method) ||
-            TryResolveExactConcreteType(receiver, knownExactLocals, out _) ||
+            TryResolveExactConcreteType(receiver, callSite, semanticModel, cancellationToken, out _) ||
             !SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, operation) ||
             !seen.Add(CreateDynamicDispatchCallSiteKey(callSite, method)))
             return false;
@@ -508,7 +517,9 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(
         IInvocationOperation invocationOperation,
-        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
+        SyntaxNode callSite,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         var invokedMethod = invocationOperation.TargetMethod;
         return invokedMethod == null
@@ -516,7 +527,9 @@ internal static partial class ExceptionFlowAnalyzer
             : ResolveDispatchTargets(
                 invokedMethod,
                 invocationOperation.Instance,
-                knownExactLocals,
+                callSite,
+                semanticModel,
+                cancellationToken,
                 exactReceiverType =>
                     PurityConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType));
     }
@@ -524,7 +537,9 @@ internal static partial class ExceptionFlowAnalyzer
     private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
         IPropertyReferenceOperation propertyReferenceOperation,
         bool preferSetter,
-        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
+        SyntaxNode callSite,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         var property = propertyReferenceOperation.Property;
         var accessor = preferSetter ? property?.SetMethod : property?.GetMethod;
@@ -533,7 +548,9 @@ internal static partial class ExceptionFlowAnalyzer
             : ResolveDispatchTargets(
                 accessor,
                 propertyReferenceOperation.Instance,
-                knownExactLocals,
+                callSite,
+                semanticModel,
+                cancellationToken,
                 exactReceiverType => PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
                     property,
                     exactReceiverType,
@@ -543,11 +560,18 @@ internal static partial class ExceptionFlowAnalyzer
     private static IEnumerable<IMethodSymbol> ResolveDispatchTargets(
         IMethodSymbol fallbackTarget,
         IOperation? receiver,
-        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals,
+        SyntaxNode callSite,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
         Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget)
     {
         if (!SymbolicDispatchFacts.IsBaseReference(receiver) &&
-            TryResolveExactConcreteType(receiver, knownExactLocals, out var exactReceiverType) &&
+            TryResolveExactConcreteType(
+                receiver,
+                callSite,
+                semanticModel,
+                cancellationToken,
+                out var exactReceiverType) &&
             resolveExactTarget(exactReceiverType) is { } exactTarget)
             return new[] { exactTarget.OriginalDefinition };
 
