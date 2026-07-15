@@ -144,13 +144,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## Analyzer Configuration + Rules
 
-### 8. Overlapping symbol-id computation - `DiagnosticBaseline.cs:71-109`
-`GetSymbolIds` and `GetPreferredSymbolId` both build the candidate identifier set (compact method id / doc id / display string).
-
-**Recommendation:** `GetSymbolIdCandidates(symbol)` once; `GetPreferredSymbolId` returns first, `GetSymbolIds` returns distinct.
-
----
-
 ## Analyzer Engine - A-H
 
 ## Analyzer Engine - I-P

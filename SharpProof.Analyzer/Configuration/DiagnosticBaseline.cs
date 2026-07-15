@@ -87,10 +87,7 @@ internal sealed class DiagnosticBaseline
         if (symbol is IMethodSymbol methodSymbol && methodSymbol.ContainingType != null)
             return GetCompactMethodId(methodSymbol);
 
-        var documentationId = DocumentationCommentId.CreateDeclarationId(symbol.OriginalDefinition);
-        if (!string.IsNullOrWhiteSpace(documentationId)) return documentationId!;
-
-        return symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        return GetSymbolIds(symbol)[0];
     }
 
     internal static string NormalizePath(string path)
