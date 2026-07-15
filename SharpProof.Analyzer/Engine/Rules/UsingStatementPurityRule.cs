@@ -210,7 +210,7 @@ internal class UsingStatementPurityRule : IPurityRule
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!HasDeclaratorInitializer(local, cancellationToken) &&
-            currentState.LocalConcreteTypes.TryGetValue(local, out var concreteType) &&
+            currentState.TryGetLocalConcreteType(local, out var concreteType) &&
             DisposalMemberClassifier.FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
             return concreteType;
 

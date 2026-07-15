@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
@@ -242,6 +243,77 @@ internal static class SymbolicRuntimeTypeFacts
             .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
             .Replace("global::", string.Empty);
         return true;
+    }
+
+    internal static SymbolicState WithExactRuntimeType(
+        SymbolicState state,
+        SymbolicTerm value,
+        INamedTypeSymbol exactType,
+        SyntaxNode source,
+        string provenance)
+    {
+        if (!TryGetExactRuntimeTypeKey(exactType, out var typeKey)) return WithoutExactRuntimeType(state, value);
+
+        state = WithoutExactRuntimeType(state, value);
+        return state.AddFact(SymbolicFact.Exact(
+            new SymbolicExactRuntimeTypeAtom(value, typeKey),
+            source,
+            provenance,
+            exactType,
+            "evidence.exact-runtime-type"));
+    }
+
+    internal static SymbolicState WithoutExactRuntimeType(SymbolicState state, SymbolicTerm value)
+    {
+        var facts = state.Facts.Where(fact =>
+            fact.Atom is not SymbolicExactRuntimeTypeAtom exact || !Equals(exact.Value, value)).ToArray();
+        return facts.Length == state.Facts.Length
+            ? state
+            : new SymbolicState(
+                facts,
+                state.PathConditions,
+                state.SymbolVersions,
+                state.IsContradictory);
+    }
+
+    internal static bool TryGetExactRuntimeType(
+        SymbolicState state,
+        SymbolicTerm value,
+        out INamedTypeSymbol exactType)
+    {
+        var match = state.Facts.FirstOrDefault(fact => fact is
+            {
+                Polarity: true,
+                Confidence: SymbolicFactConfidence.Exact,
+                Atom: SymbolicExactRuntimeTypeAtom exact,
+                Symbol: INamedTypeSymbol
+            } && Equals(exact.Value, value));
+        exactType = match?.Symbol as INamedTypeSymbol ?? null!;
+        return exactType != null;
+    }
+
+    internal static SymbolicState RetainExactRuntimeTypes(SymbolicState state)
+    {
+        return new SymbolicState(state.Facts.Where(static fact => fact.Atom is SymbolicExactRuntimeTypeAtom),
+            symbolVersions: state.SymbolVersions);
+    }
+
+    private static bool TryGetExactRuntimeTypeKey(ITypeSymbol type, out string typeKey)
+    {
+        if (type.TypeKind is TypeKind.Dynamic or TypeKind.Error or TypeKind.TypeParameter)
+            return Fail(out typeKey);
+
+        typeKey = type
+            .WithNullableAnnotation(NullableAnnotation.None)
+            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            .Replace("global::", string.Empty);
+        return true;
+
+        static bool Fail(out string value)
+        {
+            value = null!;
+            return false;
+        }
     }
 
     private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)

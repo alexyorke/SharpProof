@@ -52,7 +52,10 @@ internal static partial class PurityAssignmentStateTransfer
                 cancellationToken);
 
             if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
-                nextState = nextState.WithLocalConcreteType(writtenLocalSymbol, concreteType);
+                nextState = nextState.WithLocalConcreteType(
+                    writtenLocalSymbol,
+                    concreteType,
+                    valueOperation.Syntax);
             else
                 nextState = nextState.WithoutLocalConcreteType(writtenLocalSymbol);
 

@@ -440,6 +440,9 @@ internal static class SwitchPathConditionBuilder
                 SubstituteCanonicalTerms(bounds.Length, bindings),
                 bounds.IncludeLowerBound,
                 bounds.IncludeUpperBound),
+            SymbolicExactRuntimeTypeAtom exactRuntimeType => new SymbolicExactRuntimeTypeAtom(
+                SubstituteCanonicalTerms(exactRuntimeType.Value, bindings),
+                exactRuntimeType.TypeKey),
             SymbolicTypeTestAtom typeTest => new SymbolicTypeTestAtom(
                 SubstituteCanonicalTerms(typeTest.Value, bindings),
                 typeTest.TypeKey),

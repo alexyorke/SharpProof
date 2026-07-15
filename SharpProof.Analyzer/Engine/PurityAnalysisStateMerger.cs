@@ -32,8 +32,6 @@ internal static class PurityAnalysisStateMerger
             MergeFlowCaptureMapsAcrossAll(states.Select(static state => state.FlowCaptures)),
             MergeFlowCaptureTargetMapsAcrossAll(states.Select(static state => state.FlowCaptureTargets)),
             firstImpurityEvidence,
-            IntersectLocalConcreteTypesAcrossAll(states.Select(static state => state.LocalConcreteTypes)),
-            IntersectFlowCaptureConcreteTypesAcrossAll(states.Select(static state => state.FlowCaptureConcreteTypes)),
             MergePathStatesAcrossAll(states, phiScope),
             IntersectFlowCaptureSymbolsAcrossAll(states.Select(static state => state.FlowCaptureSymbols)));
     }
@@ -133,46 +131,6 @@ internal static class PurityAnalysisStateMerger
             second,
             null,
             static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
-    }
-
-    private static ImmutableDictionary<ISymbol, INamedTypeSymbol> IntersectLocalConcreteTypes(
-        ImmutableDictionary<ISymbol, INamedTypeSymbol> first,
-        ImmutableDictionary<ISymbol, INamedTypeSymbol> second)
-    {
-        return IntersectMatchingMaps(
-            first,
-            second,
-            SymbolEqualityComparer.Default,
-            static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
-    }
-
-    private static ImmutableDictionary<ISymbol, INamedTypeSymbol> IntersectLocalConcreteTypesAcrossAll(
-        IEnumerable<ImmutableDictionary<ISymbol, INamedTypeSymbol>> maps)
-    {
-        return AggregateAcrossAll(
-            maps,
-            ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default),
-            IntersectLocalConcreteTypes);
-    }
-
-    private static ImmutableDictionary<CaptureId, INamedTypeSymbol> IntersectFlowCaptureConcreteTypes(
-        ImmutableDictionary<CaptureId, INamedTypeSymbol> first,
-        ImmutableDictionary<CaptureId, INamedTypeSymbol> second)
-    {
-        return IntersectMatchingMaps(
-            first,
-            second,
-            null,
-            static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
-    }
-
-    private static ImmutableDictionary<CaptureId, INamedTypeSymbol> IntersectFlowCaptureConcreteTypesAcrossAll(
-        IEnumerable<ImmutableDictionary<CaptureId, INamedTypeSymbol>> maps)
-    {
-        return AggregateAcrossAll(
-            maps,
-            ImmutableDictionary<CaptureId, INamedTypeSymbol>.Empty,
-            IntersectFlowCaptureConcreteTypes);
     }
 
     private static ImmutableDictionary<ISymbol, PotentialTargets> IntersectDelegateTargetMaps(

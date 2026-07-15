@@ -185,7 +185,10 @@ internal static partial class PurityAssignmentStateTransfer
 
             if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation,
                     out var concreteType))
-                nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
+                nextState = nextState.WithFlowCaptureConcreteType(
+                    flowCaptureOperation.Id,
+                    concreteType,
+                    flowCaptureOperation.Syntax);
 
             if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(
                     flowCaptureOperation.Value,

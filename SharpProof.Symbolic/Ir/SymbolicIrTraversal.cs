@@ -64,6 +64,9 @@ internal abstract class SymbolicIrRewriter
             SymbolicResourceLifetimeAtom lifetime => new SymbolicResourceLifetimeAtom(
                 Rewrite(lifetime.Resource),
                 lifetime.State),
+            SymbolicExactRuntimeTypeAtom exactRuntimeType => new SymbolicExactRuntimeTypeAtom(
+                Rewrite(exactRuntimeType.Value),
+                exactRuntimeType.TypeKey),
             SymbolicTypeTestAtom typeTest => new SymbolicTypeTestAtom(
                 Rewrite(typeTest.Value),
                 typeTest.TypeKey),

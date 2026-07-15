@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
@@ -203,7 +204,8 @@ internal partial class PurityAnalysisEngine
                         postCfgExitResourceState = PurityResourceStateFacts.AddUsingDeclarationDisposeFacts(
                             postCfgExitResourceState.Value,
                             usingDeclaration);
-                    var postCfgProbeState = postCfgReturnState.WithPathState(new SymbolicState());
+                    var postCfgProbeState = postCfgReturnState.WithPathState(
+                        SymbolicRuntimeTypeFacts.RetainExactRuntimeTypes(postCfgReturnState.PathState));
 
                     foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op =>
                                  op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))

@@ -197,7 +197,10 @@ internal sealed record SymbolicResourceLifetimeAtom(
     SymbolicTerm Resource,
     SymbolicResourceLifetimeState State) : SymbolicAtom;
 
-internal sealed record SymbolicTypeTestAtom(SymbolicTerm Value, string TypeKey) : SymbolicAtom;
+internal record SymbolicTypeTestAtom(SymbolicTerm Value, string TypeKey) : SymbolicAtom;
+
+internal sealed record SymbolicExactRuntimeTypeAtom(SymbolicTerm Value, string TypeKey)
+    : SymbolicTypeTestAtom(Value, TypeKey);
 
 internal sealed record SymbolicExceptionPreconditionAtom(
     SymbolicExceptionPreconditionKind Kind,
@@ -1061,6 +1064,9 @@ internal sealed class SymbolicState
                 return "disposal:" + disposal.State + ":" + CreateTermKey(disposal.Resource);
             case SymbolicResourceLifetimeAtom resourceLifetime:
                 return "resource-lifetime:" + resourceLifetime.State + ":" + CreateTermKey(resourceLifetime.Resource);
+            case SymbolicExactRuntimeTypeAtom exactRuntimeType:
+                return "exact-runtime-type:" + exactRuntimeType.TypeKey + ":" +
+                       CreateTermKey(exactRuntimeType.Value);
             case SymbolicTypeTestAtom typeTest:
                 return "type-test:" + typeTest.TypeKey + ":" + CreateTermKey(typeTest.Value);
             case SymbolicExceptionPreconditionAtom precondition:

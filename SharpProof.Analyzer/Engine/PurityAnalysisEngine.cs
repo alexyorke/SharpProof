@@ -250,9 +250,7 @@ internal partial class PurityAnalysisEngine
 
         public ImmutableDictionary<CaptureId, PurityAnalysisResult> FlowCaptures { get; }
         public ImmutableDictionary<CaptureId, PotentialTargets> FlowCaptureTargets { get; }
-        public ImmutableDictionary<CaptureId, INamedTypeSymbol> FlowCaptureConcreteTypes { get; }
         public ImmutableDictionary<CaptureId, ISymbol> FlowCaptureSymbols { get; }
-        public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
         public SymbolicState PathState { get; }
 
 
@@ -263,8 +261,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<CaptureId, PurityAnalysisResult>? flowCaptures,
             ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
             PurityEvidence firstImpurityEvidence = default,
-            ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
-            ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
         {
@@ -276,11 +272,7 @@ internal partial class PurityAnalysisEngine
                                 ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
             FlowCaptures = flowCaptures ?? ImmutableDictionary<CaptureId, PurityAnalysisResult>.Empty;
             FlowCaptureTargets = flowCaptureTargets ?? ImmutableDictionary<CaptureId, PotentialTargets>.Empty;
-            FlowCaptureConcreteTypes =
-                flowCaptureConcreteTypes ?? ImmutableDictionary<CaptureId, INamedTypeSymbol>.Empty;
             FlowCaptureSymbols = flowCaptureSymbols ?? ImmutableDictionary.Create<CaptureId, ISymbol>();
-            LocalConcreteTypes = localConcreteTypes ??
-                                 ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
             PathState = pathState ?? new SymbolicState();
         }
 
@@ -306,13 +298,9 @@ internal partial class PurityAnalysisEngine
                        static (left, right) => PurityResultsEqual(left, right)) &&
                    MapsEqual(FlowCaptureTargets, other.FlowCaptureTargets,
                        static (left, right) => left.Equals(right)) &&
-                   MapsEqual(FlowCaptureConcreteTypes, other.FlowCaptureConcreteTypes,
-                       static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
                    MapsEqual(FlowCaptureSymbols, other.FlowCaptureSymbols,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
-                   SymbolicStatesEqual(PathState, other.PathState) &&
-                   MapsEqual(LocalConcreteTypes, other.LocalConcreteTypes,
-                       static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
+                   SymbolicStatesEqual(PathState, other.PathState);
         }
 
         private static bool MapsEqual<TKey, TValue>(
@@ -363,12 +351,6 @@ internal partial class PurityAnalysisEngine
                 hash = hash * 23 + kvp.Value.GetHashCode();
             }
 
-            foreach (var kvp in FlowCaptureConcreteTypes.OrderBy(kv => kv.Key.GetHashCode()))
-            {
-                hash = hash * 23 + kvp.Key.GetHashCode();
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
-            }
-
             foreach (var kvp in FlowCaptureSymbols.OrderBy(kv => kv.Key.GetHashCode()))
             {
                 hash = hash * 23 + kvp.Key.GetHashCode();
@@ -378,12 +360,6 @@ internal partial class PurityAnalysisEngine
             foreach (var fact in PathState.Facts) hash = hash * 23 + fact.GetHashCode();
 
             foreach (var condition in PathState.PathConditions) hash = hash * 23 + condition.GetHashCode();
-
-            foreach (var kvp in LocalConcreteTypes.OrderBy(kv => kv.Key.Name))
-            {
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Key);
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
-            }
 
             foreach (var kvp in PathState.SymbolVersions.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
                 hash = hash * 23 + kvp.GetHashCode();
@@ -429,8 +405,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<CaptureId, PurityAnalysisResult>? flowCaptures = null,
             ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
             PurityEvidence? firstImpurityEvidence = null,
-            ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
-            ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
         {
@@ -441,8 +415,6 @@ internal partial class PurityAnalysisEngine
                 flowCaptures ?? FlowCaptures,
                 flowCaptureTargets ?? FlowCaptureTargets,
                 firstImpurityEvidence ?? FirstImpurityEvidence,
-                localConcreteTypes ?? LocalConcreteTypes,
-                flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
                 pathState ?? PathState,
                 flowCaptureSymbols ?? FlowCaptureSymbols);
         }
@@ -489,13 +461,18 @@ internal partial class PurityAnalysisEngine
             return Copy(flowCaptureTargets: FlowCaptureTargets.SetItem(id, targets));
         }
 
-        public PurityAnalysisState WithFlowCaptureConcreteType(CaptureId id, INamedTypeSymbol concreteType)
+        public PurityAnalysisState WithFlowCaptureConcreteType(
+            CaptureId id,
+            INamedTypeSymbol concreteType,
+            SyntaxNode source)
         {
-            if (FlowCaptureConcreteTypes.TryGetValue(id, out var existingType) &&
-                SymbolEqualityComparer.Default.Equals(existingType, concreteType))
-                return this;
-
-            return Copy(flowCaptureConcreteTypes: FlowCaptureConcreteTypes.SetItem(id, concreteType));
+            var term = CreateFlowCaptureReferenceTerm(id);
+            return Copy(pathState: SymbolicRuntimeTypeFacts.WithExactRuntimeType(
+                PathState,
+                term,
+                concreteType,
+                source,
+                "analyzer.flow-capture.exact-runtime-type"));
         }
 
         public PurityAnalysisState WithFlowCaptureSymbol(CaptureId id, ISymbol symbol)
@@ -524,7 +501,7 @@ internal partial class PurityAnalysisEngine
 
         public bool IsOwnedArrayFlowCapture(CaptureId id)
         {
-            var term = CreateOwnedArrayFlowCaptureTerm(id);
+            var term = CreateFlowCaptureReferenceTerm(id);
             return PathState.Facts.Any(fact => IsOwnedArrayFlowCaptureFact(fact, term));
         }
 
@@ -533,7 +510,7 @@ internal partial class PurityAnalysisEngine
         {
             if (source == null) return pathState;
 
-            var term = CreateOwnedArrayFlowCaptureTerm(id);
+            var term = CreateFlowCaptureReferenceTerm(id);
             return SymbolicOperationTransferKernel.TransitionLifetime(
                 pathState,
                 term,
@@ -545,7 +522,7 @@ internal partial class PurityAnalysisEngine
 
         private static SymbolicState RemoveOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id)
         {
-            var term = CreateOwnedArrayFlowCaptureTerm(id);
+            var term = CreateFlowCaptureReferenceTerm(id);
             var facts = pathState.Facts
                 .Where(fact => !IsOwnedArrayFlowCaptureFact(fact, term))
                 .ToArray();
@@ -554,7 +531,7 @@ internal partial class PurityAnalysisEngine
                 : new SymbolicState(facts, pathState.PathConditions);
         }
 
-        private static SymbolicTerm CreateOwnedArrayFlowCaptureTerm(CaptureId id)
+        private static SymbolicTerm CreateFlowCaptureReferenceTerm(CaptureId id)
         {
             return new SymbolicVariableTerm(
                 "flowCapture#" + id.GetHashCode().ToString(CultureInfo.InvariantCulture),
@@ -592,31 +569,38 @@ internal partial class PurityAnalysisEngine
                 PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this));
         }
 
-        public PurityAnalysisState WithLocalConcreteType(ISymbol localSymbol, INamedTypeSymbol concreteType)
+        public PurityAnalysisState WithLocalConcreteType(
+            ISymbol localSymbol,
+            INamedTypeSymbol concreteType,
+            SyntaxNode source)
         {
-            if (LocalConcreteTypes.TryGetValue(localSymbol, out var existingType) &&
-                SymbolEqualityComparer.Default.Equals(existingType, concreteType))
-                return this;
-
-            return Copy(
-                localConcreteTypes: LocalConcreteTypes.SetItem(localSymbol, concreteType));
+            var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
+            return Copy(pathState: SymbolicRuntimeTypeFacts.WithExactRuntimeType(
+                PathState,
+                term,
+                concreteType,
+                source,
+                "analyzer.local.exact-runtime-type"));
         }
 
         public PurityAnalysisState WithoutLocalConcreteType(ISymbol localSymbol)
         {
-            if (!LocalConcreteTypes.ContainsKey(localSymbol)) return this;
-
-            return Copy(localConcreteTypes: LocalConcreteTypes.Remove(localSymbol));
+            var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
+            return Copy(pathState: SymbolicRuntimeTypeFacts.WithoutExactRuntimeType(PathState, term));
         }
 
         public bool TryGetLocalConcreteType(ISymbol localSymbol, out INamedTypeSymbol concreteType)
         {
-            return LocalConcreteTypes.TryGetValue(localSymbol, out concreteType!);
+            var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
+            return SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(PathState, term, out concreteType);
         }
 
         public bool TryGetFlowCaptureConcreteType(CaptureId id, out INamedTypeSymbol concreteType)
         {
-            return FlowCaptureConcreteTypes.TryGetValue(id, out concreteType!);
+            return SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                PathState,
+                CreateFlowCaptureReferenceTerm(id),
+                out concreteType);
         }
 
         public bool TryGetFlowCaptureSymbol(CaptureId id, out ISymbol symbol)
