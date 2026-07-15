@@ -1,6 +1,5 @@
 using System.Text.Json;
 using NUnit.Framework;
-using SharpProof.Symbolic;
 using static SharpProof.Test.SourceMarker;
 
 namespace SharpProof.Test;
@@ -38,11 +37,7 @@ public sealed class SymbolicComplexityQueryTests
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
-        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
-        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        SymbolicCliTestAssertions.AssertCompactEnvelope(root, "complexity");
     }
 
     [Test]
@@ -60,15 +55,7 @@ public sealed class SymbolicComplexityQueryTests
         using var sourceFile = TemporarySourceFile.Create("SymbolicComplexityInvalid-", source);
         var sourcePath = sourceFile.Path;
 
-        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-            "--file",
-            sourcePath,
-            "--complexity",
-            "--all-lines");
-
-        Assert.That(result.ExitCode, Is.EqualTo(64));
-        Assert.That(result.StandardError,
-            Does.Contain("--complexity supports --line, --line with --column, or --position only."));
+        await SymbolicCliTestAssertions.AssertRejectsAllLinesAsync(sourcePath, "complexity");
     }
 
     [Test]

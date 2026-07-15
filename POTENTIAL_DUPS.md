@@ -8,9 +8,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Code fixes, attributes, and test infrastructure
 
-17. **CLI compact envelope assertions and invalid-mode cases** - `SharpProof.ToolingTest/SymbolicCapabilityQueryTests.cs:79-128`; `SharpProof.ToolingTest/SymbolicComplexityQueryTests.cs:40-87`
-    Capability and complexity tests duplicate compact JSON envelope assertions and invalid `--all-lines` invocation checks. Parameterize command/expected mode and retain feature-specific payload assertions locally.
-
 ## Tooling and build scripts
 
 18. **SARIF materialization from project/solution inputs** - `Tools/SharpProof.Baseline/Program.cs:87-111`; `Tools/SharpProof.CorpusReport/Program.cs:23-56`

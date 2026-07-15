@@ -1,6 +1,5 @@
 using System.Text.Json;
 using NUnit.Framework;
-using SharpProof.Symbolic;
 using static SharpProof.Test.SourceMarker;
 
 namespace SharpProof.Test;
@@ -69,11 +68,7 @@ public sealed class SymbolicCapabilityQueryTests
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
-        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
-        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        SymbolicCliTestAssertions.AssertCompactEnvelope(root, "capabilities");
         Assert.That(root.GetProperty("hasUnknowns").GetBoolean(), Is.True);
         Assert.That(root.GetProperty("unknownReasons")[0].GetString(), Is.EqualTo("DynamicDispatch"));
     }
@@ -93,15 +88,7 @@ public sealed class SymbolicCapabilityQueryTests
         using var sourceFile = TemporarySourceFile.Create("SymbolicCapabilitiesInvalid-", source);
         var sourcePath = sourceFile.Path;
 
-        var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-            "--file",
-            sourcePath,
-            "--capabilities",
-            "--all-lines");
-
-        Assert.That(result.ExitCode, Is.EqualTo(64));
-        Assert.That(result.StandardError,
-            Does.Contain("--capabilities supports --line, --line with --column, or --position only."));
+        await SymbolicCliTestAssertions.AssertRejectsAllLinesAsync(sourcePath, "capabilities");
     }
 
     [Test]

@@ -115,12 +115,7 @@ public sealed class CompactDomainProjectionTests
                 Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy), compactResult.Kind);
 
             var root = Serialize(compactResult);
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo(compactResult.Kind));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-                Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-            Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-                Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+            SymbolicCliTestAssertions.AssertCompactEnvelope(root, compactResult.Kind);
         }
 
         Assert.That(capability.Kind, Is.EqualTo("capabilities"));
