@@ -912,11 +912,6 @@ internal sealed class SymbolicState
         return EnumerateConjunctiveFacts(condition, false);
     }
 
-    private static IEnumerable<SymbolicFact> EnumerateNegatedConditionFacts(SymbolicCondition condition)
-    {
-        return EnumerateConjunctiveFacts(condition, true);
-    }
-
     private static IEnumerable<SymbolicFact> EnumerateConjunctiveFacts(
         SymbolicCondition condition,
         bool negate)

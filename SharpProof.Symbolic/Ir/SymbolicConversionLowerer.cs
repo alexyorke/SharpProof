@@ -256,22 +256,6 @@ internal static class SymbolicConversionLowerer
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType);
     }
 
-    private static bool TryLowerIdentityPreservingAsTerm(
-        BinaryExpressionSyntax asExpression,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        term = null!;
-        if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
-            !IsIdentityPreservingReferenceConversion(asExpression.Left, targetTypeSyntax, context) ||
-            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(asExpression.Left, context), out var operand) ||
-            operand.Kind != SmtValueKind.Reference)
-            return false;
-
-        term = operand;
-        return true;
-    }
-
     private static bool IsIdentityPreservingReferenceConversion(
         ExpressionSyntax expression,
         TypeSyntax targetTypeSyntax,

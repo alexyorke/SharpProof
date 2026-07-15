@@ -267,32 +267,6 @@ internal sealed class SymbolicComplexityService
                    expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
         }
 
-        private ComplexityArtifacts AnalyzeExternalInvocationFallbacks(
-            SyntaxNode bodyNode,
-            SemanticModel semanticModel)
-        {
-            foreach (var invocation in EnumerateTopLevelInvocationTargets(bodyNode, semanticModel))
-            {
-                var (invocationSyntax, _, targetMethod) = invocation;
-                if (targetMethod == null)
-                    return ComplexityArtifacts.Unknown(
-                        SymbolicComplexityUnknownReason.UnknownCallee,
-                        invocationSyntax,
-                        invocationSyntax.SyntaxTree,
-                        _cancellationToken);
-
-                if (TryGetKnownMethodCost(targetMethod, out _)) continue;
-
-                if (!IsSourceMethod(targetMethod))
-                    return CreateUnknownCalleeArtifacts(
-                        targetMethod,
-                        SymbolicComplexityUnknownReason.ExternalCallee,
-                        invocationSyntax);
-            }
-
-            return ComplexityArtifacts.Constant;
-        }
-
         private ComplexityArtifacts AnalyzeTopLevelInvocations(
             SyntaxNode bodyNode,
             SemanticModel semanticModel,

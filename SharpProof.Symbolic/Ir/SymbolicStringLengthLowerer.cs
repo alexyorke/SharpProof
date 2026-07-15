@@ -367,20 +367,4 @@ internal static class SymbolicStringLengthLowerer
                SymbolicTypeFacts.HasInstanceInt32Member(type, "Count");
     }
 
-    private static bool TryLowerInvocationArgument(
-        IInvocationOperation invocationOperation,
-        int parameterIndex,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        term = null!;
-        if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(
-                invocationOperation,
-                parameterIndex,
-                out var argumentExpression))
-            return false;
-
-        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term);
-    }
-
 }

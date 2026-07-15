@@ -171,14 +171,6 @@ internal static partial class ExceptionFlowQuery
         return containingType + "." + methodName + "(" + parameterList + ")";
     }
 
-    private static ImmutableArray<string> CreateSummaryCalleeChain(string source, string fallbackSource)
-    {
-        if (string.IsNullOrWhiteSpace(source) || string.Equals(source, fallbackSource, StringComparison.Ordinal))
-            return ImmutableArray<string>.Empty;
-
-        return ParseCalleeChainFromSource(source);
-    }
-
     private static (string? Category, string Source) SplitQualifiedSource(string qualifiedSource)
     {
         if (string.IsNullOrWhiteSpace(qualifiedSource)) return (null, string.Empty);
@@ -256,23 +248,6 @@ internal static partial class ExceptionFlowQuery
         }
 
         return builder.ToImmutable();
-    }
-
-    private static ImmutableArray<ExceptionEdgeDiagnosticEntry> MergeDiagnosticEdges(
-        ImmutableArray<ExceptionEdgeDiagnosticEntry> first,
-        ImmutableArray<ExceptionEdgeDiagnosticEntry> second)
-    {
-        if (first.IsDefaultOrEmpty)
-            return second.IsDefault ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty : second;
-
-        if (second.IsDefaultOrEmpty) return first;
-
-        var merged = new SortedDictionary<string, ExceptionEdgeDiagnosticEntry>(StringComparer.Ordinal);
-        foreach (var edge in first) merged[edge.CreateKey()] = edge;
-
-        foreach (var edge in second) merged[edge.CreateKey()] = edge;
-
-        return merged.Values.ToImmutableArray();
     }
 
     private static bool IsKnownExceptionCategory(string category)

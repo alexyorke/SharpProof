@@ -150,14 +150,6 @@ internal partial class PurityAnalysisEngine
     }
 
 
-    private static string GetPuritySource(PurityAnalysisResult result)
-    {
-        if (result.IsPure) return "Assumed/Analyzed Pure";
-        if (result.ImpureSyntaxNode != null) return "Analyzed Impure";
-
-        return "Unknown/Default Impure";
-    }
-
     private static PurityAnalysisState CreateInitialRequiresState(
         IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
