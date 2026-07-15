@@ -267,6 +267,7 @@ transfer policy after its slice is complete.
 | Canonical throwing-finally completion | `0e4d3bb5` | 106,173 | -1,503 |
 | Central contract evidence projection | `26cbd9c6` | 106,166 | -1,510 |
 | Canonical exception-flow hazard projection | `ecb384c5` | 106,104 | -1,572 |
+| Canonical flow-capture invalidation | `ccf50299` | 106,094 | -1,582 |
 
 ## Validation Ledger
 
@@ -339,6 +340,7 @@ transfer policy after its slice is complete.
 | Phase 5 canonical throwing-finally completion | Commit `0e4d3bb5` replaces exception flow's recursive block/if exit interpreter with canonical completed-block transfer followed by the shared reachability proof. This preserves path-sensitive one-branch and all-branch exits while deleting 89 lines of duplicate completion policy. Direct finally tests: 17 passed; focused exception/path/catch/finally batch: 219 passed with only baseline SP0010. Production LOC fell to 106,173, or -1,503 from the rewrite start. Exception flow now consumes canonical hazard descriptors, path state, and completion semantics, closing the second Phase 5 item. |
 | Phase 5 central contract evidence projection | Commit `26cbd9c6` makes one typed Requires/Ensures projector own family keys, baseline identity, proof status, structured unknown reason, truncation, and explain metadata while each analyzer retains rule selection, reporting conditions, messages, and evidence-key policy. Inferred-contract and invalid-contract diagnostics now use the same baseline-plus-explain envelope; syntax-tree fallback and trusted-boundary paths remain separate because their identity or explain policy differs. Release Analyzer build: zero warnings; direct envelope and adjacent contract/suggestion tests: 16 passed; MainSmtAnalyzer: 487 passed. Production LOC fell to 106,166, or -1,510 from the rewrite start. |
 | Phase 5 canonical exception-flow hazard projection | Commit `ecb384c5` replaces 19 independent proven-hazard family loops with one ordered compatibility projection. Exception type comes directly from the canonical hazard descriptor; the adapter retains only source labels, legacy category normalization, supported-site filtering, and the established direct-throw/callee/family order. Release Analyzer build: zero warnings; MainSmtAnalyzer: 487 passed; MainSmtFlow: 256 passed with only the documented baseline SP0010 failure. Production LOC fell by 62 lines to 106,104, or -1,572 from the rewrite start. |
+| Phase 5 canonical flow-capture invalidation | Commit `ccf50299` invalidates a reassigned CFG flow capture through `SymbolicOperationTransferKernel.Invalidate` before applying exact runtime-type and ownership facts, and deletes Analyzer's owned-array-only fact filter and direct `SymbolicState` reconstruction. The new mixed fresh/external conditional-array regression characterizes conservative caller-visible mutation. Release Analyzer build: zero warnings; focused array/capture/dispatch tests: 35 passed; MainSmtAnalyzer: 487 passed. Production LOC fell by 10 lines to 106,094, or -1,582 from the rewrite start. |
 
 ## Current Checkpoint
 
@@ -352,9 +354,10 @@ transfer policy after its slice is complete.
 - Last confirmed fact: the Release Analyzer build has zero warnings; direct
   evidence-envelope and adjacent contract/suggestion tests are 16/16,
   MainSmtAnalyzer is 487/487, and MainSmtFlow is 256 passing with only baseline
-  SP0010. Production LOC is 106,104, or -1,572 from the rewrite start.
-- Next cheapest step: route owned flow-capture fact removal through canonical
-  invalidation; it is the first remaining direct Analyzer `SymbolicState`
-  reconstruction found by the exact mutation audit.
+  SP0010. Flow-capture/array/dispatch tests are 35/35 and MainSmtAnalyzer remains
+  487/487. Production LOC is 106,094, or -1,582 from the rewrite start.
+- Next cheapest step: route switch evaluation alias and selection conditions
+  through canonical branch assumptions, then repeat the exact Analyzer mutation
+  audit to distinguish entry-state/snapshot construction from live transfer.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
