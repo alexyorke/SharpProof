@@ -904,7 +904,11 @@ public sealed class SymbolicQueryScope
         int? position = null,
         int? spanStart = null,
         int? spanEnd = null,
-        int? lineCount = null)
+        int? lineCount = null,
+        int? startLine = null,
+        int? startColumn = null,
+        int? endLine = null,
+        int? endColumn = null)
     {
         Kind = kind;
         FilePath = filePath ?? string.Empty;
@@ -914,6 +918,10 @@ public sealed class SymbolicQueryScope
         SpanStart = spanStart;
         SpanEnd = spanEnd;
         LineCount = lineCount;
+        StartLine = startLine;
+        StartColumn = startColumn;
+        EndLine = endLine;
+        EndColumn = endColumn;
     }
 
     public SymbolicQueryScopeKind Kind { get; }
@@ -931,15 +939,18 @@ public sealed class SymbolicQueryScope
     public int? SpanEnd { get; }
 
     public int? LineCount { get; }
+
+    internal int? StartLine { get; }
+
+    internal int? StartColumn { get; }
+
+    internal int? EndLine { get; }
+
+    internal int? EndColumn { get; }
 }
 
 public sealed class SymbolicQueryResult
 {
-    private readonly SymbolicFileQueryResult? _fileResult;
-    private readonly SymbolicLineQueryResult? _lineResult;
-    private readonly SymbolicProgramPointResult? _pointResult;
-    private readonly SymbolicSpanQueryResult? _spanResult;
-
     private SymbolicQueryResult(
         SymbolicQueryScope scope,
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
@@ -951,10 +962,7 @@ public sealed class SymbolicQueryResult
         IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
         SymbolicSmtDiagnostics smtDiagnostics,
         SymbolicInvariantQueryView invariantQuery,
-        SymbolicFileQueryResult? fileResult = null,
-        SymbolicLineQueryResult? lineResult = null,
-        SymbolicSpanQueryResult? spanResult = null,
-        SymbolicProgramPointResult? pointResult = null)
+        IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
@@ -968,10 +976,7 @@ public sealed class SymbolicQueryResult
         ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        _fileResult = fileResult;
-        _lineResult = lineResult;
-        _spanResult = spanResult;
-        _pointResult = pointResult;
+        LineGroups = lineGroups ?? Array.Empty<SymbolicQueryLineGroup>();
         InvariantInfo = new SymbolicInvariantInfo(
             MergedInvariant.MergedInvariantText,
             SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
@@ -1028,57 +1033,61 @@ public sealed class SymbolicQueryResult
 
     public SymbolicInputDomainSummary InputDomainSummary { get; }
 
-    internal SymbolicFileQueryResult? FileResult => _fileResult;
-
-    internal SymbolicLineQueryResult? LineResult => _lineResult;
-
-    internal SymbolicSpanQueryResult? SpanResult => _spanResult;
-
-    internal SymbolicProgramPointResult? PointResult => _pointResult;
-
-    internal TResult SelectScope<TResult>(
-        Func<SymbolicFileQueryResult, TResult> selectFile,
-        Func<SymbolicLineQueryResult, TResult> selectLine,
-        Func<SymbolicSpanQueryResult, TResult> selectSpan,
-        Func<SymbolicProgramPointResult, TResult> selectPoint)
-    {
-        if (selectFile == null) throw new ArgumentNullException(nameof(selectFile));
-        if (selectLine == null) throw new ArgumentNullException(nameof(selectLine));
-        if (selectSpan == null) throw new ArgumentNullException(nameof(selectSpan));
-        if (selectPoint == null) throw new ArgumentNullException(nameof(selectPoint));
-
-        return Scope.Kind switch
-        {
-            SymbolicQueryScopeKind.File => selectFile(RequireScopeResult(_fileResult)),
-            SymbolicQueryScopeKind.Line => selectLine(RequireScopeResult(_lineResult)),
-            SymbolicQueryScopeKind.Span => selectSpan(RequireScopeResult(_spanResult)),
-            SymbolicQueryScopeKind.Point => selectPoint(RequireScopeResult(_pointResult)),
-            _ => throw new InvalidOperationException("Unexpected symbolic query scope.")
-        };
-    }
+    internal IReadOnlyList<SymbolicQueryLineGroup> LineGroups { get; }
 
     public SymbolicQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
         if (filter == null) throw new ArgumentNullException(nameof(filter));
 
-        return SelectScope(
-            file => From(file.Filter(filter)),
-            line => From(line.Filter(filter)),
-            span => From(span.Filter(filter)),
-            point => filter.Matches(point)
-                ? From(point)
-                : From(new SymbolicLineQueryResult(
-                    point.FilePath,
-                    point.Line,
-                    Array.Empty<SymbolicProgramPointResult>(),
-                    point.SmtDiagnostics)));
+        var points = ProgramPoints.Where(filter.Matches).ToArray();
+        return Scope.Kind switch
+        {
+            SymbolicQueryScopeKind.File => From(new SymbolicFileQueryResult(
+                FilePath,
+                LineCount ?? 0,
+                LineGroups
+                    .Select(group => new SymbolicLineQueryResult(
+                        FilePath,
+                        group.Line,
+                        group.ProgramPoints.Where(filter.Matches).ToArray(),
+                        SmtDiagnostics))
+                    .Where(static line => line.ProgramPoints.Count != 0)
+                    .ToArray(),
+                SmtDiagnostics)),
+            SymbolicQueryScopeKind.Line => From(new SymbolicLineQueryResult(
+                FilePath,
+                Line ?? 0,
+                points,
+                SmtDiagnostics)),
+            SymbolicQueryScopeKind.Span => From(new SymbolicSpanQueryResult(
+                FilePath,
+                SpanStart ?? 0,
+                SpanEnd ?? 0,
+                Scope.StartLine ?? 1,
+                Scope.StartColumn ?? 1,
+                Scope.EndLine ?? 1,
+                Scope.EndColumn ?? 1,
+                points,
+                SmtDiagnostics)),
+            SymbolicQueryScopeKind.Point when points.Length != 0 => From(points[0]),
+            SymbolicQueryScopeKind.Point => From(new SymbolicLineQueryResult(
+                FilePath,
+                Line ?? 0,
+                points,
+                SmtDiagnostics)),
+            _ => throw new InvalidOperationException("Unexpected symbolic query scope.")
+        };
     }
 
-    private static T RequireScopeResult<T>(T? result)
-        where T : class
+    internal IReadOnlyList<SymbolicLineQueryResult> CreateLineResults()
     {
-        return result ?? throw new InvalidOperationException(
-            "Symbolic query result has no typed result for its scope.");
+        return LineGroups
+            .Select(group => new SymbolicLineQueryResult(
+                FilePath,
+                group.Line,
+                group.ProgramPoints,
+                SmtDiagnostics))
+            .ToArray();
     }
 
     internal static SymbolicQueryResult From(SymbolicFileQueryResult file)
@@ -1099,7 +1108,7 @@ public sealed class SymbolicQueryResult
             file.ConditionProofs,
             file.SmtDiagnostics,
             file.InvariantQuery,
-            fileResult: file);
+            file.Lines.Select(static line => new SymbolicQueryLineGroup(line.Line, line.ProgramPoints)).ToArray());
     }
 
     internal static SymbolicQueryResult From(SymbolicLineQueryResult line)
@@ -1116,8 +1125,7 @@ public sealed class SymbolicQueryResult
             line.Reachability,
             line.ConditionProofs,
             line.SmtDiagnostics,
-            line.InvariantQuery,
-            lineResult: line);
+            line.InvariantQuery);
     }
 
     internal static SymbolicQueryResult From(SymbolicSpanQueryResult span)
@@ -1129,7 +1137,11 @@ public sealed class SymbolicQueryResult
                 SymbolicQueryScopeKind.Span,
                 span.FilePath,
                 spanStart: span.SpanStart,
-                spanEnd: span.SpanEnd),
+                spanEnd: span.SpanEnd,
+                startLine: span.StartLine,
+                startColumn: span.StartColumn,
+                endLine: span.EndLine,
+                endColumn: span.EndColumn),
             span.ProgramPoints,
             span.ObservedInvariant,
             span.MergedInvariant,
@@ -1138,8 +1150,7 @@ public sealed class SymbolicQueryResult
             span.Reachability,
             span.ConditionProofs,
             span.SmtDiagnostics,
-            span.InvariantQuery,
-            spanResult: span);
+            span.InvariantQuery);
     }
 
     internal static SymbolicQueryResult From(SymbolicProgramPointResult point)
@@ -1161,7 +1172,19 @@ public sealed class SymbolicQueryResult
             SymbolicReachabilitySummary.FromProgramPoints(new[] { point }),
             SymbolicConditionProofSummary.FromProgramPoints(new[] { point }),
             point.SmtDiagnostics,
-            point.InvariantQuery,
-            pointResult: point);
+            point.InvariantQuery);
     }
+}
+
+internal sealed class SymbolicQueryLineGroup
+{
+    internal SymbolicQueryLineGroup(int line, IReadOnlyList<SymbolicProgramPointResult> programPoints)
+    {
+        Line = line;
+        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+    }
+
+    internal int Line { get; }
+
+    internal IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
 }

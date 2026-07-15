@@ -306,15 +306,23 @@ internal sealed record SymbolicCompactQueryScope(
     int? RequestedPositionDistance = null,
     bool? ContainsRequestedPosition = null)
 {
-    internal static SymbolicCompactQueryScope FromResult(SymbolicQueryResult result) => result.SelectScope(
-        file => new SymbolicCompactQueryScope("file", file.FilePath),
-        line => new SymbolicCompactQueryScope("line", line.FilePath, Line: line.Line),
-        span => new SymbolicCompactQueryScope(
-            "span", span.FilePath,
-            NodeSpanStart: span.SpanStart, NodeSpanEnd: span.SpanEnd, NodeSpanLength: span.SpanLength,
-            NodeStartLine: span.StartLine, NodeStartColumn: span.StartColumn,
-            NodeEndLine: span.EndLine, NodeEndColumn: span.EndColumn),
-        point => new SymbolicCompactQueryScope(
+    internal static SymbolicCompactQueryScope FromResult(SymbolicQueryResult result)
+    {
+        if (result.Scope.Kind != SymbolicQueryScopeKind.Point)
+            return new SymbolicCompactQueryScope(
+                result.ScopeKind,
+                result.FilePath,
+                Line: result.Line,
+                NodeSpanStart: result.SpanStart,
+                NodeSpanEnd: result.SpanEnd,
+                NodeSpanLength: result.SpanEnd - result.SpanStart,
+                NodeStartLine: result.Scope.StartLine,
+                NodeStartColumn: result.Scope.StartColumn,
+                NodeEndLine: result.Scope.EndLine,
+                NodeEndColumn: result.Scope.EndColumn);
+
+        var point = result.ProgramPoints.Single();
+        return new SymbolicCompactQueryScope(
             "point", point.FilePath,
             Line: point.Line, Column: point.Column, Position: point.Position,
             NodeKind: point.NodeKind, MethodName: point.MethodName, ProgramPointKind: point.ProgramPointKind,
@@ -325,7 +333,8 @@ internal sealed record SymbolicCompactQueryScope(
             ReachabilityReason: point.ReachabilityReason, RequestedLine: point.RequestedLine,
             RequestedColumn: point.RequestedColumn, RequestedPosition: point.RequestedPosition,
             RequestedPositionDistance: point.RequestedPositionDistance,
-            ContainsRequestedPosition: point.ContainsRequestedPosition));
+            ContainsRequestedPosition: point.ContainsRequestedPosition);
+    }
 }
 
 public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
@@ -473,11 +482,13 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
         var scope = SymbolicCompactQueryScope.FromResult(result);
-        return result.SelectScope(
-            file => FromAggregate(scope, file, normalizedOptions, file.Lines),
-            line => FromAggregate(scope, line, normalizedOptions),
-            span => FromAggregate(scope, span, normalizedOptions),
-            point => FromPoint(scope, point, normalizedOptions));
+        if (result.Scope.Kind == SymbolicQueryScopeKind.Point)
+            return FromPoint(scope, result.ProgramPoints.Single(), normalizedOptions);
+
+        var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File
+            ? result.CreateLineResults()
+            : null;
+        return FromAggregate(scope, result, normalizedOptions, sourceLines);
     }
 
     private static SymbolicCompactQueryResult FromPoint(
@@ -512,7 +523,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
     private static SymbolicCompactQueryResult FromAggregate(
         SymbolicCompactQueryScope scope,
-        SymbolicScopedQueryAggregate result,
+        SymbolicQueryResult result,
         SymbolicCompactQueryOptions options,
         IReadOnlyList<SymbolicLineQueryResult>? sourceLines = null)
     {
@@ -530,7 +541,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         var isFile = sourceLines != null;
         var projection = SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
-            result.Facts,
+            result.ObservedInvariant.Conditions.Select(static condition => condition.Text).ToArray(),
             result.MergedInvariant,
             result.MergedPathFacts,
             result.InvariantQuery,
@@ -554,11 +565,11 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
                     SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)))
             };
 
-        var lineCount = result is SymbolicFileQueryResult fileResult ? fileResult.LineCount : (int?)null;
-        var linesWithProgramPoints = result switch
+        var lineCount = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.LineCount : null;
+        var linesWithProgramPoints = result.Scope.Kind switch
         {
-            SymbolicFileQueryResult file => file.LinesWithProgramPoints,
-            SymbolicSpanQueryResult span => span.LinesWithProgramPoints,
+            SymbolicQueryScopeKind.File => sourceLines!.Count,
+            SymbolicQueryScopeKind.Span => result.ProgramPoints.Select(static point => point.Line).Distinct().Count(),
             _ => result.ProgramPointCount == 0 ? 0 : 1
         };
         return new SymbolicCompactQueryResult(
