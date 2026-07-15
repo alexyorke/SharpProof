@@ -10,8 +10,9 @@ the checkpoint below.
 
 Replace parallel Symbolic and Analyzer interpretations of C# operations with
 one canonical operation-transfer kernel, then delete the superseded paths.
-Preserve supported behavior, conservative `Unknown` outcomes, public contracts,
-CLI forms, serialized schemas, diagnostics, evidence, and package contents.
+Preserve supported behavior, conservative `Unknown` outcomes, CLI forms,
+serialized schemas, diagnostics, evidence, and package contents. The public
+.NET API may break where doing so enables a smaller canonical implementation.
 
 Primary target: remove 11,000-16,000 net handwritten production lines from the
 starting baseline of 107,676. Do not count generated output, formatting-only
@@ -323,6 +324,7 @@ transfer policy after its slice is complete.
 | Resolved string-length fact finding | `705b4439` | 105,716 | -1,960 |
 | Intentional SMT domain fact merges | `3be4f5e8` | 105,716 | -1,960 |
 | Intentional shared catalog namespace | `d49e15ca` | 105,716 | -1,960 |
+| Central compact-result schema metadata | `23992c39` | 105,708 | -1,968 |
 
 ## Validation Ledger
 
@@ -433,7 +435,8 @@ transfer policy after its slice is complete.
 | Phase 6 intentional conditional-value readers | Commit `eb8c6ae2` removes a net-positive abstraction candidate. Four typed readers select a known conditional branch before recursing into integer, reference-null, string, or string-length semantics; a generic delegate helper adds more plumbing than it removes. Boolean conditionals are intentionally different: when the condition is unknown they fork both branches under `MaxConditionalBranchEvaluationDepth` and succeed only on agreement, preserving conservative proof behavior. The complete 135-case syntactic-classifier/SMT/proof gate remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 resolved string-length fact finding | Commit `705b4439` removes a stale call-site report. Direct exact-string collection and exact-string alias merging already call the one `AddStringLengthFact` mutator, which normalizes aliases, intersects any existing `SmtIntegerInterval`, records the exact length, and surfaces contradictions. No competing interval-application block remains. The green 135-case syntactic-classifier/SMT/proof gate covers string and alias reasoning. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
 | Phase 6 intentional SMT domain fact merges | Commit `3be4f5e8` removes a net-positive generic-merge candidate. Integer aliases intersect intervals and test `IsContradictory`; strings union exclusions, reconcile exact values, and derive length facts; references detect null-state disagreement; Booleans first transform the alias value by accumulated negation. Their common dictionary lookup/store/remove shell is smaller than a typed callback/result abstraction and contains no shared proof policy. The complete 135-case syntactic-classifier/SMT/proof gate remains green. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
-| Phase 6 intentional shared catalog namespace | Commit `d49e15ca` removes a compatibility-breaking folder-name recommendation. `Constants.cs` and `BclPurityFallbackHeuristics.cs` are linked into both Analyzer and EffectSummary from one physical source, so no code is duplicated. `Constants` is a shipped public type in `SharpProof.Analyzer.Engine`; moving it to a neutral namespace would break the preserved .NET API, while renaming only the internal heuristic would add churn without changing dependencies or LOC. Constants and BCL-fallback inventory fixtures pass 234 with the two documented reflection skips. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
+| Phase 6 intentional shared catalog namespace | Commit `d49e15ca` removes a folder-name recommendation rather than a duplicate. `Constants.cs` and `BclPurityFallbackHeuristics.cs` are linked into both Analyzer and EffectSummary from one physical source, so no code is duplicated. `Constants` is a shipped type in `SharpProof.Analyzer.Engine`; even after the later API-compatibility constraint was relaxed, moving it to a neutral namespace would only add using and migration churn without changing dependency direction or LOC. Constants and BCL-fallback inventory fixtures pass 234 with the two documented reflection skips. Production LOC remains 105,716, or -1,960 from the rewrite start; tracked test LOC remains 142,465. |
+| Phase 6 central compact-result schema metadata | Commit `23992c39` applies the user's relaxed .NET API constraint by replacing the unused `ISymbolicCompactResult` interface and six repeated schema triplets with `SymbolicSchemaResultBase`. Explicit `JsonPropertyOrder` values preserve the existing schema-first capability/complexity order and kind-first query/hazard/explain order. Compact envelope/order and explain byte fixtures pass 14/14; the Release Symbolic CLI warning-as-error build has zero warnings. Production LOC fell to 105,708, or -1,968 from the rewrite start; tracked test LOC is 142,472 after adding an invariant that locks each compact property prefix. |
 
 ## Current Checkpoint
 
@@ -471,12 +474,14 @@ transfer policy after its slice is complete.
   evaluation has a distinct bounded-fork contract. Exact strings and aliases
   already share one string-length interval mutator. Domain fact merges remain
   explicit because each has different transformation and conflict semantics.
-  Shared catalog source retains its Analyzer namespace as a public API boundary.
-- Last confirmed fact: shared catalog and BCL-fallback fixtures pass 234 with the
-  two documented reflection skips. Test LOC is 142,465; production LOC is
-  105,716, or -1,960 from the rewrite start.
+  Shared catalog source retains its Analyzer namespace because moving it adds no
+  reduction; subsequent .NET API breaks are allowed. Compact schema metadata now
+  has one base owner while explicit ordering preserves exact JSON output.
+- Last confirmed fact: compact order/byte fixtures pass 14/14 and the Release CLI
+  warning-as-error build has zero warnings. Test LOC is 142,472; production LOC
+  is 105,708, or -1,968 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, repeated compact-result schema-version properties across
-  Symbolic CLI projection types.
+  `POTENTIAL_DUPS.md`, duplicated SMT-diagnostics passthrough properties in
+  compact invariant and query projections.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
