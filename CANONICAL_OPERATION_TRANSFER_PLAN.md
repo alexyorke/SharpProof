@@ -443,6 +443,7 @@ transfer policy after its slice is complete.
 | Phase 6 resolved invariant scope-adapter finding | Commit `cee2af96` removes a stale pre-canonical-graph entry. `SymbolicCliInvariantResultAdapter` no longer exists and exact search finds no replacement `TryCreate` scope switch; point, line, span, and file compact/invariant output project directly from `SymbolicQueryResult`. The 14-case compact/explain order and byte gate remains green. Production LOC remains 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
 | Phase 6 intentional compact span projection | The seven nullable span-only properties intentionally guard a flattened JSON compatibility view at its single adapter boundary. An `IsSpanScope` member would add handwritten LOC, preserve the same serialized-string check, and perform no less work because each property is independently read by the serializer. Carrying an extra typed flag through `SymbolicCompactQueryScope` would add constructor and storage code. The existing compact/explain order and byte gate remains the relevant characterization. Production LOC remains 105,707, or -1,969 from the rewrite start; tracked test LOC remains 142,472. |
 | Phase 6 central compact method location projection | Commit `6d402908` introduces `SymbolicCompactMethodResult<T>` as the single owner of the nine file/method/span location passthroughs shared by capability and complexity compact results. Explicit payload ordering preserves the existing schema-kind-location-domain JSON sequence; a focused invariant now locks all nine flattened location columns. Capability, complexity, and compact-domain fixtures pass 12/12, and the Release CLI warning-as-error build has zero warnings. Production LOC fell to 105,706, or -1,970 from the rewrite start; tracked test LOC is 142,478. |
+| Phase 6 central condition-proof filtering | Commit `630fce4d` replaces the two type-specific condition-proof filters with one typed selector-based implementation shared by summary and point-result text rendering. Both target-filter text/JSON fixtures pass 2/2. Production LOC fell to 105,698, or -1,978 from the rewrite start; tracked test LOC remains 142,478. |
 
 ## Current Checkpoint
 
@@ -488,12 +489,13 @@ transfer policy after its slice is complete.
   compact span-only getters remain local because caching or carrying a typed
   span flag adds handwritten code without reducing serialized work. Compact
   capability and complexity results now inherit one typed method-location
-  projection while retaining their exact serialized property order.
-- Last confirmed fact: capability, complexity, and compact-domain fixtures pass
-  12/12 and the Release CLI warning-as-error build has zero warnings. Test LOC
-  is 142,478; production LOC is 105,706, or -1,970 from the rewrite start.
+  projection while retaining their exact serialized property order. Condition
+  proof target filtering now has one generic implementation for summary and
+  point-result projections.
+- Last confirmed fact: both invariant-target filtering fixtures pass 2/2. Test
+  LOC is 142,478; production LOC is 105,698, or -1,978 from the rewrite start.
 - Next cheapest step: adjudicate the first remaining merged-audit finding in
-  `POTENTIAL_DUPS.md`, identical condition-proof filtering methods in the CLI
-  text renderer.
+  `POTENTIAL_DUPS.md`, duplicated capability-site prefix/detail formatting in
+  the CLI text renderer.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
