@@ -1109,12 +1109,11 @@ function Add-TestFilesReferencingTokens
         }
         else
         {
-            $matches = @(
-                Get-ChildItem -Path (Join-Path $PSScriptRoot '..\SharpProof.Test'), (Join-Path $PSScriptRoot '..\SharpProof.ToolingTest') -Recurse -Filter '*.cs' -File |
-                    Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
-                    Select-String -SimpleMatch -Pattern $token -List |
-                    ForEach-Object { $_.Path }
-            )
+            $testFiles = @(& git ls-files --cached --others --exclude-standard -- 'SharpProof.Test/*.cs' 'SharpProof.ToolingTest/*.cs')
+            if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while inventorying test sources.' }
+            $matches = @($testFiles |
+                Select-String -SimpleMatch -Pattern $token -List |
+                ForEach-Object { $_.Path })
         }
 
         foreach ($match in $matches)
