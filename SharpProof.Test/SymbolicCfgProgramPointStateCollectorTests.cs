@@ -96,6 +96,41 @@ sealed class C
                 new[] { "second" }, "first", 9)
         };
 
+    private static IEnumerable<TestCaseData> CoalesceAssignmentCompletionCases()
+    {
+        yield return CoalesceCase(
+            "ReferenceKnownNonNullNoOp",
+            "static class C { static void M() { string? value = \"old\"; value ??= \"new\"; } }");
+        yield return CoalesceCase(
+            "ReferenceKnownNullAssignment",
+            "static class C { static void M() { string? value = null; value ??= \"new\"; } }");
+        yield return CoalesceCase(
+            "ReferenceUnknownConditional",
+            "static class C { static void M(string? value) { value ??= \"new\"; } }");
+        yield return CoalesceCase(
+            "NullableKnownHasValueNoOp",
+            "static class C { static void M() { int? value = 1; value ??= 2; } }");
+        yield return CoalesceCase(
+            "NullableKnownNoValueAssignment",
+            "static class C { static void M() { int? value = null; value ??= 2; } }");
+        yield return CoalesceCase(
+            "NullableUnknownConditional",
+            "static class C { static void M(int? value) { value ??= 2; } }");
+    }
+
+    private static TestCaseData CoalesceCase(string name, string source) =>
+        new TestCaseData(source).SetName($"CoalesceAssignmentCompletion_{name}");
+
+    private static IEnumerable<TestCaseData> UnsupportedCoalesceAssignmentCompletionCases()
+    {
+        yield return CoalesceCase(
+            "GuardMutationFallback",
+            "static class C { static void M(string? value) { if (value == null) { value ??= \"new\"; } } }");
+        yield return CoalesceCase(
+            "LoopCurrentCompletionFallback",
+            "static class C { static void M(string? value, bool repeat) { while (repeat) { value ??= \"new\"; } } }");
+    }
+
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
     {
@@ -336,6 +371,94 @@ sealed class C
         var site = fixture.Root.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
             .Single(invocation => invocation.Expression.ToString() == "EnsureValue");
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
+        Assert.That(cfg.Value, Is.Null);
+        AssertStateParity(routed, structural);
+    }
+
+    [TestCaseSource(nameof(CoalesceAssignmentCompletionCases))]
+    public void CoalesceAssignmentCompletion_CurrentRoutingCharacterization(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CoalesceAssignmentCompletion_CurrentRoutingCharacterization));
+        var site = GetCoalesceAssignmentStatement(fixture);
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
+        Assert.That(cfg.Value, Is.Null);
+        AssertStateParity(routed, structural);
+    }
+
+    [TestCaseSource(nameof(UnsupportedCoalesceAssignmentCompletionCases))]
+    public void CoalesceAssignmentCompletion_UnsafeShapeUsesStructuralFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CoalesceAssignmentCompletion_UnsafeShapeUsesStructuralFallback));
+        var site = GetCoalesceAssignmentStatement(fixture);
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
+        Assert.That(cfg.Value, Is.Null);
+        AssertStateParity(routed, structural);
+    }
+
+    [Test]
+    public void CoalesceAssignmentCompletion_CustomLimitsUseStructuralFallback()
+    {
+        const string source =
+            "static class C { static void M() { string? value = null; value ??= \"new\"; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CoalesceAssignmentCompletion_CustomLimitsUseStructuralFallback));
+        var site = GetCoalesceAssignmentStatement(fixture);
         using var scope = SymbolicAnalysisLimitContext.Push(
             SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
 
@@ -1027,6 +1150,13 @@ sealed class C
             fixture.Root.DescendantNodes()
                 .OfType<VariableDeclaratorSyntax>()
                 .Single(variable => variable.Identifier.ValueText == name))!;
+
+    private static ExpressionStatementSyntax GetCoalesceAssignmentStatement(
+        RoslynTestFixture.CompilationFixture fixture) =>
+        fixture.Root.DescendantNodes()
+            .OfType<ExpressionStatementSyntax>()
+            .Single(statement => statement.Expression is AssignmentExpressionSyntax assignment &&
+                assignment.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CoalesceAssignmentExpression));
 
     private static SymbolicState CollectStructuralState(
         RoslynTestFixture.CompilationFixture fixture,

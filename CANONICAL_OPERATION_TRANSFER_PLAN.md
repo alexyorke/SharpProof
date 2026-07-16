@@ -480,6 +480,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
     bypass are deleted. Assignment completion remains on its existing path, and
     custom limits return typed `Unsupported` with no partial CFG state before
     routed structural fallback.
+  - [x] Adjudicate direct coalesce-assignment current completion. Six typed
+    reference/nullable cases lock known-value no-op, known-empty strong
+    assignment, and unknown conditional semantics across structural and routed
+    state; guard mutation, loop-local completion, and custom limits lock typed
+    CFG `Unsupported` with no partial state. An exact prototype required a
+    second state-aware transition layer because Roslyn CFG decomposes `??=` and
+    does not expose its `ICoalesceAssignmentOperation` as the target block
+    operation. Even after folding policy into the existing adapter it added 43
+    production lines, so the narrow engine was reverted under the deletion
+    gate. Coalesce completion remains an evidence-backed structural fallback
+    until a broader expression-control-flow migration can repay that cost.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -672,7 +683,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 direct finally-local query targets | `1143d7a8` | 106,802 | -874 |
 | Phase 7 multiple regular finally-local adjudication | `4d9e3bc5` | 106,802 | -874 |
 | Phase 7 residual source-query deletion audit | `000b3637` | 106,793 | -883 |
-| Phase 7 canonical expression current completion | This commit | 106,796 | -880 |
+| Phase 7 canonical expression current completion | `77ffc4fc` | 106,796 | -880 |
+| Phase 7 coalesce current-completion adjudication | This commit | 106,796 | -880 |
 
 ## Validation Ledger
 
@@ -859,6 +871,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 multiple regular finally-local adjudication | The exact complementary `if`/`else` design was implemented far enough to quantify its cost: source-shape validation, CFG exit tracing, sibling buffering, semantic continuation canonicalization, and exact baseline coverage added 389 production lines while deleting only 11. The prototype was reverted because it duplicated substantial structural-flow policy for one narrow fallback and moved against the deletion gate. Two table cases now lock the boundary: assignments to one shared local and asymmetric assignments to two locals both return typed `Unsupported` with null CFG state and reason `finally-local-target`; routed fallback matches structural normalized state, evidence, and versions, removes every protected mutation and condition guard, preserves unrelated facts, and restores a prior finally assignment. Finally-local fixtures pass 20/20; direct collector fixtures pass 158/158; the broader collector/program-point/reachability/operation batch passes 306/306; MainSmtOracle passes 573/573 and MainSmtAnalyzer passes 487/487. The Release solution warning-as-error build has zero warnings and errors. Production LOC remains 106,802, or -874 from the rewrite start; authoritative tracked test LOC is 144,237. |
 | Phase 7 residual source-query deletion audit | Exact references prove every source-query CFG `Unsupported` and custom-limit path still needs structural fallback. The only production-unreachable transfer member was `CollectCompletedLoopExitInvariantState`, called solely by the Semantic Oracle helper for two loop-exit scenarios. The wrapper is deleted; the helper preserves its initialize, completion-transfer, normalize, and format sequence by calling `SymbolicControlFlowCompletionStateTransfer` directly. The affected loop-exit fixtures pass 2/2. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,793, or -883 from the rewrite start; authoritative tracked test LOC is 144,244. |
 | Phase 7 canonical expression current completion | Non-assignment expression current completion no longer bypasses CFG. A direct `[MemberNotNull]` invocation matches structural and routed normalized state, evidence/provenance, and symbol versions through the shared expression-completion helper. That helper is now the sole owner of nested-mutation invalidation plus `LowerMemberNotNull` application for CFG and structural fallback; assignment completion is unchanged. Under custom limits direct CFG remains typed `Unsupported` with null state while routed structural completion retains exact semantics. Collector and MemberNotNull fixtures pass 172/172. The Release solution warning-as-error build has zero warnings and errors. Centralizing the correctness-sensitive policy costs three production lines: production LOC is 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,315. |
+| Phase 7 coalesce current-completion adjudication | Six table cases characterize reference and nullable `??=` current completion for known non-null/HasValue no-op, known null/NoValue strong assignment, and unknown conditional postconditions. Three more cases lock guard-mutation, loop-local, and custom-limit fallback. Direct CFG remains typed `Unsupported` with null state while routed and structural normalized state, evidence/provenance, and versions match. Roslyn CFG decomposes `??=`, so an exact prototype had to reclassify the syntax through `ICoalesceAssignmentOperation` and add a state-aware transition owner. The reduced prototype passed 9/9 but added 43 production lines and was reverted under the deletion gate. The final focused collector/coalesce batch passes 194/194 and the Release solution warning-as-error build has zero warnings and errors. Production LOC remains 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,432. |
 
 ## Current Checkpoint
 
@@ -1058,10 +1071,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   `[MemberNotNull]` completion helper with structural fallback. Direct,
   structural, and routed states match exactly; custom limits remain typed
   fallback with no partial CFG state. Assignment completion is unchanged.
-  Production LOC is 106,796, or -880 from the rewrite start; authoritative
-  tracked test LOC is 144,315.
-- Next cheapest step: audit the remaining `SymbolicExpressionStateTransfer`
-  assignment caller and deletion gate. Delete it only after every still-live
-  unsupported assignment-completion route has canonical CFG parity.
+  Direct coalesce-assignment completion was then adjudicated without a
+  production change. Six reference/nullable semantic cases plus guard, loop,
+  and custom-limit cases lock typed CFG fallback and exact routed/structural
+  parity. Roslyn decomposes `??=` in CFG; the exact state-aware prototype passed
+  but added 43 production lines, so it was reverted under the deletion gate.
+  Production LOC remains 106,796, or -880 from the rewrite start;
+  authoritative tracked test LOC is 144,432.
+- Next cheapest step: audit the next remaining assignment-completion family by
+  removable branch size. Keep coalesce completion on structural fallback until
+  a broader expression-control-flow migration can repay its measured cost.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.
