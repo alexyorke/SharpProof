@@ -308,6 +308,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Route execution-visibility reference-null proof construction through
     `SymbolicStateFactBuilder.TryCreateReferenceNullCondition` and delete its
     independent reference lowering, relation, and provenance implementation.
+  - [x] Route purity CFG, coalesce, and conditional-access null assumptions
+    through the same term-based reference-null condition builder. Preserve
+    Analyzer-owned constant, resource-lifetime, tracked-symbol, version,
+    evidence, and SMT-feasibility policy; delete its single-use term helper and
+    manual null-relation construction.
   - [x] Restore CFG source-query evidence parity for unsupported member writes,
     prior-assignment provenance, branch-local fact ordering, true/false merge
     ordering, and surviving post-branch paths. Full JSON point/line/span/file
@@ -708,7 +713,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical expression current completion | `77ffc4fc` | 106,796 | -880 |
 | Phase 7 coalesce current-completion adjudication | `822b0432` | 106,796 | -880 |
 | Phase 7 current-completion guard boundary | `a135f40e` | 106,799 | -877 |
-| Phase 7 canonical self-reference prior values | This commit | 106,769 | -907 |
+| Phase 7 canonical self-reference prior values | `a39f1574` | 106,769 | -907 |
+| Phase 7 canonical purity null conditions | This commit | 106,739 | -937 |
 
 ## Validation Ledger
 
@@ -898,6 +904,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 coalesce current-completion adjudication | Six table cases characterize reference and nullable `??=` current completion for known non-null/HasValue no-op, known null/NoValue strong assignment, and unknown conditional postconditions. Three more cases lock guard-mutation, loop-local, and custom-limit fallback. Direct CFG remains typed `Unsupported` with null state while routed and structural normalized state, evidence/provenance, and versions match. Roslyn CFG decomposes `??=`, so an exact prototype had to reclassify the syntax through `ICoalesceAssignmentOperation` and add a state-aware transition owner. The reduced prototype passed 9/9 but added 43 production lines and was reverted under the deletion gate. The final focused collector/coalesce batch passes 194/194 and the Release solution warning-as-error build has zero warnings and errors. Production LOC remains 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,432. |
 | Phase 7 current-completion guard boundary | Four independent audits ranked tuple/deconstruction as the largest remaining assignment branch, but its atomic multi-target, ordering, and multi-guard infrastructure would add code while structural fallback remains live. Compound completion already consumes the canonical updater and kernel, leaving no deletable structural arm. Focused pre-fix reproduction failed 3/3 because active-guard simple, unchecked compound, and checked compound current completion incorrectly returned `Exact`. The generic boundary now applies transfer to a temporary state, consumes the returned invalidated guard target, and refuses publication when non-null. The three guarded cases now return typed `Unsupported` with null state and route to exact structural state; two unguarded checked/unchecked compound cases retain normalized state, evidence/provenance, and symbol-version parity. The focused batch passes 5/5, the collector/program-point/compound/guard batch passes 253/253, and the Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,799, or -877 from the rewrite start; authoritative tracked test LOC is 144,488. |
 | Phase 7 canonical self-reference prior values | The structural simple-assignment path still manually substituted the pre-invalidation integer value, built one canonical binding by hand, and separately called the reference-backed postcondition lowerer even though an integer target makes that call empty. `ApplyAssignment` now passes an optional assigned-symbol substitution only to its value `SymbolicLoweringContext`; the existing integer-only eligibility and pre-state snapshot gate prevent any reference, nullable, or Boolean broadening. `AddAssignedValueStateFacts` retains snapshot-before-removal ordering and delegates the exact binding, derived bounds, invalidation, throw guard, postconditions, evidence, provenance, and versions to `LowerSimpleAssignment` and the operation kernel. The pre-edit and post-edit self-reference characterizations pass 3/3, and the broader program-point/reachability/operation/invariant batch passes 395/395. An additional parallel Semantic Oracle/flow probe passed 619/620; its unrelated while-exit invariant miss passed 1/1 immediately in isolation under the repository serial-rerun rule. The Release solution warning-as-error build has zero warnings and errors. The production diff is 21 insertions and 53 deletions across two files; authoritative production LOC falls by 30 to 106,769, or -907 from the rewrite start, while tracked test LOC remains 144,488. |
+| Phase 7 canonical purity null conditions | `SymbolicStateFactBuilder` now constructs reference-null conditions from either an expression or an already-versioned reference term, including optional Analyzer evidence. Purity CFG branching, coalesce, and conditional access retain constant-null short-circuiting, owned/not-disposed infeasibility, tracked symbol and flow-capture eligibility, current versions, conservative unsupported behavior, SMT infeasibility, provenance, and evidence while deleting their single-use term helper and manual relation. Pre-edit and post-edit path-expression characterization passes 24/24; MainSmtAnalyzer passes 487/487; the Release solution warning-as-error build has zero warnings and errors. The authoritative production metric falls by 30 to 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
 
 ## Current Checkpoint
 
@@ -1114,12 +1121,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   canonical value-lowering context, deleting the manual self-reference binding
   and empty reference-backed postcondition path. Snapshot/removal order,
   unsupported behavior, derived bounds, throw guards, evidence, provenance, and
-  versions remain locked by the focused and broader gates. Production LOC is
-  106,769, or -907 from the rewrite start; authoritative tracked test LOC is
-  144,488.
-- Next cheapest step: rank the next live assignment/completion owner by deletion
-  size after the simple-assignment consolidation. Keep tuple/deconstruction and
-  coalesce on structural fallback until a broader migration repays their cost;
-  retain the self-reference helper while inline reachability calls it.
+  versions remain locked by the focused and broader gates. Purity CFG,
+  coalesce, and conditional-access null assumptions now consume the canonical
+  term-based reference-null condition builder, preserving Analyzer-owned
+  resource feasibility, flow-capture eligibility, versioning, evidence, and
+  conservative fallback while deleting the private term helper and manual
+  relation construction. Production LOC is 106,739, or -937 from the rewrite
+  start; authoritative tracked test LOC is 144,488.
+- Next cheapest step: rank the completed-loop/lock structural transfer owner
+  against the expression-transfer deletion candidate. Require typed CFG exit
+  parity and substantial deletion credit before replacing either fallback.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

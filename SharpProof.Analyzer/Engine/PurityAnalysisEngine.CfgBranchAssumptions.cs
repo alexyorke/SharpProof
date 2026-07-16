@@ -202,8 +202,8 @@ internal partial class PurityAnalysisEngine
         value = SkipImplicitConversions(value);
         if (value?.ConstantValue.HasValue == true) return value.ConstantValue.Value == null == isNull;
 
-        if (isNull &&
-            TryResolveTrackedSymbol(value, currentState) is { } ownedSymbol &&
+        var symbol = TryResolveTrackedSymbol(value, currentState);
+        if (isNull && symbol is { } ownedSymbol &&
             (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(ownedSymbol, currentState) ||
              currentState.PathState.Facts.Any(fact =>
                  SymbolEqualityComparer.Default.Equals(fact.Symbol, ownedSymbol) &&
@@ -211,33 +211,25 @@ internal partial class PurityAnalysisEngine
                      SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed })))
             return false;
 
-        if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return true;
-
-        if (value?.Syntax is not ExpressionSyntax syntax ||
-            valueTerm.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
+        if (symbol == null ||
+            SymbolicFactFactory.GetTrackedSymbolType(symbol)?.IsReferenceType != true ||
+            value?.Syntax is not ExpressionSyntax syntax)
             return true;
 
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                valueTerm,
-                new SymbolicNullTerm()),
+        var condition = SymbolicStateFactBuilder.CreateReferenceNullCondition(
+            PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(symbol, currentState),
             syntax,
+            isNull,
             "analyzer.null_assumption",
-            evidenceKey: isNull ? "analyzer.path.null" : "analyzer.path.not_null");
+            isNull ? "analyzer.path.null" : "analyzer.path.not_null");
         var transition = SymbolicOperationTransferKernel.Assume(
             currentState.PathState,
-            new SymbolicFactCondition(fact),
+            condition,
             assumeTrue: true,
             syntax.Span,
             "analyzer.null_assumption");
         if (!transition.IsExact) return true;
-        var nextPathState = transition.State;
-        if (IsPathStateUnsatisfiable(nextPathState, smtAnalysis))
-            return false;
-
-        branchState = currentState.WithPathState(nextPathState);
-        return true;
+        return TryFinalizeSymbolicSuccessorState(currentState, transition.State, smtAnalysis, out branchState);
     }
 
     private static bool IsBranchAssumptionUnsatisfiable(
@@ -268,27 +260,6 @@ internal partial class PurityAnalysisEngine
     {
         return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
                SymbolicProofStatus.Unreachable;
-    }
-
-    private static bool TryCreateReferenceTerm(
-        IOperation? operation,
-        PurityAnalysisState currentState,
-        out SymbolicTerm term)
-    {
-        operation = SkipImplicitConversions(operation);
-
-        while (operation is IParenthesizedOperation parenthesizedOperation)
-            operation = SkipImplicitConversions(parenthesizedOperation.Operand);
-
-        if (TryResolveTrackedSymbol(operation, currentState) is { } symbol &&
-            SymbolicFactFactory.GetTrackedSymbolType(symbol)?.IsReferenceType == true)
-        {
-            term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(symbol, currentState);
-            return true;
-        }
-
-        term = null!;
-        return false;
     }
 
     internal static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)

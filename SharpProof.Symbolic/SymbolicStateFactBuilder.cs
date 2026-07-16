@@ -52,19 +52,19 @@ internal static class SymbolicStateFactBuilder
         bool isNull,
         string provenance)
     {
-        if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
-            !TryGetValueKind(type, out var kind) ||
-            kind != SmtValueKind.Reference)
+        if (!TryCreateSymbolTerm(symbol, out var term) || term.Kind != SmtValueKind.Reference)
             return;
 
-        AddRelationPathFact(
-            ref state,
-            isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-            new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Reference),
-            new SymbolicNullTerm(),
-            source,
-            provenance);
+        state = SymbolicOperationTransferKernel.Assume(
+            state, CreateReferenceNullCondition(term, source, isNull, provenance), true, source.Span, provenance).State;
     }
+
+    internal static SymbolicCondition CreateReferenceNullCondition(SymbolicTerm reference, SyntaxNode source,
+        bool isNull, string provenance, string? evidenceKey = null) =>
+        new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                reference, new SymbolicNullTerm()),
+            source, provenance, evidenceKey: evidenceKey));
 
     internal static bool TryCreateReferenceNullCondition(
         ExpressionSyntax expression,
@@ -84,13 +84,7 @@ internal static class SymbolicStateFactBuilder
             return false;
         }
 
-        condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                reference,
-                new SymbolicNullTerm()),
-            expression,
-            provenance));
+        condition = CreateReferenceNullCondition(reference, expression, isNull, provenance);
         return true;
     }
 
