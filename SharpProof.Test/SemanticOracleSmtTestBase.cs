@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Test;
 
@@ -380,8 +381,15 @@ public sealed class NotNullIfNotNullIndexer
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
-        return SymbolicLoopStateTransfer
-            .CollectCompletedLoopExitInvariantState(loopStatement, context.SemanticModel, CancellationToken.None)
+        var state = new SymbolicState();
+        SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts(
+            ref state,
+            loopStatement,
+            context.SemanticModel,
+            CancellationToken.None);
+
+        return state
+            .Normalize()
             .PathConditions
             .Select(SymbolicInvariantService.FormatCondition)
             .ToArray();

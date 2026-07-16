@@ -666,16 +666,6 @@ internal static class SymbolicLoopStateTransfer
             new SymbolicLoweringProvenance("loop-invariants", loopStatement.Span, "exact"));
     }
 
-    internal static SymbolicState CollectCompletedLoopExitInvariantState(
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var state = new SymbolicState();
-        SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts(ref state, statement, semanticModel, cancellationToken);
-        return state.Normalize();
-    }
-
     private static bool ForLoopIncrementorsInvalidateSymbolValue(
         ForStatementSyntax forStatement,
         ISymbol symbol,
