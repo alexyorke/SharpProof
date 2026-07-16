@@ -329,6 +329,65 @@ sealed class C
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; value += 2; return value; } }",
+        true,
+        TestName = "CompoundCurrentCompletion_Unchecked")]
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; checked { value += 2; } return value; } }",
+        true,
+        TestName = "CompoundCurrentCompletion_Checked")]
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; if (value < 10) { value = 12; } return value; } }",
+        false,
+        TestName = "GuardInvalidatingCurrentCompletion_SimpleAssignment")]
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; if (value < 10) { value += 2; } return value; } }",
+        false,
+        TestName = "GuardInvalidatingCurrentCompletion_UncheckedCompoundAssignment")]
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; if (value < 10) { checked { value += 2; } } return value; } }",
+        false,
+        TestName = "GuardInvalidatingCurrentCompletion_CheckedCompoundAssignment")]
+    public void AssignmentCurrentCompletion_PreservesSafeParityAndRejectsGuardMutation(
+        string source,
+        bool expectedExact)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(AssignmentCurrentCompletion_PreservesSafeParityAndRejectsGuardMutation));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<ExpressionStatementSyntax>()
+            .Single(statement => statement.Expression is AssignmentExpressionSyntax);
+
+        var direct = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        if (expectedExact)
+        {
+            Assert.That(direct.IsExact, Is.True, direct.Provenance.Single().Detail);
+            AssertStateParity(direct.Value!, structural);
+        }
+        else
+        {
+            Assert.That(direct.IsUnsupported, Is.True, direct.Provenance.Single().Detail);
+            Assert.That(direct.Value, Is.Null);
+        }
+        AssertStateParity(routed, structural);
+    }
+
     [Test]
     public void MemberNotNullExpressionCompletion_CurrentRoutingCharacterization()
     {

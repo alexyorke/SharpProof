@@ -491,6 +491,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
     production lines, so the narrow engine was reverted under the deletion
     gate. Coalesce completion remains an evidence-backed structural fallback
     until a broader expression-control-flow migration can repay that cost.
+  - [x] Adjudicate the four-audit assignment-completion ranking. Tuple and
+    deconstruction have the largest structural branch, but exact current
+    completion needs atomic multi-target snapshots, ordering, and multi-guard
+    invalidation while the fallback remains live; the result is net-positive.
+    Compound completion already uses the canonical updater and kernel, so it has
+    no deletable structural arm. The audit did expose a generic boundary defect:
+    current completion discarded the operation's invalidated active-guard
+    target. Completion now applies to a temporary state and publishes only when
+    no guard was invalidated. Unguarded checked and unchecked compound updates
+    retain exact state/evidence/version parity; active-guard simple and compound
+    updates return typed `Unsupported` with null state before routed structural
+    fallback.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -684,7 +696,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 multiple regular finally-local adjudication | `4d9e3bc5` | 106,802 | -874 |
 | Phase 7 residual source-query deletion audit | `000b3637` | 106,793 | -883 |
 | Phase 7 canonical expression current completion | `77ffc4fc` | 106,796 | -880 |
-| Phase 7 coalesce current-completion adjudication | This commit | 106,796 | -880 |
+| Phase 7 coalesce current-completion adjudication | `822b0432` | 106,796 | -880 |
+| Phase 7 current-completion guard boundary | This commit | 106,799 | -877 |
 
 ## Validation Ledger
 
@@ -872,6 +885,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 residual source-query deletion audit | Exact references prove every source-query CFG `Unsupported` and custom-limit path still needs structural fallback. The only production-unreachable transfer member was `CollectCompletedLoopExitInvariantState`, called solely by the Semantic Oracle helper for two loop-exit scenarios. The wrapper is deleted; the helper preserves its initialize, completion-transfer, normalize, and format sequence by calling `SymbolicControlFlowCompletionStateTransfer` directly. The affected loop-exit fixtures pass 2/2. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,793, or -883 from the rewrite start; authoritative tracked test LOC is 144,244. |
 | Phase 7 canonical expression current completion | Non-assignment expression current completion no longer bypasses CFG. A direct `[MemberNotNull]` invocation matches structural and routed normalized state, evidence/provenance, and symbol versions through the shared expression-completion helper. That helper is now the sole owner of nested-mutation invalidation plus `LowerMemberNotNull` application for CFG and structural fallback; assignment completion is unchanged. Under custom limits direct CFG remains typed `Unsupported` with null state while routed structural completion retains exact semantics. Collector and MemberNotNull fixtures pass 172/172. The Release solution warning-as-error build has zero warnings and errors. Centralizing the correctness-sensitive policy costs three production lines: production LOC is 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,315. |
 | Phase 7 coalesce current-completion adjudication | Six table cases characterize reference and nullable `??=` current completion for known non-null/HasValue no-op, known null/NoValue strong assignment, and unknown conditional postconditions. Three more cases lock guard-mutation, loop-local, and custom-limit fallback. Direct CFG remains typed `Unsupported` with null state while routed and structural normalized state, evidence/provenance, and versions match. Roslyn CFG decomposes `??=`, so an exact prototype had to reclassify the syntax through `ICoalesceAssignmentOperation` and add a state-aware transition owner. The reduced prototype passed 9/9 but added 43 production lines and was reverted under the deletion gate. The final focused collector/coalesce batch passes 194/194 and the Release solution warning-as-error build has zero warnings and errors. Production LOC remains 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,432. |
+| Phase 7 current-completion guard boundary | Four independent audits ranked tuple/deconstruction as the largest remaining assignment branch, but its atomic multi-target, ordering, and multi-guard infrastructure would add code while structural fallback remains live. Compound completion already consumes the canonical updater and kernel, leaving no deletable structural arm. Focused pre-fix reproduction failed 3/3 because active-guard simple, unchecked compound, and checked compound current completion incorrectly returned `Exact`. The generic boundary now applies transfer to a temporary state, consumes the returned invalidated guard target, and refuses publication when non-null. The three guarded cases now return typed `Unsupported` with null state and route to exact structural state; two unguarded checked/unchecked compound cases retain normalized state, evidence/provenance, and symbol-version parity. The focused batch passes 5/5, the collector/program-point/compound/guard batch passes 253/253, and the Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,799, or -877 from the rewrite start; authoritative tracked test LOC is 144,488. |
 
 ## Current Checkpoint
 
@@ -1075,11 +1089,19 @@ the unused preview .NET API may break when it obstructs the canonical design.
   production change. Six reference/nullable semantic cases plus guard, loop,
   and custom-limit cases lock typed CFG fallback and exact routed/structural
   parity. Roslyn decomposes `??=` in CFG; the exact state-aware prototype passed
-  but added 43 production lines, so it was reverted under the deletion gate.
-  Production LOC remains 106,796, or -880 from the rewrite start;
-  authoritative tracked test LOC is 144,432.
-- Next cheapest step: audit the next remaining assignment-completion family by
-  removable branch size. Keep coalesce completion on structural fallback until
-  a broader expression-control-flow migration can repay its measured cost.
+  but added 43 production lines, so it was reverted under the deletion gate. A
+  four-audit ranking then found tuple/deconstruction still needs net-positive
+  atomic multi-target infrastructure and compound completion has no deletable
+  structural arm because it already uses the canonical updater and kernel. The
+  ranking exposed one generic defect: current completion discarded the returned
+  invalidated active-guard target. Transfer now occurs on a temporary state and
+  publishes only after guard validation. Active-guard simple and checked or
+  unchecked compound updates are typed fallbacks with no partial state, while
+  unguarded compound completion retains exact parity. Production LOC is 106,799,
+  or -877 from the rewrite start; authoritative tracked test LOC is 144,488.
+- Next cheapest step: rank the next unadjudicated assignment branch, starting
+  with explicit-target/simple-assignment or a whole-file completion-transfer
+  consolidation that can delete a live owner. Keep tuple/deconstruction and
+  coalesce on structural fallback until a broader migration repays their cost.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

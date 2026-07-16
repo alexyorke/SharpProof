@@ -1675,8 +1675,9 @@ internal static class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken);
 
+        var completedState = state;
         if (!TryApplyOperation(
-                ref state,
+                ref completedState,
                 operation,
                 guard,
                 allowGuardedReferenceAssignments,
@@ -1684,8 +1685,11 @@ internal static class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken,
                 "ir.path.prior-statement",
-                out _))
+                out var invalidatedGuardTarget) ||
+            invalidatedGuardTarget != null)
             return false;
+
+        state = completedState;
 
         if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
