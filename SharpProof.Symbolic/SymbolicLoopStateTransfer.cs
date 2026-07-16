@@ -128,11 +128,8 @@ internal static class SymbolicLoopStateTransfer
                 continue;
 
             var initializerIsInvalidated = forStatement != null
-                ? StatementMutatesSymbol(
-                      loopBody,
-                      initializer.Symbol,
-                      semanticModel,
-                      cancellationToken) ||
+                ? SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken)
+                      .MutatesSymbol(initializer.Symbol) ||
                   ForLoopConditionInvalidatesSymbolValue(
                       forStatement,
                       initializer.Symbol,
@@ -155,11 +152,9 @@ internal static class SymbolicLoopStateTransfer
                           symbol,
                           semanticModel,
                           cancellationToken) ||
-                      ForLoopIncrementorsInvalidateSymbolValue(
-                          forStatement,
-                          symbol,
-                          semanticModel,
-                          cancellationToken)
+                      forStatement.Incrementors.Any(incrementor =>
+                          SymbolicMutationInventory.Create(incrementor, semanticModel, cancellationToken)
+                              .InvalidatesSymbol(symbol, mutableExposures: false))
                     : LoopHeaderInvalidatesSymbolValue(
                         loopStatement,
                         symbol,
@@ -653,20 +648,6 @@ internal static class SymbolicLoopStateTransfer
             new SymbolicLoweringProvenance("loop-invariants", loopStatement.Span, "exact"));
     }
 
-    private static bool ForLoopIncrementorsInvalidateSymbolValue(
-        ForStatementSyntax forStatement,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var incrementor in forStatement.Incrementors)
-            if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken) ||
-                SymbolicStateInvalidator.NodeMayMutateThroughReference(incrementor, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
-    }
-
     private static IEnumerable<(ISymbol Symbol, ExpressionSyntax Value, int StatementIndex)>
         EnumeratePreLoopInitializerExpressions(
             StatementSyntax loopStatement,
@@ -733,23 +714,9 @@ internal static class SymbolicLoopStateTransfer
             _ => null
         };
 
-        return headerExpression != null &&
-               SyntaxNodeInvalidatesSymbolValue(headerExpression, symbol, semanticModel, cancellationToken);
-    }
-
-    private static bool SyntaxNodeInvalidatesSymbolValue(
-        SyntaxNode root,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-            if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken) ||
-                SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
+        return headerExpression != null && SymbolicMutationInventory
+            .Create(headerExpression, semanticModel, cancellationToken)
+            .InvalidatesSymbol(symbol, mutableExposures: false);
     }
 
     private static bool ForLoopIncrementorsPreserveBound(
@@ -776,17 +743,12 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
-
-            if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) continue;
-
-            if (node is not ExpressionSyntax expression ||
+        var inventory = SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken);
+        if (inventory.ExposesSymbol(symbol, mutableOnly: false)) return false;
+        foreach (var source in inventory.MutationSources(symbol))
+            if (source is not ExpressionSyntax expression ||
                 !IncrementorPreservesBound(expression, symbol, direction, semanticModel, cancellationToken))
                 return false;
-        }
 
         return true;
     }
@@ -905,28 +867,8 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
-        if (conditionSymbols.Count == 0) return false;
-
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (node is AssignmentExpressionSyntax tupleAssignment &&
-                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(tupleAssignment.Left) is TupleExpressionSyntax leftTuple &&
-                leftTuple.Arguments.Any(argument =>
-                    SymbolicAssignmentStateTransfer.ExpressionReferencesAnySymbol(argument.Expression, conditionSymbols, semanticModel,
-                        cancellationToken)))
-                return true;
-
-            if (!SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression)) continue;
-
-            var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol
-                ?.OriginalDefinition;
-            if (mutatedSymbol != null &&
-                conditionSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, mutatedSymbol)))
-                return true;
-        }
-
-        return false;
+        return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
+            .MutatesAny(conditionSymbols, exactTargets: true);
     }
 
     internal static bool AnyConditionSymbolInvalidatedInStatement(
@@ -950,7 +892,8 @@ internal static class SymbolicLoopStateTransfer
         var symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression), cancellationToken).Symbol
             ?.OriginalDefinition;
         if (symbol is ILocalSymbol or IParameterSymbol)
-            return StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken);
+            return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
+                .MutatesSymbol(symbol);
 
         return AnyConditionSymbolInvalidatedInStatement(
             expression,
@@ -959,37 +902,14 @@ internal static class SymbolicLoopStateTransfer
             cancellationToken);
     }
 
-    internal static bool StatementMutatesSymbol(
-        StatementSyntax statement,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
-                SymbolMutationFacts.ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
-                return true;
-        }
-
-        return false;
-    }
-
     internal static bool ExpressionMutatesAnySymbol(
         ExpressionSyntax expression,
         IReadOnlyCollection<ISymbol> symbols,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (symbols.Count == 0) return false;
-
-        foreach (var node in expression.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-            if (symbols.Any(symbol => NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)))
-                return true;
-
-        return false;
+        return SymbolicMutationInventory.Create(expression, semanticModel, cancellationToken)
+            .MutatesAny(symbols);
     }
 
     private static bool ForLoopConditionInvalidatesSymbolValue(
@@ -1070,18 +990,9 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         if (symbols.Count == 0) return false;
-
-        foreach (var symbol in symbols)
-            if (IsSymbolAssignedBetween(
-                    branchRoot,
-                    branchRoot.SpanStart - 1,
-                    useSpanStart,
-                    symbol,
-                    semanticModel,
-                    cancellationToken))
-                return true;
-
-        return false;
+        var inventory = SymbolicMutationInventory.Create(branchRoot, semanticModel, cancellationToken);
+        return symbols.Any(symbol =>
+            inventory.MutatesBetween(branchRoot.SpanStart - 1, useSpanStart, symbol));
     }
 
     internal static bool IsSymbolAssignedBetween(
@@ -1092,24 +1003,8 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in root.DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (node.SpanStart <= afterSpanStart || node.SpanStart >= beforeSpanStart) continue;
-
-            if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) return true;
-        }
-
-        return false;
-    }
-
-    private static bool NodeMutatesSymbol(
-        SyntaxNode node,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
-               SymbolMutationFacts.ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
+        return SymbolicMutationInventory.Create(root, semanticModel, cancellationToken)
+            .MutatesBetween(afterSpanStart, beforeSpanStart, symbol);
     }
 
     internal static IReadOnlyList<ISymbol> GetConditionDependencySymbols(

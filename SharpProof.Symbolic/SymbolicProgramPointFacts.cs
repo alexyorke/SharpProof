@@ -550,8 +550,8 @@ internal static class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return SymbolicLoopStateTransfer.StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken) ||
-               SymbolicStateInvalidator.MayMutateThroughReference(statement, symbol, semanticModel, cancellationToken);
+        return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
+            .InvalidatesSymbol(symbol, mutableExposures: true);
     }
 
     internal static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax)

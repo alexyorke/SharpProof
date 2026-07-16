@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
@@ -33,46 +32,16 @@ internal static class SymbolicStateInvalidator
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var plan = LowerNestedMutations(root, semanticModel, cancellationToken);
-        state = ApplyNestedMutationInvalidations(state, plan);
+        state = ApplyNestedMutationInvalidations(
+            state,
+            LowerNestedMutations(root, semanticModel, cancellationToken));
     }
 
     internal static SymbolicNestedMutationInvalidationPlan LowerNestedMutations(
         SyntaxNode root,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
-        var hasUnsupportedMutation = false;
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression))
-            {
-                var targets = LowerMutationTargets(
-                    mutatedExpression,
-                    semanticModel,
-                    cancellationToken);
-                if (targets.IsDefaultOrEmpty)
-                    hasUnsupportedMutation = true;
-                else
-                    steps.Add(new SymbolicMutationInvalidationStep(
-                        targets,
-                        mutatedExpression.Span,
-                        "operation-transfer.mutation-invalidation"));
-            }
-
-            foreach (var receiverSymbol in GetPotentiallyMutatedReferenceSymbols(node, semanticModel, cancellationToken))
-                steps.Add(new SymbolicMutationInvalidationStep(
-                    ImmutableArray.Create(ForSymbol(receiverSymbol)),
-                    node.Span,
-                    "operation-transfer.reference-invalidation"));
-        }
-
-        return new SymbolicNestedMutationInvalidationPlan(
-            steps.ToImmutable(),
-            hasUnsupportedMutation);
-    }
+        CancellationToken cancellationToken) =>
+        SymbolicMutationInventory.Create(root, semanticModel, cancellationToken).ToInvalidationPlan();
 
     internal static SymbolicState ApplyNestedMutationInvalidations(
         SymbolicState state,
@@ -93,7 +62,7 @@ internal static class SymbolicStateInvalidator
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var invalidations = LowerMutationTargets(
+        var invalidations = SymbolicMutationInventory.LowerTargetInvalidations(
             mutatedExpression,
             semanticModel,
             cancellationToken);
@@ -105,64 +74,18 @@ internal static class SymbolicStateInvalidator
                 "operation-transfer.mutation-invalidation").State;
     }
 
-    private static ImmutableArray<SymbolicInvalidationTarget> LowerMutationTargets(
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var invalidations = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
-        var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
-        if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-            invalidations.Add(ForSymbol(mutatedSymbol));
-        else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
-                 IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-            invalidations.Add(new SymbolicInvalidationTarget(
-                SymbolicStateValueFacts.ImplicitThisVariableName + "." + mutatedSymbol.Name,
-                SymbolicInvalidationMatchKind.VariableOrMember));
-
-        foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
-            invalidations.Add(ForSymbol(receiverSymbol));
-
-        return invalidations.ToImmutable();
-    }
-
     internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
     {
         state = SymbolicOperationTransferKernel.Invalidate(
             state,
-            ImmutableArray.Create(ForSymbol(symbol)),
+            ImmutableArray.Create(new SymbolicInvalidationTarget(
+                SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition))),
             source.Span,
             "operation-transfer.reference-invalidation").State;
     }
 
-    private static SymbolicInvalidationTarget ForSymbol(ISymbol symbol)
-    {
-        return new SymbolicInvalidationTarget(
-            SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition));
-    }
-
-    private static ISymbol? GetMutatedSymbol(
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
-        if (symbol != null) return NormalizeMutatedSymbol(symbol);
-
-        return semanticModel.GetOperation(mutatedExpression, cancellationToken) switch
-        {
-            IFieldReferenceOperation fieldReference => fieldReference.Field,
-            IPropertyReferenceOperation propertyReference => propertyReference.Property,
-            _ => null
-        };
-    }
-
-    internal static ISymbol NormalizeMutatedSymbol(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property }
-            ? property
-            : symbol;
-    }
+    internal static ISymbol NormalizeMutatedSymbol(ISymbol symbol) =>
+        symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property } ? property : symbol;
 
     internal static bool IsCurrentInstanceMemberReference(
         ExpressionSyntax expression,
@@ -171,115 +94,10 @@ internal static class SymbolicStateInvalidator
     {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (expression is IdentifierNameSyntax &&
-            GetMutatedSymbol(expression, semanticModel, cancellationToken) is { IsStatic: false }
-                and (IFieldSymbol or IPropertySymbol))
+            SymbolicMutationInventory.GetMutatedSymbol(expression, semanticModel, cancellationToken) is
+                { IsStatic: false } and (IFieldSymbol or IPropertySymbol))
             return true;
-
         return expression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
     }
 
-    private static IEnumerable<ISymbol> GetMutatedReceiverSymbols(
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var receiverExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(mutatedExpression) switch
-        {
-            ElementAccessExpressionSyntax elementAccess => elementAccess.Expression,
-            MemberAccessExpressionSyntax memberAccess => memberAccess.Expression,
-            _ => null
-        };
-
-        if (receiverExpression == null) yield break;
-
-        var receiverSymbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(receiverExpression), cancellationToken).Symbol
-            ?.OriginalDefinition;
-        if (receiverSymbol is ILocalSymbol or IParameterSymbol) yield return receiverSymbol;
-    }
-
-    private static IEnumerable<ISymbol> GetPotentiallyMutatedReferenceSymbols(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (node)
-        {
-            case InvocationExpressionSyntax invocation:
-                if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-                    foreach (var symbol in GetReferencedMutableReferenceSymbols(memberAccess.Expression, semanticModel,
-                                 cancellationToken))
-                        yield return symbol;
-
-                foreach (var argument in invocation.ArgumentList.Arguments)
-                    foreach (var symbol in GetReferencedMutableReferenceSymbols(argument.Expression, semanticModel, cancellationToken))
-                        yield return symbol;
-
-                break;
-            case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
-                foreach (var argument in argumentList.Arguments)
-                    foreach (var symbol in GetReferencedMutableReferenceSymbols(argument.Expression, semanticModel, cancellationToken))
-                        yield return symbol;
-
-                break;
-        }
-    }
-
-    private static IEnumerable<ISymbol> GetReferencedMutableReferenceSymbols(
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-                     root,
-                     semanticModel,
-                     cancellationToken))
-            if (IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
-                yield return symbol;
-    }
-
-    internal static bool MayMutateThroughReference(
-        StatementSyntax statement,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol))) return false;
-
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-            if (NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
-    }
-
-    internal static bool NodeMayMutateThroughReference(
-        SyntaxNode node,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (node)
-        {
-            case InvocationExpressionSyntax invocation:
-                if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
-                    SymbolMutationFacts.ExpressionReferencesSymbol(memberAccess.Expression, symbol, semanticModel, cancellationToken))
-                    return true;
-
-                return invocation.ArgumentList.Arguments.Any(argument =>
-                    SymbolMutationFacts.ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
-            case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
-                return argumentList.Arguments.Any(argument =>
-                    SymbolMutationFacts.ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
-            default:
-                return false;
-        }
-    }
-
-    private static bool IsPotentiallyMutableThroughReference(ITypeSymbol? type)
-    {
-        return type is IArrayTypeSymbol ||
-               (type?.IsReferenceType == true &&
-                type.SpecialType != SpecialType.System_String);
-    }
 }

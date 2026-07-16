@@ -98,24 +98,12 @@ internal static class SymbolicLoopTransferLowerer
         var targets = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var root in EnumerateBackEdgeMutationRoots(loop))
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
-        {
-            if (!SymbolMutationFacts.TryGetMutationTarget(node, out var expression))
-                continue;
-            if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var symbol))
+            if (!SymbolicMutationInventory.Create(root, semanticModel, cancellationToken)
+                    .TryCollectLocalOrParameterInvalidations(keys, targets))
             {
                 invalidations = default;
                 return false;
             }
-
-            var key = SymbolicFactFactory.GetSmtVariableName(symbol);
-            if (keys.Add(key))
-                targets.Add(new SymbolicInvalidationTarget(key));
-        }
 
         invalidations = targets.ToImmutable();
         return true;

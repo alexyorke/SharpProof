@@ -1489,11 +1489,24 @@ the unused preview .NET API may break when it obstructs the canonical design.
   warning-as-error solution build are green. The refreshed impact inventory no
   longer contains the deleted source. Production LOC is 105,425 across 443 files
   and tracked test LOC remains 145,267.
-- Next cheapest step: re-audit the remaining compact projection sources for
-  exact live callers before deleting any further linked source; return to the
-  first semantic prerequisite when no independently removable projection leaf
-  remains.
-- Blockers: the 11,000-line production target still requires 8,749 lines. The
+  Mutation discovery now has one execution-scoped ordered
+  `SymbolicMutationInventory`. It owns direct targets, exact and reference
+  queries, call exposure policy, strict source windows, invalidation plans, and
+  loop back-edge target collection. The parallel loop, program-point, and state
+  invalidator walkers are deleted while nested-callable boundaries, tuple
+  unsupported behavior, duplicate exposures, source order, accessor identity,
+  and conservative `HasUnsupportedMutation` remain locked by four focused
+  invariants. The focused inventory/loop gate passes 8/8, the CFG/state/loop
+  parity batch 278/278, source-query tooling 96/96, MainSmtFlow 257/257, and the
+  affected exception-flow batch 63/63. The full main lane passes 5,548 tests
+  with the same two documented skips, and the Release warning-as-error solution
+  build is clean. Production LOC is 105,315 across 444 files, down 110 in this
+  tranche and 2,361 from the rewrite start; tracked test LOC is 145,395.
+- Next cheapest step: use the mutation inventory as the prerequisite for one
+  bounded state-transfer migration whose deleted legacy path clears a 100-line
+  net gate; first inventory exact callers and reject another low-yield wrapper
+  extraction before implementation.
+- Blockers: the 11,000-line production target still requires 8,639 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.
