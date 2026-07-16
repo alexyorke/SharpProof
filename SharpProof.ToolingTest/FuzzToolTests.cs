@@ -412,6 +412,58 @@ public class FuzzToolTests
     }
 
     [Test]
+    public void FuzzCaseGenerator_RegistryManifestAndVariants_PreserveExactBytes()
+    {
+        var generator = new FuzzCaseGenerator(20260614);
+        var payload = new StringBuilder();
+
+        static void AppendValue(StringBuilder target, object? value)
+        {
+            var text = value?.ToString() ?? "<null>";
+            target.Append(text.Length).Append(':').Append(text).Append('\n');
+        }
+
+        static void AppendValues(StringBuilder target, IEnumerable<string> values)
+        {
+            var materialized = values.ToArray();
+            AppendValue(target, materialized.Length);
+            foreach (var value in materialized)
+                AppendValue(target, value);
+        }
+
+        foreach (var (entry, ordinal) in FuzzCaseGenerator.RegistryEntries.Select((entry, ordinal) => (entry, ordinal)))
+        {
+            AppendValue(payload, ordinal);
+            AppendValue(payload, entry.Id);
+            AppendValues(payload, entry.PrimaryShapeIds);
+            AppendValues(payload, entry.ExpectedOperationKinds);
+            AppendValues(payload, entry.ExpectedSyntaxKinds);
+            AppendValue(payload, entry.Expectation.Sp0002);
+            AppendValue(payload, entry.Expectation.Sp0010);
+            AppendValues(payload, entry.Expectation.RequiredSp0002Properties);
+            AppendValues(payload, entry.Expectation.RequiredSp0010Properties);
+            AppendValues(payload, entry.Expectation.RequiredAnySp0010Properties);
+            AppendValue(payload, entry.AllowUnsafe);
+            AppendValue(payload, entry.AllowEffectPreservingWrappers);
+
+            for (var variant = 0; variant < 4; variant++)
+            {
+                var fuzzCase = generator.GenerateForRegistryEntry(entry, ordinal, variant);
+                AppendValue(payload, fuzzCase.Name);
+                AppendValue(payload, fuzzCase.Family);
+                AppendValue(payload, fuzzCase.Source);
+                AppendValue(payload, fuzzCase.AllowUnsafe);
+                AppendValues(payload, fuzzCase.PrimaryShapeIds);
+                AppendValues(payload, fuzzCase.ExpectedOperationKinds);
+                AppendValues(payload, fuzzCase.ExpectedSyntaxKinds);
+            }
+        }
+
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload.ToString())));
+        Assert.That(hash, Is.EqualTo("A997A5C3644EC859A883975E11DD10E7E04BE7550B9A2616B65378CE1F542539"));
+    }
+
+    [Test]
     public async Task ExpandedCoverageFamilies_Compile_AndEmitExpectedOperationKinds()
     {
         var analyses = await AnalyzeCachedRegistryFamiliesAsync();
