@@ -71,9 +71,12 @@ internal static class SymbolicCfgProgramPointStateCollector
             cancellationToken);
 
         var entryPoint = new CfgTraversalPoint(graph.Blocks[0], null);
-        var incoming = new Dictionary<CfgTraversalPoint, List<CfgPathState>>
+        var incoming = new Dictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>>
         {
-            [entryPoint] = new List<CfgPathState> { new(state, null) }
+            [entryPoint] = new Dictionary<CfgIncomingEdge, CfgPathState>
+            {
+                [new CfgIncomingEdge(null, null, CfgIncomingEdgeKind.Entry)] = new(state, null)
+            }
         };
         var queue = new Queue<CfgTraversalPoint>();
         var queued = new HashSet<CfgTraversalPoint> { entryPoint };
@@ -93,7 +96,7 @@ internal static class SymbolicCfgProgramPointStateCollector
             var point = queue.Dequeue();
             queued.Remove(point);
             var block = point.Block;
-            var currentPath = MergeIncomingStates(incoming[point], site);
+            var currentPath = MergeIncomingStates(incoming[point].Values.ToArray(), site);
             state = currentPath.State;
             if (targetIsCompletedRootBlock && block.Kind == BasicBlockKind.Exit)
             {
@@ -245,7 +248,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ControlFlowGraph graph,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        IDictionary<CfgTraversalPoint, List<CfgPathState>> incoming,
+        IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
         Queue<CfgTraversalPoint> queue,
         ISet<CfgTraversalPoint> queued,
         ICollection<CfgPathState> completedPaths,
@@ -278,6 +281,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                    TryPropagate(
                        block,
                        block.ConditionalSuccessor,
+                       CfgIncomingEdgeKind.Conditional,
                        activeContinuation,
                        new CfgPathState(
                            conditionalState,
@@ -298,6 +302,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                    TryPropagate(
                        block,
                        block.FallThroughSuccessor,
+                       CfgIncomingEdgeKind.FallThrough,
                        activeContinuation,
                        new CfgPathState(
                            fallThroughState,
@@ -320,6 +325,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         return TryPropagate(
                    block,
                    block.FallThroughSuccessor,
+                   CfgIncomingEdgeKind.FallThrough,
                    activeContinuation,
                    path,
                    graph,
@@ -333,6 +339,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                TryPropagate(
                    block,
                    block.ConditionalSuccessor,
+                   CfgIncomingEdgeKind.Conditional,
                    activeContinuation,
                    path,
                    graph,
@@ -375,10 +382,11 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool TryPropagate(
         BasicBlock source,
         ControlFlowBranch? branch,
+        CfgIncomingEdgeKind edgeKind,
         CfgFinallyContinuation? activeContinuation,
         CfgPathState path,
         ControlFlowGraph graph,
-        IDictionary<CfgTraversalPoint, List<CfgPathState>> incoming,
+        IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
         Queue<CfgTraversalPoint> queue,
         ISet<CfgTraversalPoint> queued,
         ICollection<CfgPathState> completedPaths,
@@ -399,6 +407,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 new CfgTraversalPoint(
                     graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal],
                     continuation),
+                new CfgIncomingEdge(branch, continuation, edgeKind),
+                loopPlans.Count != 0,
                 path,
                 incoming,
                 queue,
@@ -414,7 +424,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         {
             if (activeContinuation != null)
                 return TryCompleteFinallyContinuation(
+                    branch,
                     activeContinuation,
+                    loopPlans.Count != 0,
                     path,
                     graph,
                     incoming,
@@ -453,6 +465,8 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         return TryPropagateToPoint(
             new CfgTraversalPoint(branch.Destination, activeContinuation),
+            new CfgIncomingEdge(branch, activeContinuation, edgeKind),
+            loopPlans.Count != 0,
             path,
             incoming,
             queue,
@@ -460,10 +474,12 @@ internal static class SymbolicCfgProgramPointStateCollector
     }
 
     private static bool TryCompleteFinallyContinuation(
+        ControlFlowBranch sourceBranch,
         CfgFinallyContinuation? continuation,
+        bool preserveIncomingHistory,
         CfgPathState path,
         ControlFlowGraph graph,
-        IDictionary<CfgTraversalPoint, List<CfgPathState>> incoming,
+        IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
         Queue<CfgTraversalPoint> queue,
         ISet<CfgTraversalPoint> queued,
         ICollection<CfgPathState> completedPaths)
@@ -476,23 +492,38 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         var nextRegionIndex = continuation.RegionIndex + 1;
         if (nextRegionIndex < continuation.Regions.Length)
+        {
+            var nextContinuation = continuation with { RegionIndex = nextRegionIndex };
             return TryPropagateToPoint(
                 new CfgTraversalPoint(
                     graph.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal],
-                    continuation with { RegionIndex = nextRegionIndex }),
+                    nextContinuation),
+                new CfgIncomingEdge(
+                    sourceBranch,
+                    nextContinuation,
+                    CfgIncomingEdgeKind.FinallyContinuation),
+                preserveIncomingHistory,
                 path,
                 incoming,
                 queue,
                 queued);
+        }
         if (continuation.Destination != null)
             return TryPropagateToPoint(
                 new CfgTraversalPoint(continuation.Destination, continuation.Parent),
+                new CfgIncomingEdge(
+                    sourceBranch,
+                    continuation,
+                    CfgIncomingEdgeKind.FinallyContinuation),
+                preserveIncomingHistory,
                 path,
                 incoming,
                 queue,
                 queued);
         return TryCompleteFinallyContinuation(
+            sourceBranch,
             continuation.Parent,
+            preserveIncomingHistory,
             path,
             graph,
             incoming,
@@ -503,30 +534,43 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool TryPropagateToPoint(
         CfgTraversalPoint destination,
+        CfgIncomingEdge edge,
+        bool preserveIncomingHistory,
         CfgPathState path,
-        IDictionary<CfgTraversalPoint, List<CfgPathState>> incoming,
+        IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
         Queue<CfgTraversalPoint> queue,
         ISet<CfgTraversalPoint> queued)
     {
-        if (!incoming.TryGetValue(destination, out var states))
-        {
-            states = new List<CfgPathState>();
-            incoming.Add(destination, states);
-        }
-
         var activeGuard = GetActiveGuard(path.GuardFrame);
         var guardKey = activeGuard == null
             ? string.Empty
             : SymbolicState.CreateProofConditionKey(activeGuard);
-        if (states.Any(existing =>
+        if (preserveIncomingHistory)
+        {
+            // The bounded loop transfer still derives its fixed point from accumulated iterations.
+            edge = new CfgIncomingEdge(
+                null,
+                null,
+                CfgIncomingEdgeKind.History,
+                path.State.NormalizedProofKey + "\nactive-guard:" + guardKey +
+                "\nguard-invalidated:" + HasInvalidatedGuard(path.GuardFrame));
+        }
+
+        if (!incoming.TryGetValue(destination, out var states))
+        {
+            states = new Dictionary<CfgIncomingEdge, CfgPathState>();
+            incoming.Add(destination, states);
+        }
+
+        if (states.TryGetValue(edge, out var existing) &&
                 existing.State.NormalizedProofKey == path.State.NormalizedProofKey &&
                 (GetActiveGuard(existing.GuardFrame) is not { } existingGuard
                     ? string.Empty
                     : SymbolicState.CreateProofConditionKey(existingGuard)) == guardKey &&
                 HasInvalidatedGuard(existing.GuardFrame) ==
-                HasInvalidatedGuard(path.GuardFrame)))
+                HasInvalidatedGuard(path.GuardFrame))
             return true;
-        states.Add(path);
+        states[edge] = path;
         if (queued.Add(destination))
             queue.Enqueue(destination);
         return true;
@@ -744,6 +788,21 @@ internal static class SymbolicCfgProgramPointStateCollector
     private readonly record struct CfgPathState(
         SymbolicState State,
         CfgGuardFrame? GuardFrame);
+
+    private readonly record struct CfgIncomingEdge(
+        ControlFlowBranch? Branch,
+        CfgFinallyContinuation? Continuation,
+        CfgIncomingEdgeKind Kind,
+        string? HistoryKey = null);
+
+    private enum CfgIncomingEdgeKind
+    {
+        Entry,
+        Conditional,
+        FallThrough,
+        FinallyContinuation,
+        History
+    }
 
     private sealed record CfgGuardFrame(
         SymbolicState Baseline,
@@ -1330,8 +1389,11 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
             return true;
+        if (graph.Blocks.Count(static block =>
+                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 1) > 1)
+            return false;
         if (graph.Blocks.Any(static block =>
-                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 1))
+                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 2))
             return false;
 
         return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
