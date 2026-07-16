@@ -418,41 +418,15 @@ internal static class SymbolicStatementStateTransfer
                 semanticModel,
                 cancellationToken,
                 out var mutatedSymbol,
-                out var delta))
+                out _))
         {
-            if (SymbolicStateValueFacts.TryGetCurrentValue(state, mutatedSymbol, out var previousValueTerm) &&
-                SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement(
-                    previousValueTerm,
-                    delta,
+            if (!SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
+                    ref state,
+                    mutatedSymbol,
                     unaryExpressionStatement.Expression,
                     semanticModel,
-                    cancellationToken,
-                    mutatedSymbol,
-                    out var updatedValueTerm,
-                    out var isChecked))
-            {
-                var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
-                    state,
-                    mutatedSymbol,
-                    updatedValueTerm,
-                    unaryExpressionStatement.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    delta >= 0
-                        ? SymbolicComputedUpdateKind.Increment
-                        : SymbolicComputedUpdateKind.Decrement,
-                    isChecked,
-                    delta >= 0
-                        ? "ir.path.prior-statement.increment"
-                        : "ir.path.prior-statement.decrement");
-                if (transition.IsExact)
-                {
-                    state = transition.State;
-                    return;
-                }
-            }
-
-            state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
+                    cancellationToken))
+                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
             return;
         }
 

@@ -1590,72 +1590,34 @@ internal static class SymbolicCfgProgramPointStateCollector
                     cancellationToken,
                     out invalidatedGuardTarget);
 
-        var increment = operation switch
+        IOperation? computedUpdate = operation switch
         {
             IExpressionStatementOperation { Operation: IIncrementOrDecrementOperation nested } => nested,
-            IIncrementOrDecrementOperation direct => direct,
-            _ => null
-        };
-        if (increment != null)
-            return TryGetDirectTarget(increment.Target, out var target) &&
-                   increment.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression &&
-                   SymbolicStateValueFacts.TryGetCurrentValue(state, target, out var previousValue) &&
-                   SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement(
-                       previousValue,
-                       increment.Kind == OperationKind.Increment ? 1 : -1,
-                       expression,
-                       semanticModel,
-                       cancellationToken,
-                       target,
-                       out var updatedValue,
-                       out var isChecked) &&
-                   TryApplyComputedUpdate(
-                       ref state,
-                       target,
-                       updatedValue,
-                       expression,
-                       guard,
-                       semanticModel,
-                       cancellationToken,
-                       increment.Kind == OperationKind.Increment
-                           ? SymbolicComputedUpdateKind.Increment
-                           : SymbolicComputedUpdateKind.Decrement,
-                       isChecked,
-                       increment.Kind == OperationKind.Increment
-                            ? "ir.path.prior-statement.increment"
-                            : "ir.path.prior-statement.decrement",
-                        out invalidatedGuardTarget);
-
-        var compound = operation switch
-        {
             IExpressionStatementOperation { Operation: ICompoundAssignmentOperation nested } => nested,
+            IIncrementOrDecrementOperation direct => direct,
             ICompoundAssignmentOperation direct => direct,
             _ => null
         };
-        return compound != null &&
-               TryGetDirectTarget(compound.Target, out var compoundTarget) &&
-               compound.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax compoundSyntax &&
-               SymbolicStateValueFacts.TryGetCurrentValue(state, compoundTarget, out var compoundPreviousValue) &&
-               SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment(
-                   compoundPreviousValue,
-                   compoundSyntax,
-                   semanticModel,
-                   cancellationToken,
-                   compoundTarget,
-                   out var compoundValue,
-                   out var compoundIsChecked) &&
-               TryApplyComputedUpdate(
-                   ref state,
-                   compoundTarget,
-                   compoundValue,
-                   compoundSyntax,
-                   guard,
-                   semanticModel,
-                   cancellationToken,
-                   SymbolicComputedUpdateKind.CompoundAssignment,
-                    compoundIsChecked,
-                    "ir.path.prior-statement.compound-assignment",
-                    out invalidatedGuardTarget);
+        var computedTarget = computedUpdate switch
+        {
+            IIncrementOrDecrementOperation increment => increment.Target,
+            ICompoundAssignmentOperation compound => compound.Target,
+            _ => null
+        };
+        if (computedUpdate == null ||
+            computedTarget == null ||
+            !TryGetDirectTarget(computedTarget, out var computedTargetSymbol) ||
+            computedUpdate.Syntax is not ExpressionSyntax expression ||
+            !SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
+                ref state,
+                computedTargetSymbol,
+                expression,
+                semanticModel,
+                cancellationToken))
+            return false;
+        if (GuardReferencesTarget(guard, computedTargetSymbol))
+            invalidatedGuardTarget = computedTargetSymbol;
+        return true;
     }
 
     private static bool TryApplyCurrentCompletion(
@@ -1883,37 +1845,6 @@ internal static class SymbolicCfgProgramPointStateCollector
         }
 
         return state;
-    }
-
-    private static bool TryApplyComputedUpdate(
-        ref SymbolicState state,
-        ISymbol target,
-        SymbolicTerm updatedValue,
-        SyntaxNode source,
-        SymbolicCondition? guard,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SymbolicComputedUpdateKind updateKind,
-        bool isChecked,
-        string provenance,
-        out ISymbol? invalidatedGuardTarget)
-    {
-        invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
-        var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
-            state,
-            target,
-            updatedValue,
-            source,
-            semanticModel,
-            cancellationToken,
-            updateKind,
-            isChecked,
-            provenance);
-        if (!transition.IsExact)
-            return false;
-
-        state = transition.State;
-        return true;
     }
 
     private static bool TryApplyAssignment(

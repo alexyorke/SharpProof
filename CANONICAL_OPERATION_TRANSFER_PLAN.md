@@ -518,6 +518,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     reference, nullable, Boolean, tuple, explicit-target, and coalesce lowering
     are unchanged. `TryCreateSelfReferentialAssignedValueStateTerm` remains for
     the independent inline-reachability consumer.
+  - [x] Consolidate computed-update application. One
+    `SymbolicAssignmentValueUpdater.TryApplyComputedUpdate` entry point now
+    classifies only non-overloaded Roslyn increment/decrement and compound
+    operations, derives checkedness, update kind, and provenance, and publishes
+    only an exact canonical transition. Expression transfer supplies its
+    pre-invalidation value snapshot; statement transfer retains reference
+    removal on unsupported updates; CFG transfer retains direct-target,
+    expression-syntax, and guard-invalidation gates.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -715,7 +723,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 current-completion guard boundary | `a135f40e` | 106,799 | -877 |
 | Phase 7 canonical self-reference prior values | `a39f1574` | 106,769 | -907 |
 | Phase 7 canonical purity null conditions | `c87b5963` | 106,739 | -937 |
-| Phase 7 completed-loop-exit adjudication | This commit | 106,739 | -937 |
+| Phase 7 completed-loop-exit adjudication | `cab599ae` | 106,739 | -937 |
+| Phase 7 canonical computed-update application | This commit | 106,687 | -989 |
 
 ## Validation Ledger
 
@@ -907,6 +916,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical self-reference prior values | The structural simple-assignment path still manually substituted the pre-invalidation integer value, built one canonical binding by hand, and separately called the reference-backed postcondition lowerer even though an integer target makes that call empty. `ApplyAssignment` now passes an optional assigned-symbol substitution only to its value `SymbolicLoweringContext`; the existing integer-only eligibility and pre-state snapshot gate prevent any reference, nullable, or Boolean broadening. `AddAssignedValueStateFacts` retains snapshot-before-removal ordering and delegates the exact binding, derived bounds, invalidation, throw guard, postconditions, evidence, provenance, and versions to `LowerSimpleAssignment` and the operation kernel. The pre-edit and post-edit self-reference characterizations pass 3/3, and the broader program-point/reachability/operation/invariant batch passes 395/395. An additional parallel Semantic Oracle/flow probe passed 619/620; its unrelated while-exit invariant miss passed 1/1 immediately in isolation under the repository serial-rerun rule. The Release solution warning-as-error build has zero warnings and errors. The production diff is 21 insertions and 53 deletions across two files; authoritative production LOC falls by 30 to 106,769, or -907 from the rewrite start, while tracked test LOC remains 144,488. |
 | Phase 7 canonical purity null conditions | `SymbolicStateFactBuilder` now constructs reference-null conditions from either an expression or an already-versioned reference term, including optional Analyzer evidence. Purity CFG branching, coalesce, and conditional access retain constant-null short-circuiting, owned/not-disposed infeasibility, tracked symbol and flow-capture eligibility, current versions, conservative unsupported behavior, SMT infeasibility, provenance, and evidence while deleting their single-use term helper and manual relation. Pre-edit and post-edit path-expression characterization passes 24/24; MainSmtAnalyzer passes 487/487; the Release solution warning-as-error build has zero warnings and errors. The authoritative production metric falls by 30 to 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 completed-loop-exit adjudication | The proposed seeded completed-loop target was implemented against the existing CFG worklist and then reverted. Roslyn represents break and continue as regular branches, so exact classification requires the loop header's false-polarity successor as one recorded exit block; continue remains an internal edge, while only another proven loop-member edge to that same block can be a break. The prototype reached 25/33 focused cases but failed direct-break suppression and mutation-sensitive guarded break/continue parity. It also added 339 net production lines before legacy deletion, leaving less than the required 250-line reduction after removing the guarded walker. Recreating guard invalidation and target-membership policy would duplicate the structural engine, so the fallback remains authoritative. The reverted baseline passes the full loop-exit characterization 33/33. Production LOC remains 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
+| Phase 7 canonical computed-update application | Expression, statement, and CFG transfer now share one computed-update classifier and exact transition owner. Non-overloaded Roslyn increment/decrement and compound operations retain checked overflow, target-width wrapping, signed division, update kind, provenance, direct-target rejection, current-value versioning, and guard invalidation. Expression transfer supplies its pre-invalidation snapshot; statement fallback still removes references; CFG still rejects non-expression and indirect targets before publication. The pre-edit and post-edit focused characterization passes 8/8, the expanded program-point/invariant/operation/reachability batch passes 419/419, MainSmtOracle passes 573/573, and the Release solution warning-as-error build has zero warnings and errors. The production diff removes 52 authoritative lines to 106,687, or -989 from the rewrite start; tracked test LOC remains 144,488. |
 
 ## Current Checkpoint
 
@@ -1131,10 +1141,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   relation construction. A seeded completed-loop CFG prototype was reverted
   after 25/33 parity and sub-gate deletion economics; Roslyn regular-edge
   classification and the exact remaining guard/mutation gap are recorded above.
-  Production LOC is 106,739, or -937 from the rewrite start; authoritative
-  tracked test LOC is 144,488.
-- Next cheapest step: rank the expression-transfer deletion candidate. Keep the
+  Computed updates now have one semantic classifier and exact transition owner
+  across expression, statement, and CFG transfer. The three callers preserve
+  their distinct snapshot, invalidation, direct-target, and guard boundaries.
+  Focused characterization passes 8/8, the expanded affected batch passes
+  419/419, MainSmtOracle passes 573/573, and the Release solution warning-as-error
+  build is clean. Production LOC is 106,687, or -989 from the rewrite start;
+  authoritative tracked test LOC is 144,488.
+- Next cheapest step: re-rank expression and statement transfer deletion now
+  that computed-update classification and application have one owner. Keep the
   completed-loop/lock structural owner until a shared CFG target-membership and
-  guard-invalidation design can remove at least 250 production lines.
+  guard-invalidation design can remove at least 250 production lines; require
+  at least 50 net production lines from the next accepted slice.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

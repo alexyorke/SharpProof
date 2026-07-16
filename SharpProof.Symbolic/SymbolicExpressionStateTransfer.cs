@@ -144,29 +144,14 @@ internal static class SymbolicExpressionStateTransfer
                 "ir.path.coalesce-assignment");
             if (transition.IsExact) state = transition.State;
         }
-        else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                 previousAssignedValueTerm != null &&
-                 SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment(
-                     previousAssignedValueTerm,
-                     assignment,
-                 semanticModel,
-                 cancellationToken,
-                 assignedSymbol.OriginalDefinition,
-                     out var compoundAssignmentValueTerm,
-                     out var isChecked))
-        {
-            var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
-                state,
+        else if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+            SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
+                ref state,
                 assignedSymbol.OriginalDefinition,
-                compoundAssignmentValueTerm,
                 assignment,
                 semanticModel,
                 cancellationToken,
-                SymbolicComputedUpdateKind.CompoundAssignment,
-                isChecked,
-                "ir.path.prior-statement.compound-assignment");
-            if (transition.IsExact) state = transition.State;
-        }
+                previousAssignedValueTerm);
 
         if (containingStatement != null)
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(

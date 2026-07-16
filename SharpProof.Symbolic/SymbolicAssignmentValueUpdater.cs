@@ -10,35 +10,97 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicAssignmentValueUpdater
 {
-    internal static bool TryCreateIncrementOrDecrement(
+    internal static bool TryApplyComputedUpdate(
+        ref SymbolicState state,
+        ISymbol target,
+        ExpressionSyntax source,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicTerm? previousValueOverride = null)
+    {
+        if (previousValueOverride is not { } previousValue &&
+            !SymbolicStateValueFacts.TryGetCurrentValue(state, target, out previousValue))
+            return false;
+
+        SymbolicTerm updatedValue;
+        SymbolicComputedUpdateKind updateKind;
+        bool isChecked;
+        string provenance;
+        switch (semanticModel.GetOperation(source, cancellationToken))
+        {
+            case IIncrementOrDecrementOperation { OperatorMethod: null } increment:
+                var delta = increment.Kind == OperationKind.Increment ? 1 : -1;
+                isChecked = increment.IsChecked;
+                if (!TryCreateIncrementOrDecrement(
+                        previousValue,
+                        delta,
+                        source,
+                        target,
+                        isChecked,
+                        out updatedValue))
+                    return false;
+                updateKind = delta > 0
+                    ? SymbolicComputedUpdateKind.Increment
+                    : SymbolicComputedUpdateKind.Decrement;
+                provenance = delta > 0
+                    ? "ir.path.prior-statement.increment"
+                    : "ir.path.prior-statement.decrement";
+                break;
+            case ICompoundAssignmentOperation { OperatorMethod: null } compound
+                when source is AssignmentExpressionSyntax assignment:
+                isChecked = compound.IsChecked;
+                if (!TryCreateCompoundAssignment(
+                        previousValue,
+                        assignment,
+                        semanticModel,
+                        cancellationToken,
+                        target,
+                        isChecked,
+                        out updatedValue))
+                    return false;
+                updateKind = SymbolicComputedUpdateKind.CompoundAssignment;
+                provenance = "ir.path.prior-statement.compound-assignment";
+                break;
+            default:
+                return false;
+        }
+
+        var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+            state,
+            target,
+            updatedValue,
+            source,
+            semanticModel,
+            cancellationToken,
+            updateKind,
+            isChecked,
+            provenance);
+        if (!transition.IsExact)
+            return false;
+        state = transition.State;
+        return true;
+    }
+
+    private static bool TryCreateIncrementOrDecrement(
         SymbolicTerm previousValue,
         int delta,
         ExpressionSyntax updateExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
         ISymbol targetSymbol,
-        out SymbolicTerm updatedValue,
-        out bool isChecked)
+        bool isChecked,
+        out SymbolicTerm updatedValue)
     {
         updatedValue = null!;
-        isChecked = false;
         if (previousValue.Kind != SmtValueKind.Int ||
             delta is not 1 and not -1 ||
-            semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
-            {
-                OperatorMethod: null
-            } operation ||
             !TryGetTargetRange(targetSymbol, out var minimum, out var maximum))
             return false;
-
-        isChecked = operation.IsChecked;
 
         if (previousValue is SymbolicIntegerConstantTerm integerConstant)
             return TryCreateConstantResult(
                 integerConstant.Value + (BigInteger)delta,
                 minimum,
                 maximum,
-                operation.IsChecked,
+                isChecked,
                 out updatedValue);
 
         var mathematicalTerm = new SymbolicBinaryTerm(
@@ -53,30 +115,25 @@ internal static class SymbolicAssignmentValueUpdater
             maximum,
             updateExpression,
             "ir.path.prior-statement.update",
-            operation.IsChecked);
+            isChecked);
         return true;
     }
 
-    internal static bool TryCreateCompoundAssignment(
+    private static bool TryCreateCompoundAssignment(
         SymbolicTerm previousValue,
         AssignmentExpressionSyntax assignment,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ISymbol targetSymbol,
-        out SymbolicTerm updatedValue,
-        out bool isChecked)
+        bool isChecked,
+        out SymbolicTerm updatedValue)
     {
         updatedValue = null!;
-        isChecked = false;
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             assignment.Right,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         var targetName = SymbolicFactFactory.GetSmtVariableName(targetSymbol);
         if (previousValue.Kind != SmtValueKind.Int ||
-            semanticModel.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation
-            {
-                OperatorMethod: null
-            } operation ||
             !TryGetTargetRange(targetSymbol, out var minimum, out var maximum) ||
             !CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind) ||
             !SymbolicOperatorLowerer.TryGetBinaryTermOperator(binaryKind, out var binaryOperator) ||
@@ -86,8 +143,6 @@ internal static class SymbolicAssignmentValueUpdater
             SymbolicIrReferenceScanner.ContainsVariableOrMember(rightTerm, targetName))
             return false;
 
-        isChecked = operation.IsChecked;
-
         if (previousValue is SymbolicIntegerConstantTerm leftConstant &&
             rightTerm is SymbolicIntegerConstantTerm rightConstant)
             return TryCreateConstantBinaryResult(
@@ -96,7 +151,7 @@ internal static class SymbolicAssignmentValueUpdater
                 binaryOperator,
                 minimum,
                 maximum,
-                operation.IsChecked,
+                isChecked,
                 out updatedValue);
 
         if (binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder &&
@@ -114,7 +169,7 @@ internal static class SymbolicAssignmentValueUpdater
                 maximum,
                 assignment,
                 "ir.path.prior-statement.compound-assignment",
-                operation.IsChecked);
+                isChecked);
             return true;
         }
 
