@@ -586,6 +586,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     operation cursors and topology once, keep completion/terminal execution
     state per collection, preserve every typed fallback reason, and delete the
     old scheduler types without adding a parallel engine.
+  - [x] Replace the 97-line completed-try syntax island with a typed CFG
+    exception-region plan. Validate Roslyn `TryAndCatch`, `Catch`,
+    `FilterAndHandler`, and `Finally` ownership; seed possible handlers from the
+    protected entry state after canonical mutation invalidation; preserve the
+    legacy conservative multi-catch/filter merge and unknown-call paths; and
+    exclude a catch only when the thrown runtime type is proven exact. Delete
+    the static-type catch classifier, which was unsound for a base-typed local
+    holding a derived exception.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -807,6 +815,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical normal-completion coordinator | `c7a543ee` | 106,009 | -1,667 |
 | Phase 7 target-aware CFG region plan | `b5d34d6e` | 105,990 | -1,686 |
 | Phase 7 root block eligibility consolidation | `d3657d4f` | 105,989 | -1,687 |
+| Phase 7 typed CFG exception-region routing | `d2726997` | 106,118 | -1,558 |
 
 ## Validation Ledger
 
@@ -1015,6 +1024,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 root block eligibility consolidation | Root completion now has one eligibility owner for invocation, try/catch-region, and acyclic/terminal CFG policy. The duplicate recursive region-kind walker is deleted in favor of the collector's existing region enumeration. The structural completion owner remains intentionally authoritative after the direct region-worklist prototype failed guarded-choice parity. Root exact/fallback and typed identity fixtures pass 32/32. Authoritative metrics report 105,989 production LOC, or -1,687 from the rewrite start. |
 | Phase 7 nested block completion adjudication | A second prototype retained the exact structural block-entry state, added block topology to `CfgRegionPlan`, and distinguished internal versus target scope exits. It reduced failures from 31 to 8 but still changed guarded-choice normalization/evidence, array completion facts, and all-terminal branch results. The prototype was reverted completely under the two-failure pivot rule; the clean 53-case block gate remains green. Nested structural completion is therefore an evidence-backed semantic owner until guard-choice finalization itself is unified, not merely adapted at plan entry. Production LOC remains 105,989. |
 | Phase 7 residual legacy call-graph pivot | Three independent exact caller/LOC audits found no non-block legacy island with an existing canonical replacement and at least 50 net removable lines. The 339-line ancestor-reachability island remains the guard-sensitive fallback for every typed CFG `Unsupported`; completed-try is 90 gross lines but needs typed exception-to-catch routing; using entry is 77 gross lines but retains unique binding/evidence semantics; branch/loop candidates top out at 29 safe lines. No production change was made. The next foundational slice is typed CFG exception-region/catch routing, characterized before any completed-try deletion. |
+| Phase 7 typed CFG exception-region routing | Commit `d2726997` adds a typed plan over Roslyn `TryAndCatch`, `Catch`, `FilterAndHandler`, and `Finally` regions, explicitly seeds disconnected handler paths, and deletes the 97-line completed-try owner plus its static-type catch classifier. Exact/base/incompatible catches, constant and unknown filters, ordered multiple catches, normal and throwing finally blocks, base-typed exact runtime values, unresolved runtime types, and unknown potentially throwing calls are characterized in 13 named cases with normalized state, evidence/provenance, version, contradiction, and current-value checks. Catch exclusion now requires `SymbolicRuntimeTypeFacts.TryGetExactRuntimeType`; unresolved values retain every possible completion path. The focused collector/program-point gate passes 298/298. Exception/oracle coverage passed 848/849 with the known while-exit flake immediately green in isolated serial rerun; limits pass 9/9 and impacted-selection passes 39/39. All six lanes pass 6,118 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,952 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. The correctness scaffold is +129 production lines, leaving production LOC at 106,118, or -1,558 from the rewrite start; tracked nonblank test LOC is 144,823. The collector partial remains under its limit at 2,986 lines. Independent GitHub inspection found PR #79 green; no CI edit was warranted because `1ebaebea` already fixed the historical README inventory race. |
 
 ## Current Checkpoint
 
@@ -1314,14 +1324,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
   was reverted. This migration family has reached the two-failure pivot limit.
   Root eligibility leaves the authoritative metric at 105,989 production LOC,
   or -1,687 from the rewrite start. The residual call-graph audit found no safe
-  non-block 50-line deletion; completed-try is the first large island and awaits
-  typed exception-to-catch routing.
-- Next cheapest step: characterize explicit throw-to-catch completion across
-  exact/base/incompatible catch types, filters, multiple catches, and finally;
-  then introduce a typed CFG exception-region routing plan. Keep unknown
-  potentially throwing calls conservative. Delete the 90-line completed-try
-  structural island only after exact state/evidence/provenance parity.
-- Blockers: the 11,000-line production target still requires 9,313 lines, while
+  non-block 50-line deletion. Completed try/catch/finally now has a typed CFG
+  exception-region plan, including conservative unknown-call routing, and its
+  structural island is deleted. A soundness reproduction also replaced static
+  thrown-type exclusion with proven exact runtime identity. Production LOC is
+  106,118, or -1,558 from the rewrite start; all six lanes pass 6,118 tests with
+  the same two documented MainGeneral skips.
+- Next cheapest step: characterize completed `using` expression and declaration
+  forms across normal completion, nested mutation invalidation, resource
+  binding/evidence, and abrupt bodies. Introduce one typed using-completion plan
+  and delete the 77-line statement-owned island only if exact state, evidence,
+  provenance, versions, and conservative fallback identity match.
+- Blockers: the 11,000-line production target still requires 9,442 lines, while
   two bounded semantic-owner audits found no remaining 250-line safe cut. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
