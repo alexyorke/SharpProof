@@ -241,6 +241,12 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; else value = 2; } int marker = 3; } }")]
     [TestCase(
         "static class C { static void M(bool condition, bool nested, bool third) { int value = 0; if (condition) { if (nested) value = 1; else if (third) value = 2; } int marker = 3; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; int inner = 2; } int marker = 3; } }")]
+    [TestCase(
+        "static class C { static void M(bool first, bool second) { int value = 0; if (first) value = 1; int marker = 2; if (second) value = 3; int final = 4; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; else value = 2; int inner = 3; } int marker = 4; } }")]
     public void RootBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -373,8 +379,6 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static int M(bool condition) { int value = 0; if (condition) return 1; value = 2; return value; } }")]
     [TestCase(
         "static class C { static void M(bool condition) { int value = 0; while (condition) value = 1; } }")]
-    [TestCase(
-        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; int inner = 2; } int marker = 3; } }")]
     public void UnsupportedRootBlockCompletion_RemainsConservativeFallback(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(

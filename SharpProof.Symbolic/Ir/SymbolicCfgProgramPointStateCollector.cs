@@ -62,6 +62,15 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "nested-block-completion");
         if (targetIsCompletedRootBlock && !SupportsRootBlockCompletion(graph))
             return Unsupported(site, "root-block-control-flow");
+        var preservedRootLocals = targetIsCompletedRootBlock
+            ? new HashSet<ISymbol>(
+                semanticModel.LookupSymbols(Math.Max(
+                        ((BlockSyntax)site).OpenBraceToken.Span.End,
+                        ((BlockSyntax)site).CloseBraceToken.SpanStart - 1))
+                    .OfType<ILocalSymbol>()
+                    .Select(static local => local.OriginalDefinition),
+                SymbolEqualityComparer.Default)
+            : null;
 
         var state = initialState ?? new SymbolicState();
         SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
@@ -214,6 +223,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     completedPaths,
                     nestedBlockCompletionEdges,
                     nestedBlockCompletedPaths,
+                    preservedRootLocals,
                     loopPlans))
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
@@ -254,6 +264,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ICollection<CfgPathState> completedPaths,
         ISet<CfgEdge> nestedBlockCompletionEdges,
         ICollection<CfgPathState> nestedBlockCompletedPaths,
+        ISet<ISymbol>? preservedRootLocals,
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
         if (block.ConditionKind != ControlFlowConditionKind.None)
@@ -298,6 +309,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                        completedPaths,
                        nestedBlockCompletionEdges,
                        nestedBlockCompletedPaths,
+                       preservedRootLocals,
                        loopPlans) &&
                    TryPropagate(
                        block,
@@ -319,6 +331,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                        completedPaths,
                        nestedBlockCompletionEdges,
                        nestedBlockCompletedPaths,
+                       preservedRootLocals,
                        loopPlans);
         }
 
@@ -335,6 +348,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                    completedPaths,
                    nestedBlockCompletionEdges,
                    nestedBlockCompletedPaths,
+                   preservedRootLocals,
                    loopPlans) &&
                TryPropagate(
                    block,
@@ -349,6 +363,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                    completedPaths,
                    nestedBlockCompletionEdges,
                    nestedBlockCompletedPaths,
+                   preservedRootLocals,
                    loopPlans);
     }
 
@@ -392,6 +407,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ICollection<CfgPathState> completedPaths,
         ISet<CfgEdge> nestedBlockCompletionEdges,
         ICollection<CfgPathState> nestedBlockCompletedPaths,
+        ISet<ISymbol>? preservedRootLocals,
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
         if (branch == null)
@@ -403,9 +419,15 @@ internal static class SymbolicCfgProgramPointStateCollector
                 0,
                 branch.Destination,
                 activeContinuation);
+            var finallyEntry = graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal];
+            path = ApplyExitedRegionLocalInvalidation(
+                source,
+                finallyEntry,
+                preservedRootLocals,
+                path);
             return TryPropagateToPoint(
                 new CfgTraversalPoint(
-                    graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal],
+                    finallyEntry,
                     continuation),
                 new CfgIncomingEdge(branch, continuation, edgeKind),
                 loopPlans.Count != 0,
@@ -427,6 +449,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     branch,
                     activeContinuation,
                     loopPlans.Count != 0,
+                    preservedRootLocals,
                     path,
                     graph,
                     incoming,
@@ -462,6 +485,11 @@ internal static class SymbolicCfgProgramPointStateCollector
         {
             return false;
         }
+        path = ApplyExitedRegionLocalInvalidation(
+            source,
+            branch.Destination,
+            preservedRootLocals,
+            path);
 
         return TryPropagateToPoint(
             new CfgTraversalPoint(branch.Destination, activeContinuation),
@@ -477,6 +505,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ControlFlowBranch sourceBranch,
         CfgFinallyContinuation? continuation,
         bool preserveIncomingHistory,
+        ISet<ISymbol>? preservedRootLocals,
         CfgPathState path,
         ControlFlowGraph graph,
         IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
@@ -494,9 +523,15 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (nextRegionIndex < continuation.Regions.Length)
         {
             var nextContinuation = continuation with { RegionIndex = nextRegionIndex };
+            var nextEntry = graph.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal];
+            path = ApplyExitedRegionLocalInvalidation(
+                sourceBranch.Source,
+                nextEntry,
+                preservedRootLocals,
+                path);
             return TryPropagateToPoint(
                 new CfgTraversalPoint(
-                    graph.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal],
+                    nextEntry,
                     nextContinuation),
                 new CfgIncomingEdge(
                     sourceBranch,
@@ -509,6 +544,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                 queued);
         }
         if (continuation.Destination != null)
+        {
+            path = ApplyExitedRegionLocalInvalidation(
+                sourceBranch.Source,
+                continuation.Destination,
+                preservedRootLocals,
+                path);
             return TryPropagateToPoint(
                 new CfgTraversalPoint(continuation.Destination, continuation.Parent),
                 new CfgIncomingEdge(
@@ -520,10 +561,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                 incoming,
                 queue,
                 queued);
+        }
         return TryCompleteFinallyContinuation(
             sourceBranch,
             continuation.Parent,
             preserveIncomingHistory,
+            preservedRootLocals,
             path,
             graph,
             incoming,
@@ -531,6 +574,70 @@ internal static class SymbolicCfgProgramPointStateCollector
             queued,
             completedPaths);
     }
+
+    private static CfgPathState ApplyExitedRegionLocalInvalidation(
+        BasicBlock source,
+        BasicBlock destination,
+        ISet<ISymbol>? preservedRootLocals,
+        CfgPathState path)
+    {
+        if (preservedRootLocals == null)
+            return path;
+
+        var destinationRegions = new HashSet<ControlFlowRegion>();
+        for (var region = destination.EnclosingRegion; region != null; region = region.EnclosingRegion)
+            destinationRegions.Add(region);
+
+        var targets = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
+        for (var region = source.EnclosingRegion;
+             region != null && !destinationRegions.Contains(region);
+             region = region.EnclosingRegion)
+        {
+            foreach (var local in region.Locals)
+            {
+                var symbol = local.OriginalDefinition;
+                if (preservedRootLocals.Contains(symbol))
+                    continue;
+                var key = SymbolicFactFactory.GetSmtVariableName(symbol);
+                targets.Add(new SymbolicInvalidationTarget(key));
+            }
+        }
+
+        if (targets.Count == 0)
+            return path;
+
+        var sourceSpan = source.Operations.LastOrDefault()?.Syntax.Span ??
+                         source.BranchValue?.Syntax.Span ??
+                         default;
+        var invalidations = targets.ToImmutable();
+        return new CfgPathState(
+            ApplyScopeExitInvalidation(path.State, invalidations, sourceSpan),
+            InvalidateGuardFrameBaselines(path.GuardFrame, invalidations, sourceSpan));
+    }
+
+    private static CfgGuardFrame? InvalidateGuardFrameBaselines(
+        CfgGuardFrame? frame,
+        ImmutableArray<SymbolicInvalidationTarget> invalidations,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan)
+    {
+        if (frame == null)
+            return null;
+        return frame with
+        {
+            Baseline = ApplyScopeExitInvalidation(frame.Baseline, invalidations, sourceSpan),
+            Parent = InvalidateGuardFrameBaselines(frame.Parent, invalidations, sourceSpan)
+        };
+    }
+
+    private static SymbolicState ApplyScopeExitInvalidation(
+        SymbolicState state,
+        ImmutableArray<SymbolicInvalidationTarget> invalidations,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) =>
+        SymbolicOperationTransferKernel.Invalidate(
+            state,
+            invalidations,
+            sourceSpan,
+            "cfg-program-point.scope-exit").State;
 
     private static bool TryPropagateToPoint(
         CfgTraversalPoint destination,
@@ -1436,9 +1543,6 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
             return true;
-        if (graph.Blocks.Count(static block =>
-                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 1) > 1)
-            return false;
         return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
             branch.Semantics == ControlFlowBranchSemantics.Regular &&
             (branch.Destination == null || branch.Destination.Ordinal > source.Ordinal)));
