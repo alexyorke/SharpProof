@@ -17,8 +17,8 @@ internal static class SymbolicOperationTransferAdapter
         string? bindingProvenance = null,
         string? evidenceKey = null,
         string? asExpressionProvenanceRoot = null,
-        SymbolicAssignmentPostconditionProfile postconditionProfile =
-            SymbolicAssignmentPostconditionProfile.Analyzer)
+        SymbolicAssignmentPostconditionProfile postconditionProfile = SymbolicAssignmentPostconditionProfile.Analyzer,
+        SymbolicTerm? preInvalidationTargetValue = null)
     {
         var targetContext = new SymbolicLoweringContext(
             semanticModel,
@@ -27,7 +27,11 @@ internal static class SymbolicOperationTransferAdapter
         var valueContext = new SymbolicLoweringContext(
             semanticModel,
             cancellationToken,
-            getValueVersion);
+            getValueVersion,
+            symbolSubstitutions: preInvalidationTargetValue == null
+                ? null
+                : new Dictionary<ISymbol, SymbolicTerm>(1, SymbolEqualityComparer.Default)
+                    { [targetSymbol.OriginalDefinition] = preInvalidationTargetValue });
         var lowering = SymbolicOperationLowerer.LowerSimpleAssignment(
             targetSymbol,
             valueSyntax,

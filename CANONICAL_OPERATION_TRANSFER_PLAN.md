@@ -503,6 +503,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
     retain exact state/evidence/version parity; active-guard simple and compound
     updates return typed `Unsupported` with null state before routed structural
     fallback.
+  - [x] Consolidate simple-assignment prior-value lowering. The operation
+    adapter's value context now accepts one optional pre-invalidation target
+    substitution, used only for an integer self-reference with an exact previous
+    value. Structural assignment retains its snapshot-then-`RemoveReferences`
+    order but delegates the binding, integer-bound derivation, throw guard, and
+    assignment postconditions to canonical `LowerSimpleAssignment` plus the
+    kernel. Unsupported/no-previous-value behavior remains conservative;
+    reference, nullable, Boolean, tuple, explicit-target, and coalesce lowering
+    are unchanged. `TryCreateSelfReferentialAssignedValueStateTerm` remains for
+    the independent inline-reachability consumer.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -697,7 +707,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 residual source-query deletion audit | `000b3637` | 106,793 | -883 |
 | Phase 7 canonical expression current completion | `77ffc4fc` | 106,796 | -880 |
 | Phase 7 coalesce current-completion adjudication | `822b0432` | 106,796 | -880 |
-| Phase 7 current-completion guard boundary | This commit | 106,799 | -877 |
+| Phase 7 current-completion guard boundary | `a135f40e` | 106,799 | -877 |
+| Phase 7 canonical self-reference prior values | This commit | 106,769 | -907 |
 
 ## Validation Ledger
 
@@ -886,6 +897,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical expression current completion | Non-assignment expression current completion no longer bypasses CFG. A direct `[MemberNotNull]` invocation matches structural and routed normalized state, evidence/provenance, and symbol versions through the shared expression-completion helper. That helper is now the sole owner of nested-mutation invalidation plus `LowerMemberNotNull` application for CFG and structural fallback; assignment completion is unchanged. Under custom limits direct CFG remains typed `Unsupported` with null state while routed structural completion retains exact semantics. Collector and MemberNotNull fixtures pass 172/172. The Release solution warning-as-error build has zero warnings and errors. Centralizing the correctness-sensitive policy costs three production lines: production LOC is 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,315. |
 | Phase 7 coalesce current-completion adjudication | Six table cases characterize reference and nullable `??=` current completion for known non-null/HasValue no-op, known null/NoValue strong assignment, and unknown conditional postconditions. Three more cases lock guard-mutation, loop-local, and custom-limit fallback. Direct CFG remains typed `Unsupported` with null state while routed and structural normalized state, evidence/provenance, and versions match. Roslyn CFG decomposes `??=`, so an exact prototype had to reclassify the syntax through `ICoalesceAssignmentOperation` and add a state-aware transition owner. The reduced prototype passed 9/9 but added 43 production lines and was reverted under the deletion gate. The final focused collector/coalesce batch passes 194/194 and the Release solution warning-as-error build has zero warnings and errors. Production LOC remains 106,796, or -880 from the rewrite start; authoritative tracked test LOC is 144,432. |
 | Phase 7 current-completion guard boundary | Four independent audits ranked tuple/deconstruction as the largest remaining assignment branch, but its atomic multi-target, ordering, and multi-guard infrastructure would add code while structural fallback remains live. Compound completion already consumes the canonical updater and kernel, leaving no deletable structural arm. Focused pre-fix reproduction failed 3/3 because active-guard simple, unchecked compound, and checked compound current completion incorrectly returned `Exact`. The generic boundary now applies transfer to a temporary state, consumes the returned invalidated guard target, and refuses publication when non-null. The three guarded cases now return typed `Unsupported` with null state and route to exact structural state; two unguarded checked/unchecked compound cases retain normalized state, evidence/provenance, and symbol-version parity. The focused batch passes 5/5, the collector/program-point/compound/guard batch passes 253/253, and the Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,799, or -877 from the rewrite start; authoritative tracked test LOC is 144,488. |
+| Phase 7 canonical self-reference prior values | The structural simple-assignment path still manually substituted the pre-invalidation integer value, built one canonical binding by hand, and separately called the reference-backed postcondition lowerer even though an integer target makes that call empty. `ApplyAssignment` now passes an optional assigned-symbol substitution only to its value `SymbolicLoweringContext`; the existing integer-only eligibility and pre-state snapshot gate prevent any reference, nullable, or Boolean broadening. `AddAssignedValueStateFacts` retains snapshot-before-removal ordering and delegates the exact binding, derived bounds, invalidation, throw guard, postconditions, evidence, provenance, and versions to `LowerSimpleAssignment` and the operation kernel. The pre-edit and post-edit self-reference characterizations pass 3/3, and the broader program-point/reachability/operation/invariant batch passes 395/395. An additional parallel Semantic Oracle/flow probe passed 619/620; its unrelated while-exit invariant miss passed 1/1 immediately in isolation under the repository serial-rerun rule. The Release solution warning-as-error build has zero warnings and errors. The production diff is 21 insertions and 53 deletions across two files; authoritative production LOC falls by 30 to 106,769, or -907 from the rewrite start, while tracked test LOC remains 144,488. |
 
 ## Current Checkpoint
 
@@ -1097,11 +1109,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   invalidated active-guard target. Transfer now occurs on a temporary state and
   publishes only after guard validation. Active-guard simple and checked or
   unchecked compound updates are typed fallbacks with no partial state, while
-  unguarded compound completion retains exact parity. Production LOC is 106,799,
-  or -877 from the rewrite start; authoritative tracked test LOC is 144,488.
-- Next cheapest step: rank the next unadjudicated assignment branch, starting
-  with explicit-target/simple-assignment or a whole-file completion-transfer
-  consolidation that can delete a live owner. Keep tuple/deconstruction and
-  coalesce on structural fallback until a broader migration repays their cost.
+  unguarded compound completion retains exact parity. Simple-assignment prior-
+  value handling now passes its integer-only pre-invalidation snapshot into the
+  canonical value-lowering context, deleting the manual self-reference binding
+  and empty reference-backed postcondition path. Snapshot/removal order,
+  unsupported behavior, derived bounds, throw guards, evidence, provenance, and
+  versions remain locked by the focused and broader gates. Production LOC is
+  106,769, or -907 from the rewrite start; authoritative tracked test LOC is
+  144,488.
+- Next cheapest step: rank the next live assignment/completion owner by deletion
+  size after the simple-assignment consolidation. Keep tuple/deconstruction and
+  coalesce on structural fallback until a broader migration repays their cost;
+  retain the self-reference helper while inline reachability calls it.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

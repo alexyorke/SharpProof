@@ -87,16 +87,10 @@ internal static class SymbolicAssignmentStateTransfer
             assignedSymbol,
             semanticModel,
             cancellationToken);
-        SymbolicTerm? selfReferentialValueTerm = null;
-        if (isSelfReferential &&
-            (!hadPreviousValueTerm ||
-             !TryCreateSelfReferentialAssignedValueStateTerm(
-                 previousValueTerm,
-                 assignedSymbol,
-                 effectiveValueExpression,
-                 semanticModel,
-                 cancellationToken,
-                 out selfReferentialValueTerm)))
+        var canLowerSelfReference = isSelfReferential &&
+                                    hadPreviousValueTerm &&
+                                    previousValueTerm is { Kind: SmtValueKind.Int };
+        if (isSelfReferential && !canLowerSelfReference)
         {
             AddThrowGuardedAssignmentCompletionStateFacts(
                 ref state,
@@ -110,18 +104,17 @@ internal static class SymbolicAssignmentStateTransfer
         }
 
         var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var isAsExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
             effectiveValueExpression) is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(SyntaxKind.AsExpression);
-        if (!isSelfReferential &&
-            (isAsExpression ||
-             assignedType != null &&
-             (SymbolicTypeFacts.IsSymbolicReferenceLikeType(assignedType) ||
-              SymbolicTypeFacts.IsNullableType(assignedType) ||
-              assignedType is INamedTypeSymbol { IsTupleType: true } ||
-              assignedType.SpecialType == SpecialType.System_Boolean ||
-              SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
+        if (canLowerSelfReference ||
+            !isSelfReferential &&
+            (isAsExpression || assignedType != null &&
+                (SymbolicTypeFacts.IsSymbolicReferenceLikeType(assignedType) ||
+                 SymbolicTypeFacts.IsNullableType(assignedType) ||
+                 assignedType is INamedTypeSymbol { IsTupleType: true } ||
+                 assignedType.SpecialType == SpecialType.System_Boolean ||
+                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(assignedType))))
         {
             var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
                 state,
@@ -132,40 +125,11 @@ internal static class SymbolicAssignmentStateTransfer
                 provenance: provenanceRoot,
                 bindingProvenance: provenanceRoot + ".assigned-value",
                 asExpressionProvenanceRoot: provenanceRoot + ".as",
-                postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
+                postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
+                preInvalidationTargetValue: canLowerSelfReference ? previousValueTerm : null);
             if (transition.IsExact)
                 state = transition.State;
         }
-
-        if (isSelfReferential &&
-                 TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
-                 selfReferentialValueTerm != null &&
-                 selfReferentialValueTerm.Kind == targetTerm.Kind &&
-                 CanCompareIrTerms(targetTerm, selfReferentialValueTerm))
-        {
-            var transition = SymbolicOperationTransferAdapter.ApplyBindings(
-                state,
-                ImmutableArray.Create(new SymbolicAssignmentBinding(
-                    SymbolicFactFactory.GetSmtVariableName(assignedSymbol),
-                    targetTerm,
-                    selfReferentialValueTerm,
-                    provenanceRoot + ".assigned-value",
-                    DeriveIntegerBounds: true)),
-                effectiveValueExpression,
-                SymbolicAssignmentOperationKind.Simple,
-                provenanceRoot);
-            if (transition.IsExact)
-                state = transition.State;
-        }
-
-        if (isSelfReferential &&
-            TryCreateSymbolTerm(assignedSymbol, out var selfReferenceTarget))
-            foreach (var condition in SymbolicOperationLowerer.LowerSymbolicReferenceBackedPostconditions(
-                         selfReferenceTarget,
-                         effectiveValueExpression,
-                         context,
-                         provenanceRoot))
-                state = state.AddPathCondition(condition);
 
         if (throwGuardedValue.HasGuard)
             AddThrowGuardedAssignmentCompletionStateFacts(
