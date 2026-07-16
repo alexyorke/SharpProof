@@ -20,6 +20,14 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         ("static class C { static string? M(string? input) { string? value = input; return value; } }", "return value")
     };
 
+    private static readonly string[] ForInitialEntryCases =
+    {
+        "static class C { static void M() { for (int index = 0; index < 3; index++) { } } }",
+        "static class C { static void M(int index) { for (index = 0; index < 3; index++) { } } }",
+        "static class C { static void M() { for (int first = 1, second = first + 1; second < 3; second++) { } } }",
+        "static class C { static void M(int[] values) { for (int value = values[0]; value < 3;) { } } }"
+    };
+
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
     {
@@ -492,6 +500,189 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
+    public void ForInitialEntry_ReassignmentDiscardsPriorValue()
+    {
+        const string source =
+            "static class C { static void M() { int index = 7; for (index = 0; index == 0; index++) { } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ForInitialEntry_ReassignmentDiscardsPriorValue));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+        var index = fixture.SemanticModel.GetSymbolInfo(
+            ((BinaryExpressionSyntax)forStatement.Condition!).Left).Symbol!;
+
+        var analysis = new SymbolicInvariantService().AnalyzeForInitialEntry(
+            forStatement,
+            fixture.SemanticModel);
+
+        Assert.That(analysis.PathState.IsContradictory, Is.False);
+        Assert.That(
+            SymbolicStateValueFacts.TryGetCurrentValue(analysis.PathState, index, out var value),
+            Is.True);
+        Assert.That(value, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+    }
+
+    [TestCaseSource(nameof(ForInitialEntryCases))]
+    public void ForInitialEntryState_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ForInitialEntryState_MatchesStructuralCollector));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+        Assert.That(CreateVersionKey(actual.Value), Is.EqualTo(CreateVersionKey(expected)));
+    }
+
+    [TestCase(
+        "static class C { static void M() { int index = 7; for (index = 0, index = 1; index == 1; index++) { } } }",
+        1)]
+    [TestCase(
+        "static class C { static void M(string? input) { string? value = null; for (value = input; value != null;) { } } }",
+        0)]
+    [TestCase(
+        "static class C { static void M(int? input) { int? value = null; for (value = input; value.HasValue;) { } } }",
+        0)]
+    public void ForInitialEntryState_SequentialAssignmentsDiscardStaleFacts(
+        string source,
+        int initializerIndex)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ForInitialEntryState_SequentialAssignmentsDiscardStaleFacts));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+        var assignment = (AssignmentExpressionSyntax)forStatement.Initializers[initializerIndex];
+        var target = fixture.SemanticModel.GetSymbolInfo(assignment.Left).Symbol!;
+        var targetType = target switch
+        {
+            ILocalSymbol local => local.Type,
+            IParameterSymbol parameter => parameter.Type,
+            _ => null
+        };
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var routed = SymbolicReachabilityService.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.IsContradictory, Is.False);
+        if (targetType?.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            Assert.That(SymbolicStateValueFacts.IsKnownNullableNoValue(actual.Value, target), Is.False);
+        }
+        else if (targetType?.IsReferenceType == true)
+        {
+            Assert.That(SymbolicStateValueFacts.IsKnownNullReference(actual.Value, target), Is.False);
+        }
+        else
+        {
+            var expectedValue = SymbolicSemanticPipeline.LowerTerm(
+                assignment.Right,
+                new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
+            Assert.That(expectedValue.IsExact, Is.True);
+            Assert.That(
+                SymbolicStateValueFacts.TryGetCurrentValue(actual.Value, target, out var currentValue),
+                Is.True);
+            Assert.That(currentValue, Is.EqualTo(expectedValue.Value));
+        }
+        Assert.That(routed.NormalizedProofKey, Is.EqualTo(actual.Value.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(actual.Value)));
+    }
+
+    [TestCase(
+        "static class C { static int Get() => 1; static void M() { for (int index = Get(); index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static int Get() => 1; static void M() { int index = 0; for (index = 1, index = Get(); index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M(bool select) { for (int index = select ? 0 : 1; index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M(string? input) { for (string value = input ?? throw new System.Exception(); value != null;) { } } }")]
+    [TestCase(
+        "static class C { static void Set(out int value) => value = 0; static void M() { int index = 0; for (Set(out index); index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M() { int index = 0; for (index++; index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M() { int index = 0; for (index += 1; index < 3; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M() { for (int index = 0;; index++) { } } }")]
+    [TestCase(
+        "static class C { static void M(bool keepGoing) { while (keepGoing) { for (int index = 0; index < 3; index++) { } } } }")]
+    [TestCase(
+        "static class C { static void M(bool select) { int value = select ? 1 : 2; for (int index = 0; index < 3; index++) { } } }")]
+    [TestCase(
+        "sealed class C { int Value; void M() { for (Value = 0; Value < 3; Value++) { } } }")]
+    public void UnsupportedForInitialEntry_RemainsConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedForInitialEntry_RemainsConservativeFallback));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var routed = SymbolicReachabilityService.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void CustomLimitsForInitialEntry_RemainsConservativeFallback()
+    {
+        const string source =
+            "static class C { static void M() { for (int index = 0; index < 3; index++) { } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CustomLimitsForInitialEntry_RemainsConservativeFallback));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var routed = SymbolicReachabilityService.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
     private static void AssertLoopTargetMatchesStructural(

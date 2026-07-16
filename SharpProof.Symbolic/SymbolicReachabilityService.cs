@@ -90,7 +90,7 @@ internal static class SymbolicReachabilityService
     {
         if (forStatement.Condition == null) return false;
 
-        var initialEntryState = SymbolicProgramPointFacts.CollectForInitialEntryState(
+        var initialEntryState = CollectForInitialEntryState(
             forStatement,
             semanticModel,
             cancellationToken);
@@ -101,6 +101,23 @@ internal static class SymbolicReachabilityService
 
         var proof = ClassifyStateConditionTruth(initialEntryState, initialEntryCondition, smtAnalysis);
         return proof.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
+    }
+
+    internal static SymbolicState CollectForInitialEntryState(
+        ForStatementSyntax forStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var cfgState = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            forStatement,
+            semanticModel,
+            cancellationToken);
+        return cfgState is { IsExact: true, Value: { } exactState }
+            ? exactState
+            : SymbolicProgramPointFacts.CollectForInitialEntryState(
+                forStatement,
+                semanticModel,
+                cancellationToken);
     }
 
     internal static SymbolicCacheInfo GetStructuralPathCacheInfo(

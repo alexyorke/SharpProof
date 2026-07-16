@@ -430,6 +430,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     a single observation is preserved directly. Contradictory observations,
     unobserved targets, computed-update completion, nested loops, abrupt exits,
     counted-for loops, and foreach retain typed conservative fallback.
+  - [x] Route for-loop initializer entry state through the canonical CFG
+    collector for one unique conditional header reached by a linear forward
+    preheader. Scalar and parameter assignments, ordered initializer lists,
+    multi-declarations, invalidation, and declaration completion match the
+    structural state, evidence, and versions. Branched preheaders, unsupported
+    initializer operations, nested/catch locations, custom limits, and missing
+    conditions retain typed fallback; the structural initializer path remains
+    reachable until those fallback shapes migrate.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -616,7 +624,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 nested reference guard invalidation | `ac41a1a1` | 106,270 | -1,406 |
 | Phase 7 canonical assignment invalidation | `73e7bc53` | 106,281 | -1,395 |
 | Phase 7 canonical nullable reassignment | `5d610810` | 106,278 | -1,398 |
-| Phase 7 bounded while/do loop-local targets | This commit | 106,361 | -1,315 |
+| Phase 7 bounded while/do loop-local targets | `49cf8b10` | 106,361 | -1,315 |
+| Phase 7 canonical for-initializer entry state | This commit | 106,574 | -1,102 |
 
 ## Validation Ledger
 
@@ -797,6 +806,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical assignment invalidation | Simple-assignment lowering now emits an explicit target invalidation owned by `SymbolicAssignmentOperation`; the kernel applies the same typed invalidation helper for assignment and mutation events. This fixes postcondition-only array/reference assignments that previously retained stale target projections across a guarded join, while unsupported lowering still publishes no partial state. The exact normalized-state/evidence differential passes, direct collector fixtures pass 83/83, and the broader program-point/invariant/operation/reachability batch passes 235/235. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,281, or -1,395 from the rewrite start; authoritative tracked test LOC is 143,415. |
 | Phase 7 canonical nullable reassignment | The CFG collector no longer rejects every `Nullable<T>` assignment before canonical lowering. The focused nullable-to-nullable reassignment now matches structural normalized state, evidence, and version identity exactly because assignment-owned invalidation removes the old HasValue/value pair before canonical postconditions and propagations apply. Unsupported nullable shapes still return typed `Unsupported` through the lowerer. Nullable/program-point/invariant/operation/reachability fixtures pass 261/261. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,278, or -1,398 from the rewrite start; authoritative tracked test LOC is 143,428. |
 | Phase 7 bounded while/do loop-local targets | Stable targets inside one while or do loop now accumulate every bounded CFG observation and use the canonical evidence-aware state intersection; a single observation bypasses merging so its full state and version identity remain intact. Focused differentials cover loop-carried writes before and after the target, expression and declaration completion, nested blocks, and a one-iteration do loop. Contradictory or unobserved targets, computed-update completion, nested loops, abrupt exits, counted-for loops, and foreach remain typed `Unsupported`. Direct collector fixtures pass 107/107 and the broader program-point/invariant/operation/reachability batch passes 259/259. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,831 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,361, or -1,315 from the rewrite start; authoritative tracked test LOC is 143,625. |
+| Phase 7 canonical for-initializer entry state | A dedicated typed target mode now observes one for-loop condition header only after its unique linear forward preheader has applied every supported initializer operation. Assignment provenance remains `ir.path.for-initializer`; canonical invalidation removes prior scalar, reference, and nullable facts, and declaration initializers receive their typed normal-completion facts in source order. Branched preheaders are rejected before any first-predecessor state can be published. After rebasing onto the independent inline multidimensional bounds, scoped CLI host, infeasible-CFG-input repairs, and CI source-inventory/byte-fixture normalization, direct collector fixtures pass 129/129 and the broader collector/program-point/reachability/operation batch passes 271/271; the two initial-entry Semantic Oracle cases pass 2/2. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtCore passes 257/257; MainGeneral passes 3,851 with the same two explicit skips; MainSmtFlow passes 257/257. Source-query/full-JSON fixtures pass 100/100, the combined CI boundary passes 103/103, and full Tooling passes 591/591. The Release solution warning-as-error build has zero warnings. Production LOC is 106,574, or -1,102 from the rewrite start; authoritative tracked test LOC is 143,838. |
 
 ## Current Checkpoint
 
@@ -962,11 +972,24 @@ the unused preview .NET API may break when it obstructs the canonical design.
   nested blocks match structural state, evidence, and version identity.
   Contradictory or unobserved targets, computed-update completion, nested loops,
   abrupt exits, counted-for loops, foreach, and finally-local targets retain
-  typed conservative fallback. Production LOC is 106,361, or -1,315 from the
-  rewrite start; authoritative tracked test LOC is 143,625.
-- Next cheapest step: canonicalize for-loop initializer entry state and delete
-  the structural `CollectForInitialEntryState` / `CollectForInitializerState`
-  mutation path only after exact normalized-state, evidence, completion, and
-  version parity.
+  typed conservative fallback. For-loop initializer entry queries now use one
+  typed CFG target after a unique conditional header and linear forward
+  preheader are proven. Supported scalar/parameter assignments, ordered
+  initializer lists, multi-declarations, invalidation, and declaration
+  completion match structural normalized state, evidence, and version identity.
+  Branched preheaders, unsupported initializer operations, nested/catch sites,
+  custom limits, and missing conditions retain conservative structural fallback,
+  so `CollectForInitialEntryState` / `CollectForInitializerState` cannot yet be
+  deleted. The integrated branch also contains the independently repaired
+  inline multidimensional bounds, scoped CLI host, and infeasible CFG merge
+  inputs: MainSmtCore and MainSmtFlow pass 257/257, source-query/full-JSON
+  passes 100/100, the combined CI boundary passes 103/103, full Tooling passes
+  591/591, and the Release warning-as-error
+  solution build is clean. Production LOC is 106,574, or -1,102 from the
+  rewrite start; authoritative tracked test LOC is 143,838.
+- Next cheapest step: route Requires-seeded exception path queries through the
+  canonical CFG collector by removing the unconditional `initialState` bypass,
+  while retaining exact-or-structural fallback and locking branch, reference,
+  and nullable entry-state parity.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

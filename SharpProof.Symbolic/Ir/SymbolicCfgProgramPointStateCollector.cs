@@ -13,9 +13,40 @@ internal static class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SymbolicState? initialState = null,
-        bool includeCurrentStatementCompletionFacts = false)
+        bool includeCurrentStatementCompletionFacts = false) =>
+        CollectState(
+            site,
+            semanticModel,
+            cancellationToken,
+            initialState,
+            includeCurrentStatementCompletionFacts
+                ? CfgProgramPointTargetKind.CurrentCompletion
+                : CfgProgramPointTargetKind.BeforeCurrent);
+
+    internal static SymbolicLoweringResult<SymbolicState> CollectForInitialEntryState(
+        ForStatementSyntax forStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
+        CollectState(
+            forStatement,
+            semanticModel,
+            cancellationToken,
+            initialState: null,
+            CfgProgramPointTargetKind.ForInitialEntry);
+
+    private static SymbolicLoweringResult<SymbolicState> CollectState(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicState? initialState,
+        CfgProgramPointTargetKind targetKind)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var includeCurrentStatementCompletionFacts =
+            targetKind == CfgProgramPointTargetKind.CurrentCompletion;
+        var forInitialEntry = targetKind == CfgProgramPointTargetKind.ForInitialEntry
+            ? (ForStatementSyntax)site
+            : null;
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(
             site,
             ExecutionRootPolicy.Callable);
@@ -35,17 +66,26 @@ internal static class SymbolicCfgProgramPointStateCollector
                 cancellationToken,
                 out var loopPlans))
             return Unsupported(site, "loop-lowering");
+        if (forInitialEntry != null &&
+            (forInitialEntry.Condition == null ||
+             loopPlans.Count(plan => ReferenceEquals(plan.Loop, forInitialEntry)) != 1))
+            return Unsupported(site, "for-initial-entry-shape");
         var containingLoopPlans = loopPlans
-            .Where(plan => plan.Loop.Span.Contains(site.SpanStart))
+            .Where(plan =>
+                plan.Loop.Span.Contains(site.SpanStart) &&
+                !ReferenceEquals(plan.Loop, forInitialEntry))
             .ToArray();
-        if (containingLoopPlans.Length > 1 ||
+        if (forInitialEntry != null && containingLoopPlans.Length != 0 ||
+            containingLoopPlans.Length > 1 ||
             containingLoopPlans.Any(plan =>
                 plan.Loop is not WhileStatementSyntax &&
                 plan.Loop is not DoStatementSyntax ||
                 HasAbruptOrNestedLoopControlFlow(plan.Loop)))
             return Unsupported(site, "loop-local-target");
         var targetIsInsideLoop = containingLoopPlans.Length != 0;
-        if (site.Ancestors().Any(static ancestor => ancestor is FinallyClauseSyntax))
+        if (site.Ancestors().Any(ancestor =>
+                ancestor is FinallyClauseSyntax ||
+                forInitialEntry != null && ancestor is CatchClauseSyntax))
             return Unsupported(site, "finally-local-target");
         ControlFlowGraph? graph;
         try
@@ -59,6 +99,10 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        BasicBlock? forInitialEntryHeader = null;
+        if (forInitialEntry != null &&
+            !TryGetForInitialEntryHeader(graph, forInitialEntry, out forInitialEntryHeader))
+            return Unsupported(site, "for-initial-entry-header");
         IOperation? nestedBlockCompletionOperation = null;
         ISet<CfgEdge> nestedBlockCompletionEdges = new HashSet<CfgEdge>();
         ISet<ControlFlowBranch> nestedBlockTerminalBranches = new HashSet<ControlFlowBranch>();
@@ -130,6 +174,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     operation is IFlowCaptureOperation)
                     continue;
                 if (!targetIsCompletedRootBlock &&
+                    forInitialEntry == null &&
                     !observedLoopTarget &&
                     IsTargetOperation(
                         operation,
@@ -186,11 +231,15 @@ internal static class SymbolicCfgProgramPointStateCollector
                     }
                 }
                 if (!targetIsCompletedRootBlock &&
+                    forInitialEntry == null &&
                     !targetIsInsideLoop &&
                     operation.Syntax.SpanStart >= site.SpanStart &&
                     !(targetIsCompletedNestedBlock &&
                       site.Span.Contains(operation.Syntax.SpanStart)))
                     return Unsupported(site, "operation-order");
+                if (forInitialEntry != null &&
+                    !SupportsForInitialEntryOperation(operation, forInitialEntry))
+                    return Unsupported(operation.Syntax, "for-initializer-operation");
                 if (!TryApplyOperation(
                         ref state,
                         operation,
@@ -199,6 +248,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         targetIsCompletedNestedBlock,
                         semanticModel,
                         cancellationToken,
+                        GetAssignmentProvenance(operation, forInitialEntry),
                         out var invalidatedGuardTarget))
                     return Unsupported(operation.Syntax, "operation-" + operation.Kind);
                 if (invalidatedGuardTarget != null)
@@ -214,10 +264,27 @@ internal static class SymbolicCfgProgramPointStateCollector
                         operation,
                         semanticModel,
                         cancellationToken);
+                else if (forInitialEntry != null)
+                    AddForDeclarationInitializerNormalCompletionFacts(
+                        ref state,
+                        operation,
+                        forInitialEntry,
+                        semanticModel,
+                        cancellationToken);
             }
 
             if (foundTarget)
                 continue;
+
+            if (forInitialEntryHeader != null && ReferenceEquals(block, forInitialEntryHeader))
+            {
+                if (point.Continuation != null ||
+                    targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
+                    return Unsupported(site, "for-initial-entry-path");
+                return Exact(
+                    OrderTargetState(state, currentPath, targetIsInsideBranch),
+                    site);
+            }
 
             if (block.BranchValue != null)
             {
@@ -1280,6 +1347,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         bool allowGuardMutation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        string assignmentProvenance,
         out ISymbol? invalidatedGuardTarget)
     {
         invalidatedGuardTarget = null;
@@ -1298,7 +1366,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         allowGuardMutation,
                         semanticModel,
                         cancellationToken,
-                        "ir.path.prior-statement",
+                        assignmentProvenance,
                         out var declaratorInvalidatedGuardTarget))
                     return false;
                 invalidatedGuardTarget ??= declaratorInvalidatedGuardTarget;
@@ -1324,7 +1392,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     allowGuardMutation,
                     semanticModel,
                     cancellationToken,
-                    "ir.path.prior-statement",
+                    assignmentProvenance,
                     out invalidatedGuardTarget)
                 : TryApplyExplicitTargetAssignment(
                     ref state,
@@ -1419,6 +1487,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 false,
                 semanticModel,
                 cancellationToken,
+                "ir.path.prior-statement",
                 out _))
             return false;
 
@@ -1463,6 +1532,70 @@ internal static class SymbolicCfgProgramPointStateCollector
             statement,
             !TryGetDirectTarget(assignment.Target, out var target) ||
             target is not (ILocalSymbol or IParameterSymbol),
+            semanticModel,
+            cancellationToken);
+    }
+
+    private static string GetAssignmentProvenance(
+        IOperation operation,
+        ForStatementSyntax? forInitialEntry) =>
+        forInitialEntry != null && IsForInitializerSyntax(operation.Syntax, forInitialEntry)
+            ? "ir.path.for-initializer"
+            : "ir.path.prior-statement";
+
+    private static bool IsForInitializerSyntax(
+        SyntaxNode syntax,
+        ForStatementSyntax forStatement) =>
+        forStatement.Declaration?.Variables.Any(variable =>
+            variable.Span.Contains(syntax.SpanStart)) == true ||
+        forStatement.Initializers.Any(initializer =>
+            initializer.Span.Contains(syntax.SpanStart));
+
+    private static bool SupportsForInitialEntryOperation(
+        IOperation operation,
+        ForStatementSyntax forStatement)
+    {
+        if (!IsForInitializerSyntax(operation.Syntax, forStatement))
+            return true;
+        var assignment = operation switch
+        {
+            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
+            ISimpleAssignmentOperation direct => direct,
+            _ => null
+        };
+        return assignment != null && TryGetDirectTarget(assignment.Target, out _);
+    }
+
+    private static void AddForDeclarationInitializerNormalCompletionFacts(
+        ref SymbolicState state,
+        IOperation operation,
+        ForStatementSyntax forStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var assignment = operation switch
+        {
+            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
+            ISimpleAssignmentOperation direct => direct,
+            _ => null
+        };
+        if (assignment == null ||
+            !TryGetDirectTarget(assignment.Target, out var assignmentTarget) ||
+            forStatement.Declaration?.Variables.FirstOrDefault(variable =>
+                variable.Span.Contains(operation.Syntax.SpanStart)) is not
+                {
+                    Initializer.Value: { } value
+                } declarator ||
+            !SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetDeclaredSymbol(declarator, cancellationToken),
+                assignmentTarget))
+            return;
+
+        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+            ref state,
+            value,
+            forStatement.Statement,
+            includeThrowGuardFacts: false,
             semanticModel,
             cancellationToken);
     }
@@ -1702,6 +1835,46 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
+
+    private static bool TryGetForInitialEntryHeader(
+        ControlFlowGraph graph,
+        ForStatementSyntax forStatement,
+        out BasicBlock header)
+    {
+        var matches = graph.Blocks.Where(block =>
+            block.ConditionKind != ControlFlowConditionKind.None &&
+            block.BranchValue != null &&
+            ContainsSite(block.BranchValue.Syntax, forStatement.Condition!)).ToArray();
+        if (matches.Length != 1)
+        {
+            header = null!;
+            return false;
+        }
+
+        header = matches[0];
+        return HasLinearInitialEntryPrefix(header);
+    }
+
+    private static bool HasLinearInitialEntryPrefix(BasicBlock header)
+    {
+        var visited = new HashSet<BasicBlock>();
+        var current = header;
+        while (current.Kind != BasicBlockKind.Entry)
+        {
+            if (!visited.Add(current))
+                return false;
+            var forwardPredecessors = current.Predecessors.Where(predecessor =>
+                predecessor.Source.Ordinal < current.Ordinal &&
+                predecessor.Semantics is
+                    ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling).ToArray();
+            if (forwardPredecessors.Length != 1)
+                return false;
+            current = forwardPredecessors[0].Source;
+        }
+
+        return true;
+    }
 
     private static bool TryGetNestedBlockCompletionTarget(
         ControlFlowGraph graph,
@@ -2002,4 +2175,11 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static SymbolicLoweringProvenance Provenance(SyntaxNode site, string detail) =>
         new("cfg-program-point", site.Span, detail);
+
+    private enum CfgProgramPointTargetKind
+    {
+        BeforeCurrent,
+        CurrentCompletion,
+        ForInitialEntry
+    }
 }

@@ -57,7 +57,7 @@ internal sealed class SymbolicInvariantService
         CancellationToken cancellationToken = default)
     {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        var pathState = SymbolicProgramPointFacts.CollectForInitialEntryState(
+        var pathState = SymbolicReachabilityService.CollectForInitialEntryState(
             forStatement,
             semanticModel,
             cancellationToken);
