@@ -283,49 +283,6 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken);
     }
 
-    public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int line,
-        int column = 1,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null)
-    {
-        ValidateSyntaxTreeQuery(syntaxTree, compilation);
-
-        var query = AnalyzeProgramPoint(
-            syntaxTree,
-            compilation,
-            line,
-            column,
-            smtAnalysis,
-            cancellationToken);
-        return CreateProgramPointQueryResult(syntaxTree, query, line, column);
-    }
-
-    public SymbolicProgramPointQueryResult AnalyzeSyntaxTreeAtPosition(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int position,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null)
-    {
-        ValidateSyntaxTreeQuery(syntaxTree, compilation);
-
-        var query = AnalyzeProgramPointAtPosition(
-            syntaxTree,
-            compilation,
-            position,
-            smtAnalysis,
-            cancellationToken);
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            position,
-            cancellationToken,
-            true);
-        return CreateProgramPointQueryResult(syntaxTree, query, lineColumn.Line, lineColumn.Column);
-    }
-
     public SymbolicConditionProofResult ProveConditionAtSource(
         string sourceText,
         string filePath,
@@ -476,21 +433,6 @@ internal sealed class SymbolicSourceQueryService
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
     }
-
-    private static SymbolicProgramPointQueryResult CreateProgramPointQueryResult(
-        SyntaxTree syntaxTree,
-        ProgramPointQueryContext query,
-        int line,
-        int column) =>
-        new(
-            syntaxTree.FilePath,
-            line,
-            column,
-            query.Position,
-            query.Node.SpanStart,
-            query.Node.Kind().ToString(),
-            query.Analysis,
-            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
 
     private static SymbolicConditionProofResult ProveConditionAtQuery(
         ProgramPointQueryContext query,

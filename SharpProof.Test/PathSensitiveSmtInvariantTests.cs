@@ -885,7 +885,7 @@ public class TestClass
             Is.False);
     }
 
-    private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)
+    private static SymbolicProgramPointResult AnalyzeAtPosition(string source, int position)
     {
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SymbolicSourceQueryService().AnalyzeSourceAtPosition(

@@ -539,6 +539,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
 - [ ] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
+  - [x] Remove the internal `SymbolicFileQuery` and
+    `SymbolicProgramPointQueryResult` wrappers plus the duplicate
+    `AnalyzeSyntaxTree` entry points. Test callers now use the existing string
+    request helper and canonical `SymbolicProgramPointResult`; invariant
+    assertions use its typed condition metadata. No Analyzer, CLI, serializer,
+    or public API caller reached the deleted path.
 - [ ] Gate: normalized states, proof outcomes, hazards, diagnostics/evidence,
   unknown/truncation reasons, CLI bytes, and affected test lanes match before
   every legacy-path deletion.
@@ -732,7 +738,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical purity null conditions | `c87b5963` | 106,739 | -937 |
 | Phase 7 completed-loop-exit adjudication | `cab599ae` | 106,739 | -937 |
 | Phase 7 canonical computed-update application | `61337f7c` | 106,687 | -989 |
-| Phase 7 containing-block entry consolidation | This commit | 106,631 | -1,045 |
+| Phase 7 containing-block entry consolidation | `8cbb27f3` | 106,631 | -1,045 |
+| Phase 7 internal query-wrapper deletion | This commit | 106,526 | -1,150 |
 
 ## Validation Ledger
 
@@ -926,6 +933,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 completed-loop-exit adjudication | The proposed seeded completed-loop target was implemented against the existing CFG worklist and then reverted. Roslyn represents break and continue as regular branches, so exact classification requires the loop header's false-polarity successor as one recorded exit block; continue remains an internal edge, while only another proven loop-member edge to that same block can be a break. The prototype reached 25/33 focused cases but failed direct-break suppression and mutation-sensitive guarded break/continue parity. It also added 339 net production lines before legacy deletion, leaving less than the required 250-line reduction after removing the guarded walker. Recreating guard invalidation and target-membership policy would duplicate the structural engine, so the fallback remains authoritative. The reverted baseline passes the full loop-exit characterization 33/33. Production LOC remains 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 canonical computed-update application | Expression, statement, and CFG transfer now share one computed-update classifier and exact transition owner. Non-overloaded Roslyn increment/decrement and compound operations retain checked overflow, target-width wrapping, signed division, update kind, provenance, direct-target rejection, current-value versioning, and guard invalidation. Expression transfer supplies its pre-invalidation snapshot; statement fallback still removes references; CFG still rejects non-expression and indirect targets before publication. The pre-edit and post-edit focused characterization passes 8/8, the expanded program-point/invariant/operation/reachability batch passes 419/419, MainSmtOracle passes 573/573, and the Release solution warning-as-error build has zero warnings and errors. The production diff removes 52 authoritative lines to 106,687, or -989 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 containing-block entry consolidation | Containing-block entry now classifies the parent once and preserves the required sequence: for-initializer invalidation, exact inline-assignment reachability, loop invariant application, condition-assignment invalidation, canonical loop-entry fallback, and ordinary branch reachability. Three routing/enumeration helpers were deleted; `do`, `foreach`, conditionless `for`, and unsupported shapes still flow through the canonical conservative loop owner. The pre-edit and post-edit structural batch passes 151/151; CFG/JSON fixtures pass 176/176; tooling source-query/full-JSON fixtures pass 100/100; MainSmtOracle passes 573/573; MainSmtFlow passes 257/257; and the Release warning-as-error solution build has zero warnings and errors. The production diff is 63 insertions and 123 deletions, while the authoritative metric falls by 56 to 106,631, or -1,045 from the rewrite start; tracked test LOC remains 144,488. |
+| Phase 7 internal query-wrapper deletion | Exact production references showed that `SymbolicFileQuery`, `SymbolicProgramPointQueryResult`, and the duplicate `AnalyzeSyntaxTree`/`AnalyzeSyntaxTreeAtPosition` entry points were internal and test-only. They are deleted; test helpers use the existing canonical point-query methods, the one file-request fixture uses the existing string overload, and private path-condition assertions now verify the same solver-backed binary relation through `SymbolicProgramPointResult.Invariant.Conditions`. The pre-edit characterization passes 513/513 main and 100/100 tooling tests. After correcting that intentional representation assertion, the identical post-edit batches pass 513/513 and 100/100; MainSmtOracle passes 573/573; the Tooling lane passes 592/592 with its existing environment-dependent exclusions; and the Release warning-as-error solution build has zero warnings and errors. CLI/JSON/SARIF projection code and public API files are unchanged. The physical production diff deletes 133 lines, while the authoritative metric falls by 105 to 106,526, or -1,150 from the rewrite start; authoritative tracked test LOC falls to 144,471. |
 
 ## Current Checkpoint
 
@@ -1156,13 +1164,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   Containing-block entry now has one parent-shape router and one ordered path
   through inline assignment, condition invalidation, loop entry, and ordinary
   reachability; the superseded routing and enumeration helpers are deleted.
-  Focused structural, CFG/JSON, tooling, Oracle, and Flow gates pass, and the
-  Release solution warning-as-error build is clean. Production LOC is 106,631,
-  or -1,045 from the rewrite start; authoritative tracked test LOC is 144,488.
-- Next cheapest step: re-rank the assignment and normal-completion owners after
-  the containing-block consolidation. Keep the completed-loop/lock structural
-  owner until a shared CFG target-membership and guard-invalidation design can
-  remove at least 250 production lines; require at least 50 net production lines
-  from the next accepted slice.
+  Independent post-change audits rejected assignment, normal-completion, and
+  whole-expression transfer cuts because their safe net reductions remain below
+  50 lines. The authorized fallback instead deletes two internal test-only query
+  wrappers and their duplicate analysis entry points; all test callers now use
+  the canonical point result. Focused main/tooling, Oracle, full Tooling, and
+  Release warning-as-error gates pass. Production LOC is 106,526, or -1,150 from
+  the rewrite start; authoritative tracked test LOC is 144,471.
+- Next cheapest step: adjudicate flattening the residual preview
+  `SymbolicQueryScope` metadata and `SymbolicQueryLineGroup` reconstruction into
+  `SymbolicQueryResult`. Require at least 50 authoritative production lines and
+  byte-identical point/line/span/file CLI, JSON, compact, invariant, explain, and
+  SARIF projections. Keep the completed-loop/lock owner behind its 250-line gate.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

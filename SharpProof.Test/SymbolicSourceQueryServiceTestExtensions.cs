@@ -8,24 +8,6 @@ internal static class SymbolicSourceQueryServiceTestExtensions
 {
     internal static SymbolicProgramPointResult QueryFile(
         this SymbolicSourceQueryService service,
-        SymbolicFileQuery query,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null)
-    {
-        if (query == null) throw new ArgumentNullException(nameof(query));
-
-        return service.QueryFile(
-            query.FilePath,
-            query.Line,
-            query.Column,
-            query.References.IsDefaultOrEmpty ? null : query.References,
-            cancellationToken,
-            smtAnalysis,
-            query.ImpliedConditions);
-    }
-
-    internal static SymbolicProgramPointResult QueryFile(
-        this SymbolicSourceQueryService service,
         string filePath,
         int line,
         int column = 1,
@@ -123,7 +105,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             includeCurrentStatementCompletionFacts);
     }
 
-    internal static SymbolicProgramPointQueryResult AnalyzeSource(
+    internal static SymbolicProgramPointResult AnalyzeSource(
         this SymbolicSourceQueryService service,
         string sourceText,
         string filePath,
@@ -136,7 +118,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         var (syntaxTree, compilation) = Compile(
             sourceText, filePath, references, cancellationToken, compilationProfile);
-        return service.AnalyzeSyntaxTree(
+        return service.QuerySyntaxTree(
             syntaxTree,
             compilation,
             line,
@@ -145,7 +127,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             smtAnalysis);
     }
 
-    internal static SymbolicProgramPointQueryResult AnalyzeSourceAtPosition(
+    internal static SymbolicProgramPointResult AnalyzeSourceAtPosition(
         this SymbolicSourceQueryService service,
         string sourceText,
         string filePath,
@@ -157,7 +139,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         var (syntaxTree, compilation) = Compile(
             sourceText, filePath, references, cancellationToken, compilationProfile);
-        return service.AnalyzeSyntaxTreeAtPosition(
+        return service.QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
             position,

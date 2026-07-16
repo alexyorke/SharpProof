@@ -39,16 +39,13 @@ public class TestClass
 
         try
         {
-            var query = new SymbolicFileQuery(
+            var result = new SymbolicSourceQueryService().QueryFile(
                 filePath,
                 FindLine(source, "return value;"),
                 16,
                 AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new[] { "value > 0" });
-
-            var result = new SymbolicSourceQueryService().QueryFile(
-                query,
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "value > 0" });
 
             Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
@@ -2084,11 +2081,12 @@ public class TestClass
 
         Assert.That(result.FilePath, Is.EqualTo("AnalyzeSourceProgramPoint.cs"));
         Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
-        Assert.That(result.Analysis, Is.Not.Null);
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
-        Assert.That(result.Analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
+        Assert.That(result.Invariant, Is.Not.Null);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions.Any(condition =>
+            condition.IsSolverBacked && condition.DisplayKind == "SmtBinary"), Is.True);
         Assert.That(result.SymbolicFacts, Is.Not.Empty);
-        Assert.That(result.MergedInvariantText, Is.EqualTo(result.Analysis.MergedInvariantText));
+        Assert.That(result.MergedInvariantText, Is.EqualTo(result.Invariant.MergedInvariantText));
         Assert.That(result.Facts.Any(fact => fact.Contains("value > 0", StringComparison.Ordinal)), Is.True);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
     }
@@ -2151,7 +2149,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -2654,7 +2652,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -2686,7 +2684,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -2927,7 +2925,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -2962,7 +2960,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3024,7 +3022,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3055,7 +3053,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3094,7 +3092,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3127,7 +3125,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3197,7 +3195,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3239,7 +3237,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3277,7 +3275,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3313,7 +3311,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -3842,7 +3840,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -4059,7 +4057,7 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-        Assert.That(result.Analysis.PathConditions, Is.Not.Empty);
+        Assert.That(result.Invariant.Conditions, Is.Not.Empty);
         Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
     }

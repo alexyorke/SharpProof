@@ -522,7 +522,7 @@ public class TestClass
         var assembly = typeof(SymbolicQueryService).Assembly;
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
-        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
         Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.True);
         Assert.That(typeof(SymbolicProgramPointResult).GetConstructors(), Is.Empty);
         Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);

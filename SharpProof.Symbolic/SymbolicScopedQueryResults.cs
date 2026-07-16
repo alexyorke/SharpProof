@@ -11,42 +11,6 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicFileQuery
-{
-    public SymbolicFileQuery(
-        string filePath,
-        int line,
-        int column = 1,
-        IEnumerable<MetadataReference>? references = null,
-        IEnumerable<string>? impliedConditions = null)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (line <= 0) throw new ArgumentOutOfRangeException(nameof(line), "Line must be positive.");
-
-        if (column <= 0) throw new ArgumentOutOfRangeException(nameof(column), "Column must be positive.");
-
-        FilePath = filePath;
-        Line = line;
-        Column = column;
-        References = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
-        ImpliedConditions = impliedConditions?
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .ToImmutableArray() ?? ImmutableArray<string>.Empty;
-    }
-
-    public string FilePath { get; }
-
-    public int Line { get; }
-
-    public int Column { get; }
-
-    public ImmutableArray<MetadataReference> References { get; }
-
-    public ImmutableArray<string> ImpliedConditions { get; }
-}
-
 public sealed class SymbolicInvariantQueryView
 {
     private SymbolicInvariantQueryView(

@@ -424,45 +424,6 @@ public enum SymbolicInvariantMergeKind
     ConservativeFactMerge
 }
 
-internal sealed class SymbolicProgramPointQueryResult(
-    string filePath,
-    int line,
-    int column,
-    int position,
-    int nodeSpanStart,
-    string nodeKind,
-    SymbolicProgramPointAnalysis analysis,
-    string? programPointKind = null)
-{
-    public string FilePath { get; } = filePath;
-
-    public int Line { get; } = line;
-
-    public int Column { get; } = column;
-
-    public int Position { get; } = position;
-
-    public int NodeSpanStart { get; } = nodeSpanStart;
-
-    public string NodeKind { get; } = nodeKind;
-
-    public string ProgramPointKind { get; } = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
-
-    public SymbolicProgramPointAnalysis Analysis { get; } = analysis ?? throw new ArgumentNullException(nameof(analysis));
-
-    public IReadOnlyList<string> Facts => Analysis.Facts;
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts => SymbolicFactInfo.FromState(Analysis.PathState);
-
-    public string MergedInvariantText => Analysis.MergedInvariantText;
-
-    public SymbolicReachability Reachability => Analysis.Reachability;
-
-    public string ReachabilityReason => Analysis.ReachabilityReason;
-
-    public SymbolicSmtDiagnostics SmtDiagnostics => Analysis.SmtDiagnostics;
-}
-
 public sealed class SymbolicConditionProofResult
 {
     internal SymbolicConditionProofResult(
