@@ -208,12 +208,22 @@ internal static class SymbolicAnalysisLimitContext
     internal static SymbolicAnalysisLimits Limits => CurrentScope.Value?.Limits ?? SymbolicAnalysisLimits.Default;
 
     internal static Scope Push(SymbolicAnalysisLimits? limits = null, SyntaxNode? sourceNode = null)
+        => Push(limits, sourceNode, propagateEvents: true);
+
+    internal static Scope PushIsolated(SymbolicAnalysisLimits? limits = null, SyntaxNode? sourceNode = null)
+        => Push(limits, sourceNode, propagateEvents: false);
+
+    private static Scope Push(
+        SymbolicAnalysisLimits? limits,
+        SyntaxNode? sourceNode,
+        bool propagateEvents)
     {
         var parent = CurrentScope.Value;
         var scope = new Scope(
             parent,
             limits ?? parent?.Limits ?? SymbolicAnalysisLimits.Default,
-            sourceNode?.SpanStart ?? parent?.DefaultSourceSpanStart);
+            sourceNode?.SpanStart ?? parent?.DefaultSourceSpanStart,
+            propagateEvents);
         CurrentScope.Value = scope;
         return scope;
     }
@@ -249,11 +259,17 @@ internal static class SymbolicAnalysisLimitContext
     {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();
         private readonly Scope? _parent;
+        private readonly bool _propagateEvents;
         private bool _disposed;
 
-        internal Scope(Scope? parent, SymbolicAnalysisLimits limits, int? defaultSourceSpanStart)
+        internal Scope(
+            Scope? parent,
+            SymbolicAnalysisLimits limits,
+            int? defaultSourceSpanStart,
+            bool propagateEvents)
         {
             _parent = parent;
+            _propagateEvents = propagateEvents;
             Limits = limits;
             DefaultSourceSpanStart = defaultSourceSpanStart;
         }
@@ -298,7 +314,7 @@ internal static class SymbolicAnalysisLimitContext
 
             _disposed = true;
             CurrentScope.Value = _parent;
-            if (_parent == null) return;
+            if (_parent == null || !_propagateEvents) return;
 
             foreach (var item in _events.Events)
                 _parent.Record(

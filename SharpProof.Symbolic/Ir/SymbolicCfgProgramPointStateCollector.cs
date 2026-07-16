@@ -559,7 +559,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             : Exact(targetState, site);
     }
 
-    private static bool TryPropagateSuccessors(
+    internal static bool TryPropagateSuccessors(
         BasicBlock block,
         CfgFinallyContinuation? activeContinuation,
         CfgPathState path,
@@ -1411,7 +1411,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             (block.Operations.Any(operation => ContainsSite(operation.Syntax, site)) ||
              block.BranchValue != null && ContainsSite(block.BranchValue.Syntax, site)));
 
-    private static CfgPathState MergeIncomingStates(
+    internal static CfgPathState MergeIncomingStates(
         IReadOnlyList<CfgPathState> paths,
         SyntaxNode source)
     {
@@ -1574,7 +1574,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return false;
     }
 
-    private static SymbolicState OrderTargetState(
+    internal static SymbolicState OrderTargetState(
         SymbolicState state,
         CfgPathState path,
         bool targetIsInsideBranch) =>
@@ -1586,11 +1586,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 state.IsContradictory)
             : state;
 
-    private readonly record struct CfgPathState(
+    internal readonly record struct CfgPathState(
         SymbolicState State,
         CfgGuardFrame? GuardFrame);
 
-    private sealed record CfgTraversalContext(
+    internal sealed record CfgTraversalContext(
         ControlFlowGraph Graph,
         SemanticModel SemanticModel,
         CancellationToken CancellationToken,
@@ -1602,13 +1602,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         CfgFinallyLocalTargetPlan? FinallyLocalTarget,
         CfgRegionPlan? RegionPlan);
 
-    private readonly record struct CfgIncomingEdge(
+    internal readonly record struct CfgIncomingEdge(
         ControlFlowBranch? Branch,
         CfgFinallyContinuation? Continuation,
         CfgIncomingEdgeKind Kind,
         string? HistoryKey = null);
 
-    private enum CfgIncomingEdgeKind
+    internal enum CfgIncomingEdgeKind
     {
         Entry,
         Conditional,
@@ -1617,7 +1617,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         History
     }
 
-    private sealed record CfgGuardFrame(
+    internal sealed record CfgGuardFrame(
         SymbolicState Baseline,
         BasicBlock Source,
         SymbolicCondition Guard,
@@ -1625,7 +1625,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         bool GuardInvalidated,
         CfgGuardFrame? Parent);
 
-    private static SymbolicCondition? GetActiveGuard(CfgGuardFrame? frame)
+    internal static SymbolicCondition? GetActiveGuard(CfgGuardFrame? frame)
     {
         if (frame == null)
             return null;
@@ -1648,10 +1648,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return guards;
     }
 
-    private static bool HasInvalidatedGuard(CfgGuardFrame? frame) =>
+    internal static bool HasInvalidatedGuard(CfgGuardFrame? frame) =>
         frame != null && (frame.GuardInvalidated || HasInvalidatedGuard(frame.Parent));
 
-    private static CfgGuardFrame? InvalidateGuards(CfgGuardFrame? frame, ISymbol target) =>
+    internal static CfgGuardFrame? InvalidateGuards(CfgGuardFrame? frame, ISymbol target) =>
         frame == null
             ? null
             : frame with

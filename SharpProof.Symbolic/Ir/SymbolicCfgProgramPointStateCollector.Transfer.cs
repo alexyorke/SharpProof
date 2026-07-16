@@ -210,16 +210,16 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return observed == continuation;
     }
 
-    private readonly record struct CfgTraversalPoint(
+    internal readonly record struct CfgTraversalPoint(
         BasicBlock Block,
         CfgFinallyContinuation? Continuation,
         int OperationIndex = 0);
 
-    private sealed record CfgFinallyLocalTargetPlan(
+    internal sealed record CfgFinallyLocalTargetPlan(
         ControlFlowRegion Region,
         SymbolicNestedMutationInvalidationPlan ProtectedMutations);
 
-    private sealed record CfgFinallyContinuation(
+    internal sealed record CfgFinallyContinuation(
         ControlFlowBranch OriginBranch,
         ImmutableArray<ControlFlowRegion> Regions,
         int RegionIndex,
@@ -295,7 +295,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static bool TryApplyOperation(
+    internal static bool TryApplyOperation(
         ref SymbolicState state,
         IOperation operation,
         SymbolicCondition? guard,
@@ -1398,7 +1398,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return false;
     }
 
-    private sealed record CfgRegionPlan(
+    internal sealed record CfgRegionPlan(
         CfgProgramPointTargetKind TargetKind,
         SyntaxNode Target,
         CfgTraversalPoint EntryPoint,
@@ -1423,7 +1423,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 : default;
     }
 
-    private static bool IsTargetOperation(
+    internal static bool IsTargetOperation(
         IOperation operation,
         SyntaxNode site,
         bool includeCurrentStatementCompletionFacts,
@@ -1448,7 +1448,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 target));
     }
 
-    private static bool UsesDefaultAnalysisLimits(SymbolicAnalysisLimits limits)
+    internal static bool UsesDefaultAnalysisLimits(SymbolicAnalysisLimits limits)
     {
         var defaults = SymbolicAnalysisLimits.Default;
         return limits.MaxMergedIfElseFacts == defaults.MaxMergedIfElseFacts &&
@@ -1464,22 +1464,22 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                limits.MaxGuardFactsPerTargetPerState == defaults.MaxGuardFactsPerTargetPerState;
     }
 
-    private static SymbolicLoweringResult<SymbolicState> Exact(
+    internal static SymbolicLoweringResult<SymbolicState> Exact(
         SymbolicState state,
         SyntaxNode site) =>
         SymbolicLoweringResult<SymbolicState>.Exact(
             state.Normalize(),
             Provenance(site, "exact"));
 
-    private static SymbolicLoweringResult<SymbolicState> Unsupported(
+    internal static SymbolicLoweringResult<SymbolicState> Unsupported(
         SyntaxNode site,
         string detail) =>
         SymbolicLoweringResult<SymbolicState>.Unsupported(Provenance(site, detail));
 
-    private static SymbolicLoweringProvenance Provenance(SyntaxNode site, string detail) =>
+    internal static SymbolicLoweringProvenance Provenance(SyntaxNode site, string detail) =>
         new("cfg-program-point", site.Span, detail);
 
-    private enum CfgProgramPointTargetKind
+    internal enum CfgProgramPointTargetKind
     {
         BeforeCurrent,
         CurrentCompletion,

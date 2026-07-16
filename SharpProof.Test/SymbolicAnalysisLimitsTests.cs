@@ -99,6 +99,24 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
+    public void AnalysisLimitScope_IsolatedEventsDoNotPropagateToParent()
+    {
+        using var outer = SymbolicAnalysisLimitContext.Push();
+        using (var isolated = SymbolicAnalysisLimitContext.PushIsolated())
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.IfElseFactMerge,
+                1,
+                2,
+                sourceNode: null,
+                provenance: "test.isolated");
+            Assert.That(isolated.Snapshot().IsTruncated, Is.True);
+        }
+
+        Assert.That(outer.Snapshot().IsTruncated, Is.False);
+    }
+
+    [Test]
     public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering()
     {
         var combined = SymbolicAnalysisTruncationInfo.Combine(new[]

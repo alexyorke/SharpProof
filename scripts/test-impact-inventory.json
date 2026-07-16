@@ -4592,6 +4592,19 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicCfgExecutionTrace.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "ExecutionTrace",
+                                                  "SymbolicCfgExecutionTrace",
+                                                  "TraceCacheEntry"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicCfgExecutionTrace"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -8729,6 +8742,17 @@
                                                    "ExecutionRootPolicy"
                                                ],
                                     "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicCfgExecutionTrace.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicCfgProgramPointStateCollectorTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicCfgExecutionTrace"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.cs",

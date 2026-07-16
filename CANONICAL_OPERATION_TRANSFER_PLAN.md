@@ -607,6 +607,26 @@ the unused preview .NET API may break when it obstructs the canonical design.
     distinct zero-iteration, mandatory-body, initialization, cleanup, and
     exceptional-flow contracts. Retain the explicit owners and pivot to the
     execution-root trace required to remove the structural replay wholesale.
+  - [x] Quantify the execution-root trace deletion closure before extending CFG
+    modes. All structural fallback modes total 696 physical / 650 nonblank lines,
+    or 808 / 754 with completion/prior semantics. No bounded target mode removes
+    more than 14 lines because the remaining modes keep the shared closure live;
+    the first economical cut must replace a complete family, not another adapter.
+  - [x] Route default-limit, seedless, acyclic before-current queries through one
+    cached immutable execution-root trace. The trace reuses the canonical CFG
+    worklist, transfer, branch, and merge owners; rebases method-entry evidence at
+    each query site; isolates roots and concurrent callers; and falls back
+    atomically for loops, exception/protocol regions, unsupported operations,
+    cancellation, custom limits, or truncation. Isolated limit scopes prevent
+    whole-root probing from leaking truncation events into point queries, and
+    nondefault requests bypass the cache whose key intentionally omits limits.
+  - [ ] Extend the trace with seeded completed-statement exit observations for
+    if/switch/while/do/for, then delete the completed-region scheduler and its
+    structural summary islands in the same vertical slice. Exact inventory places
+    the gross removable surface at 760-800 lines; keep the replacement at or below
+    250 lines to remove a projected 430-550 net lines. Preserve arbitrary entry
+    states, terminal/abrupt flow, evidence, versions, scope exit, typed fallback,
+    and try/finally routing before deleting either path.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -829,6 +849,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 target-aware CFG region plan | `b5d34d6e` | 105,990 | -1,686 |
 | Phase 7 root block eligibility consolidation | `d3657d4f` | 105,989 | -1,687 |
 | Phase 7 typed CFG exception-region routing | `d2726997` | 106,118 | -1,558 |
+| Phase 7 cached execution-root trace scaffold | This commit | 106,418 | -1,258 |
 
 ## Validation Ledger
 
@@ -1040,6 +1061,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed CFG exception-region routing | Commit `d2726997` adds a typed plan over Roslyn `TryAndCatch`, `Catch`, `FilterAndHandler`, and `Finally` regions, explicitly seeds disconnected handler paths, and deletes the 97-line completed-try owner plus its static-type catch classifier. Exact/base/incompatible catches, constant and unknown filters, ordered multiple catches, normal and throwing finally blocks, base-typed exact runtime values, unresolved runtime types, and unknown potentially throwing calls are characterized in 13 named cases with normalized state, evidence/provenance, version, contradiction, and current-value checks. Catch exclusion now requires `SymbolicRuntimeTypeFacts.TryGetExactRuntimeType`; unresolved values retain every possible completion path. The focused collector/program-point gate passes 298/298. Exception/oracle coverage passed 848/849 with the known while-exit flake immediately green in isolated serial rerun; limits pass 9/9 and impacted-selection passes 39/39. All six lanes pass 6,118 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,952 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. The correctness scaffold is +129 production lines, leaving production LOC at 106,118, or -1,558 from the rewrite start; tracked nonblank test LOC is 144,823. The collector partial remains under its limit at 2,986 lines. Independent GitHub inspection found PR #79 green; no CI edit was warranted because `1ebaebea` already fixed the historical README inventory race. |
 | Phase 7 completed-using standalone adjudication | Two read-only audits map the owner to 24 physical / 20 nonblank lines in `SymbolicStatementStateTransfer`. Roslyn lowers expression resources through flow captures, declaration resources through assignments, multiple resources through nested `TryAndFinally` regions with reverse disposal, returns through explicit finally continuations, and throws without an exposed disposal edge. The legacy path uniquely invalidates all nested mutations before reapplying every resource initializer's normal-completion facts; the generic CFG path does not preserve those facts, evidence, or versions, and scope-local cleanup plus implicit `Dispose` lifetime/throw behavior would require additional policy. Existing tests cover three proof outcomes but not a complete differential matrix. A safe standalone plan therefore adds more code than it deletes and is rejected before characterization churn. No code, metric, or validated behavior changed. |
 | Phase 7 joint synchronous protocol adjudication | Three read-only audits inventory the entire using/foreach/lock completion surface. Strict completion deletion is 75 physical / 71 nonblank lines: 24 lines of using fallback, 44 lines of foreach/lock completion, and 7 dispatch lines. A correct shared completion descriptor must still distinguish using initializer lists, foreach zero-or-many execution, mandatory lock-body execution, hidden locals, abrupt flow, and implicit cleanup, so it cannot remove 50 net lines. Expanding scope to body entry raises gross candidates to 242 physical / 232 nonblank lines, but the conservative replacement estimate is 140-180 lines before complete parity coverage, leaving only 62-102 lines while centralizing semantically different resource protocols. Existing exact state coverage has only simple foreach, deconstructing foreach, and lock rows; using completion has proof-only coverage, not normalized state/evidence/version parity. Await/pattern/ref-struct protocols, multiple-resource partial initialization, disposal/`Monitor.Exit` exceptions, enumerator calls, and implicit exceptional cleanup remain distinct unsupported or analyzer-owned boundaries. The marginal combined rewrite is rejected under the deletion and semantic-clarity gates. CI/CD was independently rechecked: PR #79 and package-consumer runs are green, the tracked impact inventory regenerates byte-for-byte and selects the new collector fixtures, and `git diff --check` is clean. No production, test, CI, metric, or validated behavior changed. |
+| Phase 7 cached execution-root trace scaffold | Seedless, default-limit, acyclic before-current queries now share one immutable trace per semantic model and execution root instead of replaying the CFG for every point. The trace reuses the canonical collector worklist and transfer operations, records first lexical observations while replacing revisits, rebases method-entry evidence per site, publishes outside the traversal lock, and preserves typed structural fallback for unsupported shapes. A new isolated analysis-limit scope prevents trace-wide truncation events from contaminating point-query telemetry; custom limits bypass both point and trace caches. Cancellation, concurrent-root isolation, cache/evidence/version parity, unsupported-loop atomic fallback, and limit isolation are characterized. The focused trace/limit gate passes 10/10; analysis-limit/source-query/full-JSON coverage passes 323/323; all six lanes pass 6,128 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,962 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. Production LOC is 106,418, or -1,258 from the rewrite start; tracked handwritten test LOC is 145,042. There are no oversized files or partial types, and the collector partial remains 2,986 lines. The scaffold is intentionally +300 production lines; the next seeded completed-statement slice is the first deletion closure large enough to amortize it. CI/CD was independently rechecked green at the current hosted SHA, so no workflow patch was warranted. |
 
 ## Current Checkpoint
 
@@ -1342,23 +1364,26 @@ the unused preview .NET API may break when it obstructs the canonical design.
   non-block 50-line deletion. Completed try/catch/finally now has a typed CFG
   exception-region plan, including conservative unknown-call routing, and its
   structural island is deleted. A soundness reproduction also replaced static
-  thrown-type exclusion with proven exact runtime identity. Production LOC is
-  106,118, or -1,558 from the rewrite start; all six lanes pass 6,118 tests with
+  thrown-type exclusion with proven exact runtime identity. Production LOC was
+  106,118, or -1,558 from the rewrite start; all six lanes passed 6,118 tests with
   the same two documented MainGeneral skips. The subsequent joint synchronous
   using/foreach/lock audit rejects a completion-only owner at 75 gross lines and
   a combined entry/completion owner at only 62-102 projected net lines with a
-  substantially wider semantic surface. CI/CD remains green and current; no
-  patch is warranted before the next production slice.
-- Next cheapest step: stop extracting individual protocol adapters and design
-  one execution-root state trace that records normalized state at every CFG
-  program point in a single pass. Inventory the exact `SymbolicProgramPointFacts`
-  and statement-transfer callers that a trace can delete, define typed fallback
-  identities for unsupported regions, and proceed only with a vertical slice
-  whose deletion map is at least 250 net production lines. Preserve evidence,
-  versions, scope exit, truncation, and conservative `Unknown`; do not revive the
-  rejected block-finalization or completed-loop prototypes.
-- Blockers: the 11,000-line production target still requires 9,442 lines, while
-  two bounded semantic-owner audits found no remaining 250-line safe cut. The
+  substantially wider semantic surface. CI/CD remained green and current; no
+  patch was warranted. The first cached execution-root trace now serves
+  default-limit, seedless, acyclic before-current queries while preserving exact
+  normalized state, evidence, versions, conservative fallback, cancellation,
+  concurrency, and truncation isolation. Production LOC is 106,418, or -1,258
+  from the rewrite start; all six lanes pass 6,128 tests with the same two
+  documented MainGeneral skips. This +300-line scaffold is not counted as a
+  reduction until its next capability deletes the superseded completion owners.
+- Next cheapest step: extend the same worklist with a caller-supplied entry point
+  and seed plus completed-statement exit observations for if/switch/while/do/for.
+  Shadow-compare normalized states, evidence, versions, terminal/abrupt flow,
+  scope exit, fallback identity, and truncation, then delete the 760-800-line
+  completed-region scheduler/summary closure in the same green slice. Do not take
+  the smaller for-initial-entry extension, which removes only 80-125 net lines.
+- Blockers: the 11,000-line production target still requires 9,742 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.

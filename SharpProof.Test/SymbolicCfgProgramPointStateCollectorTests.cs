@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -414,6 +415,175 @@ static class C
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         AssertStateParity(actual.Value!, expected);
+    }
+
+    [TestCase(
+        "static class C { static int M(int input) { int value = input; value++; return value; } }",
+        "return value;")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; if (condition) value = 2; else value = 3; return value; } }",
+        "return value;")]
+    [TestCase(
+        "static class C { static int M(bool condition, int value) { if (condition) return value + 1; return value; } }",
+        "return value + 1;")]
+    [TestCase(
+        "sealed class C { int[] M(int length) { var values = new int[length]; if (length < 0) return new int[0]; return values; } }",
+        "if (length < 0) return new int[0];")]
+    public void ExecutionRootTrace_BeforeCurrentMatchesPerPointCollector(
+        string source,
+        string marker)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_BeforeCurrentMatchesPerPointCollector));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<StatementSyntax>()
+            .Single(statement => statement.ToString() == marker);
+        var expected = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var actual = SymbolicCfgExecutionTrace.CollectStateFromExecutionTrace(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(expected.IsExact, Is.True, expected.Provenance.Single().Detail);
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected.Value!);
+    }
+
+    [Test]
+    public void ExecutionRootTrace_CachedStatesRebaseMethodEntryEvidencePerSite()
+    {
+        const string source = "sealed class C { int M(string input) { int first = input.Length; int second = first + 1; return second; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_CachedStatesRebaseMethodEntryEvidencePerSite));
+        var sites = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().ToArray();
+
+        foreach (var site in sites)
+        {
+            var expected = SymbolicCfgProgramPointStateCollector.CollectState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None);
+            var actual = SymbolicReachabilityService.CollectPathStateAt(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None);
+
+            Assert.That(expected.IsExact, Is.True, expected.Provenance.Single().Detail);
+            AssertStateParity(actual, expected.Value!);
+        }
+    }
+
+    [Test]
+    public void ExecutionRootTrace_ConcurrentQueriesRemainIsolatedByExecutionRoot()
+    {
+        const string source = "sealed class C { int First(int value) { value++; return value; } int Second(int value) { value += 2; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_ConcurrentQueriesRemainIsolatedByExecutionRoot));
+        var sites = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().ToArray();
+        var expected = sites.Select(site => SymbolicReachabilityService.CollectPathStateAt(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None))
+            .Select(CreateTraceStateKey)
+            .ToArray();
+        var actual = new ConcurrentBag<string>();
+
+        Parallel.For(0, 16, index => actual.Add(CreateTraceStateKey(
+            SymbolicReachabilityService.CollectPathStateAt(
+                sites[index % sites.Length],
+                fixture.SemanticModel,
+                CancellationToken.None))));
+
+        Assert.That(actual.Distinct(StringComparer.Ordinal), Is.EquivalentTo(expected));
+    }
+
+    private static string CreateTraceStateKey(SymbolicState state) =>
+        state.NormalizedProofKey + "\n" + CreateEvidenceKey(state) + "\n" + CreateVersionKey(state);
+
+    [Test]
+    public void ExecutionRootTrace_UnsupportedLoopFallsBackWithoutPartialState()
+    {
+        const string source = "static class C { static int M(int value) { while (value > 0) value--; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_UnsupportedLoopFallsBackWithoutPartialState));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var trace = SymbolicCfgExecutionTrace.CollectStateFromExecutionTrace(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = CollectStructuralState(fixture, site);
+
+        Assert.That(trace.IsUnsupported, Is.True);
+        Assert.That(trace.Value, Is.Null);
+        Assert.That(trace.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+        Assert.That(trace.Provenance.Single().Detail, Is.EqualTo("trace.control-flow-shape"));
+        AssertStateParity(routed, expected);
+    }
+
+    [Test]
+    public void ExecutionRootTrace_CustomLimitsBypassWarmDefaultCache()
+    {
+        const string source = "static class C { static int M(bool condition) { int value = 1; if (condition) value = 2; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_CustomLimitsBypassWarmDefaultCache));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+        _ = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
+
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+        var actual = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = CollectStructuralState(fixture, site);
+
+        AssertStateParity(actual, expected);
+        AssertCacheInfo(SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel), before);
+    }
+
+    [Test]
+    public void ExecutionRootTrace_CanceledRequestDoesNotPoisonCache()
+    {
+        const string source = "static class C { static int M(int input) { int value = input; value++; return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ExecutionRootTrace_CanceledRequestDoesNotPoisonCache));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            cancellation.Token));
+        var actual = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(expected.IsExact, Is.True, expected.Provenance.Single().Detail);
+        AssertStateParity(actual, expected.Value!);
     }
 
     [TestCaseSource(nameof(CompletedTryCases))]
