@@ -247,6 +247,12 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M(bool first, bool second) { int value = 0; if (first) value = 1; int marker = 2; if (second) value = 3; int final = 4; } }")]
     [TestCase(
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; else value = 2; int inner = 3; } int marker = 4; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; if (condition) return 1; value = 2; return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; if (condition) { value = 1; return value; } value = 2; return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; if (condition) { value = 1; return value; } else { value = 2; return value; } } }")]
     public void RootBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -375,8 +381,6 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
     [TestCase(
         "static class C { static void M() { System.Console.WriteLine(); } }")]
-    [TestCase(
-        "static class C { static int M(bool condition) { int value = 0; if (condition) return 1; value = 2; return value; } }")]
     [TestCase(
         "static class C { static void M(bool condition) { int value = 0; while (condition) value = 1; } }")]
     public void UnsupportedRootBlockCompletion_RemainsConservativeFallback(string source)

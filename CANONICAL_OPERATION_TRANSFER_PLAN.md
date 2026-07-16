@@ -382,6 +382,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     lifetime regions remove branch locals as their edges leave scope, while
     locals visible immediately before the root closing brace remain observable;
     ordinary loop and non-root query behavior is unchanged.
+  - [x] Separate a root's direct completion branch from earlier terminal paths.
+    A surviving regular path now exclusively determines normal root completion,
+    while exhaustive return paths collapse their guard hierarchy to the pre-
+    branch baseline before canonical unreachable completion is applied.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -556,7 +560,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 terminal root-block branches | `c979ab14` | 105,848 | -1,828 |
 | Phase 7 current predecessor-edge states | `4fb90284` | 105,906 | -1,770 |
 | Phase 7 hierarchical nested root joins | `08decbfd` | 105,947 | -1,729 |
-| Phase 7 root scope-exit joins | This commit | 106,044 | -1,632 |
+| Phase 7 root scope-exit joins | `ef4413d3` | 106,044 | -1,632 |
+| Phase 7 mixed terminal root completion | This commit | 106,150 | -1,526 |
 
 ## Validation Ledger
 
@@ -725,6 +730,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 current predecessor-edge states | Acyclic worklist inputs now replace the current state for a stable branch/continuation edge, retracting a join's stale first-predecessor output before downstream operations execute. Root-block if, if/else, and two post-join-operation cases match structural normalized state and evidence exactly. Existing loop behavior initially diverged when back-edge history was replaced, so loop graphs deliberately retain their characterized bounded-history key until loop merging migrates separately. A nested three-predecessor root exposed a distinct guard-shape mismatch and remains typed fallback. Direct collector fixtures pass 56/56; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,780 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,906, or -1,770 from the rewrite start; authoritative tracked test LOC is 143,338. |
 | Phase 7 hierarchical nested root joins | Incoming paths with compatible immediate baselines and parent guard frames now merge as siblings before the reduced path set merges at its enclosing frame. This reproduces the structural engine's nested order for three-predecessor if/if and if/if-else joins plus a recursively reduced four-predecessor if/else-if join, without flattening their conditions. A root with two distinct intermediate joins is explicitly characterized as typed fallback. Direct collector fixtures pass 59/59; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the four-worker full MainGeneral lane passes 3,782 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,947, or -1,729 from the rewrite start; authoritative tracked test LOC is 143,344. |
 | Phase 7 root scope-exit joins | Acyclic root completion no longer limits the number of intermediate joins. Sequential independent joins and nested inner/outer joins now reach exact structural parity. The focused diff exposed a leaked branch-local declaration after its lexical scope: root-completion propagation now consumes Roslyn `ControlFlowRegion.Locals`, applies canonical invalidation to the path and guard baselines, and preserves only locals visible immediately before the root closing brace. This removes the leaked guarded `inner` equality without changing ordinary loop queries. Direct collector fixtures pass 61/61; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the four-worker full MainGeneral lane passes 3,785 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,044, or -1,632 from the rewrite start; authoritative tracked test LOC is 143,348. |
+| Phase 7 mixed terminal root completion | Root completion now records the direct final return separately from earlier terminal paths. Mixed early-return roots publish only the surviving normal path, while exhaustive if/else returns recursively collapse matching true/false guard frames to their structural pre-branch baseline before canonical contradictory completion. Direct collector fixtures pass 63/63 and the broader program-point/invariant/operation/reachability differential passes 197/197. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,787 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,150, or -1,526 from the rewrite start; authoritative tracked test LOC is 143,352. |
 
 ## Current Checkpoint
 
@@ -828,7 +834,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 106,044, or -1,632 from the rewrite start. Assignment-expression current
+  now 106,150, or -1,526 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -859,13 +865,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   later operations. Nested sibling guards merge before their enclosing guard,
   preserving structural state/evidence for three- and four-predecessor joins.
   Multiple acyclic joins now compose, with CFG-region scope exit removing
-  branch-local facts while preserving root locals. Loop graphs retain bounded
+  branch-local facts while preserving root locals. Mixed early-return roots
+  retain only the surviving normal state; exhaustive returns collapse their
+  guard hierarchy before canonical unreachable completion. Loop graphs retain bounded
   historical convergence; guard mutation, abrupt paths, cycles, and unsupported
-  operations retain typed fallback. Production LOC is 106,044, or -1,632 from
-  the rewrite start; authoritative tracked test LOC is 143,348.
-- Next cheapest step: characterize mixed root completion where one branch
-  returns and the surviving regular branch continues through later operations;
-  merge only the normal-exit state while retaining terminal paths for truly
-  unreachable root completion.
+  operations retain typed fallback. Production LOC is 106,150, or -1,526 from
+  the rewrite start; authoritative tracked test LOC is 143,352.
+- Next cheapest step: characterize mixed root completion with an early direct
+  throw and a surviving regular path, then retain typed fallback for exception-
+  handling regions whose completion ordering is not yet exact.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
