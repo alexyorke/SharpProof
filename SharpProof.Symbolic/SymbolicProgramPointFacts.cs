@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -50,7 +49,8 @@ internal static class SymbolicProgramPointFacts
                         cancellationToken);
                     if (includeCurrentStatementCompletionFacts &&
                         ReferenceEquals(site, statement) &&
-                        SymbolicStatementStateTransfer.SupportsCurrentStatementCompletionFacts(statement))
+                        statement is LocalDeclarationStatementSyntax or
+                            ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax })
                         SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
                             ref state,
                             statement,
@@ -86,7 +86,7 @@ internal static class SymbolicProgramPointFacts
         else if (includeCurrentStatementCompletionFacts &&
                  site is ExpressionSyntax siteExpression)
         {
-            SymbolicExpressionStateTransfer.TryApplyCurrentExpressionCompletion(
+            SymbolicCfgProgramPointStateCollector.TryApplyCurrentExpressionCompletion(
                 ref state,
                 siteExpression,
                 semanticModel,

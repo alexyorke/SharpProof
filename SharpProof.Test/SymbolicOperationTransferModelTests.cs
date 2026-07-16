@@ -14,6 +14,25 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicOperationTransferModelTests
 {
+    [Test]
+    public void UnsupportedCurrentAssignmentExpression_UsesConservativeCompletionFallback()
+    {
+        const string source = "static class C { static int Get() => 1; static void M() { _ = Get(); } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedCurrentAssignmentExpression_UsesConservativeCompletionFallback));
+        var assignment = fixture.Root.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
+        var state = new SymbolicState();
+
+        var applied = SymbolicCfgProgramPointStateCollector.TryApplyCurrentExpressionCompletion(
+            ref state,
+            assignment,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(applied, Is.True);
+    }
+
     [TestCase("/", "definite_divide_by_zero")]
     [TestCase("%", "definite_modulo_by_zero")]
     public void DivideHazardLowering_EmitsExactTypedOperation(string op, string expectedCategory)
@@ -328,13 +347,13 @@ public sealed class SymbolicOperationTransferModelTests
         Assert.That(lowered.IsExact, Is.True);
 
         var legacyState = new SymbolicState();
-        SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts(
+        Assert.That(TryApplySymbolAssignment(
             ref legacyState,
-            declaration,
-            statement,
+            fixture.SemanticModel.GetDeclaredSymbol(declarator)!,
+            declarator.Initializer!.Value,
             fixture.SemanticModel,
             CancellationToken.None,
-            "operation-lowering.declaration");
+            "operation-lowering.declaration"), Is.True);
         var canonical = SymbolicOperationTransferKernel.Apply(new SymbolicState(), lowered.Value!);
         var expected = SymbolicStateDifferentialHarness.Capture(
             legacyState,
@@ -377,13 +396,13 @@ public sealed class SymbolicOperationTransferModelTests
         });
 
         var legacyState = initialState;
-        SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
+        Assert.That(TryApplySymbolAssignment(
             ref legacyState,
             targetSymbol,
             assignment.Right,
             fixture.SemanticModel,
             CancellationToken.None,
-            "operation-lowering.assignment");
+            "operation-lowering.assignment"), Is.True);
         var canonical = SymbolicOperationTransferKernel.Apply(initialState, lowered.Value!);
         var expected = SymbolicStateDifferentialHarness.Capture(
             legacyState,
@@ -457,13 +476,13 @@ public sealed class SymbolicOperationTransferModelTests
         const string provenance = "test.throw-guarded-assignment";
 
         var expected = new SymbolicState();
-        SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
+        Assert.That(TryApplySymbolAssignment(
             ref expected,
             target,
             valueExpression,
             fixture.SemanticModel,
             CancellationToken.None,
-            provenance);
+            provenance), Is.True);
         var actual = SymbolicOperationTransferAdapter.ApplyAssignment(
             new SymbolicState(),
             target,
@@ -947,6 +966,26 @@ public sealed class SymbolicOperationTransferModelTests
             null,
             null);
     }
+
+    private static bool TryApplySymbolAssignment(
+        ref SymbolicState state,
+        ISymbol target,
+        ExpressionSyntax value,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance) =>
+        semanticModel.GetOperation(value, cancellationToken) is { } operation &&
+        SymbolicCfgProgramPointStateCollector.TryApplyAssignment(
+            ref state,
+            target,
+            operation,
+            guard: null,
+            allowGuardedReferenceAssignments: true,
+            allowGuardMutation: true,
+            semanticModel,
+            cancellationToken,
+            provenance,
+            out _);
 
     private static ImmutableArray<SymbolicFact> OwnedFacts(
         SymbolicTerm term,

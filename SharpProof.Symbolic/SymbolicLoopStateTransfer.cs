@@ -588,13 +588,18 @@ internal static class SymbolicLoopStateTransfer
                 initializer.Value,
                 semanticModel,
                 cancellationToken);
-            SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
-                ref state,
-                initializer.Symbol,
-                initializer.Value,
-                semanticModel,
-                cancellationToken,
-                "ir.path.for-initializer");
+            if (semanticModel.GetOperation(initializer.Value, cancellationToken) is { } valueOperation)
+                SymbolicCfgProgramPointStateCollector.TryApplyAssignment(
+                    ref state,
+                    initializer.Symbol,
+                    valueOperation,
+                    guard: null,
+                    allowGuardedReferenceAssignments: true,
+                    allowGuardMutation: true,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.for-initializer",
+                    out _);
             if (initializer.IsDeclaration)
                 SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
                     ref state,

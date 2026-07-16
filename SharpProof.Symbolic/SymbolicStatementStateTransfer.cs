@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -36,12 +35,6 @@ internal static class SymbolicStatementStateTransfer
                 catchClause.Block,
                 semanticModel,
                 cancellationToken);
-    }
-
-    internal static bool SupportsCurrentStatementCompletionFacts(StatementSyntax statement)
-    {
-        return statement is LocalDeclarationStatementSyntax or
-            ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax };
     }
 
     internal static void ApplyContainingBlockEntryStateFacts(
@@ -327,26 +320,13 @@ internal static class SymbolicStatementStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (statement is LocalDeclarationStatementSyntax localDeclaration)
-        {
-            SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts(
+        if (statement is LocalDeclarationStatementSyntax or ExpressionStatementSyntax &&
+            SymbolicCfgProgramPointStateCollector.TryApplyPriorStatementCompletion(
                 ref state,
-                localDeclaration.Declaration,
-                localDeclaration,
+                statement,
                 semanticModel,
-                cancellationToken,
-                "ir.path.prior-statement");
-
-            return;
-        }
-
-        if (statement is ExpressionStatementSyntax expressionStatement)
+                cancellationToken))
         {
-            AddCompletedExpressionStatementStateFacts(
-                ref state,
-                expressionStatement,
-                semanticModel,
-                cancellationToken);
             return;
         }
 
@@ -424,54 +404,6 @@ internal static class SymbolicStatementStateTransfer
                          semanticModel,
                          cancellationToken))
                 SymbolicStateInvalidator.InvalidateSymbol(ref state, symbol, completedIf);
-    }
-
-    internal static void AddCompletedExpressionStatementStateFacts(
-        ref SymbolicState state,
-        ExpressionStatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (statement.Expression is AssignmentExpressionSyntax assignment)
-        {
-            SymbolicExpressionStateTransfer.AddAssignmentExpressionStateFacts(
-                ref state,
-                assignment,
-                statement,
-                semanticModel,
-                cancellationToken);
-            return;
-        }
-
-        if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
-                statement.Expression,
-                semanticModel,
-                cancellationToken,
-                out var mutatedSymbol,
-                out _))
-        {
-            if (!SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
-                    ref state,
-                    mutatedSymbol,
-                    statement.Expression,
-                    semanticModel,
-                    cancellationToken))
-                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
-            return;
-        }
-
-        SymbolicStateInvalidator.InvalidateNestedMutations(
-            ref state,
-            statement,
-            semanticModel,
-            cancellationToken);
-        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-            ref state,
-            statement.Expression,
-            statement,
-            true,
-            semanticModel,
-            cancellationToken);
     }
 
     private static void AddCompletedTryStatementStateFacts(

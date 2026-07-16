@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Symbolic.Ir.SymbolicStatefulAssignmentTransfer;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -225,6 +227,74 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         ControlFlowBranch? TerminalBranch,
         CfgFinallyContinuation? Parent);
 
+    internal static bool TryApplyPriorStatementCompletion(
+        ref SymbolicState state,
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (statement is LocalDeclarationStatementSyntax declaration)
+            return TryApplyCurrentDeclarationCompletion(
+                ref state,
+                declaration,
+                guard: null,
+                allowGuardedReferenceAssignments: true,
+                allowUnsupportedValueCompletion: true,
+                semanticModel,
+                cancellationToken);
+        if (semanticModel.GetOperation(statement, cancellationToken) is not { } operation)
+            return false;
+        var nextState = state;
+        if (!TryApplyOperation(
+                ref nextState, operation,
+                guard: null,
+                allowGuardedReferenceAssignments: true,
+                allowGuardMutation: true,
+                allowExpressionStatementCompletion: true,
+                semanticModel,
+                cancellationToken,
+                "ir.path.prior-statement",
+                out _))
+        {
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax
+                })
+                return false;
+            nextState = state;
+            SymbolicStateInvalidator.InvalidateNestedMutations(
+                ref nextState,
+                statement,
+                semanticModel,
+                cancellationToken);
+        }
+        AddOperationNormalCompletionFacts(ref nextState, operation, semanticModel, cancellationToken);
+        state = nextState;
+        return true;
+    }
+
+    internal static bool TryApplyCurrentExpressionCompletion(
+        ref SymbolicState state,
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        if (semanticModel.GetOperation(expression, cancellationToken) is not { } operation)
+            return false;
+        if (TryApplyCurrentCompletion(
+                ref state, expression, operation, guard: null, true, semanticModel, cancellationToken))
+            return true;
+        if (expression is not AssignmentExpressionSyntax assignment)
+            return false;
+
+        SymbolicStateInvalidator.InvalidateMutationTarget(
+            ref state, assignment.Left, semanticModel, cancellationToken);
+        SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(
+            ref state, assignment, semanticModel, cancellationToken);
+        return true;
+    }
+
     private static bool TryApplyOperation(
         ref SymbolicState state,
         IOperation operation,
@@ -243,8 +313,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             foreach (var declarator in declarations.Declarations
                          .SelectMany(static declaration => declaration.Declarators))
             {
-                if (declarator.Initializer?.Value is not { } value ||
-                    !TryApplyAssignment(
+                if (declarator.Initializer?.Value is not { } value)
+                    continue;
+                if (!TryApplyAssignment(
                         ref state,
                         declarator.Symbol,
                         value,
@@ -261,6 +332,38 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
             return true;
         }
+
+        var deconstruction = operation switch
+        {
+            IExpressionStatementOperation { Operation: IDeconstructionAssignmentOperation nested } => nested,
+            IDeconstructionAssignmentOperation direct => direct,
+            _ => null
+        };
+        if (deconstruction != null)
+            return TryApplyDeconstructionAssignment(
+                ref state,
+                deconstruction,
+                guard,
+                semanticModel,
+                cancellationToken,
+                out invalidatedGuardTarget);
+
+        var coalesce = operation switch
+        {
+            IExpressionStatementOperation { Operation: ICoalesceAssignmentOperation nested } => nested,
+            ICoalesceAssignmentOperation direct => direct,
+            _ => null
+        };
+        if (coalesce != null)
+            return TryApplyCoalesceAssignment(
+                ref state,
+                coalesce,
+                guard,
+                allowGuardedReferenceAssignments,
+                allowGuardMutation,
+                semanticModel,
+                cancellationToken,
+                out invalidatedGuardTarget);
 
         if (allowExpressionStatementCompletion &&
             operation is IExpressionStatementOperation atomicExpressionStatement &&
@@ -320,10 +423,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             if (computedTarget == null ||
                 !TryGetDirectTarget(computedTarget, out var computedTargetSymbol) ||
                 computedUpdate.Syntax is not ExpressionSyntax expression ||
-                !SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
+                !TryApplyComputedUpdate(
                     ref state,
                     computedTargetSymbol,
-                    expression,
+                    computedUpdate,
                     semanticModel,
                     cancellationToken))
                 return false;
@@ -365,9 +468,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     guard,
                     target.Key))))
             return false;
-        SymbolicStatementStateTransfer.AddCompletedExpressionStatementStateFacts(
+        state = SymbolicStateInvalidator.ApplyNestedMutationInvalidations(state, invalidations);
+        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
             ref state,
+            expressionStatement.Expression,
             expressionStatement,
+            includeThrowGuardFacts: true,
             semanticModel,
             cancellationToken);
         return true;
@@ -384,7 +490,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     {
         if (site is ExpressionSyntax expression &&
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression) is not AssignmentExpressionSyntax)
-            return SymbolicExpressionStateTransfer.TryApplyCurrentExpressionCompletion(
+            return TryApplyFrameworkExpressionCompletion(
                 ref state,
                 expression,
                 semanticModel,
@@ -426,27 +532,40 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
+    private static bool TryApplyFrameworkExpressionCompletion(
+        ref SymbolicState state,
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var lowering = SymbolicFrameworkPostconditionLowerer.LowerMemberNotNull(
+            expression, semanticModel, cancellationToken);
+        if (lowering is not { IsExact: true, Value: { } plan })
+            return false;
+        SymbolicStateInvalidator.InvalidateNestedMutations(
+            ref state, expression, semanticModel, cancellationToken);
+        SymbolicNormalCompletionStateTransfer.ApplyConditions(
+            ref state,
+            plan.AfterDoesNotReturnIf,
+            expression,
+            "ir.path.expression-completion.member-not-null");
+        return true;
+    }
+
     private static void AddOperationNormalCompletionFacts(
         ref SymbolicState state,
         IOperation operation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var assignment = operation switch
-        {
-            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
-            ISimpleAssignmentOperation direct => direct,
-            _ => null
-        };
-        if (assignment?.Value.Syntax is not ExpressionSyntax value ||
-            assignment.Syntax.FirstAncestorOrSelf<StatementSyntax>() is not { } statement)
+        if (operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() is not
+            { Expression: AssignmentExpressionSyntax assignment } statement)
             return;
-
+        var target = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
         SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
             ref state,
-            value,
+            assignment.Right,
             statement,
-            !TryGetDirectTarget(assignment.Target, out var target) ||
             target is not (ILocalSymbol or IParameterSymbol),
             semanticModel,
             cancellationToken);
@@ -514,6 +633,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         LocalDeclarationStatementSyntax declaration,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
+        bool allowUnsupportedValueCompletion,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -531,19 +651,28 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     {
                         Symbol: var declaratorSymbol,
                         Initializer.Value: { } value
-                    } ||
-                !TryApplyAssignment(
+                    })
+                return false;
+            SymbolicStateInvalidator.InvalidateNestedMutations(
+                ref completedState, value.Syntax, semanticModel, cancellationToken);
+            if (!TryApplyAssignment(
                     ref completedState,
                     declaratorSymbol,
                     value,
                     guard,
                     allowGuardedReferenceAssignments,
-                    false,
+                    allowGuardMutation: false,
                     semanticModel,
                     cancellationToken,
                     "ir.path.prior-statement",
                     out _))
-                return false;
+            {
+                if (guard != null || !allowUnsupportedValueCompletion)
+                    return false;
+                completedState = SymbolicStateValueFacts.RemoveReferences(
+                    completedState,
+                    declaratorSymbol);
+            }
 
             SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
                 ref completedState,
@@ -594,7 +723,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return state;
     }
 
-    private static bool TryApplyAssignment(
+    internal static bool TryApplyAssignment(
         ref SymbolicState state,
         ISymbol target,
         IOperation value,
@@ -617,13 +746,28 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         }
 
         invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
-        if (value.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression ||
-            SymbolMutationFacts.ExpressionReferencesSymbol(
-                expression,
-                target,
-                semanticModel,
-                cancellationToken))
+        if (value.Syntax is not ExpressionSyntax expression)
             return false;
+
+        SymbolicTerm? previousValue = null;
+        var isSelfReferential = SymbolMutationFacts.ExpressionReferencesSymbol(
+            expression,
+            target,
+            semanticModel,
+            cancellationToken);
+        if (isSelfReferential &&
+            (!SymbolicStateValueFacts.TryGetCurrentValue(state, target, out previousValue) ||
+             previousValue.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Int))
+        {
+            ApplyUnsupportedSelfReferentialCompletion(
+                ref state,
+                target,
+                expression,
+                semanticModel,
+                cancellationToken,
+                provenance);
+            return true;
+        }
 
         var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
             state,
@@ -634,12 +778,32 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             provenance: provenance,
             bindingProvenance: provenance + ".assigned-value",
             asExpressionProvenanceRoot: provenance + ".as",
-            postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
+            postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
+            preInvalidationTargetValue: previousValue);
         if (!transition.IsExact)
             return false;
 
         state = transition.State;
         return true;
+    }
+
+    private static void ApplyUnsupportedSelfReferentialCompletion(
+        ref SymbolicState state,
+        ISymbol target,
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance)
+    {
+        state = SymbolicStateValueFacts.RemoveReferences(state, target);
+        var condition = SymbolicOperationLowerer.LowerThrowGuardedAssignmentPostcondition(
+            target,
+            SymbolicAssignmentStateTransfer.GetThrowGuardedValue(expression),
+            new SymbolicLoweringContext(semanticModel, cancellationToken),
+            provenance);
+        if (condition != null)
+            state = SymbolicOperationTransferKernel.Assume(
+                state, condition, assumeTrue: true, expression.Span, provenance).State;
     }
 
     private static bool TryApplyExplicitTargetAssignment(
@@ -676,7 +840,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static bool RequiresStructuralAssignmentFallback(
+    internal static bool RequiresStructuralAssignmentFallback(
         ISymbol target,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
@@ -694,13 +858,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
              !allowGuardMutation && GuardReferencesTarget(guard, target));
     }
 
-    private static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>
+    internal static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>
         guard != null &&
         SymbolicIrReferenceScanner.ContainsVariableOrMember(
             guard,
             SymbolicFactFactory.GetSmtVariableName(target));
 
-    private static bool TryGetDirectTarget(IOperation operation, out ISymbol target)
+    internal static bool TryGetDirectTarget(IOperation operation, out ISymbol target)
     {
         target = operation switch
         {
