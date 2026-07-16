@@ -39,11 +39,15 @@ function Get-ReadmeExampleTests {
     param([string]$Root)
 
     $map = @{}
-    $files = Get-ChildItem -Path (Join-Path $Root "SharpProof.Test"), (Join-Path $Root "SharpProof.ToolingTest") -Filter *.cs -Recurse -File |
-        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    $files = @(& git -C $Root ls-files --cached --others --exclude-standard -- 'SharpProof.Test/*.cs' 'SharpProof.ToolingTest/*.cs')
+    if ($LASTEXITCODE -ne 0) {
+        throw "git ls-files failed while inventorying README example tests."
+    }
+
     $pattern = '(?ms)(?<attributes>(?:^[ \t]*\[[^\r\n]+\][ \t]*\r?\n)+)[ \t]*public\s+(?:async\s+)?(?:Task(?:<[^>\r\n]+>)?|ValueTask(?:<[^>\r\n]+>)?|void)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)'
     foreach ($file in $files) {
-        $content = Get-Content -LiteralPath $file.FullName -Raw
+        $fullPath = Join-Path $Root $file
+        $content = Get-Content -LiteralPath $fullPath -Raw
         foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($content, $pattern)) {
             $attributes = $match.Groups['attributes'].Value
             $exampleMatch = [System.Text.RegularExpressions.Regex]::Match(
@@ -59,10 +63,10 @@ function Get-ReadmeExampleTests {
             $id = $exampleMatch.Groups['id'].Value
             $name = $match.Groups["name"].Value
             if ($map.ContainsKey($id)) {
-                throw "Duplicate [ReadmeExample] id '$id' found in '$($file.FullName)'."
+                throw "Duplicate [ReadmeExample] id '$id' found in '$fullPath'."
             }
 
-            $map[$id] = "{0}.{1}" -f [System.IO.Path]::GetFileNameWithoutExtension($file.Name), $name
+            $map[$id] = "{0}.{1}" -f [System.IO.Path]::GetFileNameWithoutExtension($file), $name
         }
     }
 
