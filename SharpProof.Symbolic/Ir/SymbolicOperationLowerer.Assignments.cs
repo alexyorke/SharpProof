@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
 
@@ -10,41 +9,6 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicOperationLowerer
 {
-    internal static SymbolicLoweringResult<SymbolicOperationSequence> Lower(
-        IOperation operation,
-        SymbolicLoweringContext targetContext,
-        SymbolicLoweringContext valueContext,
-        int sequence = 0)
-    {
-        if (operation == null) throw new ArgumentNullException(nameof(operation));
-        if (targetContext == null) throw new ArgumentNullException(nameof(targetContext));
-        if (valueContext == null) throw new ArgumentNullException(nameof(valueContext));
-
-        targetContext.CancellationToken.ThrowIfCancellationRequested();
-        return operation switch
-        {
-            IExpressionStatementOperation expressionStatement =>
-                Lower(expressionStatement.Operation, targetContext, valueContext, sequence),
-            IVariableDeclaratorOperation { Initializer.Value: { } value } declarator =>
-                LowerSimpleAssignment(
-                    declarator.Symbol,
-                    value.Syntax,
-                    targetContext,
-                    valueContext,
-                    sequence,
-                    "operation-lowering.declaration"),
-            ISimpleAssignmentOperation assignment when TryGetDirectTargetSymbol(assignment.Target, out var target) =>
-                LowerSimpleAssignment(
-                    target,
-                    assignment.Value.Syntax,
-                    targetContext,
-                    valueContext,
-                    sequence,
-                    "operation-lowering.assignment"),
-            _ => Unsupported(operation, "operation-lowering.unsupported")
-        };
-    }
-
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerSimpleAssignment(
         ISymbol targetSymbol,
         SyntaxNode source,
@@ -1312,22 +1276,6 @@ internal static partial class SymbolicOperationLowerer
             evidenceKey));
     }
 
-    private static bool TryGetDirectTargetSymbol(IOperation target, out ISymbol symbol)
-    {
-        switch (target)
-        {
-            case ILocalReferenceOperation local:
-                symbol = local.Local.OriginalDefinition;
-                return true;
-            case IParameterReferenceOperation parameter:
-                symbol = parameter.Parameter.OriginalDefinition;
-                return true;
-            default:
-                symbol = null!;
-                return false;
-        }
-    }
-
     private static bool TryCreateSymbolTerm(
         ISymbol symbol,
         SymbolicLoweringContext context,
@@ -1347,13 +1295,6 @@ internal static partial class SymbolicOperationLowerer
 
         term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
         return true;
-    }
-
-    private static SymbolicLoweringResult<SymbolicOperationSequence> Unsupported(
-        IOperation operation,
-        string provenance)
-    {
-        return Unsupported(operation.Syntax, provenance);
     }
 
     private static SymbolicLoweringResult<SymbolicOperationSequence> Unsupported(
