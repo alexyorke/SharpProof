@@ -4598,12 +4598,10 @@
                             "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.Transfer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "CfgBlockSlice",
                                                   "CfgFinallyContinuation",
                                                   "CfgFinallyLocalTargetPlan",
                                                   "CfgProgramPointTargetKind",
-                                                  "CfgStatementCompletionPath",
-                                                  "CfgStatementRegionPlan",
+                                                  "CfgRegionPlan",
                                                   "CfgTraversalPoint",
                                                   "SymbolicCfgProgramPointStateCollector"
                                               ],
@@ -5927,17 +5925,6 @@
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicMethodResult"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicNormalCompletionStateTransfer.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicNormalCompletionStateTransfer"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
