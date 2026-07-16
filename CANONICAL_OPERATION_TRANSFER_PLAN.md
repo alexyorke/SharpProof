@@ -425,6 +425,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Remove the unconditional nullable-assignment CFG fallback after explicit
     canonical invalidation restored exact nullable HasValue/value state,
     evidence, and version parity for reassignment from another nullable symbol.
+  - [x] Route stable while/do loop-local targets through bounded CFG revisits.
+    Every visit contributes to one evidence-aware canonical intersection;
+    a single observation is preserved directly. Contradictory observations,
+    unobserved targets, computed-update completion, nested loops, abrupt exits,
+    counted-for loops, and foreach retain typed conservative fallback.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -610,7 +615,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 frame-selective nested guard invalidation | `4c184542` | 106,257 | -1,419 |
 | Phase 7 nested reference guard invalidation | `ac41a1a1` | 106,270 | -1,406 |
 | Phase 7 canonical assignment invalidation | `73e7bc53` | 106,281 | -1,395 |
-| Phase 7 canonical nullable reassignment | This commit | 106,278 | -1,398 |
+| Phase 7 canonical nullable reassignment | `5d610810` | 106,278 | -1,398 |
+| Phase 7 bounded while/do loop-local targets | This commit | 106,361 | -1,315 |
 
 ## Validation Ledger
 
@@ -790,6 +796,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 nested reference guard invalidation | Guarded reference assignment now distinguishes stable guarded use from permission to mutate the guard. Only nested-block completion enables the latter, allowing its canonical inner-frame merge to remove the invalidated null guard while retaining the enclosing Boolean guard. A matching enclosing-reference mutation and the existing direct branch-local mutation remain typed `Unsupported`. Direct collector fixtures pass 83/83 and the broader program-point/invariant/operation/reachability batch passes 235/235. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,270, or -1,406 from the rewrite start; authoritative tracked test LOC is 143,392. |
 | Phase 7 canonical assignment invalidation | Simple-assignment lowering now emits an explicit target invalidation owned by `SymbolicAssignmentOperation`; the kernel applies the same typed invalidation helper for assignment and mutation events. This fixes postcondition-only array/reference assignments that previously retained stale target projections across a guarded join, while unsupported lowering still publishes no partial state. The exact normalized-state/evidence differential passes, direct collector fixtures pass 83/83, and the broader program-point/invariant/operation/reachability batch passes 235/235. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,281, or -1,395 from the rewrite start; authoritative tracked test LOC is 143,415. |
 | Phase 7 canonical nullable reassignment | The CFG collector no longer rejects every `Nullable<T>` assignment before canonical lowering. The focused nullable-to-nullable reassignment now matches structural normalized state, evidence, and version identity exactly because assignment-owned invalidation removes the old HasValue/value pair before canonical postconditions and propagations apply. Unsupported nullable shapes still return typed `Unsupported` through the lowerer. Nullable/program-point/invariant/operation/reachability fixtures pass 261/261. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,278, or -1,398 from the rewrite start; authoritative tracked test LOC is 143,428. |
+| Phase 7 bounded while/do loop-local targets | Stable targets inside one while or do loop now accumulate every bounded CFG observation and use the canonical evidence-aware state intersection; a single observation bypasses merging so its full state and version identity remain intact. Focused differentials cover loop-carried writes before and after the target, expression and declaration completion, nested blocks, and a one-iteration do loop. Contradictory or unobserved targets, computed-update completion, nested loops, abrupt exits, counted-for loops, and foreach remain typed `Unsupported`. Direct collector fixtures pass 107/107 and the broader program-point/invariant/operation/reachability batch passes 259/259. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,831 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,361, or -1,315 from the rewrite start; authoritative tracked test LOC is 143,625. |
 
 ## Current Checkpoint
 
@@ -862,9 +869,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   while/do/for conditions, invariants, and local/parameter back-edge
   invalidations; queries after mutation-independent while and do loops now use
   bounded canonical CFG revisits; counted-for loops additionally retain their
-  typed monotonic initializer invariants. Loop-local targets, abrupt exits,
-  condition-dependent while/do mutations and finally-local targets remain
-  conservative fallbacks.
+  typed monotonic initializer invariants. Abrupt exits, condition-dependent
+  while/do mutations, and finally-local targets remain conservative fallbacks.
   Finite foreach entry domains now lower to typed conditions and enter state only
   through the canonical loop-edge transition. Finally regions run through typed saved continuations before
   their destinations. Pattern binding has one typed canonical owner; the
@@ -874,8 +880,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   source-derived array/dereference completion facts, `DoesNotReturnIf`, inline
   assignments, and throw guards now have typed owners and enter state through
   canonical transitions. Stable branch-local source-query targets now use the
-  CFG collector; guard-mutating references, loop-local targets, and finally-
-  local targets remain conservative fallbacks.
+  CFG collector; guard-mutating references, unsupported loop-local shapes, and
+  finally-local targets remain conservative fallbacks.
   The orphaned exception mutation partial, seven migrated private helpers, and
   745 physical lines of declaration-only internal migration APIs are deleted.
   Branch completion, execution visibility, and purity CFG share the canonical
@@ -904,8 +910,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   assignment after initializer control flow and shares operation-aware null
   branching with the canonical reachability owner. External member writes,
   active guards, unsupported initializer invocations, unsupported nested
-  blocks, loop-local targets,
-  finally-local targets, and implicit
+  blocks, unsupported loop-local targets, finally-local targets, and implicit
   constructor/bare-return CFG shapes remain conservative structural fallbacks.
   Multi-declarator completion now applies all implicit assignments and
   normal-completion plans atomically in source order, publishing no partial
@@ -950,10 +955,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
   reassignment reaches exact post-join structural parity without stale length
   facts. Nullable reassignment likewise reaches exact structural parity through
   those canonical invalidations, so its unconditional CFG rejection is gone.
-  Production LOC is 106,278, or -1,398 from the rewrite start; authoritative
-  tracked test LOC is 143,428.
-- Next cheapest step: characterize the loop-local target fallback and migrate it
-  only if canonical state, evidence, completion, and version identity match
-  structural transfer exactly.
+  Stable targets inside one while or do loop now accumulate every bounded CFG
+  observation and merge only non-contradictory states with evidence-aware
+  canonical intersection; a single observation is returned directly. Loop-
+  carried simple writes, supported expression/declaration completion, and
+  nested blocks match structural state, evidence, and version identity.
+  Contradictory or unobserved targets, computed-update completion, nested loops,
+  abrupt exits, counted-for loops, foreach, and finally-local targets retain
+  typed conservative fallback. Production LOC is 106,361, or -1,315 from the
+  rewrite start; authoritative tracked test LOC is 143,625.
+- Next cheapest step: canonicalize for-loop initializer entry state and delete
+  the structural `CollectForInitialEntryState` / `CollectForInitializerState`
+  mutation path only after exact normalized-state, evidence, completion, and
+  version parity.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

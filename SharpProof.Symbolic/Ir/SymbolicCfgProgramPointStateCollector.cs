@@ -35,8 +35,16 @@ internal static class SymbolicCfgProgramPointStateCollector
                 cancellationToken,
                 out var loopPlans))
             return Unsupported(site, "loop-lowering");
-        if (loopPlans.Any(plan => plan.Loop.Span.Contains(site.SpanStart)))
+        var containingLoopPlans = loopPlans
+            .Where(plan => plan.Loop.Span.Contains(site.SpanStart))
+            .ToArray();
+        if (containingLoopPlans.Length > 1 ||
+            containingLoopPlans.Any(plan =>
+                plan.Loop is not WhileStatementSyntax &&
+                plan.Loop is not DoStatementSyntax ||
+                HasAbruptOrNestedLoopControlFlow(plan.Loop)))
             return Unsupported(site, "loop-local-target");
+        var targetIsInsideLoop = containingLoopPlans.Length != 0;
         if (site.Ancestors().Any(static ancestor => ancestor is FinallyClauseSyntax))
             return Unsupported(site, "finally-local-target");
         ControlFlowGraph? graph;
@@ -89,6 +97,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         var terminalPaths = new List<CfgPathState>();
         var nestedBlockCompletedPaths = new List<CfgPathState>();
         var nestedBlockTerminalPaths = new List<CfgPathState>();
+        var loopTargetStates = new List<SymbolicState>();
         queue.Enqueue(entryPoint);
         SymbolicState? targetState = null;
         SymbolicState? guardedTargetState = null;
@@ -111,6 +120,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 continue;
             }
             var foundTarget = false;
+            var observedLoopTarget = false;
             foreach (var operation in block.Operations)
             {
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
@@ -120,6 +130,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     operation is IFlowCaptureOperation)
                     continue;
                 if (!targetIsCompletedRootBlock &&
+                    !observedLoopTarget &&
                     IsTargetOperation(
                         operation,
                         site,
@@ -129,6 +140,10 @@ internal static class SymbolicCfgProgramPointStateCollector
                         semanticModel,
                         cancellationToken))
                 {
+                    if (targetIsInsideLoop &&
+                        includeCurrentStatementCompletionFacts &&
+                        !SupportsLoopLocalCurrentCompletion(site, operation))
+                        return Unsupported(site, "loop-current-completion");
                     if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
                     var activeGuard = GetActiveGuard(currentPath.GuardFrame);
@@ -151,14 +166,27 @@ internal static class SymbolicCfgProgramPointStateCollector
                                 cancellationToken)))
                         return Unsupported(site, "current-completion");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
-                    if (currentPath.GuardFrame == null || targetIsInsideBranch)
+                    if (targetIsInsideLoop)
+                        loopTargetStates.Add(observedState);
+                    else if (currentPath.GuardFrame == null || targetIsInsideBranch)
                         targetState = observedState;
                     else
                         guardedTargetState = observedState;
-                    foundTarget = true;
-                    break;
+                    if (targetIsInsideLoop)
+                    {
+                        observedLoopTarget = true;
+                        if (includeCurrentStatementCompletionFacts ||
+                            operation is IReturnOperation or IThrowOperation)
+                            continue;
+                    }
+                    else
+                    {
+                        foundTarget = true;
+                        break;
+                    }
                 }
                 if (!targetIsCompletedRootBlock &&
+                    !targetIsInsideLoop &&
                     operation.Syntax.SpanStart >= site.SpanStart &&
                     !(targetIsCompletedNestedBlock &&
                       site.Span.Contains(operation.Syntax.SpanStart)))
@@ -203,11 +231,14 @@ internal static class SymbolicCfgProgramPointStateCollector
                     if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
-                    if (currentPath.GuardFrame == null || targetIsInsideBranch)
+                    if (targetIsInsideLoop)
+                        loopTargetStates.Add(observedState);
+                    else if (currentPath.GuardFrame == null || targetIsInsideBranch)
                         targetState = observedState;
                     else
                         guardedTargetState = observedState;
-                    continue;
+                    if (!targetIsInsideLoop)
+                        continue;
                 }
             }
 
@@ -257,6 +288,13 @@ internal static class SymbolicCfgProgramPointStateCollector
                 completedPath.State,
                 site.Span).State;
             targetState = OrderTargetState(completedState, completedPath, targetIsInsideBranch);
+        }
+        if (targetIsInsideLoop && loopTargetStates.Count == 0)
+            return Unsupported(site, "loop-target-unobserved");
+        if (targetIsInsideLoop)
+        {
+            if (!TryMergeLoopTargetStates(loopTargetStates, site.SpanStart, out targetState))
+                return Unsupported(site, "loop-target-merge");
         }
         targetState ??= guardedTargetState;
         if (targetState == null &&
@@ -865,6 +903,55 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool BlockIsWithinLoop(BasicBlock block, StatementSyntax loop) =>
         block.Operations.Any(operation => loop.Span.Contains(operation.Syntax.Span)) ||
         block.BranchValue != null && loop.Span.Contains(block.BranchValue.Syntax.Span);
+
+    private static bool HasAbruptOrNestedLoopControlFlow(StatementSyntax loop) =>
+        CSharpSyntaxFacts.DescendantNodesInExecution(loop, includeSelf: false)
+            .Any(node => node is BreakStatementSyntax or
+                ContinueStatementSyntax or
+                GotoStatementSyntax or
+                ReturnStatementSyntax or
+                ThrowStatementSyntax or
+                ThrowExpressionSyntax or
+                YieldStatementSyntax or
+                WhileStatementSyntax or
+                DoStatementSyntax or
+                ForStatementSyntax or
+                ForEachStatementSyntax or
+                ForEachVariableStatementSyntax);
+
+    private static bool SupportsLoopLocalCurrentCompletion(
+        SyntaxNode site,
+        IOperation operation) =>
+        site is LocalDeclarationStatementSyntax declaration &&
+            declaration.Declaration.Variables.Count == 1 ||
+        site is ExpressionStatementSyntax &&
+            operation is IExpressionStatementOperation
+            {
+                Operation: ISimpleAssignmentOperation
+            };
+
+    private static bool TryMergeLoopTargetStates(
+        IReadOnlyList<SymbolicState> states,
+        int phiScope,
+        out SymbolicState merged)
+    {
+        if (states.Any(static state => state.IsContradictory))
+        {
+            merged = null!;
+            return false;
+        }
+        if (states.Count == 1)
+        {
+            merged = states[0];
+            return true;
+        }
+
+        merged = SymbolicStateMerger.MergePathStatesAcrossAll(
+            states,
+            SymbolicStateMerger.AreEvidenceEquivalentFacts,
+            phiScope);
+        return true;
+    }
 
     private static bool TryLowerLoopPlans(
         SyntaxNode executionRoot,

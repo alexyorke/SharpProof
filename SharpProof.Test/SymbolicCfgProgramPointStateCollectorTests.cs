@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Symbolic;
@@ -492,6 +493,41 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
     }
 
+    private static void AssertLoopTargetMatchesStructural(
+        RoslynTestFixture.CompilationFixture fixture,
+        SyntaxNode site,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+        Assert.That(
+            CreateVersionKey(actual.Value),
+            Is.EqualTo(CreateVersionKey(expected)));
+    }
+
+    private static string CreateVersionKey(SymbolicState state) =>
+        string.Join(
+            "\n",
+            state.SymbolVersions.OrderBy(static pair => pair.Key, StringComparer.Ordinal).Select(static pair =>
+                pair.Key + ":" + pair.Value));
+
     private static string CreateEvidenceKey(SymbolicState state) =>
         string.Join(
             "\n",
@@ -674,6 +710,194 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { while (keepGoing) { int value = 1; value++; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { do { int value = 1; value++; } while (keepGoing); return 0; } }")]
+    public void LoopLocalTarget_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(LoopLocalTarget_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        AssertLoopTargetMatchesStructural(fixture, site);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { value = 1; value = 7; } return value; } }",
+        0)]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { value = 7; value++; } return value; } }",
+        1)]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; do { value = 1; value = 7; } while (keepGoing); return value; } }",
+        0)]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; do { value = 7; value++; } while (keepGoing); return value; } }",
+        1)]
+    public void LoopCarriedMutationAroundTarget_MatchesStructuralCollector(
+        string source,
+        int targetIndex)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(LoopCarriedMutationAroundTarget_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>()
+            .ElementAt(targetIndex);
+
+        AssertLoopTargetMatchesStructural(fixture, site);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { while (keepGoing) { int value = 1; value = 2; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { do { int value = 1; value = 2; } while (keepGoing); return 0; } }")]
+    public void LoopLocalExpressionCompletion_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(LoopLocalExpressionCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        AssertLoopTargetMatchesStructural(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { while (keepGoing) { int value = 1; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { do { int value = 1; } while (keepGoing); return 0; } }")]
+    public void LoopLocalDeclarationCompletion_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(LoopLocalDeclarationCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+
+        AssertLoopTargetMatchesStructural(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { while (keepGoing) { { int value = 1; value++; } } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { do { { int value = 1; value++; } } while (keepGoing); return 0; } }")]
+    public void NestedBlockLoopLocalTarget_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NestedBlockLoopLocalTarget_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        AssertLoopTargetMatchesStructural(fixture, site);
+    }
+
+    [Test]
+    public void SingleDoLoopTargetObservation_MatchesStructuralCollector()
+    {
+        const string source =
+            "static class C { static int M() { do { int value = 1; value++; } while (false); return 0; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SingleDoLoopTargetObservation_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        AssertLoopTargetMatchesStructural(fixture, site);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { if (value != value) value++; } return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; do { if (value != value) value++; } while (keepGoing); return value; } }")]
+    public void ContradictoryLoopTargetObservation_RemainsConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ContradictoryLoopTargetObservation_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; if (value != value) { while (keepGoing) { int item = 1; item++; } } return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; if (value != value) { do { int item = 1; item++; } while (keepGoing); } return value; } }")]
+    public void ContradictoryLoopTargetRevisits_RemainConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ContradictoryLoopTargetRevisits_RemainConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { value++; break; } return value; } }",
+        false)]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; do { value++; continue; } while (keepGoing); return value; } }",
+        false)]
+    [TestCase(
+        "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { value++; } return value; } }",
+        true)]
+    [TestCase(
+        "static class C { static int M() { while (false) { int value = 1; value++; } return 0; } }",
+        false)]
+    [TestCase(
+        "static class C { static int M(bool outer, bool inner) { int value = 0; while (outer) { while (inner) value++; } return value; } }",
+        false)]
+    public void UnsupportedLoopLocalTargets_RemainConservativeFallback(
+        string source,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedLoopLocalTargets_RemainConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [TestCase(
+        "static class C { static int M() { for (int index = 0; index < 3; index++) { int value = 1; value++; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M() { foreach (var item in new[] { 1, 2 }) { int value = item; value++; } return 0; } }")]
+    public void UnmigratedLoopLocalTargets_RemainConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnmigratedLoopLocalTargets_RemainConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ExpressionStatementSyntax>().Single();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True);
     }
 
     [Test]
