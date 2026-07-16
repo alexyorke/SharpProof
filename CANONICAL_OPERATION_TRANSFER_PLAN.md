@@ -533,6 +533,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
     order. The three superseded routing/enumeration helpers are deleted while
     `for`, `while`, `do`, `foreach`, `if`, and `else` fallback behavior remains
     conservative.
+  - [ ] Replace the completed-if/switch/loop/lock structural policy as one
+    CFG-backed completion-summary owner, then delete the completion-specific
+    regions of `SymbolicBranchCompletionStateTransfer` and
+    `SymbolicControlFlowCompletionStateTransfer`. Three independent inventories
+    reject `SymbolicProgramPointFacts`, Analyzer assignment/state/merge, and
+    exception-path adapters as sub-gate cuts. The accepted combined owner has
+    1,056 gross legacy lines and a conservative 306-456 net deletion estimate;
+    do not land it unless normalized state, evidence/provenance, symbol versions,
+    conservative fallback reasons, switch exhaustiveness/goto behavior, guarded
+    break/continue mutation, nested-loop ownership, lock nullability, and
+    try/finally boundaries match before the legacy regions are removed.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -943,6 +954,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 containing-block entry consolidation | Containing-block entry now classifies the parent once and preserves the required sequence: for-initializer invalidation, exact inline-assignment reachability, loop invariant application, condition-assignment invalidation, canonical loop-entry fallback, and ordinary branch reachability. Three routing/enumeration helpers were deleted; `do`, `foreach`, conditionless `for`, and unsupported shapes still flow through the canonical conservative loop owner. The pre-edit and post-edit structural batch passes 151/151; CFG/JSON fixtures pass 176/176; tooling source-query/full-JSON fixtures pass 100/100; MainSmtOracle passes 573/573; MainSmtFlow passes 257/257; and the Release warning-as-error solution build has zero warnings and errors. The production diff is 63 insertions and 123 deletions, while the authoritative metric falls by 56 to 106,631, or -1,045 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 internal query-wrapper deletion | Exact production references showed that `SymbolicFileQuery`, `SymbolicProgramPointQueryResult`, and the duplicate `AnalyzeSyntaxTree`/`AnalyzeSyntaxTreeAtPosition` entry points were internal and test-only. They are deleted; test helpers use the existing canonical point-query methods, the one file-request fixture uses the existing string overload, and private path-condition assertions now verify the same solver-backed binary relation through `SymbolicProgramPointResult.Invariant.Conditions`. The pre-edit characterization passes 513/513 main and 100/100 tooling tests. After correcting that intentional representation assertion, the identical post-edit batches pass 513/513 and 100/100; MainSmtOracle passes 573/573; the Tooling lane passes 592/592 with its existing environment-dependent exclusions; and the Release warning-as-error solution build has zero warnings and errors. CLI/JSON/SARIF projection code and public API files are unchanged. The physical production diff deletes 133 lines, while the authoritative metric falls by 105 to 106,526, or -1,150 from the rewrite start; authoritative tracked test LOC falls to 144,471. |
 | Phase 7 residual query-metadata adjudication | Three independent read-only audits rejected flattening the live `SymbolicQueryScope` plus `SymbolicQueryLineGroup` boundary under the 50-line gate. Removing the 54-line preview scope carrier requires carrying and assigning its eleven metadata values through the canonical result and factories, leaving only 24-30 net lines; line-group replacement contributes effectively zero to 12 lines. More importantly, file queries intentionally rebuild every nested line from grouped points after all queries finish so each child receives the final file-level SMT diagnostics. Directly storing the intermediate line results changes serialized lifecycle/counter/health fields. The exact point/line/span/file full-JSON plus explain/SARIF/source-query characterization passes 102/102. No production or test code changed; production LOC remains 106,526, or -1,150 from the rewrite start, and tracked test LOC remains 144,471. |
+| Phase 7 completion-owner deletion ranking and CI preflight | Three read-only call-graph inventories prove that `SymbolicProgramPointFacts` remains reachable for every CFG `Unsupported` family and would save at most 95 lines after replacement; Analyzer assignment/resource/state/merge owners retain Roslyn metadata, evidence, lifetime, and convergence policy and save at most 233 lines; exception adapters save at most 54. The only accepted cut is the combined completed-if/switch/loop/lock owner: 1,056 gross legacy lines with a conservative 600-750-line replacement, or 306-456 net deletion. Standalone branch or loop cuts remain below the 250-line gate. Separately, GitHub PR #79 is green at 8/8 checks: the historical README race was already fixed by commit `1ebaebea`, which replaced recursive transient-`bin` enumeration with `git ls-files`; local README verification and its focused test pass. No production or test code changed, so production LOC remains 106,526 and tracked test LOC remains 144,471. |
 
 ## Current Checkpoint
 
@@ -1182,12 +1194,21 @@ the unused preview .NET API may break when it obstructs the canonical design.
   the residual scope and line metadata at only 30-49 safe lines; retaining final
   file-level SMT diagnostics in every nested line is a byte-compatibility
   boundary. The authorized query-wrapper fallback is therefore exhausted.
+  Three new whole-owner inventories reject the residual program-point,
+  Analyzer-state, and exception-adapter cuts below the 250-line gate. The next
+  implementation tranche is the single combined branch/control-flow completion
+  summary: it must replace completed if, switch, loop, and lock policy together
+  and delete 1,056 gross legacy lines only after differential parity. GitHub CI
+  is independently confirmed green at 8/8 checks; its prior README inventory
+  race is already repaired upstream, while the local commits remain unpushed and
+  therefore have not run in Actions.
   Production LOC is 106,526, or -1,150 from the rewrite start; authoritative
   tracked test LOC is 144,471.
-- Next cheapest step: re-inventory the remaining live
-  `SymbolicProgramPointFacts` and branch/loop/completion fallback call graph by
-  typed fallback reason, then select one vertical slice that deletes an entire
-  legacy semantic owner or at least 250 net production lines. Do not revisit the
-  exhausted assignment, normal-completion, expression, scope, or line-group cuts.
+- Next cheapest step: characterize and implement the combined completed-
+  statement summary over CFG target/exit membership, landing it only when the
+  focused branch, switch, loop, lock, analysis-limit, source-query, and JSON
+  parity gates permit deletion of both completion-specific legacy regions with
+  at least 250 net production lines removed. Do not split it into the rejected
+  sub-gate branch-only or loop-only cuts.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.
