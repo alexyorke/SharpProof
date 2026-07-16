@@ -147,17 +147,8 @@ internal static class SymbolicCfgExecutionTrace
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(statement, ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(statement, "execution-root");
-        ControlFlowGraph? graph;
-        try
-        {
-            graph = ControlFlowGraph.Create(executionRoot, semanticModel, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return Unsupported(statement, "cfg");
-        }
-        if (graph == null || graph.Blocks.IsDefaultOrEmpty)
-            return Unsupported(statement, "cfg-empty");
+        if (!TryCreateGraph(executionRoot, semanticModel, cancellationToken, out var graph, out var graphFailure))
+            return Unsupported(statement, graphFailure);
         if (!TryLowerLoopPlans(
                 statement,
                 allowAbruptCompletion: true,
@@ -329,18 +320,8 @@ internal static class SymbolicCfgExecutionTrace
                     ForStatementSyntax))
             return TraceUnsupported(executionRoot, "trace.control-flow-shape");
 
-        ControlFlowGraph? graph;
-        try
-        {
-            graph = ControlFlowGraph.Create(executionRoot, semanticModel, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return TraceUnsupported(executionRoot, "trace.cfg");
-        }
-
-        if (graph == null || graph.Blocks.IsDefaultOrEmpty)
-            return TraceUnsupported(executionRoot, "trace.cfg-empty");
+        if (!TryCreateGraph(executionRoot, semanticModel, cancellationToken, out var graph, out var graphFailure))
+            return TraceUnsupported(executionRoot, "trace." + graphFailure);
         if (EnumerateRegions(graph.Root).Any(static region =>
                 region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)))
             return TraceUnsupported(executionRoot, "trace.region");
@@ -358,7 +339,7 @@ internal static class SymbolicCfgExecutionTrace
         var entryPoint = new CfgTraversalPoint(graph.Blocks[0], null);
         var incoming = new Dictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>>
         {
-            [entryPoint] = new Dictionary<CfgIncomingEdge, CfgPathState>
+            [entryPoint] = new()
             {
                 [new CfgIncomingEdge(null, null, CfgIncomingEdgeKind.Entry)] = new(state, null)
             }
@@ -439,6 +420,27 @@ internal static class SymbolicCfgExecutionTrace
 
     private static SymbolicLoweringResult<ExecutionTrace> TraceUnsupported(SyntaxNode site, string detail) =>
         SymbolicLoweringResult<ExecutionTrace>.Unsupported(Provenance(site, detail));
+
+    internal static bool TryCreateGraph(
+        SyntaxNode executionRoot,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ControlFlowGraph graph,
+        out string failure)
+    {
+        try
+        {
+            graph = ControlFlowGraph.Create(executionRoot, semanticModel, cancellationToken)!;
+            failure = graph == null || graph.Blocks.IsDefaultOrEmpty ? "cfg-empty" : string.Empty;
+            return failure.Length == 0;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            graph = null!;
+            failure = "cfg";
+            return false;
+        }
+    }
 
     private static void RecordObservation(
         IList<KeyValuePair<IOperation, CfgPathState>> observations,

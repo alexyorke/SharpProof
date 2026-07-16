@@ -59,22 +59,19 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(statement, ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(statement, "execution-root");
-        try
-        {
-            var graph = ControlFlowGraph.Create(executionRoot, semanticModel, cancellationToken);
-            return graph == null || graph.Blocks.IsDefaultOrEmpty
-                ? Unsupported(statement, "cfg-empty")
-                : SymbolicCfgExceptionRegionTransfer.CollectCompletedTryState(
-                    graph,
-                    completedTry,
-                    entryState,
-                    semanticModel,
-                    cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return Unsupported(statement, "cfg");
-        }
+        return SymbolicCfgExecutionTrace.TryCreateGraph(
+            executionRoot,
+            semanticModel,
+            cancellationToken,
+            out var graph,
+            out var failure)
+            ? SymbolicCfgExceptionRegionTransfer.CollectCompletedTryState(
+                graph,
+                completedTry,
+                entryState,
+                semanticModel,
+                cancellationToken)
+            : Unsupported(statement, failure);
     }
 
     private static SymbolicLoweringResult<SymbolicState> CollectState(
@@ -604,7 +601,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         {
             if (!IsTerminalCompletionBranch(branch))
                 return false;
-            if (statementRegion?.TerminalBranches.Contains(branch) == true)
+            if (statementRegion != null)
             {
                 statementRegion.TerminalPaths.Add(path);
                 return true;
@@ -623,7 +620,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             completedPaths.Add(path);
             return true;
         }
-        if (statementRegion?.CompletionBranches.Contains(branch) == true)
+        if (statementRegion != null &&
+            !statementRegion.Blocks.ContainsKey(branch.Destination.Ordinal))
         {
             if (!TryApplyLoopExit(
                     source,
@@ -712,8 +710,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         }
         if (continuation.Destination != null)
         {
-            if (context.RegionPlan?.CompletionBranches.Contains(
-                    continuation.OriginBranch) == true)
+            if (context.RegionPlan != null &&
+                !context.RegionPlan.Blocks.ContainsKey(continuation.Destination.Ordinal))
             {
                 if (continuation.Parent != null)
                     return false;
@@ -1130,7 +1128,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                        (frame.Source.ConditionKind == ControlFlowConditionKind.WhenTrue)
             ? frame.Source.ConditionalSuccessor
             : frame.Source.FallThroughSuccessor;
-        return opposite != null && statementRegion.CompletionBranches.Contains(opposite);
+        return opposite != null &&
+               (IsTerminalCompletionBranch(opposite) ||
+                opposite.Destination == null ||
+                !statementRegion.Blocks.ContainsKey(opposite.Destination.Ordinal));
     }
 
     private static bool BlockIsWithinLoop(BasicBlock block, StatementSyntax loop) =>

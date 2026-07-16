@@ -1027,8 +1027,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (!reachableSlices.SetEquals(slices.Keys))
             return Fail("statement-region.disconnected", out plan, out failure);
 
-        var completionBranches = new HashSet<ControlFlowBranch>();
-        var terminalBranches = new HashSet<ControlFlowBranch>();
+        var hasExit = false;
         foreach (var entry in slices)
         {
             var ordinal = entry.Key;
@@ -1049,7 +1048,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 return Fail("statement-region.finally-ownership", out plan, out failure);
             if (IsTerminalCompletionBranch(branch))
             {
-                terminalBranches.Add(branch);
+                hasExit = true;
                 continue;
             }
             if (branch.Semantics is not (ControlFlowBranchSemantics.Regular or
@@ -1065,11 +1064,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             {
                 continue;
             }
-            completionBranches.Add(branch);
+            hasExit = true;
         }
         }
-        if (completionBranches.Count == 0 &&
-            terminalBranches.Count == 0 &&
+        if (!hasExit &&
             slices.Values.All(static slice => !slice.HasCursorExit))
             return Fail("statement-region.exit", out plan, out failure);
 
@@ -1077,8 +1075,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             target,
             entryPoint,
             slices,
-            completionBranches,
-            terminalBranches,
             flowCaptureIds,
             InvalidatesExitedLocals: statement is IfStatementSyntax or SwitchStatementSyntax);
         failure = string.Empty;
@@ -1402,8 +1398,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             int FirstOperationIndex,
             int EndOperationIndexExclusive,
             bool HasCursorExit)> Blocks,
-        ISet<ControlFlowBranch> CompletionBranches,
-        ISet<ControlFlowBranch> TerminalBranches,
         ISet<CaptureId> FlowCaptureIds,
         bool InvalidatesExitedLocals)
     {
