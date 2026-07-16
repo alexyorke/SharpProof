@@ -1,22 +1,42 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 public static class SymbolicCliJsonProjectionExtensions
 {
-    public static SymbolicCompactCapabilityResult ToCompactResult(this SymbolicCapabilityResult result)
+    public static JsonElement ToCompactResult(this SymbolicCapabilityResult result)
     {
-        return SymbolicCompactCapabilityResult.FromResult(result);
+        if (result == null) throw new ArgumentNullException(nameof(result));
+
+        var projection = CreateMethodProjection(result, "capabilities");
+        projection["capabilities"] = result.Capabilities;
+        projection["capabilityText"] = result.CapabilityText;
+        projection["hasUnknowns"] = result.HasUnknowns;
+        projection["unknownReasons"] = result.UnknownReasons;
+        projection["unknownReasonDetails"] = result.UnknownReasonDetails;
+        projection["sites"] = result.Sites;
+        return JsonSerializer.SerializeToElement(projection, SymbolicCliProjectionJson.Options);
     }
 
-    public static SymbolicCompactComplexityResult ToCompactResult(this SymbolicComplexityResult result)
+    public static JsonElement ToCompactResult(this SymbolicComplexityResult result)
     {
-        return SymbolicCompactComplexityResult.FromResult(result);
+        if (result == null) throw new ArgumentNullException(nameof(result));
+
+        var projection = CreateMethodProjection(result, "complexity");
+        projection["complexity"] = result.Complexity;
+        projection["drivers"] = result.Drivers;
+        projection["unknownReasons"] = result.UnknownReasons;
+        projection["unknownReasonDetails"] = result.UnknownReasonDetails;
+        projection["calleeSummaries"] = result.CalleeSummaries;
+        return JsonSerializer.SerializeToElement(projection, SymbolicCliProjectionJson.Options);
     }
 
-    public static SymbolicCompactRuntimeHazardQueryResult ToCompactResult(
+    public static JsonElement ToCompactResult(
         this SymbolicRuntimeHazardQueryResult result,
         SymbolicCompactRuntimeHazardQueryOptions? options = null)
     {
-        return SymbolicCompactRuntimeHazardQueryResult.FromResult(result, options);
+        return SymbolicCompactRuntimeHazardProjection.Create(result, options).Json;
     }
 
     public static SymbolicCompactQueryResult ToCompactResult(
@@ -40,4 +60,39 @@ public static class SymbolicCliJsonProjectionExtensions
     public static SymbolicInvariantQueryResult ToInvariantQueryResult(
         this SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null) => SymbolicInvariantQueryResult.FromResult(result, options);
+
+    private static Dictionary<string, object?> CreateMethodProjection(SymbolicMethodResult result, string kind) =>
+        new()
+        {
+            ["schemaVersion"] = 1,
+            ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
+            ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy,
+            ["kind"] = kind,
+            ["filePath"] = result.FilePath,
+            ["methodDisplayName"] = result.MethodDisplayName,
+            ["declarationKind"] = result.DeclarationKind,
+            ["spanStart"] = result.SpanStart,
+            ["spanEnd"] = result.SpanEnd,
+            ["startLine"] = result.StartLine,
+            ["startColumn"] = result.StartColumn,
+            ["endLine"] = result.EndLine,
+            ["endColumn"] = result.EndColumn
+        };
+
+}
+
+internal static class SymbolicCliProjectionJson
+{
+    internal static JsonSerializerOptions Options { get; } = CreateOptions();
+
+    private static JsonSerializerOptions CreateOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
+    }
 }

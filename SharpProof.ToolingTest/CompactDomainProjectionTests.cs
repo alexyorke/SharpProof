@@ -98,48 +98,44 @@ public sealed class CompactDomainProjectionTests
                 options))
             .ToCompactResult(new SymbolicCompactRuntimeHazardQueryOptions(maxHazards: 0, maxConditions: 0));
 
-        var compactResults = new SymbolicSchemaResultBase[]
+        var compactInvariant = invariant.ToCompactResult();
+        var invariantQuery = invariant.ToInvariantQueryResult();
+        var compactResults = new[]
         {
-            invariant.ToCompactResult(),
-            invariant.ToInvariantQueryResult(),
-            capability,
-            complexity,
-            runtimeHazards
+            (Kind: compactInvariant.Kind, Root: Serialize(compactInvariant)),
+            (Kind: invariantQuery.Kind, Root: Serialize(invariantQuery)),
+            (Kind: "capabilities", Root: capability),
+            (Kind: "complexity", Root: complexity),
+            (Kind: "runtimeHazards", Root: runtimeHazards)
         };
-        foreach (var compactResult in compactResults)
+        foreach (var (kind, root) in compactResults)
         {
-            Assert.That(compactResult.SchemaVersion, Is.EqualTo(1), compactResult.Kind);
-            Assert.That(compactResult.EvidenceSchemaVersion,
-                Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion), compactResult.Kind);
-            Assert.That(compactResult.EvidenceSchemaCompatibility,
-                Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy), compactResult.Kind);
-
-            var root = Serialize(compactResult);
-            SymbolicCliTestAssertions.AssertCompactEnvelope(root, compactResult.Kind);
-            var expectedPropertyPrefix = compactResult.Kind is "capabilities" or "complexity"
+            SymbolicCliTestAssertions.AssertCompactEnvelope(root, kind);
+            var expectedPropertyPrefix = kind is "capabilities" or "complexity"
                 ? new[] { "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility", "kind" }
                 : new[] { "kind", "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility" };
             Assert.That(
                 root.EnumerateObject().Take(expectedPropertyPrefix.Length).Select(static property => property.Name),
                 Is.EqualTo(expectedPropertyPrefix),
-                compactResult.Kind);
-            if (compactResult.Kind is "capabilities" or "complexity")
+                kind);
+            if (kind is "capabilities" or "complexity")
                 Assert.That(
                     root.EnumerateObject().Skip(4).Take(9).Select(static property => property.Name),
                     Is.EqualTo(new[] { "filePath", "methodDisplayName", "declarationKind", "spanStart", "spanEnd",
                         "startLine", "startColumn", "endLine", "endColumn" }),
-                    compactResult.Kind);
+                    kind);
         }
 
-        Assert.That(capability.Kind, Is.EqualTo("capabilities"));
-        Assert.That(capability.CapabilityText, Does.Contain("Console"));
-        Assert.That(complexity.Kind, Is.EqualTo("complexity"));
-        Assert.That(complexity.MethodDisplayName, Does.Contain("Complexity"));
-        Assert.That(runtimeHazards.Kind, Is.EqualTo("runtimeHazards"));
-        Assert.That(runtimeHazards.HazardCount, Is.EqualTo(1));
-        Assert.That(runtimeHazards.Hazards, Is.Empty);
-        Assert.That(runtimeHazards.Truncation.Hazards, Is.True);
-        Assert.That(runtimeHazards.StatusCounts[SymbolicRuntimeHazardStatus.Proven.ToString()], Is.EqualTo(1));
+        Assert.That(capability.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
+        Assert.That(capability.GetProperty("capabilityText").GetString(), Does.Contain("Console"));
+        Assert.That(complexity.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
+        Assert.That(complexity.GetProperty("methodDisplayName").GetString(), Does.Contain("Complexity"));
+        Assert.That(runtimeHazards.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+        Assert.That(runtimeHazards.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+        Assert.That(runtimeHazards.GetProperty("hazards").GetArrayLength(), Is.Zero);
+        Assert.That(runtimeHazards.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+        Assert.That(runtimeHazards.GetProperty("statusCounts")
+            .GetProperty(SymbolicRuntimeHazardStatus.Proven.ToString()).GetInt32(), Is.EqualTo(1));
     }
 
     [Test]

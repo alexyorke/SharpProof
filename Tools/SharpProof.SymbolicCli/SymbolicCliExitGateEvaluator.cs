@@ -214,16 +214,16 @@ internal static class SymbolicCliExitGateEvaluator
         return result switch
         {
             SymbolicRuntimeHazardQueryResult hazards => IsTruncated(
-                hazards.ToCompactResult(options.CreateCompactHazardOptions()).Truncation),
+                SymbolicCompactRuntimeHazardProjection.Create(hazards, options.CreateCompactHazardOptions())),
             SymbolicCapabilityResult => false,
             SymbolicComplexityResult => false,
             _ => throw new InvalidOperationException("Unexpected query result type.")
         };
     }
 
-    private static bool IsTruncated(SymbolicCompactRuntimeHazardOutputTruncation truncation)
+    private static bool IsTruncated(SymbolicCompactRuntimeHazardProjection projection)
     {
-        return truncation.Hazards || truncation.PathConditions;
+        return projection.HazardsTruncated || projection.PathConditionsTruncated;
     }
 
     private static ComplexityComparison CompareComplexity(

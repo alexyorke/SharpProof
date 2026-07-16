@@ -140,12 +140,16 @@ public sealed class SymbolicUnknownReasonTaxonomyTests
         {
             Assert.That(capability.UnknownReasonDetails.Single().Code,
                 Is.EqualTo("capability.dynamic_dispatch"));
-            Assert.That(capability.ToCompactResult().UnknownReasonDetails.Single().Category,
-                Is.EqualTo(SymbolicUnknownReasonCategory.DynamicDispatch));
+            Assert.That(capability.ToCompactResult()
+                    .GetProperty("unknownReasonDetails")[0]
+                    .GetProperty("category").GetString(),
+                Is.EqualTo(SymbolicUnknownReasonCategory.DynamicDispatch.ToString()));
             Assert.That(complexity.UnknownReasonDetails.Single().Code,
                 Is.EqualTo("complexity.unknown_callee"));
-            Assert.That(complexity.ToCompactResult().UnknownReasonDetails.Single().Category,
-                Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedLibraryModel));
+            Assert.That(complexity.ToCompactResult()
+                    .GetProperty("unknownReasonDetails")[0]
+                    .GetProperty("category").GetString(),
+                Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedLibraryModel.ToString()));
             Assert.That(proof.UnknownReasonInfo.Code, Is.EqualTo("proof.solver_timeout"));
             Assert.That(proof.UnknownReasonInfo.IsRetryable, Is.True);
         });

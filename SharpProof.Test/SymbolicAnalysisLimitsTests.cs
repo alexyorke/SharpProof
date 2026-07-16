@@ -308,9 +308,11 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(result.Hazards, Is.Not.Empty);
         Assert.That(result.AnalysisTruncation.IsTruncated, Is.True);
         Assert.That(result.Hazards.Any(static hazard => hazard.AnalysisTruncation.IsTruncated), Is.True);
-        Assert.That(result.ToCompactResult().AnalysisTruncation.IsTruncated, Is.True);
+        var compact = result.ToCompactResult();
+        Assert.That(compact.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         Assert.That(
-            result.ToCompactResult().Hazards.Any(static hazard => hazard.AnalysisTruncation.IsTruncated),
+            compact.GetProperty("hazards").EnumerateArray().Any(static hazard =>
+                hazard.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean()),
             Is.True);
     }
 

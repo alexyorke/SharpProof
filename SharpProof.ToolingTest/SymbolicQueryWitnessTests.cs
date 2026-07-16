@@ -131,14 +131,15 @@ public sealed class SymbolicQueryWitnessTests
             .Single(assignment => assignment.SourceName == "divisor");
         var divisorDomain = hazard.TriggerWitness.DomainSummary.Domains
             .Single(domain => domain.Name == "divisor");
-        var compactHazard = result.ToCompactResult().Hazards
-            .Single(item => item.Kind == SymbolicRuntimeHazardKind.DivideByZero);
+        var compactHazard = result.ToCompactResult().GetProperty("hazards").EnumerateArray()
+            .Single(item => item.GetProperty("kind").GetString() == SymbolicRuntimeHazardKind.DivideByZero.ToString());
         Assert.Multiple(() =>
         {
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(hazard.UnknownReasonInfo.Source, Is.EqualTo(SymbolicUnknownReasonSource.RuntimeHazard));
             Assert.That(hazard.UnknownReasonInfo.Code, Is.EqualTo("runtime_hazard.unknown"));
-            Assert.That(compactHazard.UnknownReasonInfo.Code, Is.EqualTo(hazard.UnknownReasonInfo.Code));
+            Assert.That(compactHazard.GetProperty("unknownReasonInfo").GetProperty("code").GetString(),
+                Is.EqualTo(hazard.UnknownReasonInfo.Code));
             Assert.That(hazard.TriggerWitness.IsAvailable, Is.True);
             Assert.That(divisorAssignment.IntegerValue, Is.EqualTo(0));
             Assert.That(divisorDomain.IntegerRange?.ExactValue, Is.EqualTo(0));

@@ -895,6 +895,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 typed CFG exception-region routing | `d2726997` | 106,118 | -1,558 |
 | Phase 7 cached execution-root trace scaffold | This commit | 106,418 | -1,258 |
 | Phase 7 canonical invalidated-if completion | This commit | 106,367 | -1,309 |
+| Phase 7 direct compact domain projection | This commit | 105,957 | -1,719 |
 
 ## Validation Ledger
 
@@ -1117,6 +1118,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 fuzz expression and mutation manifest | Commit `1abd017e` replaces four RNG-sensitive expression builders with one descriptor that deliberately avoids a random draw for fixed expressions, and emits increment/decrement through the typed method path. The byte-distinct string-concat renderer remains specialized. The exhaustive hash and 28-case fuzz/shape gate pass. Production LOC falls to 106,156, or -1,520 from the rewrite start. |
 | Phase 7 fuzz compilation-unit manifest | Commit `8fc63e01` folds randomized ownership and twelve custom class/auxiliary-type builders into the ordered shape manifest through one LF-stable compilation-unit renderer. Every registry identity, order, RNG draw, source byte, shape classification, expectation, flag, and seeded sample remains unchanged. `FuzzCaseGenerator` is now 762 physical / 673 nonblank lines, down 395 physical / 346 nonblank from the pre-rewrite file. The exact manifest hash passes, the complete fuzz/shape gate passes 28/28, and the Release warning-as-error solution build has zero warnings/errors. All six lanes pass 6,137 tests plus the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,970 plus two skips, and Tooling 593. Production LOC is 106,067, or -1,609 from the rewrite start; tracked test LOC is 145,163. |
 | Phase 7 compact projection characterization | Commit `c5735f57` locks normalized JSON bytes for compact and invariant point/line/span/file projections plus runtime-hazard, capability, and complexity compact results in eleven named inline-hash cases. Existing full JSON and explain JSON/SARIF byte fixtures remain complementary. The new gate passes 11/11 and establishes the deletion boundary for the 2,062-line forwarding-DTO island. Production LOC remains 106,067. |
+| Phase 7 direct compact domain projection | Capability, complexity, and runtime-hazard compact output now serializes directly from the canonical domain results. The runtime-hazard materializer retains one bounded internal projection for explain Markdown/SARIF and exit-gate consumers; the public forwarding DTO graph is deleted. Eleven compact hashes and the existing explain hashes remain byte-identical, the focused main fixtures pass 22/22, the broader CLI projection gate passes 123/123, the complete Tooling lane passes 604/604, and the Release warning-as-error solution build has zero warnings/errors. Production LOC falls by 110 to 105,957, or -1,719 from the rewrite start; tracked test LOC is 145,213. |
 
 ## Current Checkpoint
 
@@ -1448,13 +1450,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
   passes 6,137 tests plus the two documented MainGeneral skips. Release
   warning-as-error is clean. The remaining topology and finalizers are an
   evidence-backed low-yield boundary after two bounded audits.
-- Next cheapest step: replace the 2,062-nonblank-line compact/invariant CLI DTO
-  island with one internal projection document and byte-stable materializers.
-  Dual-render against the eleven new compact hashes plus existing full/explain
-  byte gates before switching Program, exit gates, and explain consumers; then
-  delete the six forwarding-model files. The independent estimate is
-  1,012-1,162 net production lines.
-- Blockers: the 11,000-line production target still requires 9,391 lines. The
+  Capability, complexity, and runtime-hazard compact output now projects
+  directly from canonical results. Its public forwarding DTO graph is deleted;
+  explain and exit-gate consumers share one bounded internal hazard projection.
+  All compact/explain byte hashes, 145 focused tests, the full 604-case Tooling
+  lane, and the Release warning-as-error solution build are green. Production
+  LOC is 105,957 and tracked test LOC is 145,213.
+- Next cheapest step: replace the remaining compact query/program-point and
+  invariant forwarding models with one internal projection document. Dual-
+  render point/line/span/file output against the eight compact/invariant hashes
+  plus full/explain gates, then delete each superseded model file in the same
+  green tranche.
+- Blockers: the 11,000-line production target still requires 9,281 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.

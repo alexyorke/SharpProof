@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
@@ -8,12 +9,14 @@ using SharpProof.Symbolic.Smt;
 
 internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 {
+    private readonly SymbolicCompactRuntimeHazardProjection _runtimeHazards;
+
     private SymbolicCliExplainReport(
         SymbolicCliExplainSource source,
         SymbolicCliExplainTarget target,
         SymbolicCliExplainProject? project,
         SymbolicCompactQueryResult invariant,
-        SymbolicCompactRuntimeHazardQueryResult runtimeHazards,
+        SymbolicCompactRuntimeHazardProjection runtimeHazards,
         SymbolicCliExplainCapabilityResult capabilities,
         SymbolicCliExplainComplexityResult complexity,
         SymbolicCliExplainDiagnosticResult diagnostics,
@@ -24,7 +27,8 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         Target = target;
         Project = project;
         Invariant = invariant;
-        RuntimeHazards = runtimeHazards;
+        _runtimeHazards = runtimeHazards;
+        RuntimeHazards = runtimeHazards.Json;
         Capabilities = capabilities;
         Complexity = complexity;
         Diagnostics = diagnostics;
@@ -43,7 +47,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 
     public SymbolicCompactQueryResult Invariant { get; }
 
-    public SymbolicCompactRuntimeHazardQueryResult RuntimeHazards { get; }
+    public JsonElement RuntimeHazards { get; }
 
     public SymbolicCliExplainCapabilityResult Capabilities { get; }
 
@@ -98,7 +102,8 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 SymbolicQueryTarget.Point(point.Line, point.Column),
                 queryOptions),
             options.CreateRuntimeHazardOptions());
-        var compactHazards = runtimeHazards.ToCompactResult(
+        var compactHazards = SymbolicCompactRuntimeHazardProjection.Create(
+            runtimeHazards,
             new SymbolicCompactRuntimeHazardQueryOptions(
                 options.ReportMaxHazards,
                 itemLimit));
@@ -124,7 +129,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         var crossLinks = CreateCrossLinks(diagnostics.Items);
         var truncation = new SymbolicCliExplainTruncation(
             invariant.Truncation.IsTruncated,
-            compactHazards.Truncation.Hazards || compactHazards.Truncation.PathConditions,
+            compactHazards.HazardsTruncated || compactHazards.PathConditionsTruncated,
             capabilities.Truncation.IsTruncated,
             complexity.Truncation.IsTruncated,
             diagnostics.Truncated,
@@ -166,7 +171,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 }));
         }
 
-        foreach (var hazard in RuntimeHazards.Hazards)
+        foreach (var hazard in _runtimeHazards.Hazards)
         {
             results.Add(CreateSarifResult(
                 "SPQ-HZ-" + ToKebabCase(hazard.Kind.ToString()).ToUpperInvariant(),
@@ -324,13 +329,13 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         builder.AppendLine();
         builder.AppendLine("## Runtime hazards");
         builder.AppendLine();
-        builder.AppendLine($"Total: {RuntimeHazards.HazardCount}");
-        if (RuntimeHazards.Hazards.Count != 0)
+        builder.AppendLine($"Total: {_runtimeHazards.HazardCount}");
+        if (_runtimeHazards.Hazards.Count != 0)
         {
             builder.AppendLine();
             builder.AppendLine("| Kind | Status | Location | Operation |");
             builder.AppendLine("| --- | --- | --- | --- |");
-            foreach (var hazard in RuntimeHazards.Hazards)
+            foreach (var hazard in _runtimeHazards.Hazards)
                 builder.AppendLine($"| {EscapeCell(hazard.Kind.ToString())} | {EscapeCell(hazard.Status.ToString())} | {hazard.Line}:{hazard.Column} | {EscapeCell(hazard.OperationText)} |");
         }
 
