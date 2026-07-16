@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -357,6 +359,9 @@ public class FuzzToolTests
         var generatedCases = Enumerable.Range(0, 1200)
             .Select(index => generator.Next(index))
             .ToArray();
+        var sampleHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join(
+            "\n",
+            generatedCases.Select(static fuzzCase => $"{fuzzCase.Name}\n{fuzzCase.Source}")))));
         var families = generatedCases
             .Select(fuzzCase => fuzzCase.Family)
             .Distinct(StringComparer.Ordinal)
@@ -403,6 +408,7 @@ public class FuzzToolTests
         Assert.That(families, Does.Contain("ImpureUsingAwaitDelegateFlow"));
         Assert.That(families, Does.Contain("ImpureEventAssignment"));
         Assert.That(missingShapes, Is.Empty);
+        Assert.That(sampleHash, Is.EqualTo("66FEA38D21307DC787ABC9347627FA0F3C1DADECB705DAC7424548AA497924EA"));
     }
 
     [Test]
