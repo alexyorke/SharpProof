@@ -253,15 +253,50 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
-    [Test]
-    public void NestedBlockCompletion_RemainsConservativeFallback()
+    [TestCase(
+        "static class C { static void M(bool condition) { if (condition) { int value = 7; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) { value = 7; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, int[] values) { if (condition) { int value = values[0]; } } }")]
+    public void SingleOperationNestedBlockCompletion_MatchesStructuralCollector(string source)
     {
-        const string source =
-            "static class C { static void M(bool condition) { if (condition) { int value = 7; } } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(NestedBlockCompletion_RemainsConservativeFallback));
+            nameof(SingleOperationNestedBlockCompletion_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) { value = 1; value = 2; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; } } }")]
+    public void ComplexNestedBlockCompletion_RemainsConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ComplexNestedBlockCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().First().Statement;
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(
             site,

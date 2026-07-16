@@ -24,8 +24,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         var targetIsCompletedRootBlock = includeCurrentStatementCompletionFacts &&
                                          site is BlockSyntax &&
                                          ReferenceEquals(site, CSharpSyntaxFacts.GetBlockBody(executionRoot));
-        if (includeCurrentStatementCompletionFacts && site is BlockSyntax && !targetIsCompletedRootBlock)
-            return Unsupported(site, "nested-block-completion");
+        var targetIsCompletedNestedBlock = includeCurrentStatementCompletionFacts &&
+                                           site is BlockSyntax &&
+                                           !targetIsCompletedRootBlock;
         if (!UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
             return Unsupported(site, "analysis-limits");
         if (!TryLowerLoopPlans(
@@ -50,6 +51,9 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        if (targetIsCompletedNestedBlock &&
+            !SupportsSingleOperationNestedBlockCompletion(graph, (BlockSyntax)site))
+            return Unsupported(site, "nested-block-completion");
         if (targetIsCompletedRootBlock &&
             graph.Blocks.Count(static block => block.Operations.Length != 0 || block.BranchValue != null) != 1)
             return Unsupported(site, "root-block-control-flow");
@@ -859,8 +863,40 @@ internal static class SymbolicCfgProgramPointStateCollector
                     not (ILocalSymbol or IParameterSymbol),
                 semanticModel,
                 cancellationToken);
+        else if (site is BlockSyntax)
+            AddNestedBlockOperationCompletionFacts(
+                ref state,
+                operation,
+                semanticModel,
+                cancellationToken);
 
         return true;
+    }
+
+    private static void AddNestedBlockOperationCompletionFacts(
+        ref SymbolicState state,
+        IOperation operation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var assignment = operation switch
+        {
+            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
+            ISimpleAssignmentOperation direct => direct,
+            _ => null
+        };
+        if (assignment?.Value.Syntax is not ExpressionSyntax value ||
+            assignment.Syntax.FirstAncestorOrSelf<StatementSyntax>() is not { } statement)
+            return;
+
+        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+            ref state,
+            value,
+            statement,
+            !TryGetDirectTarget(assignment.Target, out var target) ||
+            target is not (ILocalSymbol or IParameterSymbol),
+            semanticModel,
+            cancellationToken);
     }
 
     private static bool TryApplyCurrentDeclarationCompletion(
@@ -1093,6 +1129,17 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
+
+    private static bool SupportsSingleOperationNestedBlockCompletion(
+        ControlFlowGraph graph,
+        BlockSyntax block)
+    {
+        var operationCount = graph.Blocks.Sum(cfgBlock => cfgBlock.Operations.Count(operation =>
+            block.Span.Contains(operation.Syntax.SpanStart)));
+        return operationCount == 1 && graph.Blocks.All(cfgBlock =>
+            cfgBlock.BranchValue == null ||
+            !block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart));
+    }
 
     private static bool IsTargetOperation(
         IOperation operation,

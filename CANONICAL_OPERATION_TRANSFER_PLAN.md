@@ -349,6 +349,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     declaration queries identify Roslyn's post-branch implicit assignment by
     declared symbol, and CFG null tests use the same operation-aware
     reachability transition as other branch conditions.
+  - [x] Route branch-free single-operation nested-block completion through the
+    canonical current-operation transition while preserving its enclosing
+    guard and typed normal-completion facts. Multi-operation and internally
+    branching nested blocks remain conservative fallbacks.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -515,7 +519,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical declaration completion | `7242f05e` | 105,320 | -2,356 |
 | Phase 7 canonical straight-line block completion | `48e8a4f8` | 105,335 | -2,341 |
 | Phase 7 atomic multi-declarator completion | `2721fce0` | 105,361 | -2,315 |
-| Phase 7 canonical throw-guarded completion | This commit | 105,553 | -2,123 |
+| Phase 7 canonical throw-guarded completion | `ec4ff168` | 105,553 | -2,123 |
+| Phase 7 single-operation nested-block completion | This commit | 105,597 | -2,079 |
 
 ## Validation Ledger
 
@@ -676,6 +681,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical straight-line block completion | Current completion for a root block no longer observes the first contained operation. Exact straight-line roots consume every supported operation and observe the merged state at the CFG exit; explicit `return;` uses the existing completed-path state. Nested blocks, branching roots, and unsupported invocations return typed fallback before partial state escapes, while non-default scoped limits already select structural transfer. Direct collector fixtures pass 33/33, the broader program-point/reachability differential passes 132/132, MainSmtOracle passes 573/573, MainGeneral passes 3,754 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,335, or -2,341 from the rewrite start; test LOC is 143,116. |
 | Phase 7 atomic multi-declarator completion | Roslyn emits one implicit assignment per declarator. Current declaration completion now gathers those operations in source order, applies assignment and normal-completion semantics to a temporary immutable state, and publishes it only when every declarator is exact. A second declarator may consume the first declarator's canonical value; element-success evidence remains byte-equivalent. Single- and multi-declarator throw-guarded shapes still return typed fallback without exposing the temporary state. Direct collector fixtures pass 34/34, the broader program-point/reachability differential passes 133/133, MainSmtOracle passes 573/573, MainGeneral passes 3,755 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,361, or -2,315 from the rewrite start; test LOC is 143,144. |
 | Phase 7 canonical throw-guarded completion | Assignment lowering now unwraps coalesce and either conditional throw arm to the value produced on successful completion, then appends the matching non-null or branch condition after assignment evidence. The CFG collector no longer mistakes an initializer's internal branch value for a completed declaration: it waits for Roslyn's implicit declared-symbol assignment, ignores compiler flow captures, and lowers `IIsNullOperation` through the canonical reachability owner. Coalesce, both conditional throw-arm shapes, and multi-declarator consumption match structural normalized state and evidence exactly; unsupported invocation initializers remain typed fallback. Direct collector/operation fixtures pass 40/40, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,761 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,553, or -2,123 from the rewrite start; test LOC is 143,250. |
+| Phase 7 single-operation nested-block completion | A nested block with exactly one CFG operation and no block-local branch value now consumes that operation plus its typed successful-completion facts before observation. The existing enclosing branch guard remains ordered first, and declaration, assignment, and array-index completion cases match structural normalized state and evidence exactly. Multi-operation and internally branching blocks remain typed fallback rather than exposing a partial state. Direct collector fixtures pass 41/41, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,765 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,597, or -2,079 from the rewrite start; test LOC is 143,282. |
 
 ## Current Checkpoint
 
@@ -779,7 +785,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 105,553, or -2,123 from the rewrite start. Assignment-expression current
+  now 105,597, or -2,079 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -789,17 +795,20 @@ the unused preview .NET API may break when it obstructs the canonical design.
   completion condition. The CFG collector waits for the declared-symbol
   assignment after initializer control flow and shares operation-aware null
   branching with the canonical reachability owner. External member writes,
-  active guards, unsupported initializer invocations, nested or branching
-  blocks, loop-local targets, finally-local targets, and implicit
+  active guards, unsupported initializer invocations, multi-operation or
+  internally branching nested blocks, branching root blocks, loop-local
+  targets, finally-local targets, and implicit
   constructor/bare-return CFG shapes remain conservative structural fallbacks.
   Multi-declarator completion now applies all implicit assignments and
   normal-completion plans atomically in source order, publishing no partial
   state if any declarator is unsupported.
   Straight-line root blocks now observe the completed CFG path at normal exit or
   explicit completion instead of stopping at their first contained operation.
-  Test LOC is 143,250.
-- Next cheapest step: characterize the next structural source-query fallback at
-  the canonical CFG boundary, starting with nested block completion, and migrate
-  only the first shape whose normalized state and evidence can remain exact.
+  Branch-free single-operation nested blocks now observe their canonical
+  operation and successful-completion state under the stable enclosing guard.
+  Test LOC is 143,282.
+- Next cheapest step: characterize multi-operation nested-block completion and
+  identify its exact CFG region exit so all supported operations can be applied
+  before observation without admitting internal branch paths.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
