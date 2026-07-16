@@ -87,13 +87,38 @@ public sealed class FuzzCaseGenerator
               """);
     }
 
+    private static ShapeRegistryEntry ExpressionEntry(
+        string id,
+        OperationKind[] primaryShapes,
+        string[] operationKinds,
+        string[] syntaxKinds,
+        FuzzExpectation expectation,
+        bool allowEffectPreservingWrappers,
+        string parameters,
+        string[] expressions)
+    {
+        return Entry(
+            id, primaryShapes, operationKinds, syntaxKinds, expectation, false,
+            allowEffectPreservingWrappers,
+            (_, random, className) =>
+            {
+                var expression = expressions.Length == 1
+                    ? expressions[0]
+                    : expressions[random.Next(expressions.Length)];
+                return BuildClass(className, BuildIntMethodFromExpression(expression, random, parameters));
+            });
+    }
+
     public static ImmutableArray<ShapeRegistryEntry> RegistryEntries { get; } = ImmutableArray.Create(
-        Entry("PureArithmetic", [OperationKind.Binary], ["Binary"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureArithmetic),
+        ExpressionEntry("PureArithmetic", [OperationKind.Binary], ["Binary"], [], FuzzExpectation.DefinitelyPure(), true, "int x",
+            ["x + 1", "(x * 3) - 7", "(x / 2) + 9", "unchecked((x << 1) ^ 17)"]),
         Entry("PureStringConcat", [OperationKind.Binary], ["Binary"], ["AddExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureStringConcat),
-        Entry("PureListPattern", [OperationKind.ListPattern], ["ListPattern"], ["ListPattern"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureListPattern),
+        ExpressionEntry("PureListPattern", [OperationKind.ListPattern], ["ListPattern"], ["ListPattern"], FuzzExpectation.DefinitelyPure(), true,
+            "int[] values", ["values is [1, .., 3] ? 1 : 0", "values is [_, .. var rest] ? rest.Length : 0"]),
         MethodEntry("PureCollectionExpression", [OperationKind.CollectionExpression], ["CollectionExpression"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "int x", "int[] values = [1, x, 3];\nreturn values.Length;"),
-        Entry("PureInterpolatedString", [OperationKind.InterpolatedString], ["InterpolatedString"], ["InterpolatedStringExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureInterpolatedString),
+        ExpressionEntry("PureInterpolatedString", [OperationKind.InterpolatedString], ["InterpolatedString"], ["InterpolatedStringExpression"], FuzzExpectation.DefinitelyPure(), true,
+            "int x", ["$\"value={x}\".Length", "$\"sum={x + 1}\".Length"]),
         MethodEntry("PureUtf8String", [OperationKind.Utf8String], ["Utf8String"], ["Utf8StringLiteralExpression"], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "", "return \"abc\"u8.Length;"),
         MethodEntry("PureArrayCreation", [OperationKind.ArrayCreation], ["ArrayCreation"], ["ArrayCreationExpression"], FuzzExpectation.DefinitelyPure(), false, true,
@@ -205,7 +230,8 @@ public sealed class FuzzCaseGenerator
                     _value = value;
                 }
             """),
-        Entry("ImpureAmbientDateTime", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureAmbientDateTime),
+        ExpressionEntry("ImpureAmbientDateTime", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.DefinitelyImpure(), false,
+            "int x", ["DateTime.Now.Day"]),
         Entry("ImpureAwaitTaskDelay", [OperationKind.Await], ["Await"], ["AwaitExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureAwaitTaskDelay),
         StaticEntry("ImpureLockSection", [OperationKind.Lock], ["Lock"], ["LockStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
             """
@@ -270,8 +296,10 @@ public sealed class FuzzCaseGenerator
             "string", "string value", "value ??= \"fallback\";\nreturn value;"),
         MethodEntry("PureDeconstructionAssignment", [OperationKind.DeconstructionAssignment], ["DeconstructionAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "int x, int y", "var left = x;\nvar right = y;\n(left, right) = (right, left);\nreturn left - right;"),
-        Entry("PureIncrement", [OperationKind.Increment], ["Increment"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureIncrement),
-        Entry("PureDecrement", [OperationKind.Decrement], ["Decrement"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureDecrement),
+        MethodEntry("PureIncrement", [OperationKind.Increment], ["Increment"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var value = x;\nvalue++;\nreturn value;"),
+        MethodEntry("PureDecrement", [OperationKind.Decrement], ["Decrement"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var value = x;\nvalue--;\nreturn value;"),
         MethodEntry("ImpureDeclarationExpression", [OperationKind.DeclarationExpression], ["DeclarationExpression"], [], FuzzExpectation.DefinitelyImpure(), false, true,
             "int", "string text", "return int.TryParse(text, out var value) ? value : 0;"),
         MethodEntry("PureDeclarationPattern", [OperationKind.DeclarationPattern], ["DeclarationPattern"], ["DeclarationPattern"], FuzzExpectation.DefinitelyPure(), false, true,
@@ -401,25 +429,9 @@ public sealed class FuzzCaseGenerator
             registryEntry.ExpectedSyntaxKinds);
     }
 
-    private static string BuildPureArithmetic(int index, Random random, string className)
-    {
-        var expression = random.Next(4) switch
-        {
-            0 => "x + 1",
-            1 => "(x * 3) - 7",
-            2 => "(x / 2) + 9",
-            _ => "unchecked((x << 1) ^ 17)"
-        };
-
-        return BuildClass(
-            className,
-            BuildIntMethodFromExpression(expression, random));
-    }
-
     private static string BuildPureStringConcat(int index, Random random, string className)
     {
-        var expression = "(left + right).Length";
-
+        const string expression = "(left + right).Length";
         return BuildClass(
             className,
             $$"""
@@ -430,19 +442,6 @@ public sealed class FuzzCaseGenerator
                   }
               """);
     }
-
-    private static string BuildPureInterpolatedString(int index, Random random, string className)
-    {
-        var expression = random.Next(2) == 0
-            ? "$\"value={x}\".Length"
-            : "$\"sum={x + 1}\".Length";
-
-        return BuildClass(
-            className,
-            BuildIntMethodFromExpression(expression, random));
-    }
-
-
 
     private static string BuildPureNestedOwnershipChain(int index, Random random, string className)
     {
@@ -499,16 +498,6 @@ public sealed class FuzzCaseGenerator
                  """;
     }
 
-    private static string BuildPureListPattern(int index, Random random, string className)
-    {
-        var expression = random.Next(2) == 0
-            ? "values is [1, .., 3] ? 1 : 0"
-            : "values is [_, .. var rest] ? rest.Length : 0";
-
-        return BuildClass(
-            className,
-            BuildIntMethodFromExpression(expression, random, "int[] values"));
-    }
 
 
 
@@ -526,14 +515,6 @@ public sealed class FuzzCaseGenerator
 
 
 
-
-
-    private static string BuildImpureAmbientDateTime(int index, Random random, string className)
-    {
-        return BuildClass(
-            className,
-            BuildIntMethodFromExpression("DateTime.Now.Day", random));
-    }
 
     private static string BuildImpureAwaitTaskDelay(int index, Random random, string className)
     {
@@ -562,31 +543,6 @@ public sealed class FuzzCaseGenerator
 
 
 
-
-    private static string BuildPureIncrement(int index, Random random, string className)
-    {
-        return BuildPureUnaryMutation(className, "++");
-    }
-
-    private static string BuildPureDecrement(int index, Random random, string className)
-    {
-        return BuildPureUnaryMutation(className, "--");
-    }
-
-    private static string BuildPureUnaryMutation(string className, string operatorToken)
-    {
-        return BuildClass(
-            className,
-            $$"""
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var value = x;
-                    value{{operatorToken}};
-                    return value;
-                }
-            """);
-    }
 
 
 
