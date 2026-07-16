@@ -9,7 +9,7 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicExpressionStateTransfer
 {
-    internal static void AddCompletedExpressionStateFacts(
+    internal static bool TryApplyCurrentExpressionCompletion(
         ref SymbolicState state,
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -24,24 +24,27 @@ internal static class SymbolicExpressionStateTransfer
                 null,
                 semanticModel,
                 cancellationToken);
-            return;
+            return true;
         }
+
+        var frameworkLowering = SymbolicFrameworkPostconditionLowerer.LowerMemberNotNull(
+            expression,
+            semanticModel,
+            cancellationToken);
+        if (frameworkLowering is not { IsExact: true, Value: { } frameworkPlan })
+            return false;
 
         SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             expression,
             semanticModel,
             cancellationToken);
-        var frameworkLowering = SymbolicFrameworkPostconditionLowerer.LowerMemberNotNull(
+        SymbolicNormalCompletionStateTransfer.ApplyConditions(
+            ref state,
+            frameworkPlan.AfterDoesNotReturnIf,
             expression,
-            semanticModel,
-            cancellationToken);
-        if (frameworkLowering is { IsExact: true, Value: { } frameworkPlan })
-            SymbolicNormalCompletionStateTransfer.ApplyConditions(
-                ref state,
-                frameworkPlan.AfterDoesNotReturnIf,
-                expression,
-                "ir.path.expression-completion.member-not-null");
+            "ir.path.expression-completion.member-not-null");
+        return true;
     }
 
     internal static void AddAssignmentExpressionStateFacts(

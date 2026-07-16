@@ -11,6 +11,20 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicCfgProgramPointStateCollectorTests
 {
+    private const string MemberNotNullCompletionSource = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+sealed class C
+{
+    private string? _value;
+
+    [MemberNotNull(nameof(_value))]
+    private void EnsureValue() => _value = string.Empty;
+
+    private void M() => EnsureValue();
+}";
+
     public enum SeedKind
     {
         Numeric,
@@ -278,6 +292,71 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void MemberNotNullExpressionCompletion_CurrentRoutingCharacterization()
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            MemberNotNullCompletionSource,
+            nameof(MemberNotNullExpressionCompletion_CurrentRoutingCharacterization));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single(invocation => invocation.Expression.ToString() == "EnsureValue");
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
+        AssertStateParity(routed, structural);
+        Assert.That(
+            CreateEvidenceKey(structural),
+            Does.Contain("ir.path.normal-completion.member-not-null"));
+    }
+
+    [Test]
+    public void MemberNotNullExpressionCompletion_CustomLimitsUseConservativeFallback()
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            MemberNotNullCompletionSource,
+            nameof(MemberNotNullExpressionCompletion_CustomLimitsUseConservativeFallback));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single(invocation => invocation.Expression.ToString() == "EnsureValue");
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
+        Assert.That(cfg.Value, Is.Null);
+        AssertStateParity(routed, structural);
     }
 
     [Test]
@@ -951,7 +1030,8 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
     private static SymbolicState CollectStructuralState(
         RoslynTestFixture.CompilationFixture fixture,
-        SyntaxNode site) =>
+        SyntaxNode site,
+        bool includeCurrentStatementCompletionFacts = false) =>
         SymbolicProgramPointFacts.MergeStates(
             SymbolicProgramPointFacts.CollectAncestorReachabilityState(
                 site,
@@ -960,7 +1040,8 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
             SymbolicProgramPointFacts.CollectPriorAssignmentState(
                 site,
                 fixture.SemanticModel,
-                CancellationToken.None));
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts));
 
     private static void AssertStateParity(SymbolicState actual, SymbolicState expected)
     {

@@ -1667,6 +1667,14 @@ internal static class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (site is ExpressionSyntax expression &&
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression) is not AssignmentExpressionSyntax)
+            return SymbolicExpressionStateTransfer.TryApplyCurrentExpressionCompletion(
+                ref state,
+                expression,
+                semanticModel,
+                cancellationToken);
+
         if (!TryApplyOperation(
                 ref state,
                 operation,

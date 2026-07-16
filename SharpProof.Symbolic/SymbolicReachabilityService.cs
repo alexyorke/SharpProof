@@ -145,20 +145,14 @@ internal static class SymbolicReachabilityService
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts)
     {
-        if (!includeCurrentStatementCompletionFacts ||
-            site is AssignmentExpressionSyntax ||
-            site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax } or
-                LocalDeclarationStatementSyntax or BlockSyntax)
-        {
-            var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
-                site,
-                semanticModel,
-                cancellationToken,
-                initialState,
-                includeCurrentStatementCompletionFacts);
-            if (cfgState is { IsExact: true, Value: { } exactState })
-                return exactState;
-        }
+        var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            semanticModel,
+            cancellationToken,
+            initialState,
+            includeCurrentStatementCompletionFacts);
+        if (cfgState is { IsExact: true, Value: { } exactState })
+            return exactState;
 
         var state = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
             site,

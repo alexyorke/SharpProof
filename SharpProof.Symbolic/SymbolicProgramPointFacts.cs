@@ -86,7 +86,7 @@ internal static class SymbolicProgramPointFacts
         else if (includeCurrentStatementCompletionFacts &&
                  site is ExpressionSyntax siteExpression)
         {
-            SymbolicExpressionStateTransfer.AddCompletedExpressionStateFacts(
+            SymbolicExpressionStateTransfer.TryApplyCurrentExpressionCompletion(
                 ref state,
                 siteExpression,
                 semanticModel,
