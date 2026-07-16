@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -10,6 +11,14 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicCfgProgramPointStateCollectorTests
 {
+    public enum SeedKind
+    {
+        Numeric,
+        ReferenceNull,
+        ReferenceNotNull,
+        NullableValue
+    }
+
     private static readonly (string Source, string Target)[] StraightLineCases =
     {
         ("static class C { static int M(int input) { int value = input; return value; } }", "return value"),
@@ -27,6 +36,23 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M() { for (int first = 1, second = first + 1; second < 3; second++) { } } }",
         "static class C { static void M(int[] values) { for (int value = values[0]; value < 3;) { } } }"
     };
+
+    private static readonly (string Source, string Target, string Parameter, SeedKind Kind, bool SeedSurvives)[]
+        SeededPathCases =
+        {
+            ("static class C { static int M(int input, bool condition) { if (condition) return input; return 0; } }",
+                "return input;", "input", SeedKind.Numeric, true),
+            ("static class C { static int M(string? value) { if (value == null) return 0; return value.Length; } }",
+                "return 0;", "value", SeedKind.ReferenceNull, true),
+            ("static class C { static int M(string? value) { if (value != null) return value.Length; return 0; } }",
+                "return value.Length;", "value", SeedKind.ReferenceNotNull, true),
+            ("static class C { static int M(int? value) { if (value.HasValue) return value.Value; return 0; } }",
+                "return value.Value;", "value", SeedKind.NullableValue, true),
+            ("static class C { static int M(int input, bool condition) { int copy; if (condition) copy = input; else copy = input; return copy; } }",
+                "return copy;", "input", SeedKind.Numeric, true),
+            ("static class C { static int M(int input) { input = 9; return input; } }",
+                "return input;", "input", SeedKind.Numeric, false)
+        };
 
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
@@ -55,6 +81,144 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expectedState.NormalizedProofKey));
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expectedState)));
+    }
+
+    [TestCaseSource(nameof(SeededPathCases))]
+    public void SeededState_MatchesCfgStructuralAndRoutedCollectors(
+        (string Source, string Target, string Parameter, SeedKind Kind, bool SeedSurvives) testCase)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            testCase.Source,
+            nameof(SeededState_MatchesCfgStructuralAndRoutedCollectors));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<ReturnStatementSyntax>()
+            .Single(statement => statement.ToString() == testCase.Target);
+        var seed = CreateSeed(fixture, site, testCase.Parameter, testCase.Kind);
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            seed);
+        var structural = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                initialState: seed));
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            seed);
+
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
+        AssertStateParity(routed, structural);
+        Assert.That(ContainsSeedEvidence(cfg.Value!), Is.EqualTo(testCase.SeedSurvives));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SeededState_IsolatedFromSeedlessCacheAndOtherSeeds(bool warmUnseededCacheFirst)
+    {
+        const string source = "static class C { static int M(int input) { return input; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SeededState_IsolatedFromSeedlessCacheAndOtherSeeds));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+        var parameter = fixture.SemanticModel.GetDeclaredSymbol(
+            fixture.Root.DescendantNodes().OfType<ParameterSyntax>().Single())!;
+        SymbolicState? unseeded = null;
+        if (warmUnseededCacheFirst)
+        {
+            unseeded = SymbolicReachabilityService.CollectPathStateAt(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None);
+        }
+
+        var cacheBeforeSeeds = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
+        var seededStates = new List<SymbolicState>();
+        foreach (var value in new long[] { 1, 2 })
+        {
+            var seed = CreateSeed(fixture, site, "input", SeedKind.Numeric, value);
+            var seeded = SymbolicReachabilityService.CollectPathStateAt(
+                site, fixture.SemanticModel, CancellationToken.None, seed);
+            seededStates.Add(seeded);
+
+            AssertStateParity(seeded, seed);
+            Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(seeded, parameter, out var current), Is.True);
+            Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(value)));
+        }
+
+        var afterSeeds = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
+        AssertCacheInfo(afterSeeds, cacheBeforeSeeds);
+        Assert.That(seededStates[0].NormalizedProofKey, Is.Not.EqualTo(seededStates[1].NormalizedProofKey));
+
+        unseeded ??= SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var warmCache = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(unseeded, parameter, out _), Is.False);
+
+        var cachedUnseeded = SymbolicReachabilityService.CollectPathStateAt(
+            site, fixture.SemanticModel, CancellationToken.None);
+        AssertStateParity(cachedUnseeded, unseeded);
+        AssertCacheInfo(
+            SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel),
+            new SymbolicCacheInfo(
+                warmCache.Hits + 1,
+                warmCache.Misses,
+                warmCache.Entries,
+                warmCache.Evictions));
+    }
+
+    [Test]
+    public void SeededState_CustomLimitsPreserveSeedThroughStructuralFallback()
+    {
+        const string source = "static class C { static int M(int input) { return input; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SeededState_CustomLimitsPreserveSeedThroughStructuralFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+        var parameter = fixture.SemanticModel.GetDeclaredSymbol(
+            fixture.Root.DescendantNodes().OfType<ParameterSyntax>().Single())!;
+        var seed = CreateSeed(fixture, site, "input", SeedKind.Numeric, 17);
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+
+        var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            seed);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            seed);
+        var structural = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                initialState: seed));
+
+        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
+        Assert.That(cfg.Value, Is.Null);
+        AssertStateParity(routed, structural);
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(routed, parameter, out var current), Is.True);
+        Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(17)));
     }
 
     [Test]
@@ -683,6 +847,78 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
         Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
         Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    private static SymbolicState CreateSeed(
+        RoslynTestFixture.CompilationFixture fixture,
+        SyntaxNode site,
+        string parameterName,
+        SeedKind kind,
+        long numericValue = 7)
+    {
+        var parameterSyntax = fixture.Root.DescendantNodes()
+            .OfType<ParameterSyntax>()
+            .Single(parameter => parameter.Identifier.ValueText == parameterName);
+        var parameter = fixture.SemanticModel.GetDeclaredSymbol(parameterSyntax)!;
+        var variableName = SymbolicFactFactory.GetSmtVariableName(parameter);
+        var atoms = kind switch
+        {
+            SeedKind.Numeric => new SymbolicAtom[]
+            {
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicVariableTerm(variableName, SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(numericValue))
+            },
+            SeedKind.ReferenceNull => new SymbolicAtom[]
+            {
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicVariableTerm(variableName, SmtValueKind.Reference),
+                    new SymbolicNullTerm())
+            },
+            SeedKind.ReferenceNotNull => new SymbolicAtom[]
+            {
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    new SymbolicVariableTerm(variableName, SmtValueKind.Reference),
+                    new SymbolicNullTerm())
+            },
+            SeedKind.NullableValue => new SymbolicAtom[]
+            {
+                new SymbolicTruthAtom(new SymbolicNullableHasValueTerm(variableName)),
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicNullableValueTerm(variableName, SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(numericValue))
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        return new SymbolicState(atoms.Select(atom => SymbolicFact.Exact(
+            atom,
+            site,
+            "test.seed." + kind,
+            parameter,
+            "seed." + kind)));
+    }
+
+    private static bool ContainsSeedEvidence(SymbolicState state) =>
+        state.Facts.Concat(state.PathConditions.SelectMany(EnumerateFacts))
+            .Any(static fact => fact.Provenance.StartsWith("test.seed.", StringComparison.Ordinal));
+
+    private static void AssertStateParity(SymbolicState actual, SymbolicState expected)
+    {
+        Assert.That(actual.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual), Is.EqualTo(CreateEvidenceKey(expected)));
+        Assert.That(CreateVersionKey(actual), Is.EqualTo(CreateVersionKey(expected)));
+    }
+
+    private static void AssertCacheInfo(SymbolicCacheInfo actual, SymbolicCacheInfo expected)
+    {
+        Assert.That(actual.Hits, Is.EqualTo(expected.Hits));
+        Assert.That(actual.Misses, Is.EqualTo(expected.Misses));
+        Assert.That(actual.Entries, Is.EqualTo(expected.Entries));
+        Assert.That(actual.Evictions, Is.EqualTo(expected.Evictions));
     }
 
     private static void AssertLoopTargetMatchesStructural(

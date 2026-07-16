@@ -438,6 +438,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     initializer operations, nested/catch locations, custom limits, and missing
     conditions retain typed fallback; the structural initializer path remains
     reachable until those fallback shapes migrate.
+  - [x] Adjudicate Requires-seeded exception path routing. Non-null entry state
+    already enters the canonical CFG collector before exact-or-structural
+    fallback; its early branch intentionally bypasses only the seedless cache,
+    whose key omits seed identity. Numeric, reference, nullable, join, and
+    reassignment states now have direct CFG/structural/routed parity fixtures.
+    Two seed/cache orderings prove isolation, and custom-limit fallback proves
+    that unsupported CFG collection publishes no partial state and retains the
+    seed through structural routing.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -625,7 +633,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical assignment invalidation | `73e7bc53` | 106,281 | -1,395 |
 | Phase 7 canonical nullable reassignment | `5d610810` | 106,278 | -1,398 |
 | Phase 7 bounded while/do loop-local targets | `49cf8b10` | 106,361 | -1,315 |
-| Phase 7 canonical for-initializer entry state | This commit | 106,574 | -1,102 |
+| Phase 7 canonical for-initializer entry state | `403819ca` | 106,574 | -1,102 |
+| Phase 7 Requires-seeded path adjudication | This commit | 106,574 | -1,102 |
 
 ## Validation Ledger
 
@@ -807,10 +816,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical nullable reassignment | The CFG collector no longer rejects every `Nullable<T>` assignment before canonical lowering. The focused nullable-to-nullable reassignment now matches structural normalized state, evidence, and version identity exactly because assignment-owned invalidation removes the old HasValue/value pair before canonical postconditions and propagations apply. Unsupported nullable shapes still return typed `Unsupported` through the lowerer. Nullable/program-point/invariant/operation/reachability fixtures pass 261/261. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,278, or -1,398 from the rewrite start; authoritative tracked test LOC is 143,428. |
 | Phase 7 bounded while/do loop-local targets | Stable targets inside one while or do loop now accumulate every bounded CFG observation and use the canonical evidence-aware state intersection; a single observation bypasses merging so its full state and version identity remain intact. Focused differentials cover loop-carried writes before and after the target, expression and declaration completion, nested blocks, and a one-iteration do loop. Contradictory or unobserved targets, computed-update completion, nested loops, abrupt exits, counted-for loops, and foreach remain typed `Unsupported`. Direct collector fixtures pass 107/107 and the broader program-point/invariant/operation/reachability batch passes 259/259. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,831 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,361, or -1,315 from the rewrite start; authoritative tracked test LOC is 143,625. |
 | Phase 7 canonical for-initializer entry state | A dedicated typed target mode now observes one for-loop condition header only after its unique linear forward preheader has applied every supported initializer operation. Assignment provenance remains `ir.path.for-initializer`; canonical invalidation removes prior scalar, reference, and nullable facts, and declaration initializers receive their typed normal-completion facts in source order. Branched preheaders are rejected before any first-predecessor state can be published. After rebasing onto the independent inline multidimensional bounds, scoped CLI host, infeasible-CFG-input repairs, and CI source-inventory/byte-fixture normalization, direct collector fixtures pass 129/129 and the broader collector/program-point/reachability/operation batch passes 271/271; the two initial-entry Semantic Oracle cases pass 2/2. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtCore passes 257/257; MainGeneral passes 3,851 with the same two explicit skips; MainSmtFlow passes 257/257. Source-query/full-JSON fixtures pass 100/100, the combined CI boundary passes 103/103, and full Tooling passes 591/591. The Release solution warning-as-error build has zero warnings. Production LOC is 106,574, or -1,102 from the rewrite start; authoritative tracked test LOC is 143,838. |
+| Phase 7 Requires-seeded path adjudication | The proposed production change was rejected after exact routing inspection: non-null entry state calls `BuildStructuralPathStateSnapshot`, which already tries `SymbolicCfgProgramPointStateCollector.CollectState(seed)` before structural fallback. Only the seedless bounded cache is bypassed because its key has no seed identity. Six typed cases lock numeric, reference-null, reference-not-null, nullable-value, branch-join, and reassignment parity across direct CFG, structural, and routed state. Two cache-order cases prove distinct seeds neither read nor mutate the seedless cache, and a custom-limit case proves direct `Unsupported` has no partial value while routed fallback retains the seed. Seeded/Requires fixtures pass 19/19; direct collector fixtures pass 138/138; the broader collector/program-point/reachability/operation batch passes 286/286. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtFlow passes 257/257. The Release solution warning-as-error build has zero warnings. Production LOC remains 106,574, or -1,102 from the rewrite start; authoritative tracked test LOC is 144,056. |
 
 ## Current Checkpoint
 
-- Last updated: 2026-07-15.
+- Last updated: 2026-07-16.
 - State: Phase 7 is active under explicit authorization for a major,
   behavior-preserving rearchitecture. The earlier phases are gated. The
   `POTENTIAL_DUPS.md` cleanup is complete; its Requires/Ensures and
@@ -986,10 +996,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   passes 100/100, the combined CI boundary passes 103/103, full Tooling passes
   591/591, and the Release warning-as-error
   solution build is clean. Production LOC is 106,574, or -1,102 from the
-  rewrite start; authoritative tracked test LOC is 143,838.
-- Next cheapest step: route Requires-seeded exception path queries through the
-  canonical CFG collector by removing the unconditional `initialState` bypass,
-  while retaining exact-or-structural fallback and locking branch, reference,
-  and nullable entry-state parity.
-- Blockers: none. The known SP0010 focused failure must be tracked as baseline,
-  not attributed to the rewrite without new evidence.
+  rewrite start. Requires-seeded path routing was then adjudicated without a
+  production change: seeded requests already try the canonical CFG collector,
+  while bypassing only the seedless cache whose key omits seed identity. Direct
+  CFG/structural/routed parity, cache isolation in both orderings, and typed
+  unsupported fallback are locked by tests. Authoritative tracked test LOC is
+  144,056.
+- Next cheapest step: route finally-local source-query targets through typed
+  finally-entry invalidation and continuation identity, beginning with one
+  linear `try`/`finally` shape and preserving fallback for ambiguous multiple
+  continuation states.
+- Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
+  been repaired and is no longer a current blocker.
