@@ -446,6 +446,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
     Two seed/cache orderings prove isolation, and custom-limit fallback proves
     that unsupported CFG collection publishes no partial state and retains the
     seed through structural routing.
+  - [x] Route one direct finally-local source-query shape through the canonical
+    CFG collector. A branch-free top-level `try`/`finally` with no catches now
+    lowers protected local/parameter mutations into typed invalidation steps,
+    applies them before entering the one exact Roslyn finally continuation, and
+    requires one full continuation identity at the target. First-statement and
+    prior-simple-assignment targets match direct, structural, and routed state,
+    evidence, and versions. Catches, nested or guarded finally targets, loops,
+    branching or throwing protected code, unsupported finally prefixes,
+    compiler-generated finally regions, terminal continuations, and custom
+    limits retain typed fallback with no partial CFG state.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -634,7 +644,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical nullable reassignment | `5d610810` | 106,278 | -1,398 |
 | Phase 7 bounded while/do loop-local targets | `49cf8b10` | 106,361 | -1,315 |
 | Phase 7 canonical for-initializer entry state | `403819ca` | 106,574 | -1,102 |
-| Phase 7 Requires-seeded path adjudication | This commit | 106,574 | -1,102 |
+| Phase 7 Requires-seeded path adjudication | `a9c0e8e5` | 106,574 | -1,102 |
+| Phase 7 direct finally-local query targets | This commit | 106,802 | -874 |
 
 ## Validation Ledger
 
@@ -817,6 +828,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 bounded while/do loop-local targets | Stable targets inside one while or do loop now accumulate every bounded CFG observation and use the canonical evidence-aware state intersection; a single observation bypasses merging so its full state and version identity remain intact. Focused differentials cover loop-carried writes before and after the target, expression and declaration completion, nested blocks, and a one-iteration do loop. Contradictory or unobserved targets, computed-update completion, nested loops, abrupt exits, counted-for loops, and foreach remain typed `Unsupported`. Direct collector fixtures pass 107/107 and the broader program-point/invariant/operation/reachability batch passes 259/259. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,831 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,361, or -1,315 from the rewrite start; authoritative tracked test LOC is 143,625. |
 | Phase 7 canonical for-initializer entry state | A dedicated typed target mode now observes one for-loop condition header only after its unique linear forward preheader has applied every supported initializer operation. Assignment provenance remains `ir.path.for-initializer`; canonical invalidation removes prior scalar, reference, and nullable facts, and declaration initializers receive their typed normal-completion facts in source order. Branched preheaders are rejected before any first-predecessor state can be published. After rebasing onto the independent inline multidimensional bounds, scoped CLI host, infeasible-CFG-input repairs, and CI source-inventory/byte-fixture normalization, direct collector fixtures pass 129/129 and the broader collector/program-point/reachability/operation batch passes 271/271; the two initial-entry Semantic Oracle cases pass 2/2. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtCore passes 257/257; MainGeneral passes 3,851 with the same two explicit skips; MainSmtFlow passes 257/257. Source-query/full-JSON fixtures pass 100/100, the combined CI boundary passes 103/103, and full Tooling passes 591/591. The Release solution warning-as-error build has zero warnings. Production LOC is 106,574, or -1,102 from the rewrite start; authoritative tracked test LOC is 143,838. |
 | Phase 7 Requires-seeded path adjudication | The proposed production change was rejected after exact routing inspection: non-null entry state calls `BuildStructuralPathStateSnapshot`, which already tries `SymbolicCfgProgramPointStateCollector.CollectState(seed)` before structural fallback. Only the seedless bounded cache is bypassed because its key has no seed identity. Six typed cases lock numeric, reference-null, reference-not-null, nullable-value, branch-join, and reassignment parity across direct CFG, structural, and routed state. Two cache-order cases prove distinct seeds neither read nor mutate the seedless cache, and a custom-limit case proves direct `Unsupported` has no partial value while routed fallback retains the seed. Seeded/Requires fixtures pass 19/19; direct collector fixtures pass 138/138; the broader collector/program-point/reachability/operation batch passes 286/286. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtFlow passes 257/257. The Release solution warning-as-error build has zero warnings. Production LOC remains 106,574, or -1,102 from the rewrite start; authoritative tracked test LOC is 144,056. |
+| Phase 7 direct finally-local query targets | One direct branch-free top-level `try`/`finally` shape now reaches a finally-local target through the canonical CFG collector. `SymbolicStateInvalidator` lowers protected local/parameter mutations into ordered typed invalidation steps, and the collector applies them before queueing the exact Roslyn finally region. Target publication requires one full continuation identity; distinct identities poison the result instead of merging optimistically. Exact parity covers the first finally statement and a target after one supported finally assignment. Fifteen catch, nested, guarded, branching, looping, throwing/unsupported, compiler-finally, and terminal-continuation shapes plus custom limits remain typed `Unsupported` with null partial state. Finally-local fixtures pass 18/18; direct collector fixtures pass 156/156; the broader collector/program-point/reachability/operation batch passes 304/304. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainSmtFlow passes 257/257. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,802, or -874 from the rewrite start; authoritative tracked test LOC is 144,180. |
 
 ## Current Checkpoint
 
@@ -1000,11 +1012,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   production change: seeded requests already try the canonical CFG collector,
   while bypassing only the seedless cache whose key omits seed identity. Direct
   CFG/structural/routed parity, cache isolation in both orderings, and typed
-  unsupported fallback are locked by tests. Authoritative tracked test LOC is
-  144,056.
-- Next cheapest step: route finally-local source-query targets through typed
-  finally-entry invalidation and continuation identity, beginning with one
-  linear `try`/`finally` shape and preserving fallback for ambiguous multiple
-  continuation states.
+  unsupported fallback are locked by tests. One direct branch-free top-level
+  `try`/`finally` shape now also routes finally-local targets through ordered
+  typed protected-mutation invalidation and one exact full continuation
+  identity. First-statement and prior-simple-assignment targets match structural
+  state exactly; the broad unsupported matrix remains conservative with no
+  partial state. Production LOC is now 106,802, or -874 from the rewrite start;
+  authoritative tracked test LOC is 144,180.
+- Next cheapest step: adjudicate the remaining finally-local structural
+  fallback starting with multiple regular protected paths. Accept it only after
+  typed incoming-state merging preserves exact continuation identity; retain
+  fallback for catches, terminal completions, nested finally regions, and
+  potentially throwing operations.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

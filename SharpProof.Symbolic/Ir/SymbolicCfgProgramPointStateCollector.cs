@@ -83,9 +83,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 HasAbruptOrNestedLoopControlFlow(plan.Loop)))
             return Unsupported(site, "loop-local-target");
         var targetIsInsideLoop = containingLoopPlans.Length != 0;
-        if (site.Ancestors().Any(ancestor =>
-                ancestor is FinallyClauseSyntax ||
-                forInitialEntry != null && ancestor is CatchClauseSyntax))
+        var finallyClause = site.AncestorsAndSelf().OfType<FinallyClauseSyntax>().FirstOrDefault();
+        if (forInitialEntry != null && site.Ancestors().Any(static ancestor => ancestor is CatchClauseSyntax))
             return Unsupported(site, "finally-local-target");
         ControlFlowGraph? graph;
         try
@@ -99,6 +98,17 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        CfgFinallyLocalTargetPlan? finallyLocalTarget = null;
+        if (finallyClause != null &&
+            !TryCreateFinallyLocalTargetPlan(
+                site,
+                executionRoot,
+                finallyClause,
+                graph,
+                semanticModel,
+                cancellationToken,
+                out finallyLocalTarget))
+            return Unsupported(site, "finally-local-target");
         BasicBlock? forInitialEntryHeader = null;
         if (forInitialEntry != null &&
             !TryGetForInitialEntryHeader(graph, forInitialEntry, out forInitialEntryHeader))
@@ -145,6 +155,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         queue.Enqueue(entryPoint);
         SymbolicState? targetState = null;
         SymbolicState? guardedTargetState = null;
+        CfgFinallyContinuation? observedFinallyTargetContinuation = null;
         var targetIsInsideBranch = site.Ancestors().Any(static ancestor =>
             ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax or
                 Microsoft.CodeAnalysis.CSharp.Syntax.ElseClauseSyntax or
@@ -191,6 +202,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                         return Unsupported(site, "loop-current-completion");
                     if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
+                    if (finallyLocalTarget != null &&
+                        !TryObserveFinallyLocalTarget(
+                            point.Continuation,
+                            finallyLocalTarget,
+                            ref observedFinallyTargetContinuation))
+                        return Unsupported(site, "finally-local-continuation");
                     var activeGuard = GetActiveGuard(currentPath.GuardFrame);
                     if (includeCurrentStatementCompletionFacts &&
                         !(site is LocalDeclarationStatementSyntax declaration
@@ -297,6 +314,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                 {
                     if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
+                    if (finallyLocalTarget != null &&
+                        !TryObserveFinallyLocalTarget(
+                            point.Continuation,
+                            finallyLocalTarget,
+                            ref observedFinallyTargetContinuation))
+                        return Unsupported(site, "finally-local-continuation");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
                     if (targetIsInsideLoop)
                         loopTargetStates.Add(observedState);
@@ -326,7 +349,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                     nestedBlockTerminalBranches,
                     nestedBlockTerminalPaths,
                     rootCompletion,
-                    loopPlans))
+                    loopPlans,
+                    finallyLocalTarget))
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
@@ -394,7 +418,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         ISet<ControlFlowBranch> nestedBlockTerminalBranches,
         ICollection<CfgPathState> nestedBlockTerminalPaths,
         CfgRootCompletionPlan? rootCompletion,
-        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans,
+        CfgFinallyLocalTargetPlan? finallyLocalTarget)
     {
         if (block.ConditionKind != ControlFlowConditionKind.None)
         {
@@ -442,7 +467,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        nestedBlockTerminalBranches,
                        nestedBlockTerminalPaths,
                        rootCompletion,
-                       loopPlans) &&
+                       loopPlans,
+                       finallyLocalTarget) &&
                    TryPropagate(
                        block,
                        block.FallThroughSuccessor,
@@ -467,7 +493,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        nestedBlockTerminalBranches,
                        nestedBlockTerminalPaths,
                        rootCompletion,
-                       loopPlans);
+                       loopPlans,
+                       finallyLocalTarget);
         }
 
         return TryPropagate(
@@ -487,7 +514,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    nestedBlockTerminalBranches,
                    nestedBlockTerminalPaths,
                    rootCompletion,
-                   loopPlans) &&
+                   loopPlans,
+                   finallyLocalTarget) &&
                TryPropagate(
                    block,
                    block.ConditionalSuccessor,
@@ -505,7 +533,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    nestedBlockTerminalBranches,
                    nestedBlockTerminalPaths,
                    rootCompletion,
-                   loopPlans);
+                   loopPlans,
+                   finallyLocalTarget);
     }
 
     private static bool TryCreateBranchState(
@@ -552,13 +581,15 @@ internal static class SymbolicCfgProgramPointStateCollector
         ISet<ControlFlowBranch> nestedBlockTerminalBranches,
         ICollection<CfgPathState> nestedBlockTerminalPaths,
         CfgRootCompletionPlan? rootCompletion,
-        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
+        IReadOnlyList<SymbolicLoopTransferPlan> loopPlans,
+        CfgFinallyLocalTargetPlan? finallyLocalTarget)
     {
         if (branch == null)
             return true;
         if (!branch.FinallyRegions.IsDefaultOrEmpty)
         {
             var continuation = new CfgFinallyContinuation(
+                branch,
                 branch.FinallyRegions,
                 0,
                 branch.Destination,
@@ -568,6 +599,20 @@ internal static class SymbolicCfgProgramPointStateCollector
                     ? null
                     : branch,
                 activeContinuation);
+            if (finallyLocalTarget != null &&
+                branch.FinallyRegions.Any(region => ReferenceEquals(region, finallyLocalTarget.Region)))
+            {
+                if (!IsSupportedFinallyLocalContinuation(continuation, finallyLocalTarget) ||
+                    path.GuardFrame != null ||
+                    finallyLocalTarget.ProtectedMutations.HasUnsupportedMutation)
+                    return false;
+                path = path with
+                {
+                    State = SymbolicStateInvalidator.ApplyNestedMutationInvalidations(
+                        path.State,
+                        finallyLocalTarget.ProtectedMutations)
+                };
+            }
             var finallyEntry = graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal];
             path = ApplyExitedRegionLocalInvalidation(
                 source,
@@ -1328,11 +1373,154 @@ internal static class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
+    private static bool TryCreateFinallyLocalTargetPlan(
+        SyntaxNode site,
+        SyntaxNode executionRoot,
+        FinallyClauseSyntax finallyClause,
+        ControlFlowGraph graph,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out CfgFinallyLocalTargetPlan? plan)
+    {
+        plan = null;
+        var targetStatement = site.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
+        if (targetStatement == null ||
+            !ReferenceEquals(targetStatement.Parent, finallyClause.Block) ||
+            finallyClause.Parent is not TryStatementSyntax tryStatement ||
+            !ReferenceEquals(tryStatement.Finally, finallyClause) ||
+            tryStatement.Catches.Count != 0 ||
+            CSharpSyntaxFacts.GetBlockBody(executionRoot) is not { } rootBlock ||
+            !ReferenceEquals(tryStatement.Parent, rootBlock) ||
+            !tryStatement.Block.Statements.All(statement =>
+                SupportsFinallyLinearStatement(statement, semanticModel, cancellationToken)) ||
+            !finallyClause.Block.Statements.All(statement =>
+                SupportsFinallyLinearStatement(statement, semanticModel, cancellationToken)))
+            return false;
+
+        var regions = EnumerateRegions(graph.Root)
+            .Where(region => region.Kind == ControlFlowRegionKind.Finally &&
+                             RegionContainsSyntax(region, graph, finallyClause.Block))
+            .ToArray();
+        if (regions.Length != 1)
+            return false;
+
+        var protectedMutations = SymbolicStateInvalidator.LowerNestedMutations(
+            tryStatement.Block,
+            semanticModel,
+            cancellationToken);
+        if (protectedMutations.HasUnsupportedMutation)
+            return false;
+
+        plan = new CfgFinallyLocalTargetPlan(regions[0], protectedMutations);
+        return true;
+    }
+
+    private static bool SupportsFinallyLinearStatement(
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (statement is LocalDeclarationStatementSyntax declaration &&
+            declaration.UsingKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.None) &&
+            declaration.AwaitKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.None))
+        {
+            return declaration.Declaration.Variables.All(variable =>
+                semanticModel.GetDeclaredSymbol(variable, cancellationToken) is ILocalSymbol { RefKind: RefKind.None } &&
+                (variable.Initializer == null ||
+                 SupportsFinallyLinearValue(
+                     variable.Initializer.Value,
+                     semanticModel,
+                     cancellationToken)));
+        }
+
+        if (statement is not ExpressionStatementSyntax
+            {
+                Expression: AssignmentExpressionSyntax assignment
+            } ||
+            !assignment.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SimpleAssignmentExpression) ||
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left) is not IdentifierNameSyntax left ||
+            semanticModel.GetSymbolInfo(left, cancellationToken).Symbol is not
+                (ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }))
+            return false;
+
+        return SupportsFinallyLinearValue(assignment.Right, semanticModel, cancellationToken);
+    }
+
+    private static bool SupportsFinallyLinearValue(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        if (expression is LiteralExpressionSyntax)
+            return true;
+        if (expression is not IdentifierNameSyntax identifier ||
+            semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not
+                (ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }))
+            return false;
+
+        var typeInfo = semanticModel.GetTypeInfo(identifier, cancellationToken);
+        return typeInfo.Type != null &&
+               SymbolEqualityComparer.Default.Equals(typeInfo.Type, typeInfo.ConvertedType);
+    }
+
+    private static IEnumerable<ControlFlowRegion> EnumerateRegions(ControlFlowRegion region)
+    {
+        yield return region;
+        foreach (var nested in region.NestedRegions)
+            foreach (var descendant in EnumerateRegions(nested))
+                yield return descendant;
+    }
+
+    private static bool RegionContainsSyntax(
+        ControlFlowRegion region,
+        ControlFlowGraph graph,
+        SyntaxNode syntax)
+    {
+        for (var ordinal = region.FirstBlockOrdinal; ordinal <= region.LastBlockOrdinal; ordinal++)
+        {
+            var block = graph.Blocks[ordinal];
+            if (block.Operations.Any(operation => syntax.Span.Contains(operation.Syntax.SpanStart)) ||
+                block.BranchValue != null && syntax.Span.Contains(block.BranchValue.Syntax.SpanStart))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsSupportedFinallyLocalContinuation(
+        CfgFinallyContinuation continuation,
+        CfgFinallyLocalTargetPlan plan) =>
+        continuation.Regions.Length == 1 &&
+        continuation.RegionIndex == 0 &&
+        ReferenceEquals(continuation.Regions[0], plan.Region) &&
+        continuation.Parent == null &&
+        continuation.TerminalBranch == null;
+
+    private static bool TryObserveFinallyLocalTarget(
+        CfgFinallyContinuation? continuation,
+        CfgFinallyLocalTargetPlan plan,
+        ref CfgFinallyContinuation? observed)
+    {
+        if (continuation == null || !IsSupportedFinallyLocalContinuation(continuation, plan))
+            return false;
+        if (observed == null)
+        {
+            observed = continuation;
+            return true;
+        }
+        return observed == continuation;
+    }
+
     private readonly record struct CfgTraversalPoint(
         BasicBlock Block,
         CfgFinallyContinuation? Continuation);
 
+    private sealed record CfgFinallyLocalTargetPlan(
+        ControlFlowRegion Region,
+        SymbolicNestedMutationInvalidationPlan ProtectedMutations);
+
     private sealed record CfgFinallyContinuation(
+        ControlFlowBranch OriginBranch,
         ImmutableArray<ControlFlowRegion> Regions,
         int RegionIndex,
         BasicBlock? Destination,

@@ -54,6 +54,25 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
                 "return input;", "input", SeedKind.Numeric, false)
         };
 
+    private static readonly string[] FinallyLocalFallbackCases =
+    {
+        "static class C { static int M(bool condition) { int value = 0; try { if (condition) return 1; value = 2; } finally { int marker = value; } return value; } }",
+        "static class C { static int M(bool condition) { int value = 0; try { if (condition) throw new System.Exception(); value = 2; } finally { int marker = value; } return value; } }",
+        "static class C { static int M() { int value = 0; try { return value; } finally { int marker = value; } } }",
+        "static class C { static void M() { int value = 0; try { throw new System.Exception(); } finally { int marker = value; } } }",
+        "static class C { static void M() { int value = 0; try { value = 1; } catch { value = 2; } finally { int marker = value; } } }",
+        "static class C { static void M() { int value = 0; try { try { value = 1; } finally { value = 2; } } finally { int marker = value; } } }",
+        "static class C { static void M(bool condition) { int value = 0; try { value = 1; } finally { if (condition) { int marker = value; } } } }",
+        "static class C { static void M(bool condition) { int value = 0; try { value = 1; } finally { if (condition) value = 2; int marker = value; } } }",
+        "static class C { static void M(bool condition) { int value = 0; while (condition) { try { value = 1; } finally { int marker = value; } break; } } }",
+        "static class C { static void Touch() { } static void M() { int value = 0; try { Touch(); } finally { int marker = value; } } }",
+        "static class C { static void M(int[] values) { int value = 0; try { value = values[0]; } finally { int marker = value; } } }",
+        "static class C { static void M() { int value = 0; try { value = checked(value + 1); } finally { int marker = value; } } }",
+        "static class C { static void Touch() { } static void M() { int value = 0; try { value = 1; } finally { Touch(); int marker = value; } } }",
+        "sealed class D : System.IDisposable { public void Dispose() { } } static class C { static void M() { int value = 0; try { using (var resource = new D()) { value = 1; } } finally { int marker = value; } } }",
+        "static class C { static readonly object Gate = new(); static void M() { int value = 0; try { lock (Gate) { value = 1; } } finally { int marker = value; } } }"
+    };
+
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
     {
@@ -906,6 +925,34 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         state.Facts.Concat(state.PathConditions.SelectMany(EnumerateFacts))
             .Any(static fact => fact.Provenance.StartsWith("test.seed.", StringComparison.Ordinal));
 
+    private static LocalDeclarationStatementSyntax GetFinallyMarkerSite(
+        RoslynTestFixture.CompilationFixture fixture) =>
+        fixture.Root.DescendantNodes()
+            .OfType<VariableDeclaratorSyntax>()
+            .Single(variable => variable.Identifier.ValueText == "marker")
+            .FirstAncestorOrSelf<LocalDeclarationStatementSyntax>()!;
+
+    private static ILocalSymbol GetLocal(
+        RoslynTestFixture.CompilationFixture fixture,
+        string name) =>
+        (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(
+            fixture.Root.DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>()
+                .Single(variable => variable.Identifier.ValueText == name))!;
+
+    private static SymbolicState CollectStructuralState(
+        RoslynTestFixture.CompilationFixture fixture,
+        SyntaxNode site) =>
+        SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
     private static void AssertStateParity(SymbolicState actual, SymbolicState expected)
     {
         Assert.That(actual.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
@@ -1498,6 +1545,99 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [Test]
+    public void FinallyLocalFirstStatement_MatchesStructuralCollectorAndInvalidatesProtectedMutation()
+    {
+        const string source = "static class C { static void M() { int mutated = 1; int retained = 7; try { mutated = 2; } finally { int marker = retained; mutated = marker; } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(FinallyLocalFirstStatement_MatchesStructuralCollectorAndInvalidatesProtectedMutation));
+        var site = GetFinallyMarkerSite(fixture);
+        var mutated = GetLocal(fixture, "mutated");
+        var retained = GetLocal(fixture, "retained");
+
+        var direct = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var structural = CollectStructuralState(fixture, site);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(direct.IsExact, Is.True, direct.Provenance.Single().Detail);
+        AssertStateParity(direct.Value!, structural);
+        AssertStateParity(routed, structural);
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(direct.Value!, mutated, out _), Is.False);
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(direct.Value!, retained, out var retainedValue), Is.True);
+        Assert.That(retainedValue, Is.EqualTo(new SymbolicIntegerConstantTerm(7)));
+    }
+
+    [Test]
+    public void FinallyLocalPriorAssignment_MatchesStructuralCollector()
+    {
+        const string source = "static class C { static void M() { int value = 1; try { value = 2; } finally { value = 3; int marker = value; } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(FinallyLocalPriorAssignment_MatchesStructuralCollector));
+        var site = GetFinallyMarkerSite(fixture);
+        var value = GetLocal(fixture, "value");
+
+        var direct = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var structural = CollectStructuralState(fixture, site);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(direct.IsExact, Is.True, direct.Provenance.Single().Detail);
+        AssertStateParity(direct.Value!, structural);
+        AssertStateParity(routed, structural);
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(direct.Value!, value, out var current), Is.True);
+        Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(3)));
+    }
+
+    [TestCaseSource(nameof(FinallyLocalFallbackCases))]
+    public void FinallyLocalUnsupportedShapes_PublishNoPartialState(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(FinallyLocalUnsupportedShapes_PublishNoPartialState));
+        var site = GetFinallyMarkerSite(fixture);
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.Value, Is.Null);
+    }
+
+    [Test]
+    public void FinallyLocalCustomLimits_PublishNoPartialState()
+    {
+        const string source = "static class C { static void M() { int value = 1; try { value = 2; } finally { int marker = value; } } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(FinallyLocalCustomLimits_PublishNoPartialState));
+        var site = GetFinallyMarkerSite(fixture);
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.Value, Is.Null);
     }
 
     [Test]

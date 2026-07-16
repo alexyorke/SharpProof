@@ -6,6 +6,15 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
+internal readonly record struct SymbolicMutationInvalidationStep(
+    ImmutableArray<SymbolicInvalidationTarget> Targets,
+    Microsoft.CodeAnalysis.Text.TextSpan SourceSpan,
+    string Provenance);
+
+internal sealed record SymbolicNestedMutationInvalidationPlan(
+    ImmutableArray<SymbolicMutationInvalidationStep> Steps,
+    bool HasUnsupportedMutation);
+
 internal static class SymbolicStateInvalidator
 {
     internal static void InvalidateNestedAssignmentMutations(
@@ -24,23 +33,79 @@ internal static class SymbolicStateInvalidator
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        var plan = LowerNestedMutations(root, semanticModel, cancellationToken);
+        state = ApplyNestedMutationInvalidations(state, plan);
+    }
+
+    internal static SymbolicNestedMutationInvalidationPlan LowerNestedMutations(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
+        var hasUnsupportedMutation = false;
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression))
-                InvalidateMutationTarget(
-                    ref state,
+            {
+                var targets = LowerMutationTargets(
                     mutatedExpression,
                     semanticModel,
                     cancellationToken);
+                if (targets.IsDefaultOrEmpty)
+                    hasUnsupportedMutation = true;
+                else
+                    steps.Add(new SymbolicMutationInvalidationStep(
+                        targets,
+                        mutatedExpression.Span,
+                        "operation-transfer.mutation-invalidation"));
+            }
 
             foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
-                InvalidateSymbol(ref state, receiverSymbol, node);
+                steps.Add(new SymbolicMutationInvalidationStep(
+                    ImmutableArray.Create(ForSymbol(receiverSymbol)),
+                    node.Span,
+                    "operation-transfer.reference-invalidation"));
         }
+
+        return new SymbolicNestedMutationInvalidationPlan(
+            steps.ToImmutable(),
+            hasUnsupportedMutation);
+    }
+
+    internal static SymbolicState ApplyNestedMutationInvalidations(
+        SymbolicState state,
+        SymbolicNestedMutationInvalidationPlan plan)
+    {
+        foreach (var step in plan.Steps)
+            state = SymbolicOperationTransferKernel.Invalidate(
+                state,
+                step.Targets,
+                step.SourceSpan,
+                step.Provenance).State;
+        return state;
     }
 
     internal static void InvalidateMutationTarget(
         ref SymbolicState state,
+        ExpressionSyntax mutatedExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var invalidations = LowerMutationTargets(
+            mutatedExpression,
+            semanticModel,
+            cancellationToken);
+        if (!invalidations.IsDefaultOrEmpty)
+            state = SymbolicOperationTransferKernel.Invalidate(
+                state,
+                invalidations,
+                mutatedExpression.Span,
+                "operation-transfer.mutation-invalidation").State;
+    }
+
+    private static ImmutableArray<SymbolicInvalidationTarget> LowerMutationTargets(
         ExpressionSyntax mutatedExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -58,12 +123,7 @@ internal static class SymbolicStateInvalidator
         foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
             invalidations.Add(ForSymbol(receiverSymbol));
 
-        if (invalidations.Count != 0)
-            state = SymbolicOperationTransferKernel.Invalidate(
-                state,
-                invalidations.ToImmutable(),
-                mutatedExpression.Span,
-                "operation-transfer.mutation-invalidation").State;
+        return invalidations.ToImmutable();
     }
 
     internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
