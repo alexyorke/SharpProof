@@ -920,30 +920,17 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
     internal static bool TryCreateRegionPlan(
         ControlFlowGraph graph,
-        SyntaxNode target,
+        StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out CfgRegionPlan plan,
         out string failure)
     {
-        if (target is not StatementSyntax statement)
-            return Fail("statement-region.kind", out plan, out failure);
-        if (!TryValidateStatementRegionShape(
-                graph,
-                statement,
-                semanticModel,
-                cancellationToken,
-                out var flowCaptureIds,
-                out failure))
-        {
-            plan = null!;
-            return false;
-        }
+        failure = GetStatementShapeFailure(graph, statement, semanticModel, cancellationToken) ?? string.Empty;
+        if (failure.Length != 0)
+            return Fail(failure, out plan, out failure);
 
-        var directSlices = new Dictionary<int, (
-            int FirstOperationIndex,
-            int EndOperationIndexExclusive,
-            bool HasCursorExit)>();
+        var directSlices = new Dictionary<int, CfgBlockSlice>();
         foreach (var block in graph.Blocks)
         {
             if (!block.IsReachable)
@@ -966,12 +953,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             var endOperation = ownedOperationIndexes.Length == 0
                 ? firstOperation
                 : ownedOperationIndexes[ownedOperationIndexes.Length - 1] + 1;
-            if (ownedOperationIndexes.Where((index, offset) => index != firstOperation + offset).Any())
+            if (!ownedOperationIndexes.SequenceEqual(
+                    Enumerable.Range(firstOperation, ownedOperationIndexes.Length)))
                 return Fail("statement-region.operation-slice", out plan, out failure);
 
             directSlices.Add(
                 block.Ordinal,
-                (firstOperation,
+                new CfgBlockSlice(
+                    firstOperation,
                     endOperation,
                     endOperation < block.Operations.Length ||
                     !ownsBranchValue && block.BranchValue != null));
@@ -986,24 +975,20 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 block.Operations.IsDefaultOrEmpty &&
                 block.BranchValue == null)
             .Select(static block => block.Ordinal));
-        var forwardConnectors = CollectAdjacentConnectors(
+        var forwardConnectors = CollectConnectorClosure(
             graph,
             directSlices.Keys,
             connectorCandidates,
             forward: true);
-        var backwardConnectors = CollectAdjacentConnectors(
+        forwardConnectors.IntersectWith(CollectConnectorClosure(
             graph,
             directSlices.Keys,
             connectorCandidates,
-            forward: false);
-        forwardConnectors.IntersectWith(backwardConnectors);
+            forward: false));
 
-        var slices = new Dictionary<int, (
-            int FirstOperationIndex,
-            int EndOperationIndexExclusive,
-            bool HasCursorExit)>(directSlices);
+        var slices = new Dictionary<int, CfgBlockSlice>(directSlices);
         foreach (var ordinal in forwardConnectors)
-            slices.Add(ordinal, (0, 0, false));
+            slices.Add(ordinal, new CfgBlockSlice(0, 0, false));
 
         var entryPoints = new HashSet<CfgTraversalPoint>();
         foreach (var entry in slices)
@@ -1018,7 +1003,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (entryPoints.Count != 1)
             return Fail("statement-region.entry", out plan, out failure);
         var entryPoint = entryPoints.Single();
-        var reachableSlices = CollectAdjacentConnectors(
+        var reachableSlices = CollectConnectorClosure(
             graph,
             new[] { entryPoint.Block.Ordinal },
             new HashSet<int>(slices.Keys),
@@ -1027,7 +1012,25 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (!reachableSlices.SetEquals(slices.Keys))
             return Fail("statement-region.disconnected", out plan, out failure);
 
-        var hasExit = false;
+        failure = GetRegionEdgeFailure(graph, slices, directSlices.Keys) ?? string.Empty;
+        if (failure.Length != 0)
+            return Fail(failure, out plan, out failure);
+
+        plan = new CfgRegionPlan(
+            statement,
+            entryPoint,
+            slices);
+        failure = string.Empty;
+        return true;
+    }
+
+    private static string? GetRegionEdgeFailure(
+        ControlFlowGraph graph,
+        IReadOnlyDictionary<int, CfgBlockSlice> slices,
+        IEnumerable<int> directOrdinals)
+    {
+        var direct = new HashSet<int>(directOrdinals);
+        var hasExit = slices.Values.Any(static slice => slice.HasCursorExit);
         foreach (var entry in slices)
         {
             var ordinal = entry.Key;
@@ -1035,50 +1038,34 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             if (slice.HasCursorExit)
                 continue;
             var block = graph.Blocks[ordinal];
-            if (!directSlices.ContainsKey(ordinal) &&
+            if (!direct.Contains(ordinal) &&
                 (!block.Operations.IsDefaultOrEmpty || block.BranchValue != null))
-                return Fail("statement-region.connector", out plan, out failure);
-        foreach (var branch in GetSuccessors(block))
-        {
-            if (!branch.FinallyRegions.IsDefaultOrEmpty && branch.FinallyRegions.Any(region =>
-                    Enumerable.Range(
-                            region.FirstBlockOrdinal,
-                            region.LastBlockOrdinal - region.FirstBlockOrdinal + 1)
-                        .Any(ordinal => !slices.ContainsKey(ordinal))))
-                return Fail("statement-region.finally-ownership", out plan, out failure);
-            if (IsTerminalCompletionBranch(branch))
+                return "statement-region.connector";
+            foreach (var branch in GetSuccessors(block))
             {
-                hasExit = true;
-                continue;
-            }
-            if (branch.Semantics is not (ControlFlowBranchSemantics.Regular or
-                ControlFlowBranchSemantics.StructuredExceptionHandling))
-                return Fail("statement-region.exit", out plan, out failure);
-            if (branch.Destination == null)
-            {
-                if (IsWithinRegion(block, ControlFlowRegionKind.Finally))
+                if (branch.FinallyRegions.Any(region => Enumerable.Range(
+                        region.FirstBlockOrdinal,
+                        region.LastBlockOrdinal - region.FirstBlockOrdinal + 1)
+                    .Any(candidate => !slices.ContainsKey(candidate))))
+                    return "statement-region.finally-ownership";
+                if (IsTerminalCompletionBranch(branch))
+                {
+                    hasExit = true;
                     continue;
-                return Fail("statement-region.exit", out plan, out failure);
+                }
+                if (branch.Semantics is not (ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling))
+                    return "statement-region.exit";
+                if (branch.Destination == null)
+                {
+                    if (!IsWithinRegion(block, ControlFlowRegionKind.Finally))
+                        return "statement-region.exit";
+                    continue;
+                }
+                hasExit |= !slices.ContainsKey(branch.Destination.Ordinal);
             }
-            if (slices.ContainsKey(branch.Destination.Ordinal))
-            {
-                continue;
-            }
-            hasExit = true;
         }
-        }
-        if (!hasExit &&
-            slices.Values.All(static slice => !slice.HasCursorExit))
-            return Fail("statement-region.exit", out plan, out failure);
-
-        plan = new CfgRegionPlan(
-            target,
-            entryPoint,
-            slices,
-            flowCaptureIds,
-            InvalidatesExitedLocals: statement is IfStatementSyntax or SwitchStatementSyntax);
-        failure = string.Empty;
-        return true;
+        return hasExit ? null : "statement-region.exit";
     }
 
     private static SymbolicLoweringResult<SymbolicState> CollectProtocolCompletionState(
@@ -1178,18 +1165,15 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static bool TryValidateStatementRegionShape(
+    private static string? GetStatementShapeFailure(
         ControlFlowGraph graph,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out ISet<CaptureId> flowCaptureIds,
-        out string failure)
+        CancellationToken cancellationToken)
     {
-        flowCaptureIds = new HashSet<CaptureId>();
-        failure = string.Empty;
-        var captures = graph.Blocks
-            .SelectMany(static block => block.Operations)
+        var flowCaptureIds = new HashSet<CaptureId>();
+        var operations = graph.Blocks.SelectMany(static block => block.Operations).ToArray();
+        var captures = operations
             .OfType<IFlowCaptureOperation>()
             .Where(capture => statement.Span.Contains(capture.Syntax.SpanStart))
             .ToArray();
@@ -1197,21 +1181,21 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (statement is SwitchStatementSyntax switchStatement)
         {
             if (switchStatement.DescendantNodes().OfType<SwitchStatementSyntax>().Any())
-                return FailShape("statement-region.switch-nested", out failure);
+                return "statement-region.switch-nested";
             if (switchStatement.Sections.Any(static section => section.Labels.Count != 1))
-                return FailShape("statement-region.switch-multi-label", out failure);
+                return "statement-region.switch-multi-label";
             if (HasUnsupportedAbruptTransfer(switchStatement, allowBreak: true))
-                return FailShape("statement-region.switch-abrupt", out failure);
+                return "statement-region.switch-abrupt";
             switches = new[] { switchStatement };
         }
         else
         {
             if (statement is IfStatementSyntax && HasUnsupportedAbruptTransfer(statement, allowBreak: false))
-                return FailShape("statement-region.if-abrupt", out failure);
+                return "statement-region.if-abrupt";
             if (statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax &&
                 statement.DescendantNodes().Any(static node =>
                     node is GotoStatementSyntax or YieldStatementSyntax))
-                return FailShape("statement-region.loop-abrupt", out failure);
+                return "statement-region.loop-abrupt";
             switches = statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax
                 ? statement.DescendantNodes().OfType<SwitchStatementSyntax>()
                 : Array.Empty<SwitchStatementSyntax>();
@@ -1225,11 +1209,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 nestedSwitch.Span.Contains(capture.Syntax.SpanStart)).ToArray();
             if (governingValue is not (ILocalReferenceOperation or
                     IParameterReferenceOperation or ILiteralOperation))
-                return FailShape("statement-region.switch-governing-value", out failure);
+                return "statement-region.switch-governing-value";
             if (switchCaptures.Length != 1 ||
                 UnwrapConversion(switchCaptures[0].Value) is not (ILocalReferenceOperation or
                     IParameterReferenceOperation or ILiteralOperation))
-                return FailShape("statement-region.switch-capture-shape", out failure);
+                return "statement-region.switch-capture-shape";
             if (nestedSwitch.Sections.SelectMany(static section => section.Labels)
                 .Where(static label => label is not DefaultSwitchLabelSyntax)
                 .Any(label => !SwitchPathConditionBuilder.TryCreateSwitchStatementLabelSymbolicCondition(
@@ -1238,12 +1222,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     semanticModel,
                     cancellationToken,
                     out _)))
-                return FailShape("statement-region.switch-label-shape", out failure);
+                return "statement-region.switch-label-shape";
             flowCaptureIds.Add(switchCaptures[0].Id);
         }
 
-        var expressionOwners = graph.Blocks
-            .SelectMany(static block => block.Operations)
+        var expressionOwners = operations
             .OfType<IExpressionStatementOperation>()
             .Where(operation => statement.Span.Contains(operation.Syntax.SpanStart))
             .GroupBy(static operation => operation.Syntax)
@@ -1256,10 +1239,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             if (owner == null ||
                 !expressionOwners.TryGetValue(owner, out var ownerCount) ||
                 ownerCount != 1)
-                return FailShape("statement-region.flow-capture", out failure);
+                return "statement-region.flow-capture";
             flowCaptureIds.Add(capture.Id);
         }
-        return true;
+        return null;
     }
 
     private static IOperation? UnwrapConversion(IOperation? operation) =>
@@ -1274,13 +1257,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             node is GotoStatementSyntax or ContinueStatementSyntax or YieldStatementSyntax ||
             !allowBreak && node is BreakStatementSyntax);
 
-    private static bool FailShape(string detail, out string failure)
-    {
-        failure = detail;
-        return false;
-    }
-
-    private static HashSet<int> CollectAdjacentConnectors(
+    private static HashSet<int> CollectConnectorClosure(
         ControlFlowGraph graph,
         IEnumerable<int> directOrdinals,
         ISet<int> connectorCandidates,
@@ -1319,7 +1296,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         out string failure)
     {
         plan = null!;
-        return FailShape(failureDetail, out failure);
+        failure = failureDetail;
+        return false;
     }
 
     private static IEnumerable<ControlFlowBranch> GetSuccessors(BasicBlock block)
@@ -1392,15 +1370,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     }
 
     internal sealed record CfgRegionPlan(
-        SyntaxNode Target,
+        StatementSyntax Target,
         CfgTraversalPoint EntryPoint,
-        IReadOnlyDictionary<int, (
-            int FirstOperationIndex,
-            int EndOperationIndexExclusive,
-            bool HasCursorExit)> Blocks,
-        ISet<CaptureId> FlowCaptureIds,
-        bool InvalidatesExitedLocals)
+        IReadOnlyDictionary<int, CfgBlockSlice> Blocks)
     {
+        internal bool InvalidatesExitedLocals => Target is IfStatementSyntax or SwitchStatementSyntax;
+
         internal List<(ControlFlowBranch Branch, CfgPathState Path)> CompletedPaths { get; } = [];
 
         internal List<CfgPathState> TerminalPaths { get; } = [];
@@ -1412,6 +1387,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 ? new CfgTraversalPoint(block, continuation, slice.FirstOperationIndex)
                 : default;
     }
+
+    internal readonly record struct CfgBlockSlice(
+        int FirstOperationIndex,
+        int EndOperationIndexExclusive,
+        bool HasCursorExit);
 
     internal static bool IsTargetOperation(
         IOperation operation,

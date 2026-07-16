@@ -202,7 +202,7 @@ internal static class SymbolicCfgExecutionTrace
             {
                 var operation = point.Block.Operations[index];
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot) ||
-                    operation is IFlowCaptureOperation flowCapture && region.FlowCaptureIds.Contains(flowCapture.Id))
+                    operation is IFlowCaptureOperation)
                     continue;
                 ISymbol? invalidatedGuardTarget = null;
                 if (!summarizesLoop && !TryApplyOperation(

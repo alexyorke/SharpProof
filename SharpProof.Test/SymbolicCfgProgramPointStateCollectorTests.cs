@@ -700,28 +700,32 @@ static class C
         }
     }
 
-    [Test]
-    public void CompletedStatementRegion_UnsupportedShapePreservesTypedReason()
+    [TestCase(
+        "static class C { static int M(int value) { switch (value) { case 0: switch (value) { case 1: break; } break; } return value; } }",
+        typeof(SwitchStatementSyntax),
+        "statement-region.switch-nested")]
+    [TestCase(
+        "static class C { static int M(int value) { switch (value) { case 0: case 1: break; } return value; } }",
+        typeof(SwitchStatementSyntax),
+        "statement-region.switch-multi-label")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool other) { int value = 0; if (condition) { if (other) goto End; value = 1; } End: return value; } }",
+        typeof(IfStatementSyntax),
+        "statement-region.if-abrupt")]
+    [TestCase(
+        "static class C { static int M(int value) { try { switch (value) { case 0: return 1; } } finally { value = 2; } return value; } }",
+        typeof(SwitchStatementSyntax),
+        "statement-region.finally-ownership")]
+    public void CompletedStatementRegion_UnsupportedShapePreservesTypedReason(
+        string source,
+        Type statementType,
+        string expectedDetail)
     {
-        const string source = """
-            static class C
-            {
-                static int M(int value)
-                {
-                    switch (value)
-                    {
-                        case 0:
-                            switch (value) { case 1: break; }
-                            break;
-                    }
-                    return value;
-                }
-            }
-            """;
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
             nameof(CompletedStatementRegion_UnsupportedShapePreservesTypedReason));
-        var statement = fixture.Root.DescendantNodes().OfType<SwitchStatementSyntax>().First();
+        var statement = (StatementSyntax)fixture.Root.DescendantNodes()
+            .First(node => node.GetType() == statementType);
 
         var result = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
             statement,
@@ -737,7 +741,7 @@ static class C
             var provenance = result.Provenance.Single();
             Assert.That(provenance.Stage, Is.EqualTo("cfg-program-point"));
             Assert.That(provenance.SourceSpan, Is.EqualTo(statement.Span));
-            Assert.That(provenance.Detail, Is.EqualTo("statement-region.switch-nested"));
+            Assert.That(provenance.Detail, Is.EqualTo(expectedDetail));
         });
     }
 
