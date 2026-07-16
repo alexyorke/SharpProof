@@ -1115,7 +1115,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 exhaustive fuzz manifest characterization | Commit `e1049a5d` adds one inline SHA-256 characterization over all 70 registry entries in declaration order and variants zero through three. The payload locks entry and generated-case identity, ordered operation/syntax/primary-shape metadata, expectation enums and required-property arrays, flags, and exact source bytes without an external snapshot file. The direct characterization passes 1/1. Production LOC remains 106,413; tracked test LOC is 145,163. |
 | Phase 7 typed fuzz method manifest | Commit `f068d3da` replaces 43 raw method-shaped source blocks with one typed method emitter while preserving the deliberately unusual historical indentation and mixed newline bytes. Guarded, try/catch, switch, local-function, lambda, tuple, pattern, and straight-line bodies retain their exact source text and registry metadata. The exhaustive manifest hash passes, and the complete fuzz/shape gate passes 28/28. `FuzzCaseGenerator` falls by 225 nonblank production lines to 794; repository production LOC is 106,188, or -1,488 from the rewrite start. |
 | Phase 7 fuzz expression and mutation manifest | Commit `1abd017e` replaces four RNG-sensitive expression builders with one descriptor that deliberately avoids a random draw for fixed expressions, and emits increment/decrement through the typed method path. The byte-distinct string-concat renderer remains specialized. The exhaustive hash and 28-case fuzz/shape gate pass. Production LOC falls to 106,156, or -1,520 from the rewrite start. |
-| Phase 7 fuzz compilation-unit manifest | Commit `8fc63e01` folds randomized ownership and twelve custom class/auxiliary-type builders into the ordered shape manifest through one LF-stable compilation-unit renderer. Every registry identity, order, RNG draw, source byte, shape classification, expectation, flag, and seeded sample remains unchanged. `FuzzCaseGenerator` is now 762 physical / 673 nonblank lines, down 395 physical / 346 nonblank from the pre-rewrite file. The exact manifest hash passes, the complete fuzz/shape gate passes 28/28, and the Release warning-as-error solution build has zero warnings/errors. Production LOC is 106,067, or -1,609 from the rewrite start; tracked test LOC is 145,163. |
+| Phase 7 fuzz compilation-unit manifest | Commit `8fc63e01` folds randomized ownership and twelve custom class/auxiliary-type builders into the ordered shape manifest through one LF-stable compilation-unit renderer. Every registry identity, order, RNG draw, source byte, shape classification, expectation, flag, and seeded sample remains unchanged. `FuzzCaseGenerator` is now 762 physical / 673 nonblank lines, down 395 physical / 346 nonblank from the pre-rewrite file. The exact manifest hash passes, the complete fuzz/shape gate passes 28/28, and the Release warning-as-error solution build has zero warnings/errors. All six lanes pass 6,137 tests plus the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,970 plus two skips, and Tooling 593. Production LOC is 106,067, or -1,609 from the rewrite start; tracked test LOC is 145,163. |
+| Phase 7 compact projection characterization | Commit `c5735f57` locks normalized JSON bytes for compact and invariant point/line/span/file projections plus runtime-hazard, capability, and complexity compact results in eleven named inline-hash cases. Existing full JSON and explain JSON/SARIF byte fixtures remain complementary. The new gate passes 11/11 and establishes the deletion boundary for the 2,062-line forwarding-DTO island. Production LOC remains 106,067. |
 
 ## Current Checkpoint
 
@@ -1443,14 +1444,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   entry/variant hash and the 28-case fuzz/shape gate are green, and the Release
   warning-as-error solution build remains clean. The file falls from 1,157
   physical / 1,019 nonblank lines to 762 / 673 without changing source bytes.
-  Production LOC is 106,067 and test LOC is 145,163. The last complete six-lane
-  gate passed 6,133 tests plus the two documented MainGeneral skips; the three
-  added fallback cases pass in the 244-case collector gate. Release
+  Production LOC is 106,067 and test LOC is 145,163. The complete six-lane gate
+  passes 6,137 tests plus the two documented MainGeneral skips. Release
   warning-as-error is clean. The remaining topology and finalizers are an
   evidence-backed low-yield boundary after two bounded audits.
-- Next cheapest step: use the whole-solution call graph and independent semantic
-  and tooling audits to choose the next rewrite with at least 250 net production
-  lines; do not return to the measured low-yield completion/finalizer boundary.
+- Next cheapest step: replace the 2,062-nonblank-line compact/invariant CLI DTO
+  island with one internal projection document and byte-stable materializers.
+  Dual-render against the eleven new compact hashes plus existing full/explain
+  byte gates before switching Program, exit gates, and explain consumers; then
+  delete the six forwarding-model files. The independent estimate is
+  1,012-1,162 net production lines.
 - Blockers: the 11,000-line production target still requires 9,391 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
