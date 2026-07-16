@@ -394,6 +394,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     regions. Normal `try`/`finally` completion and terminal branches originating
     inside `finally` are exact; terminal edges leaving `try` with pending finally
     regions retain typed fallback after their guard polarity diverged.
+  - [x] Preserve the originating return/throw branch through typed finally
+    continuations. After every pending region executes, classify that path as
+    terminal instead of reintroducing it at the normal CFG exit; mixed and
+    exhaustive terminal roots now match structural state and evidence.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -571,7 +575,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 root scope-exit joins | `ef4413d3` | 106,044 | -1,632 |
 | Phase 7 mixed terminal root completion | `179fc4e4` | 106,150 | -1,526 |
 | Phase 7 direct-throw root completion boundary | `ec56f433` | 106,154 | -1,522 |
-| Phase 7 structured finally root completion | This commit | 106,162 | -1,514 |
+| Phase 7 structured finally root completion | `395902d0` | 106,162 | -1,514 |
+| Phase 7 terminal identity through finally | This commit | 106,182 | -1,494 |
 
 ## Validation Ledger
 
@@ -743,6 +748,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 mixed terminal root completion | Root completion now records the direct final return separately from earlier terminal paths. Mixed early-return roots publish only the surviving normal path, while exhaustive if/else returns recursively collapse matching true/false guard frames to their structural pre-branch baseline before canonical contradictory completion. Direct collector fixtures pass 63/63 and the broader program-point/invariant/operation/reachability differential passes 197/197. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,787 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,150, or -1,526 from the rewrite start; authoritative tracked test LOC is 143,352. |
 | Phase 7 direct-throw root completion boundary | Mixed early-throw roots and exhaustive throw/return roots match structural normalized state and evidence through the canonical terminal-path split. A `try`/`catch` reproduction initially returned `Exact` while omitting the catch alternative; root completion now detects Roslyn `TryAndCatch` regions and returns typed `Unsupported` so the structural collector remains authoritative. Direct collector fixtures pass 67/67 and the broader program-point/invariant/operation/reachability differential passes 201/201. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,791 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,154, or -1,522 from the rewrite start; authoritative tracked test LOC is 143,360. |
 | Phase 7 structured finally root completion | Root completion now admits Roslyn structured exception-handling edges outside `TryAndCatch` regions. A normal `try`/`finally` and a conditional throw originating inside `finally` match structural normalized state and evidence exactly. A return leaving `try` with pending finally regions reproduced a reversed surviving guard, so that terminal-edge shape remains typed `Unsupported` until its original completion identity survives the continuation. Direct collector fixtures pass 70/70 and the broader program-point/invariant/operation/reachability differential passes 204/204. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,794 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,162, or -1,514 from the rewrite start; authoritative tracked test LOC is 143,366. |
+| Phase 7 terminal identity through finally | `CfgFinallyContinuation` now retains the original terminal branch while its ordered finally regions execute. Completion records that branch in the root's direct-versus-earlier terminal partition instead of propagating it to the normal exit. Mixed early return, mixed early throw, and exhaustive return/throw through finally now match structural normalized state and evidence; the temporary pending-finally fallback is removed. Direct collector fixtures pass 72/72 and the broader program-point/invariant/operation/reachability differential passes 206/206. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,796 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,182, or -1,494 from the rewrite start; authoritative tracked test LOC is 143,370. |
 
 ## Current Checkpoint
 
@@ -846,7 +852,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 106,162, or -1,514 from the rewrite start. Assignment-expression current
+  now 106,182, or -1,494 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -883,13 +889,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   branches share that terminal boundary. Roots containing `TryAndCatch` regions
   select typed fallback after differential evidence exposed a missing catch
   alternative. Structured root `try`/`finally` completion is exact for normal
-  paths and terminals originating inside `finally`; a terminal leaving `try`
-  with pending finally regions retains typed fallback. Loop graphs retain bounded
+  paths and terminals originating inside `finally`. Return/throw edges leaving
+  `try` retain their terminal identity through every pending finally region and
+  no longer re-enter the normal CFG exit. Loop graphs retain bounded
   historical convergence; guard mutation, abrupt paths, cycles, and unsupported
-  operations retain typed fallback. Production LOC is 106,162, or -1,514 from
-  the rewrite start; authoritative tracked test LOC is 143,366.
-- Next cheapest step: retain the original terminal completion identity and guard
-  through typed finally continuations, then migrate early return/throw edges only
-  after their normalized state and evidence match structural transfer.
+  operations retain typed fallback. Production LOC is 106,182, or -1,494 from
+  the rewrite start; authoritative tracked test LOC is 143,370.
+- Next cheapest step: characterize nested pending-finally stacks and overriding
+  terminal completion inside an inner/outer finally, then preserve typed fallback
+  for any continuation hierarchy whose structural parity is not exact.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

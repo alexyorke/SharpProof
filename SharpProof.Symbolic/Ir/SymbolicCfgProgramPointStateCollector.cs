@@ -427,6 +427,11 @@ internal static class SymbolicCfgProgramPointStateCollector
                 branch.FinallyRegions,
                 0,
                 branch.Destination,
+                branch.Semantics is
+                    ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling
+                    ? null
+                    : branch,
                 activeContinuation);
             var finallyEntry = graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal];
             path = ApplyExitedRegionLocalInvalidation(
@@ -448,9 +453,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (branch.Semantics is not (ControlFlowBranchSemantics.Regular or
             ControlFlowBranchSemantics.StructuredExceptionHandling))
         {
-            (rootCompletion == null || ReferenceEquals(rootCompletion.CompletionBranch, branch)
-                ? completedPaths
-                : terminalPaths).Add(path);
+            RecordTerminalPath(branch, path, rootCompletion, completedPaths, terminalPaths);
             return true;
         }
         if (branch.Destination == null)
@@ -466,7 +469,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                     incoming,
                     queue,
                     queued,
-                    completedPaths);
+                    completedPaths,
+                    terminalPaths);
             completedPaths.Add(path);
             return true;
         }
@@ -522,7 +526,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         IDictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> incoming,
         Queue<CfgTraversalPoint> queue,
         ISet<CfgTraversalPoint> queued,
-        ICollection<CfgPathState> completedPaths)
+        ICollection<CfgPathState> completedPaths,
+        ICollection<CfgPathState> terminalPaths)
     {
         if (continuation == null)
         {
@@ -554,6 +559,16 @@ internal static class SymbolicCfgProgramPointStateCollector
                 queue,
                 queued);
         }
+        if (continuation.TerminalBranch is { } terminalBranch)
+        {
+            RecordTerminalPath(
+                terminalBranch,
+                path,
+                rootCompletion,
+                completedPaths,
+                terminalPaths);
+            return true;
+        }
         if (continuation.Destination != null)
         {
             path = ApplyExitedRegionLocalInvalidation(
@@ -583,8 +598,19 @@ internal static class SymbolicCfgProgramPointStateCollector
             incoming,
             queue,
             queued,
-            completedPaths);
+            completedPaths,
+            terminalPaths);
     }
+
+    private static void RecordTerminalPath(
+        ControlFlowBranch branch,
+        CfgPathState path,
+        CfgRootCompletionPlan? rootCompletion,
+        ICollection<CfgPathState> completedPaths,
+        ICollection<CfgPathState> terminalPaths) =>
+        (rootCompletion == null || ReferenceEquals(rootCompletion.CompletionBranch, branch)
+            ? completedPaths
+            : terminalPaths).Add(path);
 
     private static CfgPathState ApplyExitedRegionLocalInvalidation(
         BasicBlock source,
@@ -1116,6 +1142,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         ImmutableArray<ControlFlowRegion> Regions,
         int RegionIndex,
         BasicBlock? Destination,
+        ControlFlowBranch? TerminalBranch,
         CfgFinallyContinuation? Parent);
 
     private static bool TryApplyOperation(
@@ -1618,12 +1645,6 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool SupportsRootBlockCompletion(ControlFlowGraph graph)
     {
         if (ContainsRegionKind(graph.Root, ControlFlowRegionKind.TryAndCatch))
-            return false;
-        if (graph.Blocks.SelectMany(GetSuccessors).Any(branch =>
-                !branch.FinallyRegions.IsDefaultOrEmpty &&
-                branch.Semantics is not (
-                    ControlFlowBranchSemantics.Regular or
-                    ControlFlowBranchSemantics.StructuredExceptionHandling)))
             return false;
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
