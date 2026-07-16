@@ -438,6 +438,58 @@ public sealed class SymbolicOperationTransferModelTests
         });
     }
 
+    [TestCase(
+        "static class C { static string M(string? input) { string value = input ?? throw new System.Exception(); return value; } }")]
+    [TestCase(
+        "static class C { static string M(bool condition, string input) { string value = condition ? input : throw new System.Exception(); return value; } }")]
+    [TestCase(
+        "static class C { static string M(bool condition, string input) { string value = condition ? throw new System.Exception() : input; return value; } }")]
+    public void ThrowGuardedAssignment_MatchesStructuralTransfer(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ThrowGuardedAssignment_MatchesStructuralTransfer));
+        var declarator = fixture.Root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>()
+            .Single();
+        var valueExpression = declarator.Initializer!.Value;
+        var target = fixture.SemanticModel.GetDeclaredSymbol(declarator)!;
+        const string provenance = "test.throw-guarded-assignment";
+
+        var expected = new SymbolicState();
+        SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
+            ref expected,
+            target,
+            valueExpression,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            provenance);
+        var actual = SymbolicOperationTransferAdapter.ApplyAssignment(
+            new SymbolicState(),
+            target,
+            valueExpression,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            provenance: provenance,
+            bindingProvenance: provenance + ".assigned-value",
+            postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
+
+        SymbolicStateDifferentialHarness.AssertEquivalent(
+            SymbolicStateDifferentialHarness.Capture(
+                expected,
+                actual.Support,
+                actual.UnknownReason,
+                actual.Provenance,
+                actual.Truncation),
+            SymbolicStateDifferentialHarness.Capture(
+                actual.State,
+                actual.Support,
+                actual.UnknownReason,
+                actual.Provenance,
+                actual.Truncation),
+            "throw-guarded assignment");
+    }
+
     [Test]
     public void SymbolicNullableAssignment_MatchesLegacyValueParts()
     {

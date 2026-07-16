@@ -1112,6 +1112,8 @@ internal static class SymbolicOperationLowerer
         if (source is not ExpressionSyntax valueExpression)
             return Unsupported(source, provenance + ".target");
 
+        var throwGuardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(valueExpression);
+        valueExpression = throwGuardedValue.EffectiveValueExpression;
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(1);
         var postconditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         var propagations = ImmutableArray.CreateBuilder<SymbolicTermPropagation>();
@@ -1202,6 +1204,13 @@ internal static class SymbolicOperationLowerer
             if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
                 postconditions.AddRange(asExpressionState.PathConditions);
         }
+        if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
+            AddSymbolicThrowGuardedAssignmentPostconditions(
+                postconditions,
+                targetSymbol,
+                throwGuardedValue,
+                valueContext,
+                provenance);
         if (bindings.Count == 0 && postconditions.Count == 0 && propagations.Count == 0)
             return Unsupported(source, provenance + ".value");
 
@@ -1210,11 +1219,79 @@ internal static class SymbolicOperationLowerer
             postconditions.ToImmutable(),
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
-            new SymbolicOperationOrigin(source.Span, sequence, provenance),
+            new SymbolicOperationOrigin(valueExpression.Span, sequence, provenance),
             propagations.ToImmutable());
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
-            new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
+            new SymbolicLoweringProvenance("roslyn-to-operation", valueExpression.Span, provenance));
+    }
+
+    private static void AddSymbolicThrowGuardedAssignmentPostconditions(
+        ImmutableArray<SymbolicCondition>.Builder conditions,
+        ISymbol targetSymbol,
+        SymbolicThrowGuardedValue guardedValue,
+        SymbolicLoweringContext valueContext,
+        string provenance)
+    {
+        var condition = LowerThrowGuardedAssignmentPostcondition(
+            targetSymbol,
+            guardedValue,
+            valueContext,
+            provenance);
+        if (condition != null)
+            conditions.Add(condition);
+    }
+
+    internal static SymbolicCondition? LowerThrowGuardedAssignmentPostcondition(
+        ISymbol targetSymbol,
+        SymbolicThrowGuardedValue guardedValue,
+        SymbolicLoweringContext valueContext,
+        string provenance)
+    {
+        if (!guardedValue.HasGuard) return null;
+
+        if (guardedValue.GuardExpression is { } guard)
+        {
+            var effectiveValueIsTarget =
+                SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                    CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
+                        guardedValue.EffectiveValueExpression),
+                    valueContext.SemanticModel,
+                    valueContext.CancellationToken,
+                    out var effectiveValueSymbol) &&
+                SymbolEqualityComparer.Default.Equals(effectiveValueSymbol, targetSymbol);
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(
+                    guard,
+                    targetSymbol,
+                    valueContext.SemanticModel,
+                    valueContext.CancellationToken) &&
+                !effectiveValueIsTarget)
+                return null;
+
+            return SymbolicSemanticPipeline.LowerBranchCondition(
+                guard,
+                guardedValue.GuardBranchWhenTrue,
+                valueContext) is { IsExact: true, Value: { } condition }
+                    ? condition
+                    : null;
+        }
+
+        if (!guardedValue.RequiresNonNullValue ||
+            NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                guardedValue.EffectiveValueExpression,
+                valueContext.SemanticModel,
+                valueContext.CancellationToken) ||
+            SymbolicSemanticPipeline.LowerTerm(
+                guardedValue.EffectiveValueExpression,
+                valueContext) is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject })
+            return null;
+
+        return ExactRelation(
+            SymbolicRelationOperator.NotEqual,
+            subject,
+            new SymbolicNullTerm(),
+            guardedValue.EffectiveValueExpression,
+            provenance + ".throw-guard.non-null");
     }
 
     private static void AddReferenceAssignmentPostconditions(

@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
@@ -83,6 +85,54 @@ internal static class SymbolicReachabilityLowerer
             exactCondition,
             assumeTrue: true,
             condition.Span,
+            "operation-transfer.branch-assumption");
+    }
+
+    internal static SymbolicOperationTransitionResult ApplyCondition(
+        SymbolicState state,
+        IOperation condition,
+        bool branchWhenTrue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition branchCondition,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        SyntaxNode source;
+        if (condition is IIsNullOperation { Operand.Syntax: ExpressionSyntax operand } &&
+            SymbolicSemanticPipeline.LowerTerm(operand, context) is
+                { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject })
+        {
+            source = operand;
+            branchCondition = SymbolicIrLowerer.CreateRelationCondition(
+                branchWhenTrue
+                    ? SymbolicRelationOperator.Equal
+                    : SymbolicRelationOperator.NotEqual,
+                subject,
+                new SymbolicNullTerm(),
+                operand,
+                "operation-transfer.branch-null-assumption");
+        }
+        else if (condition.Syntax is ExpressionSyntax expression &&
+                 SymbolicSemanticPipeline.LowerBranchCondition(
+                     expression,
+                     branchWhenTrue,
+                     context) is { IsExact: true, Value: { } lowered })
+        {
+            source = expression;
+            branchCondition = lowered;
+        }
+        else
+        {
+            branchCondition = null!;
+            return Unsupported(state, condition.Syntax, "condition-operation");
+        }
+
+        return SymbolicOperationTransferKernel.Assume(
+            state,
+            branchCondition,
+            assumeTrue: true,
+            source.Span,
             "operation-transfer.branch-assumption");
     }
 

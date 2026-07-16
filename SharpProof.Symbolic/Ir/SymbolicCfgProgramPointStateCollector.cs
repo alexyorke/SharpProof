@@ -95,7 +95,17 @@ internal static class SymbolicCfgProgramPointStateCollector
             {
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
                     continue;
-                if (!targetIsCompletedRootBlock && ContainsSite(operation.Syntax, site))
+                if (includeCurrentStatementCompletionFacts &&
+                    site is LocalDeclarationStatementSyntax &&
+                    operation is IFlowCaptureOperation)
+                    continue;
+                if (!targetIsCompletedRootBlock &&
+                    IsTargetOperation(
+                        operation,
+                        site,
+                        includeCurrentStatementCompletionFacts,
+                        semanticModel,
+                        cancellationToken))
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
@@ -104,9 +114,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                             ? TryApplyCurrentDeclarationCompletion(
                                 ref state,
                                 declaration,
-                                block.Operations,
                                 currentPath.Guard,
-                                targetIsInsideBranch,
+                                allowGuardedReferenceAssignments: true,
                                 semanticModel,
                                 cancellationToken)
                             : TryApplyCurrentCompletion(
@@ -148,7 +157,10 @@ internal static class SymbolicCfgProgramPointStateCollector
 
             if (block.BranchValue != null)
             {
-                if (!targetIsCompletedRootBlock && ContainsSite(block.BranchValue.Syntax, site))
+                if (!targetIsCompletedRootBlock &&
+                    ContainsSite(block.BranchValue.Syntax, site) &&
+                    !(includeCurrentStatementCompletionFacts &&
+                      site is LocalDeclarationStatementSyntax))
                 {
                     if (targetIsInsideBranch && currentPath.GuardInvalidated)
                         return Unsupported(site, "branch-guard-mutation");
@@ -209,7 +221,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         {
             if (path.Guard != null)
                 return false;
-            if (block.BranchValue?.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax condition)
+            if (block.BranchValue is not { } condition)
                 return false;
 
             var conditionalIsTrue = block.ConditionKind == ControlFlowConditionKind.WhenTrue;
@@ -289,33 +301,29 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool TryCreateBranchState(
         SymbolicState state,
-        Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax condition,
+        IOperation condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicState branchState,
         out SymbolicCondition branchCondition)
     {
-        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
+        var transition = SymbolicReachabilityLowerer.ApplyCondition(
+            state,
             condition,
             branchWhenTrue,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } exactCondition })
+            semanticModel,
+            cancellationToken,
+            out branchCondition);
+        if (!transition.IsExact)
         {
             branchState = state;
             branchCondition = null!;
             return false;
         }
 
-        var transition = SymbolicOperationTransferKernel.Assume(
-            state,
-            exactCondition,
-            assumeTrue: true,
-            condition.Span,
-            "operation-transfer.branch-assumption");
         branchState = transition.State;
-        branchCondition = exactCondition;
-        return transition.IsExact;
+        return true;
     }
 
     private static bool TryPropagate(
@@ -858,25 +866,35 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool TryApplyCurrentDeclarationCompletion(
         ref SymbolicState state,
         LocalDeclarationStatementSyntax declaration,
-        ImmutableArray<IOperation> blockOperations,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var completedState = state;
+        var completedState = RemoveMatchingThrowGuard(
+            state,
+            declaration,
+            guard,
+            semanticModel,
+            cancellationToken);
         foreach (var declarator in declaration.Declaration.Variables)
         {
             if (declarator.Initializer is not { } initializer ||
-                blockOperations.FirstOrDefault(candidate => ReferenceEquals(candidate.Syntax, declarator)) is not
-                    { } operation ||
-                !TryApplyOperation(
+                semanticModel.GetOperation(declarator, cancellationToken) is not
+                    IVariableDeclaratorOperation
+                    {
+                        Symbol: var declaratorSymbol,
+                        Initializer.Value: { } value
+                    } ||
+                !TryApplyAssignment(
                     ref completedState,
-                    operation,
+                    declaratorSymbol,
+                    value,
                     guard,
                     allowGuardedReferenceAssignments,
                     semanticModel,
                     cancellationToken,
+                    "ir.path.prior-statement",
                     out _))
                 return false;
 
@@ -891,6 +909,42 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         state = completedState;
         return true;
+    }
+
+    private static SymbolicState RemoveMatchingThrowGuard(
+        SymbolicState state,
+        LocalDeclarationStatementSyntax declaration,
+        SymbolicCondition? guard,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (guard == null) return state;
+
+        var guardKey = SymbolicState.CreateProofConditionKey(guard);
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        foreach (var variable in declaration.Declaration.Variables)
+        {
+            if (variable.Initializer is not { Value: { } value } ||
+                semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not { } target)
+                continue;
+            var completion = SymbolicOperationLowerer.LowerThrowGuardedAssignmentPostcondition(
+                target,
+                SymbolicAssignmentStateTransfer.GetThrowGuardedValue(value),
+                context,
+                "ir.path.prior-statement");
+            if (completion == null ||
+                SymbolicState.CreateProofConditionKey(completion) != guardKey)
+                continue;
+
+            return new SymbolicState(
+                state.Facts,
+                state.PathConditions.Where(condition =>
+                    SymbolicState.CreateProofConditionKey(condition) != guardKey),
+                state.SymbolVersions,
+                state.IsContradictory);
+        }
+
+        return state;
     }
 
     private static bool TryApplyComputedUpdate(
@@ -1039,6 +1093,31 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
+
+    private static bool IsTargetOperation(
+        IOperation operation,
+        SyntaxNode site,
+        bool includeCurrentStatementCompletionFacts,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!includeCurrentStatementCompletionFacts || site is not LocalDeclarationStatementSyntax declaration)
+            return ContainsSite(operation.Syntax, site);
+        if (operation is IVariableDeclarationGroupOperation)
+            return ContainsSite(operation.Syntax, declaration);
+
+        ISymbol? target = operation switch
+        {
+            IVariableDeclaratorOperation declarator => declarator.Symbol,
+            ISimpleAssignmentOperation assignment when TryGetDirectTarget(assignment.Target, out var symbol) =>
+                symbol,
+            _ => null
+        };
+        return target != null && declaration.Declaration.Variables.Any(variable =>
+            SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetDeclaredSymbol(variable, cancellationToken),
+                target));
+    }
 
     private static bool UsesDefaultAnalysisLimits(SymbolicAnalysisLimits limits)
     {

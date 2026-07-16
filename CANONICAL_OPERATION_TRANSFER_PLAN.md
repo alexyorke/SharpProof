@@ -344,6 +344,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
     implicit assignment operations and normal-completion plans. Publish no
     partial state if any declarator is unsupported; throw-guarded initializer
     shapes retain typed structural fallback.
+  - [x] Lower coalesce and conditional throw-guarded assignments to their
+    effective value plus an ordered successful-completion condition. Current
+    declaration queries identify Roslyn's post-branch implicit assignment by
+    declared symbol, and CFG null tests use the same operation-aware
+    reachability transition as other branch conditions.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -509,7 +514,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical explicit-target CFG assignments | `de7c15e5` | 105,301 | -2,375 |
 | Phase 7 canonical declaration completion | `7242f05e` | 105,320 | -2,356 |
 | Phase 7 canonical straight-line block completion | `48e8a4f8` | 105,335 | -2,341 |
-| Phase 7 atomic multi-declarator completion | This commit | 105,361 | -2,315 |
+| Phase 7 atomic multi-declarator completion | `2721fce0` | 105,361 | -2,315 |
+| Phase 7 canonical throw-guarded completion | This commit | 105,553 | -2,123 |
 
 ## Validation Ledger
 
@@ -669,6 +675,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical declaration completion | Roslyn CFG represents a local initializer as an implicit simple assignment whose syntax is the declarator, not as the declaration-group operation returned by `SemanticModel.GetOperation`. Exact single-declarator current completion now consumes that assignment and the shared typed normal-completion lowerers. Multi-declarator and throw-guarded initializer shapes return typed fallback before partial state can escape. Direct collector fixtures pass 28/28, the broader program-point/reachability differential passes 127/127, MainSmtOracle passes 573/573, MainGeneral passes 3,749 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,320, or -2,356 from the rewrite start; test LOC is 143,057. |
 | Phase 7 canonical straight-line block completion | Current completion for a root block no longer observes the first contained operation. Exact straight-line roots consume every supported operation and observe the merged state at the CFG exit; explicit `return;` uses the existing completed-path state. Nested blocks, branching roots, and unsupported invocations return typed fallback before partial state escapes, while non-default scoped limits already select structural transfer. Direct collector fixtures pass 33/33, the broader program-point/reachability differential passes 132/132, MainSmtOracle passes 573/573, MainGeneral passes 3,754 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,335, or -2,341 from the rewrite start; test LOC is 143,116. |
 | Phase 7 atomic multi-declarator completion | Roslyn emits one implicit assignment per declarator. Current declaration completion now gathers those operations in source order, applies assignment and normal-completion semantics to a temporary immutable state, and publishes it only when every declarator is exact. A second declarator may consume the first declarator's canonical value; element-success evidence remains byte-equivalent. Single- and multi-declarator throw-guarded shapes still return typed fallback without exposing the temporary state. Direct collector fixtures pass 34/34, the broader program-point/reachability differential passes 133/133, MainSmtOracle passes 573/573, MainGeneral passes 3,755 with the same two explicit skips, Tooling passes 591/591, and MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 failure. The Release developer/test warning-as-error build has zero warnings. Production LOC is 105,361, or -2,315 from the rewrite start; test LOC is 143,144. |
+| Phase 7 canonical throw-guarded completion | Assignment lowering now unwraps coalesce and either conditional throw arm to the value produced on successful completion, then appends the matching non-null or branch condition after assignment evidence. The CFG collector no longer mistakes an initializer's internal branch value for a completed declaration: it waits for Roslyn's implicit declared-symbol assignment, ignores compiler flow captures, and lowers `IIsNullOperation` through the canonical reachability owner. Coalesce, both conditional throw-arm shapes, and multi-declarator consumption match structural normalized state and evidence exactly; unsupported invocation initializers remain typed fallback. Direct collector/operation fixtures pass 40/40, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,761 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,553, or -2,123 from the rewrite start; test LOC is 143,250. |
 
 ## Current Checkpoint
 
@@ -772,23 +779,27 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 105,361, or -2,315 from the rewrite start. Assignment-expression current
+  now 105,553, or -2,123 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
   current completion consumes Roslyn's implicit assignment plus the shared
-  normal-completion lowerers. External member writes, active guards,
-  throw-guarded declaration completion, nested or branching blocks, loop-local
-  targets, finally-local targets, and implicit
+  normal-completion lowerers. Coalesce and either conditional throw arm now
+  lower as the effective assigned value followed by an ordered successful-
+  completion condition. The CFG collector waits for the declared-symbol
+  assignment after initializer control flow and shares operation-aware null
+  branching with the canonical reachability owner. External member writes,
+  active guards, unsupported initializer invocations, nested or branching
+  blocks, loop-local targets, finally-local targets, and implicit
   constructor/bare-return CFG shapes remain conservative structural fallbacks.
   Multi-declarator completion now applies all implicit assignments and
   normal-completion plans atomically in source order, publishing no partial
   state if any declarator is unsupported.
   Straight-line root blocks now observe the completed CFG path at normal exit or
   explicit completion instead of stopping at their first contained operation.
-  Test LOC is 143,144.
-- Next cheapest step: characterize throw-guarded declaration lowering at the
-  implicit assignment boundary, emit its successful-completion conditions
-  canonically when exact, and retain typed fallback for unsupported guard forms.
+  Test LOC is 143,250.
+- Next cheapest step: characterize the next structural source-query fallback at
+  the canonical CFG boundary, starting with nested block completion, and migrate
+  only the first shape whose normalized state and evidence can remain exact.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

@@ -144,12 +144,75 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static string M(string? input) { string value = input ?? throw new System.Exception(); return value; } }")]
     [TestCase(
         "static class C { static string M(string? input) { int first = 1; string value = input ?? throw new System.Exception(), copy = value; return copy; } }")]
-    public void ThrowGuardedDeclarationCompletion_RemainsConservativeFallback(string source)
+    public void ThrowGuardedDeclarationCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ThrowGuardedDeclarationCompletion_RemainsConservativeFallback));
+            nameof(ThrowGuardedDeclarationCompletion_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Last();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [TestCase(
+        "static class C { static string M(bool condition, string input) { string value = condition ? input : throw new System.Exception(); return value; } }")]
+    [TestCase(
+        "static class C { static string M(bool condition, string input) { string value = condition ? throw new System.Exception() : input; return value; } }")]
+    public void ConditionalThrowGuardedDeclarationCompletion_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ConditionalThrowGuardedDeclarationCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [Test]
+    public void UnsupportedDeclarationCompletion_RemainsConservativeFallback()
+    {
+        const string source =
+            "static class C { static int Get() => 1; static int M() { int value = Get(); return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedDeclarationCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
