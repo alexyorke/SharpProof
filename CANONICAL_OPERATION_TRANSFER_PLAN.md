@@ -638,6 +638,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     net lines. Preserve arbitrary entry
     states, terminal/abrupt flow, evidence, versions, scope exit, typed fallback,
     and try/finally routing before deleting either path.
+    - [x] Route if/switch/while/do/for completion through one uncached seeded-trace
+      facade and make truncation atomic. The facade bypasses both trace and
+      structural caches, preserves arbitrary caller state, and returns typed
+      `Unsupported` with no partial value after any nested analysis-limit event.
+      Three missing terminal/do-loop matrix rows plus direct seed/cache and
+      truncation/cache invariants raise the collector fixture from 236 to 241
+      passing cases. The facade still delegates to the legacy region core; the
+      scheduler deletion remains the next step.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -1075,6 +1083,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 joint synchronous protocol adjudication | Three read-only audits inventory the entire using/foreach/lock completion surface. Strict completion deletion is 75 physical / 71 nonblank lines: 24 lines of using fallback, 44 lines of foreach/lock completion, and 7 dispatch lines. A correct shared completion descriptor must still distinguish using initializer lists, foreach zero-or-many execution, mandatory lock-body execution, hidden locals, abrupt flow, and implicit cleanup, so it cannot remove 50 net lines. Expanding scope to body entry raises gross candidates to 242 physical / 232 nonblank lines, but the conservative replacement estimate is 140-180 lines before complete parity coverage, leaving only 62-102 lines while centralizing semantically different resource protocols. Existing exact state coverage has only simple foreach, deconstructing foreach, and lock rows; using completion has proof-only coverage, not normalized state/evidence/version parity. Await/pattern/ref-struct protocols, multiple-resource partial initialization, disposal/`Monitor.Exit` exceptions, enumerator calls, and implicit exceptional cleanup remain distinct unsupported or analyzer-owned boundaries. The marginal combined rewrite is rejected under the deletion and semantic-clarity gates. CI/CD was independently rechecked: PR #79 and package-consumer runs are green, the tracked impact inventory regenerates byte-for-byte and selects the new collector fixtures, and `git diff --check` is clean. No production, test, CI, metric, or validated behavior changed. |
 | Phase 7 cached execution-root trace scaffold | Seedless, default-limit, acyclic before-current queries now share one immutable trace per semantic model and execution root instead of replaying the CFG for every point. The trace reuses the canonical collector worklist and transfer operations, records first lexical observations while replacing revisits, rebases method-entry evidence per site, publishes outside the traversal lock, and preserves typed structural fallback for unsupported shapes. A new isolated analysis-limit scope prevents trace-wide truncation events from contaminating point-query telemetry; custom limits bypass both point and trace caches. Cancellation, concurrent-root isolation, cache/evidence/version parity, unsupported-loop atomic fallback, and limit isolation are characterized. The focused trace/limit gate passes 10/10; analysis-limit/source-query/full-JSON coverage passes 323/323; all six lanes pass 6,128 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,962 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. Production LOC is 106,418, or -1,258 from the rewrite start; tracked handwritten test LOC is 145,042. There are no oversized files or partial types, and the collector partial remains 2,986 lines. The scaffold is intentionally +300 production lines; the next seeded completed-statement slice is the first deletion closure large enough to amortize it. CI/CD was independently rechecked green at the current hosted SHA, so no workflow patch was warranted. |
 | Phase 7 canonical invalidated-if completion | The completed-region worklist already invalidates mutated guards and merges surviving paths canonically, so its older 54-line syntax summary is deleted. The 36-case completion differential, complete collector fixture (236/236), analysis-limit/source-query/full-JSON gate (323/323), MainSmtFlow (257/257), and all six lanes remain green at 6,128 passes plus the two documented MainGeneral skips. Three deliberately broader deletions were rejected with evidence: raw loop exits changed six proof outcomes, removing abrupt-if completion broke finally/guarded-hazard diagnostics, and removing switch terminal exclusions changed one reachability result. The Release warning-as-error build remains at zero warnings and errors. Production LOC falls to 106,367, or -1,309 from the rewrite start; test LOC remains 145,042. |
+| Phase 7 seeded completion facade and atomic truncation | If/switch/while/do/for completion now enters through an uncached seeded execution-trace facade. Caller state and evidence remain exact, structural-cache telemetry is unchanged, and any nested limit event downgrades the result atomically to typed `Unsupported` with null value. Both-terminal if, all-terminal switch, do break/continue with a scoped local, caller seed, and truncation/cache cases close the characterization gaps; the full collector fixture passes 241/241. This scaffold is intentionally intermediate and still delegates to the legacy region core. Production LOC is 106,403, or -1,273 from the rewrite start; tracked test LOC is 145,113. |
 
 ## Current Checkpoint
 
@@ -1393,14 +1402,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   reachability semantics. Production LOC is 106,367, or -1,309 from the rewrite
   start; all six lanes pass 6,128 tests with the same two documented MainGeneral
   skips. The trace scaffold is not fully amortized until its next capability
-  deletes the superseded completion owners.
-- Next cheapest step: extend the same worklist with a caller-supplied entry point
-  and seed plus completed-statement exit observations for if/switch/while/do/for.
+  deletes the superseded completion owners. The uncached seeded facade and its
+  five missing invariants are now green at 241/241 focused cases; it still calls
+  the legacy region core. Production LOC is 106,403 and test LOC is 145,113.
+- Next cheapest step: replace that legacy core with caller-seeded statement-exit
+  observations for if/switch/while/do/for in the shared worklist.
   Shadow-compare normalized states, evidence, versions, terminal/abrupt flow,
   scope exit, fallback identity, and truncation, then delete the 873-line
   completed-region scheduler/summary closure in the same green slice. Do not take
   the smaller for-initial-entry extension, which removes only 80-125 net lines.
-- Blockers: the 11,000-line production target still requires 9,691 lines. The
+- Blockers: the 11,000-line production target still requires 9,727 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.

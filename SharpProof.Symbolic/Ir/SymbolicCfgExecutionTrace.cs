@@ -98,6 +98,26 @@ internal static class SymbolicCfgExecutionTrace
             : SymbolicLoweringResult<SymbolicState>.Unsupported(trace.Provenance.Single());
     }
 
+    internal static SymbolicLoweringResult<SymbolicState> CollectCompletedStatementState(
+        StatementSyntax statement,
+        SymbolicState entryState,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var limitScope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimitContext.Limits,
+            statement);
+        var result = CollectCompletedStatementStateCore(
+            statement,
+            entryState,
+            semanticModel,
+            cancellationToken);
+        return limitScope.Snapshot().IsTruncated
+            ? Unsupported(statement, "trace.truncation")
+            : result;
+    }
+
     private static SymbolicLoweringResult<ExecutionTrace> CollectExecutionTrace(
         SyntaxNode executionRoot,
         SemanticModel semanticModel,

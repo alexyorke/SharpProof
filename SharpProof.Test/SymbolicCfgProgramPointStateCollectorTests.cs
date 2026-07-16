@@ -296,6 +296,9 @@ static class C
         "static class C { static int M(bool condition) { int value = 1; if (condition) throw new System.Exception(); value = 2; return value; } }",
         typeof(IfStatementSyntax))]
     [TestCase(
+        "static class C { static int M(bool condition) { if (condition) return 1; else throw new System.Exception(); } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
         "static class C { static int M(int input) { int value = 1; switch (input) { case 0: value = 2; break; default: value = 3; break; } return value; } }",
         typeof(SwitchStatementSyntax))]
     [TestCase(
@@ -306,6 +309,9 @@ static class C
         typeof(SwitchStatementSyntax))]
     [TestCase(
         "static class C { static int M(object input) { int value = 1; switch (input) { case int _: value = 2; break; default: value = 3; break; } return value; } }",
+        typeof(SwitchStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int input) { switch (input) { case 0: return 1; default: throw new System.Exception(); } } }",
         typeof(SwitchStatementSyntax))]
     [TestCase(
         "static class C { static int M(bool condition) { int value = 1; while (condition) value = 2; return value; } }",
@@ -357,6 +363,9 @@ static class C
         typeof(WhileStatementSyntax))]
     [TestCase(
         "static class C { static int M(bool condition) { int value = 1; do value = 2; while (condition); return value; } }",
+        typeof(DoStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool repeat, bool stop) { int value = 1; do { int hidden = value; if (stop) break; if (repeat) continue; value = hidden + 1; } while (repeat); return value; } }",
         typeof(DoStatementSyntax))]
     [TestCase(
         "static class C { static int M(bool condition) { int value = 1; for (; condition;) value = 2; return value; } }",
@@ -415,6 +424,74 @@ static class C
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         AssertStateParity(actual.Value!, expected);
+    }
+
+    [Test]
+    public void SeededCompletedStatementTrace_PreservesSeedAndBypassesCache()
+    {
+        const string source =
+            "static class C { static int M(bool condition, int input) { if (condition) { int hidden = input; } return input; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SeededCompletedStatementTrace_PreservesSeedAndBypassesCache));
+        var statement = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single();
+        var seed = CreateSeed(fixture, statement, "input", SeedKind.Numeric, 17);
+        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
+
+        var actual = SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+            statement,
+            seed,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementStateCore(
+            statement,
+            seed,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected.Value!);
+        Assert.That(ContainsSeedEvidence(actual.Value!), Is.True);
+        Assert.That(actual.Provenance.Single().Stage, Is.EqualTo("cfg-program-point"));
+        Assert.That(actual.Provenance.Single().SourceSpan, Is.EqualTo(statement.Span));
+        Assert.That(actual.Provenance.Single().Detail, Is.EqualTo("exact"));
+        AssertCacheInfo(
+            SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel),
+            before);
+    }
+
+    [Test]
+    public void SeededCompletedStatementTrace_TruncationIsAtomicAndBypassesCache()
+    {
+        const string source =
+            "static class C { static int M(bool condition) { int value = 0; if (condition) { int left = 1; value = left; } else { int right = 2; value = right; } return value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SeededCompletedStatementTrace_TruncationIsAtomicAndBypassesCache));
+        var statement = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single();
+        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedIfElseFacts: 1));
+
+        var result = SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+            statement,
+            new SymbolicState(),
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsUnsupported, Is.True);
+            Assert.That(result.Value, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            var provenance = result.Provenance.Single();
+            Assert.That(provenance.Stage, Is.EqualTo("cfg-program-point"));
+            Assert.That(provenance.SourceSpan, Is.EqualTo(statement.Span));
+            Assert.That(provenance.Detail, Is.EqualTo("trace.truncation"));
+        });
+        AssertCacheInfo(
+            SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel),
+            before);
     }
 
     [TestCase(

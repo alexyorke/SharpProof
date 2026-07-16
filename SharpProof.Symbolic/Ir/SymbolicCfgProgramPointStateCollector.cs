@@ -40,6 +40,24 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         SymbolicState entryState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
+        statement is IfStatementSyntax or SwitchStatementSyntax or
+            WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax
+            ? SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+                statement,
+                entryState,
+                semanticModel,
+                cancellationToken)
+            : CollectCompletedStatementStateCore(
+                statement,
+                entryState,
+                semanticModel,
+                cancellationToken);
+
+    internal static SymbolicLoweringResult<SymbolicState> CollectCompletedStatementStateCore(
+        StatementSyntax statement,
+        SymbolicState entryState,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
         CollectState(
             statement,
             semanticModel,
