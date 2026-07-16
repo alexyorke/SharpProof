@@ -259,11 +259,15 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M(bool condition) { int value = 0; if (condition) { value = 7; } } }")]
     [TestCase(
         "static class C { static void M(bool condition, int[] values) { if (condition) { int value = values[0]; } } }")]
-    public void SingleOperationNestedBlockCompletion_MatchesStructuralCollector(string source)
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) { value = 1; value = 2; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, int[] values) { if (condition) { int first = values[0]; int second = first + 1; } } }")]
+    public void LinearNestedBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(SingleOperationNestedBlockCompletion_MatchesStructuralCollector));
+            nameof(LinearNestedBlockCompletion_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
 
         var actual = SymbolicCfgProgramPointStateCollector.CollectState(
@@ -288,9 +292,9 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [TestCase(
-        "static class C { static void M(bool condition) { int value = 0; if (condition) { value = 1; value = 2; } } }")]
-    [TestCase(
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) { System.Console.WriteLine(); value = 2; } } }")]
     public void ComplexNestedBlockCompletion_RemainsConservativeFallback(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(

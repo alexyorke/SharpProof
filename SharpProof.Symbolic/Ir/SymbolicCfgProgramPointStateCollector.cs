@@ -51,8 +51,12 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        IOperation? nestedBlockCompletionOperation = null;
         if (targetIsCompletedNestedBlock &&
-            !SupportsSingleOperationNestedBlockCompletion(graph, (BlockSyntax)site))
+            !TryGetLinearNestedBlockCompletionOperation(
+                graph,
+                (BlockSyntax)site,
+                out nestedBlockCompletionOperation))
             return Unsupported(site, "nested-block-completion");
         if (targetIsCompletedRootBlock &&
             graph.Blocks.Count(static block => block.Operations.Length != 0 || block.BranchValue != null) != 1)
@@ -108,6 +112,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         operation,
                         site,
                         includeCurrentStatementCompletionFacts,
+                        nestedBlockCompletionOperation,
                         semanticModel,
                         cancellationToken))
                 {
@@ -139,7 +144,10 @@ internal static class SymbolicCfgProgramPointStateCollector
                     foundTarget = true;
                     break;
                 }
-                if (!targetIsCompletedRootBlock && operation.Syntax.SpanStart >= site.SpanStart)
+                if (!targetIsCompletedRootBlock &&
+                    operation.Syntax.SpanStart >= site.SpanStart &&
+                    !(targetIsCompletedNestedBlock &&
+                      site.Span.Contains(operation.Syntax.SpanStart)))
                     return Unsupported(site, "operation-order");
                 if (!TryApplyOperation(
                         ref state,
@@ -154,6 +162,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                 {
                     GuardInvalidated = currentPath.GuardInvalidated || guardInvalidated
                 };
+                if (targetIsCompletedNestedBlock && site.Span.Contains(operation.Syntax.SpanStart))
+                    AddOperationNormalCompletionFacts(
+                        ref state,
+                        operation,
+                        semanticModel,
+                        cancellationToken);
             }
 
             if (foundTarget)
@@ -864,7 +878,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken);
         else if (site is BlockSyntax)
-            AddNestedBlockOperationCompletionFacts(
+            AddOperationNormalCompletionFacts(
                 ref state,
                 operation,
                 semanticModel,
@@ -873,7 +887,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static void AddNestedBlockOperationCompletionFacts(
+    private static void AddOperationNormalCompletionFacts(
         ref SymbolicState state,
         IOperation operation,
         SemanticModel semanticModel,
@@ -1130,24 +1144,37 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
 
-    private static bool SupportsSingleOperationNestedBlockCompletion(
+    private static bool TryGetLinearNestedBlockCompletionOperation(
         ControlFlowGraph graph,
-        BlockSyntax block)
+        BlockSyntax block,
+        out IOperation completionOperation)
     {
-        var operationCount = graph.Blocks.Sum(cfgBlock => cfgBlock.Operations.Count(operation =>
-            block.Span.Contains(operation.Syntax.SpanStart)));
-        return operationCount == 1 && graph.Blocks.All(cfgBlock =>
-            cfgBlock.BranchValue == null ||
-            !block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart));
+        var operations = graph.Blocks
+            .SelectMany(static cfgBlock => cfgBlock.Operations)
+            .Where(operation => block.Span.Contains(operation.Syntax.SpanStart))
+            .ToArray();
+        if (operations.Length == 0 || graph.Blocks.Any(cfgBlock =>
+                cfgBlock.BranchValue != null &&
+                block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart)))
+        {
+            completionOperation = null!;
+            return false;
+        }
+
+        completionOperation = operations[operations.Length - 1];
+        return true;
     }
 
     private static bool IsTargetOperation(
         IOperation operation,
         SyntaxNode site,
         bool includeCurrentStatementCompletionFacts,
+        IOperation? nestedBlockCompletionOperation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (nestedBlockCompletionOperation != null)
+            return ReferenceEquals(operation, nestedBlockCompletionOperation);
         if (!includeCurrentStatementCompletionFacts || site is not LocalDeclarationStatementSyntax declaration)
             return ContainsSite(operation.Syntax, site);
         if (operation is IVariableDeclarationGroupOperation)
