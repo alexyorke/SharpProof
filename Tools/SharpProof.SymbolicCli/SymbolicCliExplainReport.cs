@@ -325,7 +325,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         builder.AppendLine();
         builder.AppendLine($"- Invariant: `{EscapeInline(_invariant.MergedInvariantText)}`");
         builder.AppendLine($"- Invariant status: `{_invariant.InvariantQuery.Status}` - {EscapeInline(_invariant.InvariantQuery.StatusReason)}");
-        builder.AppendLine($"- Reachability: `{_invariant.PointReachability}` - {EscapeInline(_invariant.ReachabilityReason ?? string.Empty)}");
+        builder.AppendLine($"- Reachability: `{_invariant.Scope.PointReachability}` - {EscapeInline(_invariant.Scope.ReachabilityReason ?? string.Empty)}");
         builder.AppendLine($"- Proof outcomes: {_invariant.ProofOutcomes.TotalCount} total, {_invariant.ProofOutcomes.ProvenTrueCount} true, {_invariant.ProofOutcomes.ProvenFalseCount} false, {_invariant.ProofOutcomes.UnknownCount} unknown");
 
         builder.AppendLine();

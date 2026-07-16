@@ -1,31 +1,20 @@
+using System.Text.Json;
+
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicCompactLineResult(
-    SymbolicQueryResult result,
-    SymbolicCompactScopeProjection projection)
+internal sealed record SymbolicCompactLineResult(
+    JsonElement Json,
+    SymbolicCompactScopeProjection Projection) : ISymbolicRawJsonProjection
 {
-    public string FilePath => result.FilePath;
-    public int Line => result.Line ?? 0;
-    public int ProgramPointCount => result.ProgramPoints.Count;
-    public SymbolicCompactInvariantSummary ObservedInvariant => projection.ObservedInvariant;
-    public SymbolicCompactInvariantSummary ConservativeInvariant => projection.ConservativeInvariant;
-    public SymbolicCompactInvariantQueryView InvariantQuery => projection.InvariantQuery;
-    public string MergedInvariantText => ConservativeInvariant.Text;
-    public SymbolicReachabilitySummary Reachability => projection.Reachability;
-    public SymbolicProgramPointSummary ProgramPointSummary => projection.ProgramPointSummary;
-    public SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => projection.ConditionProofs;
-    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => projection.ProgramPoints;
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics => projection.SmtDiagnostics;
-    public SymbolicCompactOutputTruncation Truncation => projection.Truncation;
-    internal SymbolicCompactScopeProjection Projection => projection;
+    internal IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => Projection.ProgramPoints;
+    internal SymbolicCompactOutputTruncation Truncation => Projection.Truncation;
 
     internal static SymbolicCompactLineResult FromResult(
         SymbolicQueryResult result,
         SymbolicCompactQueryOptions options,
         int maxProgramPoints)
     {
-        return new SymbolicCompactLineResult(result, SymbolicCompactScopeProjection.Create(
+        var projection = SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
             result.Facts,
             result.MergedInvariant,
@@ -37,59 +26,30 @@ internal sealed class SymbolicCompactLineResult(
             result.ProgramPoints,
             result.SmtDiagnostics,
             options,
-            maxProgramPoints));
+            maxProgramPoints);
+        return new SymbolicCompactLineResult(
+            SymbolicOrderedJson.Object(
+                ("filePath", result.FilePath), ("line", result.Line),
+                ("programPointCount", result.ProgramPoints.Count),
+                ("observedInvariant", projection.ObservedInvariant),
+                ("conservativeInvariant", projection.ConservativeInvariant),
+                ("invariantQuery", projection.InvariantQuery),
+                ("mergedInvariantText", projection.ConservativeInvariant.Text),
+                ("reachability", projection.Reachability),
+                ("programPointSummary", projection.ProgramPointSummary),
+                ("proofOutcomes", projection.ProgramPointSummary.ProofOutcomes),
+                ("conditionProofs", projection.ConditionProofs),
+                ("programPoints", projection.ProgramPoints),
+                ("smtDiagnostics", projection.SmtDiagnostics),
+                ("truncation", projection.Truncation)),
+            projection);
     }
 }
 
-internal sealed class SymbolicCompactProgramPointResult(
-    SymbolicProgramPointResult result,
-    int factCount,
-    IReadOnlyList<string> facts,
-    IReadOnlyList<SymbolicFactInfo> symbolicFacts,
-    SymbolicCompactInvariantSummary observedInvariant,
-    SymbolicCompactInvariantSummary conservativeInvariant,
-    SymbolicCompactInvariantQueryView invariantQuery,
-    int pathConditionCount,
-    IReadOnlyList<SymbolicInvariantCondition> pathConditions,
-    IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
-    SymbolicCompactSmtDiagnostics smtDiagnostics,
-    SymbolicCompactOutputTruncation truncation)
+internal sealed record SymbolicCompactProgramPointResult(
+    JsonElement Json,
+    SymbolicCompactOutputTruncation Truncation) : ISymbolicRawJsonProjection
 {
-    public string FilePath => result.FilePath;
-    public int Line => result.Line;
-    public int Column => result.Column;
-    public int Position => result.Position;
-    public int? RequestedLine => result.RequestedLine;
-    public int? RequestedColumn => result.RequestedColumn;
-    public int? RequestedPosition => result.RequestedPosition;
-    public int? RequestedPositionDistance => result.RequestedPositionDistance;
-    public bool? ContainsRequestedPosition => result.ContainsRequestedPosition;
-    public int NodeSpanStart => result.NodeSpanStart;
-    public int NodeSpanEnd => result.NodeSpanEnd;
-    public int NodeSpanLength => result.NodeSpanLength;
-    public int NodeStartLine => result.NodeStartLine;
-    public int NodeStartColumn => result.NodeStartColumn;
-    public int NodeEndLine => result.NodeEndLine;
-    public int NodeEndColumn => result.NodeEndColumn;
-    public string NodeKind => result.NodeKind;
-    public string? MethodName => result.MethodName;
-    public string ProgramPointKind => result.ProgramPointKind;
-    public int FactCount { get; } = factCount;
-    public IReadOnlyList<string> Facts { get; } = facts;
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } = symbolicFacts;
-    public SymbolicCompactInvariantSummary ObservedInvariant { get; } = observedInvariant;
-    public SymbolicCompactInvariantSummary ConservativeInvariant { get; } = conservativeInvariant;
-    public SymbolicCompactInvariantQueryView InvariantQuery { get; } = invariantQuery;
-    public string MergedInvariantText => ConservativeInvariant.Text;
-    public int PathConditionCount { get; } = pathConditionCount;
-    public IReadOnlyList<SymbolicInvariantCondition> InvariantConditions { get; } = pathConditions;
-    internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => InvariantConditions;
-    public string Reachability => result.Reachability.ToString();
-    public string ReachabilityReason => result.ReachabilityReason;
-    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } = conditionProofs;
-    public SymbolicProofOutcomeSummary ProofOutcomes => result.ProofOutcomes;
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics;
-    public SymbolicCompactOutputTruncation Truncation { get; } = truncation;
 
     internal static SymbolicCompactProgramPointResult FromResult(
         SymbolicProgramPointResult result,
@@ -122,49 +82,43 @@ internal sealed class SymbolicCompactProgramPointResult(
             SymbolicCompactOutputTruncation.FromInvariant(observed),
             SymbolicCompactOutputTruncation.FromInvariant(conservative));
 
+        var invariantQuery = SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options);
         return new SymbolicCompactProgramPointResult(
-            result,
-            focusedFacts.Count,
-            facts,
-            symbolicFacts,
-            observed,
-            conservative,
-            SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
-            focusedConditions.Count,
-            conditions,
-            proofs,
-            SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            SymbolicOrderedJson.Object(
+                ("filePath", result.FilePath), ("line", result.Line), ("column", result.Column),
+                ("position", result.Position), ("requestedLine", result.RequestedLine),
+                ("requestedColumn", result.RequestedColumn), ("requestedPosition", result.RequestedPosition),
+                ("requestedPositionDistance", result.RequestedPositionDistance),
+                ("containsRequestedPosition", result.ContainsRequestedPosition),
+                ("nodeSpanStart", result.NodeSpanStart), ("nodeSpanEnd", result.NodeSpanEnd),
+                ("nodeSpanLength", result.NodeSpanLength), ("nodeStartLine", result.NodeStartLine),
+                ("nodeStartColumn", result.NodeStartColumn), ("nodeEndLine", result.NodeEndLine),
+                ("nodeEndColumn", result.NodeEndColumn), ("nodeKind", result.NodeKind),
+                ("methodName", result.MethodName), ("programPointKind", result.ProgramPointKind),
+                ("factCount", focusedFacts.Count), ("facts", facts), ("symbolicFacts", symbolicFacts),
+                ("observedInvariant", observed), ("conservativeInvariant", conservative),
+                ("invariantQuery", invariantQuery), ("mergedInvariantText", conservative.Text),
+                ("pathConditionCount", focusedConditions.Count), ("invariantConditions", conditions),
+                ("reachability", result.Reachability.ToString()),
+                ("reachabilityReason", result.ReachabilityReason), ("conditionProofs", proofs),
+                ("proofOutcomes", result.ProofOutcomes),
+                ("smtDiagnostics", SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics)),
+                ("truncation", truncation)),
             truncation);
     }
 }
 
-internal sealed class SymbolicCompactInvariantSummary(
-    SymbolicInvariantResult invariant,
-    IReadOnlyList<string> conditions,
-    int targetCount,
-    IReadOnlyList<string> targets,
-    int rawFactCount,
-    IReadOnlyList<string> rawFacts,
-    SymbolicCompactMergedPathFacts? mergedPathFacts,
-    bool conditionsTruncated,
-    bool targetsTruncated,
-    bool rawFactsTruncated)
+internal sealed record SymbolicCompactInvariantSummary(
+    JsonElement Json,
+    string Text,
+    int ConditionCount,
+    int TargetCount,
+    IReadOnlyList<string> Targets,
+    bool ConditionsTruncated,
+    bool TargetsTruncated,
+    bool RawFactsTruncated,
+    bool MergedPathFactsTruncated) : ISymbolicRawJsonProjection
 {
-    public string MergeKind => invariant.MergeKind.ToString();
-    public string Text => invariant.MergedInvariantText;
-    public int ConditionCount => invariant.ConditionCount;
-    public IReadOnlyList<string> Conditions { get; } = conditions;
-    public int TargetCount { get; } = targetCount;
-    public IReadOnlyList<string> Targets { get; } = targets;
-    public int RawFactCount { get; } = rawFactCount;
-    public IReadOnlyList<string> RawFacts { get; } = rawFacts;
-    public int ConservativeUnknownCount => invariant.ConservativeUnknownCount;
-    public bool HasConservativeUnknowns => invariant.HasConservativeUnknowns;
-    public SymbolicCompactMergedPathFacts? MergedPathFacts { get; } = mergedPathFacts;
-    public bool ConditionsTruncated { get; } = conditionsTruncated;
-    public bool TargetsTruncated { get; } = targetsTruncated;
-    public bool RawFactsTruncated { get; } = rawFactsTruncated;
-    internal bool MergedPathFactsTruncated => MergedPathFacts?.IsTruncated == true;
 
     internal static SymbolicCompactInvariantSummary FromObservedFacts(
         SymbolicInvariantResult invariant,
@@ -191,50 +145,40 @@ internal sealed class SymbolicCompactInvariantSummary(
                 .ToArray(),
             options.MaxConditions);
         var rawFactProjection = SymbolicCompactProjection.Project(rawFacts, options.MaxFacts);
+        var compactMerged = mergedPathFacts == null
+            ? null
+            : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options);
         return new SymbolicCompactInvariantSummary(
-            invariant,
-            conditionProjection.Items,
+            SymbolicOrderedJson.Object(
+                ("mergeKind", invariant.MergeKind.ToString()),
+                ("text", invariant.MergedInvariantText),
+                ("conditionCount", invariant.ConditionCount),
+                ("conditions", conditionProjection.Items),
+                ("targetCount", targetProjection.TotalCount),
+                ("targets", targetProjection.Items),
+                ("rawFactCount", rawFactProjection.TotalCount),
+                ("rawFacts", rawFactProjection.Items),
+                ("conservativeUnknownCount", invariant.ConservativeUnknownCount),
+                ("hasConservativeUnknowns", invariant.HasConservativeUnknowns),
+                ("mergedPathFacts", compactMerged),
+                ("conditionsTruncated", conditionProjection.IsTruncated),
+                ("targetsTruncated", targetProjection.IsTruncated),
+                ("rawFactsTruncated", rawFactProjection.IsTruncated)),
+            invariant.MergedInvariantText,
+            invariant.ConditionCount,
             targetProjection.TotalCount,
             targetProjection.Items,
-            rawFactProjection.TotalCount,
-            rawFactProjection.Items,
-            mergedPathFacts == null ? null : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
             conditionProjection.IsTruncated,
             targetProjection.IsTruncated,
-            rawFactProjection.IsTruncated);
+            rawFactProjection.IsTruncated,
+            compactMerged?.IsTruncated == true);
     }
 }
 
-internal sealed class SymbolicCompactMergedPathFacts(
-    SymbolicMergedPathFacts facts,
-    IReadOnlyList<string> alwaysFacts,
-    IReadOnlyList<string> maybeFacts,
-    IReadOnlyList<string> conservativeUnknowns,
-    IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
-    bool alwaysFactsTruncated,
-    bool maybeFactsTruncated,
-    bool conservativeUnknownsTruncated,
-    bool conservativeUnknownDiagnosticsTruncated)
+internal sealed record SymbolicCompactMergedPathFacts(
+    JsonElement Json,
+    bool IsTruncated) : ISymbolicRawJsonProjection
 {
-    public int AlwaysFactCount => facts.AlwaysFacts.Count;
-    public IReadOnlyList<string> AlwaysFacts { get; } = alwaysFacts;
-    public int MaybeFactCount => facts.MaybeFacts.Count;
-    public IReadOnlyList<string> MaybeFacts { get; } = maybeFacts;
-    public int ConservativeUnknownCount => facts.ConservativeUnknownCount;
-    public IReadOnlyList<string> ConservativeUnknowns { get; } = conservativeUnknowns;
-    public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; } =
-        conservativeUnknownDiagnostics;
-    public int CandidateProgramPointCount => facts.CandidateProgramPointCount;
-    public int UnreachableProgramPointCount => facts.UnreachableProgramPointCount;
-    public bool IsUnreachable => facts.IsUnreachable;
-    public bool AlwaysFactsTruncated { get; } = alwaysFactsTruncated;
-    public bool MaybeFactsTruncated { get; } = maybeFactsTruncated;
-    public bool ConservativeUnknownsTruncated { get; } = conservativeUnknownsTruncated;
-    public bool ConservativeUnknownDiagnosticsTruncated { get; } = conservativeUnknownDiagnosticsTruncated;
-    internal bool IsTruncated =>
-        AlwaysFactsTruncated || MaybeFactsTruncated || ConservativeUnknownsTruncated ||
-        ConservativeUnknownDiagnosticsTruncated ||
-        ConservativeUnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated);
 
     internal static SymbolicCompactMergedPathFacts FromMergedPathFacts(
         SymbolicMergedPathFacts facts,
@@ -243,41 +187,62 @@ internal sealed class SymbolicCompactMergedPathFacts(
         var diagnostics = SymbolicCompactProjection.Take(facts.ConservativeUnknownDiagnostics, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
+        var alwaysFacts = SymbolicCompactProjection.Take(facts.AlwaysFacts, options.MaxConditions);
+        var maybeFacts = SymbolicCompactProjection.Take(facts.MaybeFacts, options.MaxConditions);
+        var unknowns = SymbolicCompactProjection.Take(facts.ConservativeUnknowns, options.MaxConditions);
+        var alwaysTruncated = facts.AlwaysFacts.Count > options.MaxConditions;
+        var maybeTruncated = facts.MaybeFacts.Count > options.MaxConditions;
+        var unknownsTruncated = facts.ConservativeUnknowns.Count > options.MaxConditions;
+        var diagnosticsTruncated = facts.ConservativeUnknownDiagnostics.Count > options.MaxConditions;
         return new SymbolicCompactMergedPathFacts(
-            facts,
-            SymbolicCompactProjection.Take(facts.AlwaysFacts, options.MaxConditions),
-            SymbolicCompactProjection.Take(facts.MaybeFacts, options.MaxConditions),
-            SymbolicCompactProjection.Take(facts.ConservativeUnknowns, options.MaxConditions),
-            diagnostics,
-            facts.AlwaysFacts.Count > options.MaxConditions,
-            facts.MaybeFacts.Count > options.MaxConditions,
-            facts.ConservativeUnknowns.Count > options.MaxConditions,
-            facts.ConservativeUnknownDiagnostics.Count > options.MaxConditions);
+            SymbolicOrderedJson.Object(
+                ("alwaysFactCount", facts.AlwaysFacts.Count),
+                ("alwaysFacts", alwaysFacts),
+                ("maybeFactCount", facts.MaybeFacts.Count),
+                ("maybeFacts", maybeFacts),
+                ("conservativeUnknownCount", facts.ConservativeUnknownCount),
+                ("conservativeUnknowns", unknowns),
+                ("conservativeUnknownDiagnostics", diagnostics),
+                ("candidateProgramPointCount", facts.CandidateProgramPointCount),
+                ("unreachableProgramPointCount", facts.UnreachableProgramPointCount),
+                ("isUnreachable", facts.IsUnreachable),
+                ("alwaysFactsTruncated", alwaysTruncated),
+                ("maybeFactsTruncated", maybeTruncated),
+                ("conservativeUnknownsTruncated", unknownsTruncated),
+                ("conservativeUnknownDiagnosticsTruncated", diagnosticsTruncated)),
+            alwaysTruncated || maybeTruncated || unknownsTruncated || diagnosticsTruncated ||
+            diagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated));
     }
 }
 
-internal sealed class SymbolicCompactConservativeUnknownDiagnostic(
-    SymbolicConservativeUnknownDiagnostic diagnostic,
-    IReadOnlyList<string> maybeFacts,
-    bool maybeFactsTruncated)
+internal sealed record SymbolicCompactConservativeUnknownDiagnostic(
+    JsonElement Json,
+    string Target,
+    string UnknownText,
+    string Reason,
+    bool MaybeFactsTruncated) : ISymbolicRawJsonProjection
 {
-    public string Target => diagnostic.Target;
-    public string UnknownText => diagnostic.UnknownText;
-    public string Reason => diagnostic.Reason;
-    public int MaybeFactCount => diagnostic.MaybeFactCount;
-    public IReadOnlyList<string> MaybeFacts { get; } = maybeFacts;
-    public int CandidateProgramPointCount => diagnostic.CandidateProgramPointCount;
-    public int UnreachableProgramPointCount => diagnostic.UnreachableProgramPointCount;
-    public bool MaybeFactsTruncated { get; } = maybeFactsTruncated;
 
     internal static SymbolicCompactConservativeUnknownDiagnostic FromDiagnostic(
         SymbolicConservativeUnknownDiagnostic diagnostic,
         SymbolicCompactQueryOptions options)
     {
+        var maybeFacts = SymbolicCompactProjection.Take(diagnostic.MaybeFacts, options.MaxConditions);
+        var truncated = diagnostic.MaybeFacts.Count > options.MaxConditions;
         return new SymbolicCompactConservativeUnknownDiagnostic(
-            diagnostic,
-            SymbolicCompactProjection.Take(diagnostic.MaybeFacts, options.MaxConditions),
-            diagnostic.MaybeFacts.Count > options.MaxConditions);
+            SymbolicOrderedJson.Object(
+                ("target", diagnostic.Target),
+                ("unknownText", diagnostic.UnknownText),
+                ("reason", diagnostic.Reason),
+                ("maybeFactCount", diagnostic.MaybeFactCount),
+                ("maybeFacts", maybeFacts),
+                ("candidateProgramPointCount", diagnostic.CandidateProgramPointCount),
+                ("unreachableProgramPointCount", diagnostic.UnreachableProgramPointCount),
+                ("maybeFactsTruncated", truncated)),
+            diagnostic.Target,
+            diagnostic.UnknownText,
+            diagnostic.Reason,
+            truncated);
     }
 }
 

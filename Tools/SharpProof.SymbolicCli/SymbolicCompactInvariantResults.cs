@@ -1,113 +1,103 @@
-using System.Text.Json.Serialization;
+using System.Text.Json;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
 internal sealed record SymbolicCompactInvariantTargetSummary(
+    JsonElement Json,
     string Target,
-    string Status,
-    string StatusReason,
-    string ReasonCode,
-    string Summary,
-    int MustFactCount,
-    IReadOnlyList<string> MustFacts,
-    int MaybeFactCount,
-    IReadOnlyList<string> MaybeFacts,
-    int UnknownFactCount,
-    IReadOnlyList<string> UnknownFacts,
-    bool MustFactsTruncated,
-    bool MaybeFactsTruncated,
-    bool UnknownFactsTruncated)
+    bool IsTruncated) : ISymbolicRawJsonProjection
 {
-    internal bool IsTruncated => MustFactsTruncated || MaybeFactsTruncated || UnknownFactsTruncated;
-
     internal static SymbolicCompactInvariantTargetSummary FromSummary(
         SymbolicInvariantTargetSummary summary,
         SymbolicCompactQueryOptions options)
     {
+        var mustFacts = SymbolicCompactProjection.Take(summary.MustFacts, options.MaxConditions);
+        var maybeFacts = SymbolicCompactProjection.Take(summary.MaybeFacts, options.MaxConditions);
+        var unknownFacts = SymbolicCompactProjection.Take(summary.UnknownFacts, options.MaxConditions);
+        var mustTruncated = summary.MustFactCount > options.MaxConditions;
+        var maybeTruncated = summary.MaybeFactCount > options.MaxConditions;
+        var unknownTruncated = summary.UnknownFactCount > options.MaxConditions;
         return new SymbolicCompactInvariantTargetSummary(
+            SymbolicOrderedJson.Object(
+                ("target", summary.Target),
+                ("status", summary.Status.ToString()),
+                ("statusReason", summary.StatusReason),
+                ("reasonCode", summary.ReasonCode),
+                ("summary", summary.Summary),
+                ("mustFactCount", summary.MustFactCount),
+                ("mustFacts", mustFacts),
+                ("maybeFactCount", summary.MaybeFactCount),
+                ("maybeFacts", maybeFacts),
+                ("unknownFactCount", summary.UnknownFactCount),
+                ("unknownFacts", unknownFacts),
+                ("mustFactsTruncated", mustTruncated),
+                ("maybeFactsTruncated", maybeTruncated),
+                ("unknownFactsTruncated", unknownTruncated)),
             summary.Target,
-            summary.Status.ToString(),
-            summary.StatusReason,
-            summary.ReasonCode,
-            summary.Summary,
-            summary.MustFactCount,
-            SymbolicCompactProjection.Take(summary.MustFacts, options.MaxConditions),
-            summary.MaybeFactCount,
-            SymbolicCompactProjection.Take(summary.MaybeFacts, options.MaxConditions),
-            summary.UnknownFactCount,
-            SymbolicCompactProjection.Take(summary.UnknownFacts, options.MaxConditions),
-            summary.MustFactCount > options.MaxConditions,
-            summary.MaybeFactCount > options.MaxConditions,
-            summary.UnknownFactCount > options.MaxConditions);
+            mustTruncated || maybeTruncated || unknownTruncated);
     }
 }
 
 internal sealed record SymbolicCompactInvariantTargetPathSummary(
+    JsonElement Json,
     string Target,
-    int PathConditionCount,
-    int SmtConditionCount,
-    int ConservativeUnknownCount,
-    int ProgramPointCount,
-    int ReachableProgramPointCount,
-    int ProofTotalCount,
-    int ProofUnknownCount,
-    int ProofProvenTrueCount,
-    int ProofProvenFalseCount,
-    int ProofUnreachableCount,
-    IReadOnlyList<string> Conditions,
-    bool ConditionsTruncated,
-    string StatusReason,
-    string ReasonCode,
-    string Summary)
+    bool ConditionsTruncated) : ISymbolicRawJsonProjection
 {
     internal static SymbolicCompactInvariantTargetPathSummary FromSummary(
         SymbolicInvariantTargetPathSummary summary,
         SymbolicCompactQueryOptions options)
     {
         var conditions = SymbolicCompactProjection.Take(summary.Conditions, options.MaxConditions);
+        var truncated = summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count;
         return new SymbolicCompactInvariantTargetPathSummary(
+            SymbolicOrderedJson.Object(
+                ("target", summary.Target),
+                ("pathConditionCount", summary.PathConditionCount),
+                ("smtConditionCount", summary.SmtConditionCount),
+                ("conservativeUnknownCount", summary.ConservativeUnknownCount),
+                ("programPointCount", summary.ProgramPointCount),
+                ("reachableProgramPointCount", summary.ReachableProgramPointCount),
+                ("proofTotalCount", summary.ProofTotalCount),
+                ("proofUnknownCount", summary.ProofUnknownCount),
+                ("proofProvenTrueCount", summary.ProofProvenTrueCount),
+                ("proofProvenFalseCount", summary.ProofProvenFalseCount),
+                ("proofUnreachableCount", summary.ProofUnreachableCount),
+                ("conditions", conditions),
+                ("conditionsTruncated", truncated),
+                ("statusReason", summary.StatusReason),
+                ("reasonCode", summary.ReasonCode),
+                ("summary", summary.Summary)),
             summary.Target,
-            summary.PathConditionCount,
-            summary.SmtConditionCount,
-            summary.ConservativeUnknownCount,
-            summary.ProgramPointCount,
-            summary.ReachableProgramPointCount,
-            summary.ProofTotalCount,
-            summary.ProofUnknownCount,
-            summary.ProofProvenTrueCount,
-            summary.ProofProvenFalseCount,
-            summary.ProofUnreachableCount,
-            conditions,
-            summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count,
-            summary.StatusReason,
-            summary.ReasonCode,
-            summary.Summary);
+            truncated);
     }
 }
 
 internal sealed record SymbolicCompactInvariantQueryDiagnostic(
+    JsonElement Json,
     string Code,
-    string Severity,
     string Message,
-    int Count,
-    int EvidenceTotalCount,
-    IReadOnlyList<string> Evidence,
-    bool EvidenceTruncated)
+    bool EvidenceTruncated) : ISymbolicRawJsonProjection
 {
     internal static SymbolicCompactInvariantQueryDiagnostic FromDiagnostic(
         SymbolicInvariantQueryDiagnostic diagnostic,
         SymbolicCompactQueryOptions options)
     {
+        var evidence = SymbolicCompactProjection.Take(diagnostic.Evidence, options.MaxConditions);
+        var truncated = diagnostic.EvidenceTruncated || diagnostic.Evidence.Count > options.MaxConditions;
         return new SymbolicCompactInvariantQueryDiagnostic(
+            SymbolicOrderedJson.Object(
+                ("code", diagnostic.Code),
+                ("severity", diagnostic.Severity),
+                ("message", diagnostic.Message),
+                ("count", diagnostic.Count),
+                ("evidenceTotalCount", diagnostic.EvidenceTotalCount),
+                ("evidence", evidence),
+                ("evidenceTruncated", truncated)),
             diagnostic.Code,
-            diagnostic.Severity,
             diagnostic.Message,
-            diagnostic.Count,
-            diagnostic.EvidenceTotalCount,
-            SymbolicCompactProjection.Take(diagnostic.Evidence, options.MaxConditions),
-            diagnostic.EvidenceTruncated || diagnostic.Evidence.Count > options.MaxConditions);
+            truncated);
     }
 }
 
@@ -132,59 +122,17 @@ internal sealed class SymbolicCompactSmtDiagnostics(SymbolicSmtDiagnosticsSnapsh
     }
 }
 
-internal abstract class SymbolicSmtDiagnosticsProjectionBase(SymbolicCompactSmtDiagnostics smtDiagnostics)
+internal sealed record SymbolicCompactAnalysisSummary(
+    JsonElement Json,
+    bool HasUnresolvedAnalysis,
+    int TotalPathConditionCount,
+    int MaxPathConditionCount,
+    int ProofTotalCount,
+    int ProofUnknownCount,
+    int ConservativeUnknownCount,
+    int ReachabilityUnknownCount,
+    int ReachabilityNotCheckedCount) : ISymbolicRawJsonProjection
 {
-    [JsonPropertyOrder(100)] public bool SmtConfigured => smtDiagnostics.IsConfigured;
-    [JsonPropertyOrder(101)] public bool SmtEnabled => smtDiagnostics.IsEnabled;
-    [JsonPropertyOrder(102)] public int SmtExecutedQueryCount => smtDiagnostics.ExecutedQueryCount;
-    [JsonPropertyOrder(103)] public int SmtCacheEntryCount => smtDiagnostics.CacheEntryCount;
-    [JsonPropertyOrder(104)] public int SmtQueryTimeoutMs => smtDiagnostics.QueryTimeoutMs;
-    [JsonPropertyOrder(105)] public int SmtMethodBudgetMs => smtDiagnostics.MethodBudgetMs;
-    [JsonPropertyOrder(106)] public int SmtMaxPathConditions => smtDiagnostics.MaxPathConditions;
-    [JsonPropertyOrder(107)] public int SmtMaxExpressionNodes => smtDiagnostics.MaxExpressionNodes;
-}
-
-internal sealed class SymbolicCompactAnalysisSummary(
-    SymbolicCompactInvariantQueryView invariantQuery,
-    SymbolicProgramPointSummary programPointSummary,
-    SymbolicCompactSmtDiagnostics smtDiagnostics,
-    SymbolicAnalysisTruncationInfo analysisTruncation)
-    : SymbolicSmtDiagnosticsProjectionBase(smtDiagnostics)
-{
-    public int ProgramPointCount => programPointSummary.ProgramPointCount;
-    public int InvariantConditionCount => MustFactCount + UnknownFactCount;
-    public int ConservativeUnknownCount => UnknownFactCount;
-    public int MustFactCount => invariantQuery.MustFactCount;
-    public int MaybeFactCount => invariantQuery.MaybeFactCount;
-    public int UnknownFactCount => invariantQuery.UnknownFactCount;
-    public string InvariantStatus => invariantQuery.Status;
-    public string InvariantStatusReason => invariantQuery.StatusReason;
-    public string InvariantSummary => invariantQuery.Summary;
-    public int InvariantDiagnosticCount => invariantQuery.DiagnosticCount;
-    public int TotalPathConditionCount => programPointSummary.TotalPathConditionCount;
-    public int MaxPathConditionCount => programPointSummary.MaxPathConditionCount;
-    public int ReachabilityCheckedCount =>
-        programPointSummary.Reachability.ReachableCount +
-        programPointSummary.Reachability.UnreachableCount +
-        programPointSummary.Reachability.UnknownCount;
-    public int ReachabilityKnownCount =>
-        programPointSummary.Reachability.ReachableCount + programPointSummary.Reachability.UnreachableCount;
-    public int ReachabilityUnknownCount => programPointSummary.Reachability.UnknownCount;
-    public int ReachabilityNotCheckedCount => programPointSummary.Reachability.NotCheckedCount;
-    public int ProofTotalCount => programPointSummary.ProofOutcomes.TotalCount;
-    public int ProofResolvedCount =>
-        programPointSummary.ProofOutcomes.ProvenTrueCount +
-        programPointSummary.ProofOutcomes.ProvenFalseCount +
-        programPointSummary.ProofOutcomes.UnreachableCount;
-    public int ProofUnknownCount => programPointSummary.ProofOutcomes.UnknownCount;
-
-    [JsonPropertyOrder(108)] public bool AnalysisTruncated => analysisTruncation.IsTruncated;
-    [JsonPropertyOrder(109)] public bool HasUnresolvedAnalysis =>
-        ConservativeUnknownCount != 0 ||
-        ReachabilityUnknownCount != 0 ||
-        ReachabilityNotCheckedCount != 0 ||
-        ProofUnknownCount != 0 ||
-        AnalysisTruncated;
 
     internal static SymbolicCompactAnalysisSummary From(
         SymbolicCompactInvariantQueryView invariantQuery,
@@ -192,23 +140,63 @@ internal sealed class SymbolicCompactAnalysisSummary(
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         SymbolicAnalysisTruncationInfo analysisTruncation)
     {
-        return new SymbolicCompactAnalysisSummary(invariantQuery, programPointSummary, smtDiagnostics,
-            analysisTruncation);
+        var reachability = programPointSummary.Reachability;
+        var proofs = programPointSummary.ProofOutcomes;
+        var invariantConditionCount = invariantQuery.MustFactCount + invariantQuery.UnknownFactCount;
+        var checkedCount = reachability.ReachableCount + reachability.UnreachableCount + reachability.UnknownCount;
+        var knownCount = reachability.ReachableCount + reachability.UnreachableCount;
+        var resolvedProofs = proofs.ProvenTrueCount + proofs.ProvenFalseCount + proofs.UnreachableCount;
+        var unresolved = invariantQuery.UnknownFactCount != 0 || reachability.UnknownCount != 0 ||
+                         reachability.NotCheckedCount != 0 || proofs.UnknownCount != 0 ||
+                         analysisTruncation.IsTruncated;
+        return new SymbolicCompactAnalysisSummary(
+            SymbolicOrderedJson.Object(
+                ("programPointCount", programPointSummary.ProgramPointCount),
+                ("invariantConditionCount", invariantConditionCount),
+                ("conservativeUnknownCount", invariantQuery.UnknownFactCount),
+                ("mustFactCount", invariantQuery.MustFactCount),
+                ("maybeFactCount", invariantQuery.MaybeFactCount),
+                ("unknownFactCount", invariantQuery.UnknownFactCount),
+                ("invariantStatus", invariantQuery.Status),
+                ("invariantStatusReason", invariantQuery.StatusReason),
+                ("invariantSummary", invariantQuery.Summary),
+                ("invariantDiagnosticCount", invariantQuery.DiagnosticCount),
+                ("totalPathConditionCount", programPointSummary.TotalPathConditionCount),
+                ("maxPathConditionCount", programPointSummary.MaxPathConditionCount),
+                ("reachabilityCheckedCount", checkedCount),
+                ("reachabilityKnownCount", knownCount),
+                ("reachabilityUnknownCount", reachability.UnknownCount),
+                ("reachabilityNotCheckedCount", reachability.NotCheckedCount),
+                ("proofTotalCount", proofs.TotalCount),
+                ("proofResolvedCount", resolvedProofs),
+                ("proofUnknownCount", proofs.UnknownCount),
+                ("smtConfigured", smtDiagnostics.IsConfigured),
+                ("smtEnabled", smtDiagnostics.IsEnabled),
+                ("smtExecutedQueryCount", smtDiagnostics.ExecutedQueryCount),
+                ("smtCacheEntryCount", smtDiagnostics.CacheEntryCount),
+                ("smtQueryTimeoutMs", smtDiagnostics.QueryTimeoutMs),
+                ("smtMethodBudgetMs", smtDiagnostics.MethodBudgetMs),
+                ("smtMaxPathConditions", smtDiagnostics.MaxPathConditions),
+                ("smtMaxExpressionNodes", smtDiagnostics.MaxExpressionNodes),
+                ("analysisTruncated", analysisTruncation.IsTruncated),
+                ("hasUnresolvedAnalysis", unresolved)),
+            unresolved,
+            programPointSummary.TotalPathConditionCount,
+            programPointSummary.MaxPathConditionCount,
+            proofs.TotalCount,
+            proofs.UnknownCount,
+            invariantQuery.UnknownFactCount,
+            reachability.UnknownCount,
+            reachability.NotCheckedCount);
     }
 }
 
-internal sealed class SymbolicCompactOutputTruncation(
-    bool lines,
-    bool programPoints,
-    bool facts,
-    bool conditions,
-    bool proofs)
+internal sealed record SymbolicCompactOutputTruncation(
+    bool Lines, bool ProgramPoints, bool Facts, bool Conditions, bool Proofs) : ISymbolicRawJsonProjection
 {
-    public bool Lines { get; } = lines;
-    public bool ProgramPoints { get; } = programPoints;
-    public bool Facts { get; } = facts;
-    public bool Conditions { get; } = conditions;
-    public bool Proofs { get; } = proofs;
+    public JsonElement Json => SymbolicOrderedJson.Object(
+        ("lines", Lines), ("programPoints", ProgramPoints), ("facts", Facts),
+        ("conditions", Conditions), ("proofs", Proofs), ("isTruncated", IsTruncated));
     public bool IsTruncated => Lines || ProgramPoints || Facts || Conditions || Proofs;
 
     internal static SymbolicCompactOutputTruncation FromInvariant(SymbolicCompactInvariantSummary invariant)
@@ -225,18 +213,11 @@ internal sealed class SymbolicCompactOutputTruncation(
         IEnumerable<SymbolicCompactOutputTruncation> truncations)
     {
         ArgumentNullException.ThrowIfNull(truncations);
-        var result = new bool[5];
-        foreach (var truncation in truncations)
-        {
-            if (truncation == null) continue;
-            result[0] |= truncation.Lines;
-            result[1] |= truncation.ProgramPoints;
-            result[2] |= truncation.Facts;
-            result[3] |= truncation.Conditions;
-            result[4] |= truncation.Proofs;
-        }
-
-        return new SymbolicCompactOutputTruncation(result[0], result[1], result[2], result[3], result[4]);
+        var values = truncations.Where(static value => value != null).ToArray();
+        return new SymbolicCompactOutputTruncation(
+            values.Any(static value => value.Lines), values.Any(static value => value.ProgramPoints),
+            values.Any(static value => value.Facts), values.Any(static value => value.Conditions),
+            values.Any(static value => value.Proofs));
     }
 
     internal static SymbolicCompactOutputTruncation Combine(

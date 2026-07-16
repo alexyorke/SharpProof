@@ -95,6 +95,33 @@ internal static class SymbolicCliProjectionJson
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
         options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new SymbolicRawJsonProjectionConverter());
         return options;
+    }
+}
+
+internal interface ISymbolicRawJsonProjection
+{
+    JsonElement Json { get; }
+}
+
+internal sealed class SymbolicRawJsonProjectionConverter : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) =>
+        typeof(ISymbolicRawJsonProjection).IsAssignableFrom(typeToConvert);
+
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        return (JsonConverter)Activator.CreateInstance(
+            typeof(Converter<>).MakeGenericType(typeToConvert))!;
+    }
+
+    private sealed class Converter<T> : JsonConverter<T> where T : ISymbolicRawJsonProjection
+    {
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            throw new NotSupportedException();
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) =>
+            value.Json.WriteTo(writer);
     }
 }
