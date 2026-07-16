@@ -488,20 +488,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return Exact(completedLoopState, site);
         }
 
-        if (statementRegion is
-                {
-                    TargetKind: CfgProgramPointTargetKind.CompletedStatement,
-                    Target: IfStatementSyntax completedIf
-                } &&
-            TryCreateInvalidatedIfSummary(
-                initialState!,
-                completedIf,
-                statementRegion.CompletedPaths,
-                semanticModel,
-                cancellationToken,
-                out var invalidatedIfState))
-            return Exact(invalidatedIfState, site);
-
         if (statementRegion != null && statementRegion.CompletedPaths.Count != 0)
         {
             var completedPath = MergeIncomingStates(
@@ -1165,46 +1151,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 return false;
             summary = transition.State;
         }
-        return true;
-    }
-
-    private static bool TryCreateInvalidatedIfSummary(
-        SymbolicState entryState,
-        IfStatementSyntax statement,
-        IReadOnlyList<(ControlFlowBranch Branch, CfgPathState Path)> completedPaths,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicState summary)
-    {
-        var invalidatedSymbols = SymbolicLoopStateTransfer.GetConditionDependencySymbols(
-                statement.Condition,
-                semanticModel,
-                cancellationToken)
-            .ToArray();
-        if (invalidatedSymbols.Length == 0 || completedPaths.Count == 0 ||
-            !SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
-                statement.Condition,
-                statement,
-                semanticModel,
-                cancellationToken))
-        {
-            summary = default!;
-            return false;
-        }
-
-        var baseline = entryState;
-        SymbolicStateInvalidator.InvalidateNestedMutations(
-            ref baseline,
-            statement,
-            semanticModel,
-            cancellationToken);
-        summary = completedPaths.Count == 1
-            ? baseline
-            : SymbolicStateMerger.MergeCommonStates(
-                baseline,
-                completedPaths.Select(static path => path.Path.State).ToArray());
-        foreach (var symbol in invalidatedSymbols)
-            SymbolicStateInvalidator.InvalidateSymbol(ref summary, symbol, statement);
         return true;
     }
 
