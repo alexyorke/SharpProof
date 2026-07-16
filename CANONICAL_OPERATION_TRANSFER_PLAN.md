@@ -549,6 +549,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
       structural limits, and try/finally behavior at 325/325. The tooling batch
       covers runtime hazards, source-query lines, and full/explain JSON bytes at
       267/267.
+    - [x] Make `CfgTraversalPoint` operation-cursor-aware. Existing graph entry,
+      successor, loop, and finally paths default to cursor zero, while the block
+      transfer loop now begins at the point cursor. This is behavior-neutral for
+      current callers and permits a seeded statement entry or back edge to skip
+      operations outside the owned statement when both share one Roslyn block.
     - [ ] Add a seeded statement-region CFG traversal with operation cursors,
       exact entry/exit membership, loop/finally continuation ownership, and
       typed `Unsupported` results. Route completed if/switch/loop/lock through
@@ -767,7 +772,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical computed-update application | `61337f7c` | 106,687 | -989 |
 | Phase 7 containing-block entry consolidation | `8cbb27f3` | 106,631 | -1,045 |
 | Phase 7 internal query-wrapper deletion | `2fb383a9` | 106,526 | -1,150 |
-| Phase 7 residual query-metadata adjudication | This commit | 106,526 | -1,150 |
+| Phase 7 residual query-metadata adjudication | `a0d75e05` | 106,526 | -1,150 |
+| Phase 7 CFG operation cursors | This commit | 106,530 | -1,146 |
 
 ## Validation Ledger
 
@@ -964,6 +970,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 internal query-wrapper deletion | Exact production references showed that `SymbolicFileQuery`, `SymbolicProgramPointQueryResult`, and the duplicate `AnalyzeSyntaxTree`/`AnalyzeSyntaxTreeAtPosition` entry points were internal and test-only. They are deleted; test helpers use the existing canonical point-query methods, the one file-request fixture uses the existing string overload, and private path-condition assertions now verify the same solver-backed binary relation through `SymbolicProgramPointResult.Invariant.Conditions`. The pre-edit characterization passes 513/513 main and 100/100 tooling tests. After correcting that intentional representation assertion, the identical post-edit batches pass 513/513 and 100/100; MainSmtOracle passes 573/573; the Tooling lane passes 592/592 with its existing environment-dependent exclusions; and the Release warning-as-error solution build has zero warnings and errors. CLI/JSON/SARIF projection code and public API files are unchanged. The physical production diff deletes 133 lines, while the authoritative metric falls by 105 to 106,526, or -1,150 from the rewrite start; authoritative tracked test LOC falls to 144,471. |
 | Phase 7 residual query-metadata adjudication | Three independent read-only audits rejected flattening the live `SymbolicQueryScope` plus `SymbolicQueryLineGroup` boundary under the 50-line gate. Removing the 54-line preview scope carrier requires carrying and assigning its eleven metadata values through the canonical result and factories, leaving only 24-30 net lines; line-group replacement contributes effectively zero to 12 lines. More importantly, file queries intentionally rebuild every nested line from grouped points after all queries finish so each child receives the final file-level SMT diagnostics. Directly storing the intermediate line results changes serialized lifecycle/counter/health fields. The exact point/line/span/file full-JSON plus explain/SARIF/source-query characterization passes 102/102. No production or test code changed; production LOC remains 106,526, or -1,150 from the rewrite start, and tracked test LOC remains 144,471. |
 | Phase 7 completion-owner deletion ranking and CI preflight | Three read-only call-graph inventories prove that `SymbolicProgramPointFacts` remains reachable for every CFG `Unsupported` family and would save at most 95 lines after replacement; Analyzer assignment/resource/state/merge owners retain Roslyn metadata, evidence, lifetime, and convergence policy and save at most 233 lines; exception adapters save at most 54. The only accepted cut is the combined completed-if/switch/loop/lock owner: 1,056 gross legacy lines with a conservative 600-750-line replacement, or 306-456 net deletion. Standalone branch or loop cuts remain below the 250-line gate. The pre-rewrite focused main parity batch passes 325/325 and the runtime-hazard/source-query/full-and-explain-JSON tooling batch passes 267/267. Separately, GitHub PR #79 is green at 8/8 checks: the historical README race was already fixed by commit `1ebaebea`, which replaced recursive transient-`bin` enumeration with `git ls-files`; local README verification and its focused test pass. No production or test code changed, so production LOC remains 106,526 and tracked test LOC remains 144,471. |
+| Phase 7 CFG operation cursors | `CfgTraversalPoint` now includes an operation cursor and block transfer starts at that index. Every existing construction defaults to zero, preserving current graph entry, successor, loop, and finally behavior while making mixed-block statement entry representable without replaying an outside prefix. The direct CFG/program-point focused gate passes 249/249. Production LOC is 106,530, or -1,146 from the rewrite start; tracked test LOC remains 144,471. |
 
 ## Current Checkpoint
 
@@ -1213,7 +1220,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   therefore have not run in Actions.
   Its pre-rewrite state/branch/loop/finally baseline passes 325/325, and its
   runtime-hazard/source-query/full-and-explain-JSON baseline passes 267/267.
-  Production LOC is 106,526, or -1,150 from the rewrite start; authoritative
+  Canonical CFG traversal points now carry an operation cursor; every existing
+  caller remains at zero and the 249-case direct collector/program-point gate is
+  green. This unlocks seeded statement entry without replaying a shared block's
+  outside prefix.
+  Production LOC is 106,530, or -1,146 from the rewrite start; authoritative
   tracked test LOC is 144,471.
 - Next cheapest step: characterize and implement the combined completed-
   statement summary over CFG target/exit membership, landing it only when the

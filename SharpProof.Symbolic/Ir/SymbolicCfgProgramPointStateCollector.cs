@@ -176,8 +176,11 @@ internal static class SymbolicCfgProgramPointStateCollector
             }
             var foundTarget = false;
             var observedLoopTarget = false;
-            foreach (var operation in block.Operations)
+            for (var operationIndex = point.OperationIndex;
+                 operationIndex < block.Operations.Length;
+                 operationIndex++)
             {
+                var operation = block.Operations[operationIndex];
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
                     continue;
                 if (includeCurrentStatementCompletionFacts &&
@@ -1513,7 +1516,8 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private readonly record struct CfgTraversalPoint(
         BasicBlock Block,
-        CfgFinallyContinuation? Continuation);
+        CfgFinallyContinuation? Continuation,
+        int OperationIndex = 0);
 
     private sealed record CfgFinallyLocalTargetPlan(
         ControlFlowRegion Region,
