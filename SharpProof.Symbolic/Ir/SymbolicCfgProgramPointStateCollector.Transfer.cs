@@ -918,14 +918,18 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static bool TryCreateStatementRegionPlan(
+    private static bool TryCreateRegionPlan(
         ControlFlowGraph graph,
-        StatementSyntax statement,
+        SyntaxNode target,
+        CfgProgramPointTargetKind targetKind,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out CfgStatementRegionPlan plan,
+        out CfgRegionPlan plan,
         out string failure)
     {
+        if (targetKind != CfgProgramPointTargetKind.CompletedStatement ||
+            target is not StatementSyntax statement)
+            return Fail("statement-region.kind", out plan, out failure);
         if (!TryValidateStatementRegionShape(
                 graph,
                 statement,
@@ -938,7 +942,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return false;
         }
 
-        var directSlices = new Dictionary<int, CfgBlockSlice>();
+        var directSlices = new Dictionary<int, (
+            int FirstOperationIndex,
+            int EndOperationIndexExclusive,
+            bool HasCursorExit)>();
         foreach (var block in graph.Blocks)
         {
             if (!block.IsReachable)
@@ -966,13 +973,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
             directSlices.Add(
                 block.Ordinal,
-                new CfgBlockSlice(
-                    firstOperation,
+                (firstOperation,
                     endOperation,
-                    ownsBranchValue,
-                    IsConnector: false,
-                    HasCursorExit: endOperation < block.Operations.Length ||
-                                   !ownsBranchValue && block.BranchValue != null));
+                    endOperation < block.Operations.Length ||
+                    !ownsBranchValue && block.BranchValue != null));
         }
 
         if (directSlices.Count == 0)
@@ -996,9 +1000,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             forward: false);
         forwardConnectors.IntersectWith(backwardConnectors);
 
-        var slices = new Dictionary<int, CfgBlockSlice>(directSlices);
+        var slices = new Dictionary<int, (
+            int FirstOperationIndex,
+            int EndOperationIndexExclusive,
+            bool HasCursorExit)>(directSlices);
         foreach (var ordinal in forwardConnectors)
-            slices.Add(ordinal, new CfgBlockSlice(0, 0, false, true, false));
+            slices.Add(ordinal, (0, 0, false));
 
         var entryPoints = new HashSet<CfgTraversalPoint>();
         foreach (var entry in slices)
@@ -1031,7 +1038,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             if (slice.HasCursorExit)
                 continue;
             var block = graph.Blocks[ordinal];
-            if (slice.IsConnector &&
+            if (!directSlices.ContainsKey(ordinal) &&
                 (!block.Operations.IsDefaultOrEmpty || block.BranchValue != null))
                 return Fail("statement-region.connector", out plan, out failure);
         foreach (var branch in GetSuccessors(block))
@@ -1068,15 +1075,15 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             slices.Values.All(static slice => !slice.HasCursorExit))
             return Fail("statement-region.exit", out plan, out failure);
 
-        plan = new CfgStatementRegionPlan(
-            statement,
+        plan = new CfgRegionPlan(
+            targetKind,
+            target,
             entryPoint,
             slices,
             completionBranches,
             terminalBranches,
             flowCaptureIds,
-            InvalidatesExitedLocals: statement is IfStatementSyntax or SwitchStatementSyntax,
-            CompletedPaths: new List<CfgStatementCompletionPath>());
+            InvalidatesExitedLocals: statement is IfStatementSyntax or SwitchStatementSyntax);
         failure = string.Empty;
         return true;
     }
@@ -1315,7 +1322,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
     private static bool Fail(
         string failureDetail,
-        out CfgStatementRegionPlan plan,
+        out CfgRegionPlan plan,
         out string failure)
     {
         plan = null!;
@@ -1391,41 +1398,30 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return false;
     }
 
-    private readonly record struct CfgBlockSlice(
-        int FirstOperationIndex,
-        int EndOperationIndexExclusive,
-        bool OwnsBranchValue,
-        bool IsConnector,
-        bool HasCursorExit);
-
-    private sealed record CfgStatementRegionPlan(
-        StatementSyntax Statement,
+    private sealed record CfgRegionPlan(
+        CfgProgramPointTargetKind TargetKind,
+        SyntaxNode Target,
         CfgTraversalPoint EntryPoint,
-        IReadOnlyDictionary<int, CfgBlockSlice> Slices,
+        IReadOnlyDictionary<int, (
+            int FirstOperationIndex,
+            int EndOperationIndexExclusive,
+            bool HasCursorExit)> Blocks,
         ISet<ControlFlowBranch> CompletionBranches,
         ISet<ControlFlowBranch> TerminalBranches,
         ISet<CaptureId> FlowCaptureIds,
-        bool InvalidatesExitedLocals,
-        List<CfgStatementCompletionPath> CompletedPaths)
+        bool InvalidatesExitedLocals)
     {
-        internal bool TryGetEntryPoint(
-            BasicBlock block,
-            CfgFinallyContinuation? continuation,
-            out CfgTraversalPoint point)
-        {
-            if (!Slices.TryGetValue(block.Ordinal, out var slice))
-            {
-                point = default;
-                return false;
-            }
-            point = new CfgTraversalPoint(block, continuation, slice.FirstOperationIndex);
-            return true;
-        }
-    }
+        internal List<(ControlFlowBranch Branch, CfgPathState Path)> CompletedPaths { get; } = [];
 
-    private readonly record struct CfgStatementCompletionPath(
-        ControlFlowBranch Branch,
-        CfgPathState Path);
+        internal List<CfgPathState> TerminalPaths { get; } = [];
+
+        internal CfgTraversalPoint GetEntryPoint(
+            BasicBlock block,
+            CfgFinallyContinuation? continuation) =>
+            Blocks.TryGetValue(block.Ordinal, out var slice)
+                ? new CfgTraversalPoint(block, continuation, slice.FirstOperationIndex)
+                : default;
+    }
 
     private static bool IsTargetOperation(
         IOperation operation,

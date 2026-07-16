@@ -352,6 +352,47 @@ static class C
         AssertStateParity(actual.Value!, expected);
     }
 
+    [Test]
+    public void CompletedStatementRegion_UnsupportedShapePreservesTypedReason()
+    {
+        const string source = """
+            static class C
+            {
+                static int M(int value)
+                {
+                    switch (value)
+                    {
+                        case 0:
+                            switch (value) { case 1: break; }
+                            break;
+                    }
+                    return value;
+                }
+            }
+            """;
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CompletedStatementRegion_UnsupportedShapePreservesTypedReason));
+        var statement = fixture.Root.DescendantNodes().OfType<SwitchStatementSyntax>().First();
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
+            statement,
+            new SymbolicState(),
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsUnsupported, Is.True);
+            Assert.That(result.Value, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            var provenance = result.Provenance.Single();
+            Assert.That(provenance.Stage, Is.EqualTo("cfg-program-point"));
+            Assert.That(provenance.SourceSpan, Is.EqualTo(statement.Span));
+            Assert.That(provenance.Detail, Is.EqualTo("statement-region.switch-nested"));
+        });
+    }
+
     [TestCaseSource(nameof(SeededPathCases))]
     public void SeededState_MatchesCfgStructuralAndRoutedCollectors(
         (string Source, string Target, string Parameter, SeedKind Kind, bool SeedSurvives) testCase)

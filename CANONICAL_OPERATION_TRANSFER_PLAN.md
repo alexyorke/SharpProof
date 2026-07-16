@@ -580,6 +580,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
     Route CFG, loop, statement, using, and declaration callers through its
     immutable canonical transition, then delete
     `SymbolicNormalCompletionStateTransfer` and the loop throw-guard wrapper.
+  - [x] Replace the completed-statement-only `CfgStatementRegionPlan`,
+    `CfgBlockSlice`, and `CfgStatementCompletionPath` carriers with one
+    target-aware `CfgRegionPlan` consumed by the existing worklist. Store
+    operation cursors and topology once, keep completion/terminal execution
+    state per collection, preserve every typed fallback reason, and delete the
+    old scheduler types without adding a parallel engine.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -798,6 +804,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 final architecture split | `007040f9` | 106,037 | -1,639 |
 | Phase 7 test-only lowering facade deletion | This commit | 105,982 | -1,694 |
 | Final contract determinism and VSIX manifest gate | This commit | 106,043 | -1,633 |
+| Phase 7 canonical normal-completion coordinator | `c7a543ee` | 106,009 | -1,667 |
+| Phase 7 target-aware CFG region plan | This commit | 105,990 | -1,686 |
 
 ## Validation Ledger
 
@@ -1001,6 +1009,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 final semantic-owner audit and facade deletion | The second bounded semantic-owner audit found no high/medium parallel implementation. ProofCore's concrete preprocessor and Symbolic's syntactic classifier consume the same centralized affine, interval, comparison, and fixed-point policy but intentionally own backend preprocessing versus solver-avoidance classification. EffectSummary IL identities and Analyzer Roslyn identities remain distinct language boundaries. The only clone is an eight-line unsupported-transition wrapper; it is intentional because reachability and source completion own different provenance roots, and centralizing it saves at most 10-12 lines while spreading owner selection across seven callers. Exact caller/reflection search did accept one deletion: the generic `SymbolicOperationLowerer.Lower(IOperation, ...)` facade and its direct-target/unsupported helpers had only three test callers. Those tests now use the production `ApplyAssignment` adapter with unchanged names and assertions. The focused fixture passes 44/44. Production LOC is 105,982, down 55 in this tranche and 1,694 from the rewrite start; tracked test LOC is 144,700. The two-audit low-yield stop condition is met. |
 | Final contract determinism and VSIX manifest gate | Two identical 1,200-iteration fuzz processes first reproduced different `coverage.json` hashes because `HashCode.Combine` randomized string hashing per process. Fuzz seed mixing now uses one explicit stable integer/string mixer, and a typed 1,200-case source SHA-256 fixture locks `66FEA38D21307DC787ABC9347627FA0F3C1DADECB705DAC7424548AA497924EA`. Independent post-fix processes both produce coverage SHA-256 `E120E933AD5BBE73C7F6CCB6176AA67D370634C1AB904904DBE612D45BEFDE9B`. The real VSIX is now checked against its complete 31-entry required payload manifest before the harness loads and runs the analyzer; the harness still produces SP0002 and no AD0001. Required and graceful Windows package consumers both pass with native SMT ready and three executed queries. Public API analysis, CLI/JSON/SARIF and diagnostic/evidence fixtures, NuGet/native packaging, and all six lanes pass on the same binaries: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,936 plus two documented skips, and Tooling 592, for 6,102 passes. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,043, or -1,633 from the rewrite start; tracked test LOC is 144,706. |
 | Phase 7 canonical normal-completion coordinator | Ordered throw-guard, framework-before, inverse `DoesNotReturnIf`, framework-after, and source successful-completion conditions now compose in `SymbolicSourceCompletionLowerer` and enter state only through canonical operation transitions. CFG, loop, statement, using, and declaration callers consume the immutable result directly; the 127-line `SymbolicNormalCompletionStateTransfer` owner and the loop throw-guard wrapper are deleted. Unsupported component discovery still contributes no optimistic fact and does not prevent later independent guaranteed facts. The focused program-point/CFG/operation batch passes 330/330; all six lanes pass 6,102 tests with the same two documented skips; and the Release solution build has zero warnings and errors. Production LOC falls to 106,009, or -1,667 from the rewrite start; tracked test LOC remains 144,706. GitHub PR #79 is green: the prior README inventory race was already fixed by `1ebaebea`, so no redundant CI change was made. |
+| Phase 7 target-aware CFG region plan | The completed-statement scheduler now uses one `CfgRegionPlan` carrying target kind, target syntax, block operation cursors, completion/terminal topology, ignored flow captures, and scope-exit policy. The existing worklist consumes the plan directly; the three statement-only scheduler carriers and redundant intermediate completion/terminal collections are deleted. A focused nested-switch invariant locks support, null partial state, `UnsupportedIrEncoding`, and full provenance stage/span/detail, including `statement-region.switch-nested`. The focused scheduler gate passes 43/43 and the complete collector fixture passes 212/212. All six lanes pass 6,103 tests with the same two documented skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,937 plus two skips, and Tooling 592. The Release solution warning-as-error build has zero warnings and errors. Production LOC falls to 105,990, or -1,686 from the rewrite start; tracked test LOC is 144,744. The collector partial remains below its architecture limit at 2,979 lines. |
 
 ## Current Checkpoint
 
@@ -1279,13 +1288,21 @@ the unused preview .NET API may break when it obstructs the canonical design.
   the same two documented skips, and the Release solution build has zero
   warnings and errors. Production LOC is 106,009, or -1,667 from the rewrite
   start; tracked test LOC remains 144,706. GitHub PR #79 is independently green.
-- Next cheapest step: use the newly authorized major rewrite to replace the
-  specialized CFG statement/loop/finally schedulers and structural fallback
-  with one target-aware region worklist. Preserve target cursors, continuation
-  identity, bounded fixed points, exact normalized state/evidence/version
-  parity, and typed conservative `Unsupported` results before deleting each old
-  region interpreter.
-- Blockers: the 11,000-line production target still requires 9,333 lines, while
+  Completed-statement region scheduling now uses one target-aware plan inside
+  the existing worklist. The three statement-only carriers and redundant path
+  collections are deleted, and a typed nested-switch fallback invariant locks
+  the full unknown/provenance identity. The collector fixture passes 212/212;
+  all six lanes pass 6,103 tests with the same two documented skips; and the
+  Release warning-as-error solution build is clean. Production LOC is 105,990,
+  or -1,686 from the rewrite start; tracked test LOC is 144,744. The collector
+  partial is 2,979 lines, under its 3,000-line limit.
+- Next cheapest step: reuse `CfgRegionPlan` for root- and nested-block current
+  completion, then delete their two structural special routes plus
+  `SupportsRootBlockCompletion`, `SupportsCanonicalNestedBlockCompletion`, and
+  the now-redundant region-kind probe. Preserve try/catch rejection, invocation
+  fallback, all-terminal behavior, scope invalidation, and complete typed
+  fallback provenance before removing those paths.
+- Blockers: the 11,000-line production target still requires 9,314 lines, while
   two bounded semantic-owner audits found no remaining 250-line safe cut. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major

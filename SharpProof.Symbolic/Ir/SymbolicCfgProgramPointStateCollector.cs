@@ -179,11 +179,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 initialState!,
                 semanticModel,
                 cancellationToken);
-        CfgStatementRegionPlan? statementRegion = null;
+        CfgRegionPlan? statementRegion = null;
         if (completedStatement != null &&
-            !TryCreateStatementRegionPlan(
+            !TryCreateRegionPlan(
                 graph,
                 completedStatement,
+                targetKind,
                 semanticModel,
                 cancellationToken,
                 out statementRegion,
@@ -224,12 +225,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         includeCurrentStatementCompletionFacts: true,
                         initialState)),
                 site);
-        var nestedBlockTerminalBranches = statementRegion?.TerminalBranches ??
-                                          new HashSet<ControlFlowBranch>();
-
         var state = initialState ?? new SymbolicState();
-        var summarizesCompletedLoop = statementRegion?.Statement is
-            WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax;
+        var summarizesCompletedLoop =
+            statementRegion?.TargetKind == CfgProgramPointTargetKind.CompletedStatement &&
+            statementRegion.Target is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax;
         if (statementRegion == null)
             SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
                 ref state,
@@ -248,8 +247,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var queue = new Queue<CfgTraversalPoint>();
         var queued = new HashSet<CfgTraversalPoint> { entryPoint };
         var completedPaths = new List<CfgPathState>();
-        var nestedBlockCompletedPaths = new List<CfgPathState>();
-        var nestedBlockTerminalPaths = new List<CfgPathState>();
         var traversal = new CfgTraversalContext(
             graph,
             semanticModel,
@@ -258,8 +255,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             queue,
             queued,
             completedPaths,
-            nestedBlockTerminalBranches,
-            nestedBlockTerminalPaths,
             loopPlans,
             finallyLocalTarget,
             statementRegion);
@@ -281,7 +276,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             var block = point.Block;
             var currentPath = MergeIncomingStates(incoming[point].Values.ToArray(), site);
             state = currentPath.State;
-            var statementSlice = statementRegion?.Slices[block.Ordinal];
+            var statementSlice = statementRegion?.Blocks[block.Ordinal];
             var foundTarget = false;
             var observedLoopTarget = false;
             for (var operationIndex = point.OperationIndex;
@@ -413,7 +408,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         semanticModel,
                         cancellationToken))
                 {
-                    nestedBlockTerminalPaths.Add(currentPath with { State = state });
+                    statementRegion!.TerminalPaths.Add(currentPath with { State = state });
                     foundTarget = true;
                     break;
                 }
@@ -423,10 +418,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 continue;
 
             if (statementSlice is { HasCursorExit: true })
-            {
-                nestedBlockCompletedPaths.Add(currentPath with { State = state });
                 continue;
-            }
 
             if (forInitialEntryHeader != null && ReferenceEquals(block, forInitialEntryHeader))
             {
@@ -473,8 +465,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
         }
 
-        if (statementRegion?.Statement is WhileStatementSyntax or
-            DoStatementSyntax or ForStatementSyntax)
+        if (statementRegion is
+            {
+                TargetKind: CfgProgramPointTargetKind.CompletedStatement,
+                Target: WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax
+            })
         {
             if (!TryCreateCompletedLoopSummary(
                     initialState!,
@@ -487,7 +482,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return Exact(completedLoopState, site);
         }
 
-        if (statementRegion?.Statement is IfStatementSyntax completedIf &&
+        if (statementRegion is
+                {
+                    TargetKind: CfgProgramPointTargetKind.CompletedStatement,
+                    Target: IfStatementSyntax completedIf
+                } &&
             TryCreateInvalidatedIfSummary(
                 initialState!,
                 completedIf,
@@ -497,28 +496,23 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 out var invalidatedIfState))
             return Exact(invalidatedIfState, site);
 
-        if (statementRegion != null)
+        if (statementRegion != null && statementRegion.CompletedPaths.Count != 0)
         {
-            nestedBlockCompletedPaths.Clear();
-            foreach (var completion in statementRegion.CompletedPaths)
-                nestedBlockCompletedPaths.Add(completion.Path);
-        }
-
-        if (statementRegion != null && nestedBlockCompletedPaths.Count != 0)
-        {
-            var completedPath = MergeIncomingStates(nestedBlockCompletedPaths, site);
+            var completedPath = MergeIncomingStates(
+                statementRegion.CompletedPaths.Select(static completion => completion.Path).ToArray(),
+                site);
             if (targetIsInsideBranch && HasInvalidatedGuard(completedPath.GuardFrame))
                 return Unsupported(site, "branch-guard-mutation");
             targetState = OrderTargetState(
                 completedPath.State,
                 completedPath,
                 targetIsInsideBranch ||
-                nestedBlockCompletedPaths.Count == 1 &&
+                statementRegion.CompletedPaths.Count == 1 &&
                 !HasInvalidatedGuard(completedPath.GuardFrame));
         }
-        else if (statementRegion != null && nestedBlockTerminalPaths.Count != 0)
+        else if (statementRegion != null && statementRegion.TerminalPaths.Count != 0)
         {
-            var completedPath = CollapseTerminalCompletionPaths(nestedBlockTerminalPaths, site);
+            var completedPath = CollapseTerminalCompletionPaths(statementRegion.TerminalPaths, site);
             if (targetIsInsideBranch && HasInvalidatedGuard(completedPath.GuardFrame))
                 return Unsupported(site, "branch-guard-mutation");
             var completedState = SymbolicOperationTransferKernel.Complete(
@@ -527,7 +521,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             targetState = OrderTargetState(completedState, completedPath, targetIsInsideBranch);
         }
         if (targetState != null &&
-            statementRegion?.Statement is SwitchStatementSyntax completedSwitch &&
+            statementRegion is
+                {
+                    TargetKind: CfgProgramPointTargetKind.CompletedStatement,
+                    Target: SwitchStatementSyntax completedSwitch
+                } &&
             !TryApplyCompletedSwitchExitExclusions(
                 ref targetState,
                 completedSwitch,
@@ -691,7 +689,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var graph = context.Graph;
         var completedPaths = context.CompletedPaths;
         var loopPlans = context.LoopPlans;
-        var statementRegion = context.StatementRegion;
+        var statementRegion = context.RegionPlan;
         if (branch == null)
             return true;
         if (!branch.FinallyRegions.IsDefaultOrEmpty)
@@ -724,12 +722,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             var finallyEntry = graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal];
             var finallyEntryPoint = statementRegion == null
                 ? new CfgTraversalPoint(finallyEntry, continuation)
-                : statementRegion.TryGetEntryPoint(
-                    finallyEntry,
-                    continuation,
-                    out var regionEntryPoint)
-                    ? regionEntryPoint
-                    : default;
+                : statementRegion.GetEntryPoint(finallyEntry, continuation);
             if (statementRegion != null && finallyEntryPoint == default)
                 return false;
             return TryPropagateToPoint(
@@ -743,9 +736,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         {
             if (!IsTerminalCompletionBranch(branch))
                 return false;
-            if (context.NestedBlockTerminalBranches.Contains(branch))
+            if (statementRegion?.TerminalBranches.Contains(branch) == true)
             {
-                context.NestedBlockTerminalPaths.Add(path);
+                statementRegion.TerminalPaths.Add(path);
                 return true;
             }
             completedPaths.Add(path);
@@ -776,7 +769,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 branch.Destination,
                 path,
                 statementRegion.InvalidatesExitedLocals);
-            statementRegion.CompletedPaths.Add(new CfgStatementCompletionPath(branch, path));
+            statementRegion.CompletedPaths.Add((branch, path));
             return true;
         }
         if (branch.Destination.Ordinal <= source.Ordinal)
@@ -806,9 +799,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
         var destinationPoint = statementRegion == null
             ? new CfgTraversalPoint(branch.Destination, activeContinuation)
-            : statementRegion.TryGetEntryPoint(branch.Destination, activeContinuation, out var regionPoint)
-                ? regionPoint
-                : default;
+            : statementRegion.GetEntryPoint(branch.Destination, activeContinuation);
         if (statementRegion != null && destinationPoint == default)
             return false;
         return TryPropagateToPoint(
@@ -836,14 +827,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             var nextContinuation = continuation with { RegionIndex = nextRegionIndex };
             var nextEntry = context.Graph.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal];
             return TryPropagateToPoint(
-                context.StatementRegion == null
+                context.RegionPlan == null
                     ? new CfgTraversalPoint(nextEntry, nextContinuation)
-                    : context.StatementRegion.TryGetEntryPoint(
-                        nextEntry,
-                        nextContinuation,
-                        out var nextRegionPoint)
-                        ? nextRegionPoint
-                        : default,
+                    : context.RegionPlan.GetEntryPoint(nextEntry, nextContinuation),
                 new CfgIncomingEdge(
                     sourceBranch,
                     nextContinuation,
@@ -858,13 +844,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         }
         if (continuation.Destination != null)
         {
-            if (context.StatementRegion?.CompletionBranches.Contains(
+            if (context.RegionPlan?.CompletionBranches.Contains(
                     continuation.OriginBranch) == true)
             {
                 if (continuation.Parent != null)
                     return false;
-                context.StatementRegion.CompletedPaths.Add(
-                    new CfgStatementCompletionPath(continuation.OriginBranch, path));
+                context.RegionPlan.CompletedPaths.Add((continuation.OriginBranch, path));
                 return true;
             }
             return TryPropagateToPoint(
@@ -1093,13 +1078,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
     private static bool TryCreateCompletedLoopSummary(
         SymbolicState entryState,
-        CfgStatementRegionPlan statementRegion,
+        CfgRegionPlan statementRegion,
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicState summary)
     {
-        var loop = statementRegion.Statement;
+        var loop = (StatementSyntax)statementRegion.Target;
         var plan = loopPlans.SingleOrDefault(candidate => ReferenceEquals(candidate.Loop, loop));
         if (plan == null)
         {
@@ -1180,7 +1165,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     private static bool TryCreateInvalidatedIfSummary(
         SymbolicState entryState,
         IfStatementSyntax statement,
-        IReadOnlyList<CfgStatementCompletionPath> completedPaths,
+        IReadOnlyList<(ControlFlowBranch Branch, CfgPathState Path)> completedPaths,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicState summary)
@@ -1260,7 +1245,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         CfgGuardFrame? frame,
         ControlFlowBranch completionBranch,
         SymbolicCondition entryCondition,
-        CfgStatementRegionPlan statementRegion,
+        CfgRegionPlan statementRegion,
         SymbolicNestedMutationInvalidationPlan mutations,
         out SymbolicCondition condition)
     {
@@ -1270,7 +1255,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var entryKey = SymbolicState.CreateProofConditionKey(entryCondition);
         var completionSpanEnd = completionBranch.Source.Operations.LastOrDefault()?.Syntax.Span.End ??
                                 completionBranch.Source.BranchValue?.Syntax.Span.End ??
-                                statementRegion.Statement.Span.End;
+                                statementRegion.Target.Span.End;
         var frames = GetGuardFramesOuterToInner(frame);
         var guards = new List<SymbolicCondition>();
         foreach (var guardFrame in frames)
@@ -1310,7 +1295,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
     private static bool OppositeBranchCompletesStatement(
         CfgGuardFrame frame,
-        CfgStatementRegionPlan statementRegion)
+        CfgRegionPlan statementRegion)
     {
         var oppositeIsTrue = !frame.GuardWhenTrue;
         var opposite = oppositeIsTrue ==
@@ -1607,11 +1592,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         Queue<CfgTraversalPoint> Queue,
         ISet<CfgTraversalPoint> Queued,
         ICollection<CfgPathState> CompletedPaths,
-        ISet<ControlFlowBranch> NestedBlockTerminalBranches,
-        ICollection<CfgPathState> NestedBlockTerminalPaths,
         IReadOnlyList<SymbolicLoopTransferPlan> LoopPlans,
         CfgFinallyLocalTargetPlan? FinallyLocalTarget,
-        CfgStatementRegionPlan? StatementRegion);
+        CfgRegionPlan? RegionPlan);
 
     private readonly record struct CfgIncomingEdge(
         ControlFlowBranch? Branch,
