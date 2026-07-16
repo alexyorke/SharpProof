@@ -805,7 +805,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 test-only lowering facade deletion | This commit | 105,982 | -1,694 |
 | Final contract determinism and VSIX manifest gate | This commit | 106,043 | -1,633 |
 | Phase 7 canonical normal-completion coordinator | `c7a543ee` | 106,009 | -1,667 |
-| Phase 7 target-aware CFG region plan | This commit | 105,990 | -1,686 |
+| Phase 7 target-aware CFG region plan | `b5d34d6e` | 105,990 | -1,686 |
+| Phase 7 root block eligibility consolidation | `d3657d4f` | 105,989 | -1,687 |
 
 ## Validation Ledger
 
@@ -1011,8 +1012,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical normal-completion coordinator | Ordered throw-guard, framework-before, inverse `DoesNotReturnIf`, framework-after, and source successful-completion conditions now compose in `SymbolicSourceCompletionLowerer` and enter state only through canonical operation transitions. CFG, loop, statement, using, and declaration callers consume the immutable result directly; the 127-line `SymbolicNormalCompletionStateTransfer` owner and the loop throw-guard wrapper are deleted. Unsupported component discovery still contributes no optimistic fact and does not prevent later independent guaranteed facts. The focused program-point/CFG/operation batch passes 330/330; all six lanes pass 6,102 tests with the same two documented skips; and the Release solution build has zero warnings and errors. Production LOC falls to 106,009, or -1,667 from the rewrite start; tracked test LOC remains 144,706. GitHub PR #79 is green: the prior README inventory race was already fixed by `1ebaebea`, so no redundant CI change was made. |
 | Phase 7 target-aware CFG region plan | The completed-statement scheduler now uses one `CfgRegionPlan` carrying target kind, target syntax, block operation cursors, completion/terminal topology, ignored flow captures, and scope-exit policy. The existing worklist consumes the plan directly; the three statement-only scheduler carriers and redundant intermediate completion/terminal collections are deleted. A focused nested-switch invariant locks support, null partial state, `UnsupportedIrEncoding`, and full provenance stage/span/detail, including `statement-region.switch-nested`. The focused scheduler gate passes 43/43 and the complete collector fixture passes 212/212. All six lanes pass 6,103 tests with the same two documented skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,937 plus two skips, and Tooling 592. The Release solution warning-as-error build has zero warnings and errors. Production LOC falls to 105,990, or -1,686 from the rewrite start; tracked test LOC is 144,744. The collector partial remains below its architecture limit at 2,979 lines. |
 | Phase 7 block-completion characterization and CI inventory repair | Commit `983c151d` refreshes the tracked impacted-test inventory after the normal-completion owner and three statement-region carriers were deleted; all 39 selector/inventory tests pass. Root/nested exact characterizations now compare normalized state, evidence/provenance, and symbol versions, while a two-case invariant locks null partial state, `UnsupportedIrEncoding`, and the exact `root-block-control-flow` / `nested-block-completion` provenance identities. A direct block-through-region-worklist prototype failed 31 of 53 focused cases because block completion intentionally preserves different guarded-choice and terminal state than completed-statement merging; it was reverted completely. The clean characterization gate passes 53/53 and the Release test build has zero warnings. Production LOC remains 105,990; the next migration must model block-specific completion policy explicitly rather than reuse statement finalization unchanged. |
-| Phase 7 root block eligibility consolidation | Root completion now has one eligibility owner for invocation, try/catch-region, and acyclic/terminal CFG policy. The duplicate recursive region-kind walker is deleted in favor of the collector's existing region enumeration. The structural completion owner remains intentionally authoritative after the direct region-worklist prototype failed guarded-choice parity. Root exact/fallback and typed identity fixtures pass 32/32. Production LOC falls by two lines to 105,988, or -1,688 from the rewrite start. |
-| Phase 7 nested block completion adjudication | A second prototype retained the exact structural block-entry state, added block topology to `CfgRegionPlan`, and distinguished internal versus target scope exits. It reduced failures from 31 to 8 but still changed guarded-choice normalization/evidence, array completion facts, and all-terminal branch results. The prototype was reverted completely under the two-failure pivot rule; the clean 53-case block gate remains green. Nested structural completion is therefore an evidence-backed semantic owner until guard-choice finalization itself is unified, not merely adapted at plan entry. Production LOC remains 105,988. |
+| Phase 7 root block eligibility consolidation | Root completion now has one eligibility owner for invocation, try/catch-region, and acyclic/terminal CFG policy. The duplicate recursive region-kind walker is deleted in favor of the collector's existing region enumeration. The structural completion owner remains intentionally authoritative after the direct region-worklist prototype failed guarded-choice parity. Root exact/fallback and typed identity fixtures pass 32/32. Authoritative metrics report 105,989 production LOC, or -1,687 from the rewrite start. |
+| Phase 7 nested block completion adjudication | A second prototype retained the exact structural block-entry state, added block topology to `CfgRegionPlan`, and distinguished internal versus target scope exits. It reduced failures from 31 to 8 but still changed guarded-choice normalization/evidence, array completion facts, and all-terminal branch results. The prototype was reverted completely under the two-failure pivot rule; the clean 53-case block gate remains green. Nested structural completion is therefore an evidence-backed semantic owner until guard-choice finalization itself is unified, not merely adapted at plan entry. Production LOC remains 105,989. |
+| Phase 7 residual legacy call-graph pivot | Three independent exact caller/LOC audits found no non-block legacy island with an existing canonical replacement and at least 50 net removable lines. The 339-line ancestor-reachability island remains the guard-sensitive fallback for every typed CFG `Unsupported`; completed-try is 90 gross lines but needs typed exception-to-catch routing; using entry is 77 gross lines but retains unique binding/evidence semantics; branch/loop candidates top out at 29 safe lines. No production change was made. The next foundational slice is typed CFG exception-region/catch routing, characterized before any completed-try deletion. |
 
 ## Current Checkpoint
 
@@ -1310,12 +1312,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   A structural-entry-seeded nested prototype still failed 8/53 focused cases
   across guarded choices, evidence, array completion, and terminal branches and
   was reverted. This migration family has reached the two-failure pivot limit.
-- Next cheapest step: pivot away from block completion and regenerate the exact
-  production call graph for `SymbolicProgramPointFacts` plus the remaining
-  statement/expression/branch/loop transfer owners. Rank physical legacy islands
-  that do not depend on block guard-finalization parity, then take the first
-  vertical slice with a real deletion path and focused differential coverage.
-- Blockers: the 11,000-line production target still requires 9,314 lines, while
+  Root eligibility leaves the authoritative metric at 105,989 production LOC,
+  or -1,687 from the rewrite start. The residual call-graph audit found no safe
+  non-block 50-line deletion; completed-try is the first large island and awaits
+  typed exception-to-catch routing.
+- Next cheapest step: characterize explicit throw-to-catch completion across
+  exact/base/incompatible catch types, filters, multiple catches, and finally;
+  then introduce a typed CFG exception-region routing plan. Keep unknown
+  potentially throwing calls conservative. Delete the 90-line completed-try
+  structural island only after exact state/evidence/provenance parity.
+- Blockers: the 11,000-line production target still requires 9,313 lines, while
   two bounded semantic-owner audits found no remaining 250-line safe cut. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
