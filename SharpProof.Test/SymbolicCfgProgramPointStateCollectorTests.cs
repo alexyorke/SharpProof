@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -618,6 +619,47 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+    }
+
+    [TestCase(
+        "static class C { static int M(string? text) { if (text != null ? text.Length == 3 : false) { return 1; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(int value, int divisor) { if (divisor != 0 ? value / divisor == 3 : false) { return 1; } return 0; } }")]
+    public void ConditionalBooleanBranchLocalTarget_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(ConditionalBooleanBranchLocalTarget_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().First();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        var ifCondition = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+        var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
+            ifCondition,
+            branchWhenTrue: true,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
+        Assert.That(lowering.IsExact, Is.True, lowering.Provenance.Single().Detail);
+
+        using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var proofService = new SymbolicProofService(smt);
+        var expectedProof = proofService.ClassifyConditionTruth(expected, lowering.Value!);
+        var actualProof = proofService.ClassifyConditionTruth(actual.Value!, lowering.Value!);
+        Assert.That(actualProof.Info.Status, Is.EqualTo(expectedProof.Info.Status));
+        Assert.That(actualProof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), actualProof.Info.Reason);
     }
 
     [Test]

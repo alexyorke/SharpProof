@@ -1001,6 +1001,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         IReadOnlyList<CfgPathState> paths,
         SyntaxNode source)
     {
+        var feasiblePaths = paths.Where(static path => !path.State.IsContradictory).ToArray();
+        if (feasiblePaths.Length != 0 && feasiblePaths.Length != paths.Count)
+            return MergeIncomingStates(feasiblePaths, source);
         if (paths.Count == 1)
             return paths[0];
         if (TryMergeGuardedPaths(paths, source, out var merged))
