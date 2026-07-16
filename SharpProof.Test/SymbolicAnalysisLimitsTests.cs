@@ -269,10 +269,11 @@ public sealed class SymbolicAnalysisLimitsTests
             result.AnalysisTruncation.Events.Select(static item => item.Code),
             Does.Contain("analysis_limit.foreach_element_facts"));
         var compact = result.ToCompactResult();
-        Assert.That(compact.AnalysisTruncation.IsTruncated, Is.True);
-        Assert.That(compact.AnalysisSummary.AnalysisTruncated, Is.True);
-        Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.True);
-        Assert.That(result.ToInvariantQueryResult().AnalysisTruncation.IsTruncated, Is.True);
+        Assert.That(compact.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        Assert.That(compact.GetProperty("analysisSummary").GetProperty("analysisTruncated").GetBoolean(), Is.True);
+        Assert.That(compact.GetProperty("analysisSummary").GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+        Assert.That(result.ToInvariantQueryResult()
+            .GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
     }
 
     [Test]

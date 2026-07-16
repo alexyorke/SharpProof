@@ -1,65 +1,31 @@
-using System.Collections.Immutable;
-using System.Globalization;
-using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicCompactLineResult
+internal sealed class SymbolicCompactLineResult(
+    SymbolicQueryResult result,
+    SymbolicCompactScopeProjection projection)
 {
-    private readonly SymbolicCompactScopeProjection _projection;
-    private readonly SymbolicQueryResult _result;
-
-    private SymbolicCompactLineResult(
-        SymbolicQueryResult result,
-        SymbolicCompactScopeProjection projection)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-        _projection = projection ?? throw new ArgumentNullException(nameof(projection));
-    }
-
-    public string FilePath => _result.FilePath;
-
-    public int Line => _result.Line ?? 0;
-
-    public int ProgramPointCount => _result.ProgramPoints.Count;
-
-    public SymbolicCompactInvariantSummary ObservedInvariant => _projection.ObservedInvariant;
-
-    public SymbolicCompactInvariantSummary ConservativeInvariant => _projection.ConservativeInvariant;
-
-    public SymbolicCompactInvariantQueryView InvariantQuery => _projection.InvariantQuery;
-
+    public string FilePath => result.FilePath;
+    public int Line => result.Line ?? 0;
+    public int ProgramPointCount => result.ProgramPoints.Count;
+    public SymbolicCompactInvariantSummary ObservedInvariant => projection.ObservedInvariant;
+    public SymbolicCompactInvariantSummary ConservativeInvariant => projection.ConservativeInvariant;
+    public SymbolicCompactInvariantQueryView InvariantQuery => projection.InvariantQuery;
     public string MergedInvariantText => ConservativeInvariant.Text;
-
-    public SymbolicReachabilitySummary Reachability => _projection.Reachability;
-
-    public SymbolicProgramPointSummary ProgramPointSummary => _projection.ProgramPointSummary;
-
+    public SymbolicReachabilitySummary Reachability => projection.Reachability;
+    public SymbolicProgramPointSummary ProgramPointSummary => projection.ProgramPointSummary;
     public SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _projection.ConditionProofs;
-
-    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => _projection.ProgramPoints;
-
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _projection.SmtDiagnostics;
-
-    public SymbolicCompactOutputTruncation Truncation => _projection.Truncation;
-
-    internal SymbolicCompactScopeProjection Projection => _projection;
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => projection.ConditionProofs;
+    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => projection.ProgramPoints;
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics => projection.SmtDiagnostics;
+    public SymbolicCompactOutputTruncation Truncation => projection.Truncation;
+    internal SymbolicCompactScopeProjection Projection => projection;
 
     internal static SymbolicCompactLineResult FromResult(
         SymbolicQueryResult result,
         SymbolicCompactQueryOptions options,
         int maxProgramPoints)
     {
-        var projection = SymbolicCompactScopeProjection.Create(
+        return new SymbolicCompactLineResult(result, SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
             result.Facts,
             result.MergedInvariant,
@@ -71,241 +37,144 @@ public sealed class SymbolicCompactLineResult
             result.ProgramPoints,
             result.SmtDiagnostics,
             options,
-            maxProgramPoints);
-
-        return new SymbolicCompactLineResult(result, projection);
+            maxProgramPoints));
     }
 }
 
-public sealed class SymbolicCompactProgramPointResult
+internal sealed class SymbolicCompactProgramPointResult(
+    SymbolicProgramPointResult result,
+    int factCount,
+    IReadOnlyList<string> facts,
+    IReadOnlyList<SymbolicFactInfo> symbolicFacts,
+    SymbolicCompactInvariantSummary observedInvariant,
+    SymbolicCompactInvariantSummary conservativeInvariant,
+    SymbolicCompactInvariantQueryView invariantQuery,
+    int pathConditionCount,
+    IReadOnlyList<SymbolicInvariantCondition> pathConditions,
+    IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
+    SymbolicCompactSmtDiagnostics smtDiagnostics,
+    SymbolicCompactOutputTruncation truncation)
 {
-    private readonly SymbolicProgramPointResult _result;
-
-    private SymbolicCompactProgramPointResult(
-        SymbolicProgramPointResult result,
-        int factCount,
-        IReadOnlyList<string> facts,
-        IReadOnlyList<SymbolicFactInfo> symbolicFacts,
-        SymbolicCompactInvariantSummary observedInvariant,
-        SymbolicCompactInvariantSummary conservativeInvariant,
-        SymbolicCompactInvariantQueryView invariantQuery,
-        int pathConditionCount,
-        IReadOnlyList<SymbolicInvariantCondition> pathConditions,
-        IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicCompactOutputTruncation truncation)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-        FactCount = factCount;
-        Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-        SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
-        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
-        ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        PathConditionCount = pathConditionCount;
-        InvariantConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
-        SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
-        Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
-    }
-
-    public string FilePath => _result.FilePath;
-
-    public int Line => _result.Line;
-
-    public int Column => _result.Column;
-
-    public int Position => _result.Position;
-
-    public int? RequestedLine => _result.RequestedLine;
-
-    public int? RequestedColumn => _result.RequestedColumn;
-
-    public int? RequestedPosition => _result.RequestedPosition;
-
-    public int? RequestedPositionDistance => _result.RequestedPositionDistance;
-
-    public bool? ContainsRequestedPosition => _result.ContainsRequestedPosition;
-
-    public int NodeSpanStart => _result.NodeSpanStart;
-
-    public int NodeSpanEnd => _result.NodeSpanEnd;
-
-    public int NodeSpanLength => _result.NodeSpanLength;
-
-    public int NodeStartLine => _result.NodeStartLine;
-
-    public int NodeStartColumn => _result.NodeStartColumn;
-
-    public int NodeEndLine => _result.NodeEndLine;
-
-    public int NodeEndColumn => _result.NodeEndColumn;
-
-    public string NodeKind => _result.NodeKind;
-
-    public string? MethodName => _result.MethodName;
-
-    public string ProgramPointKind => _result.ProgramPointKind;
-
-    public int FactCount { get; }
-
-    public IReadOnlyList<string> Facts { get; }
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
-
-    public SymbolicCompactInvariantSummary ObservedInvariant { get; }
-
-    public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
-
-    public SymbolicCompactInvariantQueryView InvariantQuery { get; }
-
+    public string FilePath => result.FilePath;
+    public int Line => result.Line;
+    public int Column => result.Column;
+    public int Position => result.Position;
+    public int? RequestedLine => result.RequestedLine;
+    public int? RequestedColumn => result.RequestedColumn;
+    public int? RequestedPosition => result.RequestedPosition;
+    public int? RequestedPositionDistance => result.RequestedPositionDistance;
+    public bool? ContainsRequestedPosition => result.ContainsRequestedPosition;
+    public int NodeSpanStart => result.NodeSpanStart;
+    public int NodeSpanEnd => result.NodeSpanEnd;
+    public int NodeSpanLength => result.NodeSpanLength;
+    public int NodeStartLine => result.NodeStartLine;
+    public int NodeStartColumn => result.NodeStartColumn;
+    public int NodeEndLine => result.NodeEndLine;
+    public int NodeEndColumn => result.NodeEndColumn;
+    public string NodeKind => result.NodeKind;
+    public string? MethodName => result.MethodName;
+    public string ProgramPointKind => result.ProgramPointKind;
+    public int FactCount { get; } = factCount;
+    public IReadOnlyList<string> Facts { get; } = facts;
+    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } = symbolicFacts;
+    public SymbolicCompactInvariantSummary ObservedInvariant { get; } = observedInvariant;
+    public SymbolicCompactInvariantSummary ConservativeInvariant { get; } = conservativeInvariant;
+    public SymbolicCompactInvariantQueryView InvariantQuery { get; } = invariantQuery;
     public string MergedInvariantText => ConservativeInvariant.Text;
-
-    public int PathConditionCount { get; }
-
-    public IReadOnlyList<SymbolicInvariantCondition> InvariantConditions { get; }
-
+    public int PathConditionCount { get; } = pathConditionCount;
+    public IReadOnlyList<SymbolicInvariantCondition> InvariantConditions { get; } = pathConditions;
     internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => InvariantConditions;
-
-    public string Reachability => _result.Reachability.ToString();
-
-    public string ReachabilityReason => _result.ReachabilityReason;
-
-    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
-
-    public SymbolicProofOutcomeSummary ProofOutcomes => _result.ProofOutcomes;
-
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
-
-    public SymbolicCompactOutputTruncation Truncation { get; }
+    public string Reachability => result.Reachability.ToString();
+    public string ReachabilityReason => result.ReachabilityReason;
+    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } = conditionProofs;
+    public SymbolicProofOutcomeSummary ProofOutcomes => result.ProofOutcomes;
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics;
+    public SymbolicCompactOutputTruncation Truncation { get; } = truncation;
 
     internal static SymbolicCompactProgramPointResult FromResult(
         SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions options)
     {
-        var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
-            SymbolicInvariantResult.FromFacts(result.Facts),
-            result.Facts,
-            options);
-        var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
-            result.Invariant,
-            null,
-            options);
-        var focusedPathConditions = SymbolicInvariantTargetFilter.ApplyToConditions(
-            result.Invariant.Conditions,
-            options.InvariantTargets);
+        var observed = SymbolicCompactInvariantSummary.FromObservedFacts(
+            SymbolicInvariantResult.FromFacts(result.Facts), result.Facts, options);
+        var conservative = SymbolicCompactInvariantSummary.FromInvariant(result.Invariant, null, options);
+        var focusedConditions = SymbolicInvariantTargetFilter.ApplyToConditions(
+            result.Invariant.Conditions, options.InvariantTargets);
         var focusedFacts = options.HasInvariantTargetFilter
-            ? focusedPathConditions
-                .Select(static condition => condition.Text)
+            ? focusedConditions.Select(static condition => condition.Text)
                 .Where(static fact => !string.IsNullOrWhiteSpace(fact))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray()
             : result.Facts;
-        var focusedConditionProofs = SymbolicInvariantTargetFilter.ApplyToProofResults(
-            result.ConditionProofs,
-            options.InvariantTargets);
+        var focusedProofs = SymbolicInvariantTargetFilter.ApplyToProofResults(
+            result.ConditionProofs, options.InvariantTargets);
         var facts = SymbolicCompactProjection.Take(focusedFacts, options.MaxFacts);
         var symbolicFacts = SymbolicCompactProjection.Take(result.SymbolicFacts, options.MaxFacts);
-        var pathConditions = SymbolicCompactProjection.Take(focusedPathConditions, options.MaxConditions);
-        var conditionProofs = SymbolicCompactProjection.Take(focusedConditionProofs, options.MaxProofs);
+        var conditions = SymbolicCompactProjection.Take(focusedConditions, options.MaxConditions);
+        var proofs = SymbolicCompactProjection.Take(focusedProofs, options.MaxProofs);
         var truncation = SymbolicCompactOutputTruncation.Combine(
             new SymbolicCompactOutputTruncation(
                 false,
                 false,
-                focusedFacts.Count > facts.Count ||
-                result.SymbolicFacts.Count > symbolicFacts.Count,
-                focusedPathConditions.Count > pathConditions.Count,
-                focusedConditionProofs.Count > conditionProofs.Count),
-            SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
-            SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant));
+                focusedFacts.Count > facts.Count || result.SymbolicFacts.Count > symbolicFacts.Count,
+                focusedConditions.Count > conditions.Count,
+                focusedProofs.Count > proofs.Count),
+            SymbolicCompactOutputTruncation.FromInvariant(observed),
+            SymbolicCompactOutputTruncation.FromInvariant(conservative));
 
         return new SymbolicCompactProgramPointResult(
             result,
             focusedFacts.Count,
             facts,
             symbolicFacts,
-            observedInvariant,
-            conservativeInvariant,
+            observed,
+            conservative,
             SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
-            focusedPathConditions.Count,
-            pathConditions,
-            conditionProofs,
+            focusedConditions.Count,
+            conditions,
+            proofs,
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
             truncation);
     }
 }
 
-public sealed class SymbolicCompactInvariantSummary
+internal sealed class SymbolicCompactInvariantSummary(
+    SymbolicInvariantResult invariant,
+    IReadOnlyList<string> conditions,
+    int targetCount,
+    IReadOnlyList<string> targets,
+    int rawFactCount,
+    IReadOnlyList<string> rawFacts,
+    SymbolicCompactMergedPathFacts? mergedPathFacts,
+    bool conditionsTruncated,
+    bool targetsTruncated,
+    bool rawFactsTruncated)
 {
-    private readonly SymbolicInvariantResult _invariant;
-
-    private SymbolicCompactInvariantSummary(
-        SymbolicInvariantResult invariant,
-        IReadOnlyList<string> conditions,
-        int targetCount,
-        IReadOnlyList<string> targets,
-        int rawFactCount,
-        IReadOnlyList<string> rawFacts,
-        SymbolicCompactMergedPathFacts? mergedPathFacts,
-        bool conditionsTruncated,
-        bool targetsTruncated,
-        bool rawFactsTruncated)
-    {
-        _invariant = invariant ?? throw new ArgumentNullException(nameof(invariant));
-        Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
-        TargetCount = targetCount;
-        Targets = targets ?? throw new ArgumentNullException(nameof(targets));
-        RawFactCount = rawFactCount;
-        RawFacts = rawFacts ?? throw new ArgumentNullException(nameof(rawFacts));
-        MergedPathFacts = mergedPathFacts;
-        ConditionsTruncated = conditionsTruncated;
-        TargetsTruncated = targetsTruncated;
-        RawFactsTruncated = rawFactsTruncated;
-    }
-
-    public string MergeKind => _invariant.MergeKind.ToString();
-
-    public string Text => _invariant.MergedInvariantText;
-
-    public int ConditionCount => _invariant.ConditionCount;
-
-    public IReadOnlyList<string> Conditions { get; }
-
-    public int TargetCount { get; }
-
-    public IReadOnlyList<string> Targets { get; }
-
-    public int RawFactCount { get; }
-
-    public IReadOnlyList<string> RawFacts { get; }
-
-    public int ConservativeUnknownCount => _invariant.ConservativeUnknownCount;
-
-    public bool HasConservativeUnknowns => _invariant.HasConservativeUnknowns;
-
-    public SymbolicCompactMergedPathFacts? MergedPathFacts { get; }
-
-    public bool ConditionsTruncated { get; }
-
-    public bool TargetsTruncated { get; }
-
-    public bool RawFactsTruncated { get; }
+    public string MergeKind => invariant.MergeKind.ToString();
+    public string Text => invariant.MergedInvariantText;
+    public int ConditionCount => invariant.ConditionCount;
+    public IReadOnlyList<string> Conditions { get; } = conditions;
+    public int TargetCount { get; } = targetCount;
+    public IReadOnlyList<string> Targets { get; } = targets;
+    public int RawFactCount { get; } = rawFactCount;
+    public IReadOnlyList<string> RawFacts { get; } = rawFacts;
+    public int ConservativeUnknownCount => invariant.ConservativeUnknownCount;
+    public bool HasConservativeUnknowns => invariant.HasConservativeUnknowns;
+    public SymbolicCompactMergedPathFacts? MergedPathFacts { get; } = mergedPathFacts;
+    public bool ConditionsTruncated { get; } = conditionsTruncated;
+    public bool TargetsTruncated { get; } = targetsTruncated;
+    public bool RawFactsTruncated { get; } = rawFactsTruncated;
+    internal bool MergedPathFactsTruncated => MergedPathFacts?.IsTruncated == true;
 
     internal static SymbolicCompactInvariantSummary FromObservedFacts(
         SymbolicInvariantResult invariant,
         IReadOnlyList<string> rawFacts,
-        SymbolicCompactQueryOptions options)
-    {
-        return Create(invariant, rawFacts, null, options);
-    }
+        SymbolicCompactQueryOptions options) => Create(invariant, rawFacts, null, options);
 
     internal static SymbolicCompactInvariantSummary FromInvariant(
         SymbolicInvariantResult invariant,
         SymbolicMergedPathFacts? mergedPathFacts,
-        SymbolicCompactQueryOptions options)
-    {
-        return Create(invariant, Array.Empty<string>(), mergedPathFacts, options);
-    }
+        SymbolicCompactQueryOptions options) => Create(invariant, Array.Empty<string>(), mergedPathFacts, options);
 
     private static SymbolicCompactInvariantSummary Create(
         SymbolicInvariantResult invariant,
@@ -313,12 +182,14 @@ public sealed class SymbolicCompactInvariantSummary
         SymbolicMergedPathFacts? mergedPathFacts,
         SymbolicCompactQueryOptions options)
     {
-        var conditions = invariant.Conditions
-            .Select(static condition => condition.Text)
-            .ToArray();
-        var targets = GetDistinctTargets(invariant);
-        var conditionProjection = SymbolicCompactProjection.Project(conditions, options.MaxConditions);
-        var targetProjection = SymbolicCompactProjection.Project(targets, options.MaxConditions);
+        var conditionProjection = SymbolicCompactProjection.Project(
+            invariant.Conditions.Select(static condition => condition.Text).ToArray(), options.MaxConditions);
+        var targetProjection = SymbolicCompactProjection.Project(
+            invariant.Conditions.Select(static condition => condition.Target)
+                .Where(static target => !string.IsNullOrWhiteSpace(target))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
+            options.MaxConditions);
         var rawFactProjection = SymbolicCompactProjection.Project(rawFacts, options.MaxFacts);
         return new SymbolicCompactInvariantSummary(
             invariant,
@@ -327,83 +198,41 @@ public sealed class SymbolicCompactInvariantSummary
             targetProjection.Items,
             rawFactProjection.TotalCount,
             rawFactProjection.Items,
-            mergedPathFacts == null
-                ? null
-                : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
+            mergedPathFacts == null ? null : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
             conditionProjection.IsTruncated,
             targetProjection.IsTruncated,
             rawFactProjection.IsTruncated);
     }
-
-    private static string[] GetDistinctTargets(SymbolicInvariantResult invariant)
-    {
-        return invariant.Conditions
-            .Select(static condition => condition.Target)
-            .Where(static target => !string.IsNullOrWhiteSpace(target))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-    }
 }
 
-public sealed class SymbolicCompactMergedPathFacts
+internal sealed class SymbolicCompactMergedPathFacts(
+    SymbolicMergedPathFacts facts,
+    IReadOnlyList<string> alwaysFacts,
+    IReadOnlyList<string> maybeFacts,
+    IReadOnlyList<string> conservativeUnknowns,
+    IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
+    bool alwaysFactsTruncated,
+    bool maybeFactsTruncated,
+    bool conservativeUnknownsTruncated,
+    bool conservativeUnknownDiagnosticsTruncated)
 {
-    private readonly SymbolicMergedPathFacts _facts;
-
-    private SymbolicCompactMergedPathFacts(
-        SymbolicMergedPathFacts facts,
-        IReadOnlyList<string> alwaysFacts,
-        IReadOnlyList<string> maybeFacts,
-        IReadOnlyList<string> conservativeUnknowns,
-        IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
-        bool alwaysFactsTruncated,
-        bool maybeFactsTruncated,
-        bool conservativeUnknownsTruncated,
-        bool conservativeUnknownDiagnosticsTruncated)
-    {
-        _facts = facts ?? throw new ArgumentNullException(nameof(facts));
-        AlwaysFacts = alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        ConservativeUnknowns = conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
-        ConservativeUnknownDiagnostics = conservativeUnknownDiagnostics ??
-                                         throw new ArgumentNullException(nameof(conservativeUnknownDiagnostics));
-        AlwaysFactsTruncated = alwaysFactsTruncated;
-        MaybeFactsTruncated = maybeFactsTruncated;
-        ConservativeUnknownsTruncated = conservativeUnknownsTruncated;
-        ConservativeUnknownDiagnosticsTruncated = conservativeUnknownDiagnosticsTruncated;
-    }
-
-    public int AlwaysFactCount => _facts.AlwaysFacts.Count;
-
-    public IReadOnlyList<string> AlwaysFacts { get; }
-
-    public int MaybeFactCount => _facts.MaybeFacts.Count;
-
-    public IReadOnlyList<string> MaybeFacts { get; }
-
-    public int ConservativeUnknownCount => _facts.ConservativeUnknownCount;
-
-    public IReadOnlyList<string> ConservativeUnknowns { get; }
-
-    public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; }
-
-    public int CandidateProgramPointCount => _facts.CandidateProgramPointCount;
-
-    public int UnreachableProgramPointCount => _facts.UnreachableProgramPointCount;
-
-    public bool IsUnreachable => _facts.IsUnreachable;
-
-    public bool AlwaysFactsTruncated { get; }
-
-    public bool MaybeFactsTruncated { get; }
-
-    public bool ConservativeUnknownsTruncated { get; }
-
-    public bool ConservativeUnknownDiagnosticsTruncated { get; }
-
+    public int AlwaysFactCount => facts.AlwaysFacts.Count;
+    public IReadOnlyList<string> AlwaysFacts { get; } = alwaysFacts;
+    public int MaybeFactCount => facts.MaybeFacts.Count;
+    public IReadOnlyList<string> MaybeFacts { get; } = maybeFacts;
+    public int ConservativeUnknownCount => facts.ConservativeUnknownCount;
+    public IReadOnlyList<string> ConservativeUnknowns { get; } = conservativeUnknowns;
+    public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; } =
+        conservativeUnknownDiagnostics;
+    public int CandidateProgramPointCount => facts.CandidateProgramPointCount;
+    public int UnreachableProgramPointCount => facts.UnreachableProgramPointCount;
+    public bool IsUnreachable => facts.IsUnreachable;
+    public bool AlwaysFactsTruncated { get; } = alwaysFactsTruncated;
+    public bool MaybeFactsTruncated { get; } = maybeFactsTruncated;
+    public bool ConservativeUnknownsTruncated { get; } = conservativeUnknownsTruncated;
+    public bool ConservativeUnknownDiagnosticsTruncated { get; } = conservativeUnknownDiagnosticsTruncated;
     internal bool IsTruncated =>
-        AlwaysFactsTruncated ||
-        MaybeFactsTruncated ||
-        ConservativeUnknownsTruncated ||
+        AlwaysFactsTruncated || MaybeFactsTruncated || ConservativeUnknownsTruncated ||
         ConservativeUnknownDiagnosticsTruncated ||
         ConservativeUnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated);
 
@@ -411,8 +240,7 @@ public sealed class SymbolicCompactMergedPathFacts
         SymbolicMergedPathFacts facts,
         SymbolicCompactQueryOptions options)
     {
-        var conservativeUnknownDiagnostics = SymbolicCompactProjection
-            .Take(facts.ConservativeUnknownDiagnostics, options.MaxConditions)
+        var diagnostics = SymbolicCompactProjection.Take(facts.ConservativeUnknownDiagnostics, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
         return new SymbolicCompactMergedPathFacts(
@@ -420,7 +248,7 @@ public sealed class SymbolicCompactMergedPathFacts
             SymbolicCompactProjection.Take(facts.AlwaysFacts, options.MaxConditions),
             SymbolicCompactProjection.Take(facts.MaybeFacts, options.MaxConditions),
             SymbolicCompactProjection.Take(facts.ConservativeUnknowns, options.MaxConditions),
-            conservativeUnknownDiagnostics,
+            diagnostics,
             facts.AlwaysFacts.Count > options.MaxConditions,
             facts.MaybeFacts.Count > options.MaxConditions,
             facts.ConservativeUnknowns.Count > options.MaxConditions,
@@ -428,35 +256,19 @@ public sealed class SymbolicCompactMergedPathFacts
     }
 }
 
-public sealed class SymbolicCompactConservativeUnknownDiagnostic
+internal sealed class SymbolicCompactConservativeUnknownDiagnostic(
+    SymbolicConservativeUnknownDiagnostic diagnostic,
+    IReadOnlyList<string> maybeFacts,
+    bool maybeFactsTruncated)
 {
-    private readonly SymbolicConservativeUnknownDiagnostic _diagnostic;
-
-    private SymbolicCompactConservativeUnknownDiagnostic(
-        SymbolicConservativeUnknownDiagnostic diagnostic,
-        IReadOnlyList<string> maybeFacts,
-        bool maybeFactsTruncated)
-    {
-        _diagnostic = diagnostic ?? throw new ArgumentNullException(nameof(diagnostic));
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        MaybeFactsTruncated = maybeFactsTruncated;
-    }
-
-    public string Target => _diagnostic.Target;
-
-    public string UnknownText => _diagnostic.UnknownText;
-
-    public string Reason => _diagnostic.Reason;
-
-    public int MaybeFactCount => _diagnostic.MaybeFactCount;
-
-    public IReadOnlyList<string> MaybeFacts { get; }
-
-    public int CandidateProgramPointCount => _diagnostic.CandidateProgramPointCount;
-
-    public int UnreachableProgramPointCount => _diagnostic.UnreachableProgramPointCount;
-
-    public bool MaybeFactsTruncated { get; }
+    public string Target => diagnostic.Target;
+    public string UnknownText => diagnostic.UnknownText;
+    public string Reason => diagnostic.Reason;
+    public int MaybeFactCount => diagnostic.MaybeFactCount;
+    public IReadOnlyList<string> MaybeFacts { get; } = maybeFacts;
+    public int CandidateProgramPointCount => diagnostic.CandidateProgramPointCount;
+    public int UnreachableProgramPointCount => diagnostic.UnreachableProgramPointCount;
+    public bool MaybeFactsTruncated { get; } = maybeFactsTruncated;
 
     internal static SymbolicCompactConservativeUnknownDiagnostic FromDiagnostic(
         SymbolicConservativeUnknownDiagnostic diagnostic,
@@ -469,195 +281,55 @@ public sealed class SymbolicCompactConservativeUnknownDiagnostic
     }
 }
 
-public sealed class SymbolicCompactInvariantQueryView
+internal sealed record SymbolicCompactInvariantQueryView(
+    string Text,
+    string MergeKind,
+    int MustFactCount,
+    IReadOnlyList<string> MustFacts,
+    int MaybeFactCount,
+    IReadOnlyList<string> MaybeFacts,
+    int UnknownFactCount,
+    IReadOnlyList<string> UnknownFacts,
+    IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> UnknownDiagnostics,
+    int TargetSummaryCount,
+    IReadOnlyList<SymbolicCompactInvariantTargetSummary> TargetSummaries,
+    int TargetPathSummaryCount,
+    IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> TargetPathSummaries,
+    IReadOnlyList<string> TargetFilters,
+    int TargetFilterCount,
+    bool HasTargetFilter,
+    bool TargetFilterMatched,
+    int MatchedTargetFilterCount,
+    IReadOnlyList<string> MatchedTargetFilters,
+    int UnmatchedTargetFilterCount,
+    IReadOnlyList<string> UnmatchedTargetFilters,
+    int UnfilteredTargetSummaryCount,
+    int UnfilteredTargetPathSummaryCount,
+    int DiagnosticCount,
+    IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> Diagnostics,
+    int CandidateProgramPointCount,
+    int UnreachableProgramPointCount,
+    bool IsUnreachable,
+    string Status,
+    string StatusReason,
+    string Summary,
+    bool HasMaybeFacts,
+    bool HasUnknowns,
+    bool HasUnresolvedAnalysis,
+    bool MustFactsTruncated,
+    bool MaybeFactsTruncated,
+    bool UnknownFactsTruncated,
+    bool UnknownDiagnosticsTruncated,
+    bool TargetSummariesTruncated,
+    bool TargetPathSummariesTruncated,
+    bool MatchedTargetFiltersTruncated,
+    bool UnmatchedTargetFiltersTruncated,
+    bool DiagnosticsTruncated)
 {
-    private SymbolicCompactInvariantQueryView(
-        string text,
-        string mergeKind,
-        int mustFactCount,
-        IReadOnlyList<string> mustFacts,
-        int maybeFactCount,
-        IReadOnlyList<string> maybeFacts,
-        int unknownFactCount,
-        IReadOnlyList<string> unknownFacts,
-        IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> unknownDiagnostics,
-        int targetSummaryCount,
-        IReadOnlyList<SymbolicCompactInvariantTargetSummary> targetSummaries,
-        int targetPathSummaryCount,
-        IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> targetPathSummaries,
-        IReadOnlyList<string> targetFilters,
-        int targetFilterCount,
-        bool hasTargetFilter,
-        bool targetFilterMatched,
-        int matchedTargetFilterCount,
-        IReadOnlyList<string> matchedTargetFilters,
-        int unmatchedTargetFilterCount,
-        IReadOnlyList<string> unmatchedTargetFilters,
-        int unfilteredTargetSummaryCount,
-        int unfilteredTargetPathSummaryCount,
-        int diagnosticCount,
-        IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> diagnostics,
-        int candidateProgramPointCount,
-        int unreachableProgramPointCount,
-        bool isUnreachable,
-        string status,
-        string statusReason,
-        string summary,
-        bool hasMaybeFacts,
-        bool hasUnknowns,
-        bool hasUnresolvedAnalysis,
-        bool mustFactsTruncated,
-        bool maybeFactsTruncated,
-        bool unknownFactsTruncated,
-        bool unknownDiagnosticsTruncated,
-        bool targetSummariesTruncated,
-        bool targetPathSummariesTruncated,
-        bool matchedTargetFiltersTruncated,
-        bool unmatchedTargetFiltersTruncated,
-        bool diagnosticsTruncated)
-    {
-        Text = text ?? string.Empty;
-        MergeKind = mergeKind ?? string.Empty;
-        MustFactCount = mustFactCount;
-        MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
-        MaybeFactCount = maybeFactCount;
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        UnknownFactCount = unknownFactCount;
-        UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
-        UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
-        TargetSummaryCount = targetSummaryCount;
-        TargetSummaries = targetSummaries ?? throw new ArgumentNullException(nameof(targetSummaries));
-        TargetPathSummaryCount = targetPathSummaryCount;
-        TargetPathSummaries = targetPathSummaries ?? throw new ArgumentNullException(nameof(targetPathSummaries));
-        TargetFilters = targetFilters ?? throw new ArgumentNullException(nameof(targetFilters));
-        TargetFilterCount = targetFilterCount;
-        HasTargetFilter = hasTargetFilter;
-        TargetFilterMatched = targetFilterMatched;
-        MatchedTargetFilterCount = matchedTargetFilterCount;
-        MatchedTargetFilters = matchedTargetFilters ?? throw new ArgumentNullException(nameof(matchedTargetFilters));
-        UnmatchedTargetFilterCount = unmatchedTargetFilterCount;
-        UnmatchedTargetFilters =
-            unmatchedTargetFilters ?? throw new ArgumentNullException(nameof(unmatchedTargetFilters));
-        UnfilteredTargetSummaryCount = unfilteredTargetSummaryCount;
-        UnfilteredTargetPathSummaryCount = unfilteredTargetPathSummaryCount;
-        DiagnosticCount = diagnosticCount;
-        Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
-        CandidateProgramPointCount = candidateProgramPointCount;
-        UnreachableProgramPointCount = unreachableProgramPointCount;
-        IsUnreachable = isUnreachable;
-        Status = status ?? string.Empty;
-        StatusReason = statusReason ?? string.Empty;
-        Summary = summary ?? string.Empty;
-        HasMaybeFacts = hasMaybeFacts;
-        HasUnknowns = hasUnknowns;
-        HasUnresolvedAnalysis = hasUnresolvedAnalysis;
-        MustFactsTruncated = mustFactsTruncated;
-        MaybeFactsTruncated = maybeFactsTruncated;
-        UnknownFactsTruncated = unknownFactsTruncated;
-        UnknownDiagnosticsTruncated = unknownDiagnosticsTruncated;
-        TargetSummariesTruncated = targetSummariesTruncated;
-        TargetPathSummariesTruncated = targetPathSummariesTruncated;
-        MatchedTargetFiltersTruncated = matchedTargetFiltersTruncated;
-        UnmatchedTargetFiltersTruncated = unmatchedTargetFiltersTruncated;
-        DiagnosticsTruncated = diagnosticsTruncated;
-    }
-
-    public string Text { get; }
-
-    public string MergeKind { get; }
-
-    public int MustFactCount { get; }
-
-    public IReadOnlyList<string> MustFacts { get; }
-
-    public int MaybeFactCount { get; }
-
-    public IReadOnlyList<string> MaybeFacts { get; }
-
-    public int UnknownFactCount { get; }
-
-    public IReadOnlyList<string> UnknownFacts { get; }
-
-    public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> UnknownDiagnostics { get; }
-
-    public int TargetSummaryCount { get; }
-
-    public IReadOnlyList<SymbolicCompactInvariantTargetSummary> TargetSummaries { get; }
-
-    public int TargetPathSummaryCount { get; }
-
-    public IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> TargetPathSummaries { get; }
-
-    public IReadOnlyList<string> TargetFilters { get; }
-
-    public int TargetFilterCount { get; }
-
-    public bool HasTargetFilter { get; }
-
-    public bool TargetFilterMatched { get; }
-
-    public int MatchedTargetFilterCount { get; }
-
-    public IReadOnlyList<string> MatchedTargetFilters { get; }
-
-    public int UnmatchedTargetFilterCount { get; }
-
-    public IReadOnlyList<string> UnmatchedTargetFilters { get; }
-
-    public int UnfilteredTargetSummaryCount { get; }
-
-    public int UnfilteredTargetPathSummaryCount { get; }
-
-    public int DiagnosticCount { get; }
-
-    public IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> Diagnostics { get; }
-
-    public int CandidateProgramPointCount { get; }
-
-    public int UnreachableProgramPointCount { get; }
-
-    public bool IsUnreachable { get; }
-
-    public string Status { get; }
-
-    public string StatusReason { get; }
-
-    public string Summary { get; }
-
-    public bool HasMaybeFacts { get; }
-
-    public bool HasUnknowns { get; }
-
-    public bool HasUnresolvedAnalysis { get; }
-
-    public bool MustFactsTruncated { get; }
-
-    public bool MaybeFactsTruncated { get; }
-
-    public bool UnknownFactsTruncated { get; }
-
-    public bool UnknownDiagnosticsTruncated { get; }
-
-    public bool TargetSummariesTruncated { get; }
-
-    public bool TargetPathSummariesTruncated { get; }
-
-    public bool MatchedTargetFiltersTruncated { get; }
-
-    public bool UnmatchedTargetFiltersTruncated { get; }
-
-    public bool DiagnosticsTruncated { get; }
-
     public bool IsTruncated =>
-        MustFactsTruncated ||
-        MaybeFactsTruncated ||
-        UnknownFactsTruncated ||
-        UnknownDiagnosticsTruncated ||
-        TargetSummariesTruncated ||
-        TargetPathSummariesTruncated ||
-        MatchedTargetFiltersTruncated ||
-        UnmatchedTargetFiltersTruncated ||
-        DiagnosticsTruncated ||
+        MustFactsTruncated || MaybeFactsTruncated || UnknownFactsTruncated || UnknownDiagnosticsTruncated ||
+        TargetSummariesTruncated || TargetPathSummariesTruncated || MatchedTargetFiltersTruncated ||
+        UnmatchedTargetFiltersTruncated || DiagnosticsTruncated ||
         Diagnostics.Any(static diagnostic => diagnostic.EvidenceTruncated) ||
         UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
         TargetSummaries.Any(static target => target.IsTruncated) ||
@@ -667,88 +339,59 @@ public sealed class SymbolicCompactInvariantQueryView
         SymbolicInvariantQueryView query,
         SymbolicCompactQueryOptions options)
     {
-        if (query == null) throw new ArgumentNullException(nameof(query));
-
-        var filteredTargetSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
-            query.TargetSummaries,
-            options.InvariantTargets,
-            static summary => summary.Target);
-        var focusedMustFacts = SymbolicInvariantTargetFilter.SelectFacts(
-            query.MustFacts,
-            filteredTargetSummaries,
-            options.InvariantTargets,
-            static summary => summary.MustFacts);
-        var focusedMaybeFacts = SymbolicInvariantTargetFilter.SelectFacts(
-            query.MaybeFacts,
-            filteredTargetSummaries,
-            options.InvariantTargets,
-            static summary => summary.MaybeFacts);
-        var focusedUnknownFacts = SymbolicInvariantTargetFilter.SelectFacts(
-            query.UnknownFacts,
-            filteredTargetSummaries,
-            options.InvariantTargets,
-            static summary => summary.UnknownFacts);
-        var focusedMergedFacts = options.HasInvariantTargetFilter
-            ? focusedMustFacts.Concat(focusedUnknownFacts).ToArray()
-            : Array.Empty<string>();
-        var focusedText = options.HasInvariantTargetFilter
-            ? SymbolicInvariantService.FormatMergedInvariantFacts(focusedMergedFacts)
+        var targets = SymbolicInvariantTargetFilter.ApplyToTargets(
+            query.TargetSummaries, options.InvariantTargets, static summary => summary.Target);
+        var mustFacts = SymbolicInvariantTargetFilter.SelectFacts(
+            query.MustFacts, targets, options.InvariantTargets, static summary => summary.MustFacts);
+        var maybeFacts = SymbolicInvariantTargetFilter.SelectFacts(
+            query.MaybeFacts, targets, options.InvariantTargets, static summary => summary.MaybeFacts);
+        var unknownFacts = SymbolicInvariantTargetFilter.SelectFacts(
+            query.UnknownFacts, targets, options.InvariantTargets, static summary => summary.UnknownFacts);
+        var text = options.HasInvariantTargetFilter
+            ? SymbolicInvariantService.FormatMergedInvariantFacts(mustFacts.Concat(unknownFacts).ToArray())
             : query.Text;
-        var filteredUnknownDiagnostics = SymbolicInvariantTargetFilter.ApplyToTargets(
-            query.UnknownDiagnostics,
-            options.InvariantTargets,
-            static diagnostic => diagnostic.Target);
-        var unknownDiagnostics = SymbolicCompactProjection
-            .Take(filteredUnknownDiagnostics, options.MaxConditions)
+        var unknownSource = SymbolicInvariantTargetFilter.ApplyToTargets(
+            query.UnknownDiagnostics, options.InvariantTargets, static diagnostic => diagnostic.Target);
+        var unknownDiagnostics = SymbolicCompactProjection.Take(unknownSource, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
-        var targetSummaries = SymbolicCompactProjection
-            .Take(filteredTargetSummaries, options.MaxConditions)
+        var targetSummaries = SymbolicCompactProjection.Take(targets, options.MaxConditions)
             .Select(target => SymbolicCompactInvariantTargetSummary.FromSummary(target, options))
             .ToArray();
-        var filteredTargetPathSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
-            query.TargetPathSummaries,
-            options.InvariantTargets,
-            static summary => summary.Target);
-        var targetPathSummaries = SymbolicCompactProjection
-            .Take(filteredTargetPathSummaries, options.MaxConditions)
+        var pathTargets = SymbolicInvariantTargetFilter.ApplyToTargets(
+            query.TargetPathSummaries, options.InvariantTargets, static summary => summary.Target);
+        var pathSummaries = SymbolicCompactProjection.Take(pathTargets, options.MaxConditions)
             .Select(target => SymbolicCompactInvariantTargetPathSummary.FromSummary(target, options))
             .ToArray();
-        var diagnostics = SymbolicCompactProjection
-            .Take(query.Diagnostics, options.MaxConditions)
+        var diagnostics = SymbolicCompactProjection.Take(query.Diagnostics, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
-        var matchedTargetFilters = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(
-            query,
-            options.InvariantTargets);
-        var unmatchedTargetFilters =
-            SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matchedTargetFilters);
-        var visibleMatchedTargetFilters = SymbolicCompactProjection.Take(matchedTargetFilters, options.MaxConditions);
-        var visibleUnmatchedTargetFilters =
-            SymbolicCompactProjection.Take(unmatchedTargetFilters, options.MaxConditions);
-        var targetFilterMatched = !options.HasInvariantTargetFilter || matchedTargetFilters.Count != 0;
+        var matched = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(query, options.InvariantTargets);
+        var unmatched = SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matched);
+        var visibleMatched = SymbolicCompactProjection.Take(matched, options.MaxConditions);
+        var visibleUnmatched = SymbolicCompactProjection.Take(unmatched, options.MaxConditions);
         return new SymbolicCompactInvariantQueryView(
-            focusedText,
+            text,
             query.MergeKind.ToString(),
-            focusedMustFacts.Count,
-            SymbolicCompactProjection.Take(focusedMustFacts, options.MaxConditions),
-            focusedMaybeFacts.Count,
-            SymbolicCompactProjection.Take(focusedMaybeFacts, options.MaxConditions),
-            focusedUnknownFacts.Count,
-            SymbolicCompactProjection.Take(focusedUnknownFacts, options.MaxConditions),
+            mustFacts.Count,
+            SymbolicCompactProjection.Take(mustFacts, options.MaxConditions),
+            maybeFacts.Count,
+            SymbolicCompactProjection.Take(maybeFacts, options.MaxConditions),
+            unknownFacts.Count,
+            SymbolicCompactProjection.Take(unknownFacts, options.MaxConditions),
             unknownDiagnostics,
-            filteredTargetSummaries.Count,
+            targets.Count,
             targetSummaries,
-            filteredTargetPathSummaries.Count,
-            targetPathSummaries,
+            pathTargets.Count,
+            pathSummaries,
             options.InvariantTargets,
             options.InvariantTargets.Count,
             options.HasInvariantTargetFilter,
-            targetFilterMatched,
-            matchedTargetFilters.Count,
-            visibleMatchedTargetFilters,
-            unmatchedTargetFilters.Count,
-            visibleUnmatchedTargetFilters,
+            !options.HasInvariantTargetFilter || matched.Count != 0,
+            matched.Count,
+            visibleMatched,
+            unmatched.Count,
+            visibleUnmatched,
             query.TargetSummaryCount,
             query.TargetPathSummaryCount,
             query.DiagnosticCount,
@@ -759,17 +402,17 @@ public sealed class SymbolicCompactInvariantQueryView
             query.Status.ToString(),
             query.StatusReason,
             query.Summary,
-            focusedMaybeFacts.Count != 0,
-            focusedUnknownFacts.Count != 0,
+            maybeFacts.Count != 0,
+            unknownFacts.Count != 0,
             query.HasUnresolvedAnalysis,
-            focusedMustFacts.Count > options.MaxConditions,
-            focusedMaybeFacts.Count > options.MaxConditions,
-            focusedUnknownFacts.Count > options.MaxConditions,
-            filteredUnknownDiagnostics.Count > options.MaxConditions,
-            filteredTargetSummaries.Count > targetSummaries.Length,
-            filteredTargetPathSummaries.Count > targetPathSummaries.Length,
-            matchedTargetFilters.Count > visibleMatchedTargetFilters.Count,
-            unmatchedTargetFilters.Count > visibleUnmatchedTargetFilters.Count,
+            mustFacts.Count > options.MaxConditions,
+            maybeFacts.Count > options.MaxConditions,
+            unknownFacts.Count > options.MaxConditions,
+            unknownSource.Count > options.MaxConditions,
+            targets.Count > targetSummaries.Length,
+            pathTargets.Count > pathSummaries.Length,
+            matched.Count > visibleMatched.Count,
+            unmatched.Count > visibleUnmatched.Count,
             query.Diagnostics.Count > options.MaxConditions);
     }
 }

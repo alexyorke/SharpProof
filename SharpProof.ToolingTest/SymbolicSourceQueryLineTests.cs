@@ -729,35 +729,36 @@ public class TestClass
         Assert.That(result.ContainsRequestedPosition, Is.True);
 
         var compact = result.ToCompactResult();
-        Assert.That(compact.RequestedLine, Is.EqualTo(line));
-        Assert.That(compact.RequestedColumn, Is.EqualTo(column));
-        Assert.That(compact.RequestedPosition, Is.EqualTo(requestedPosition));
-        Assert.That(compact.RequestedPositionDistance, Is.EqualTo(0));
-        Assert.That(compact.ContainsRequestedPosition, Is.True);
-        var compactPoint = compact.ProgramPoints.Single();
-        Assert.That(compactPoint.RequestedLine, Is.EqualTo(line));
-        Assert.That(compactPoint.RequestedColumn, Is.EqualTo(column));
-        Assert.That(compactPoint.RequestedPosition, Is.EqualTo(requestedPosition));
-        Assert.That(compactPoint.RequestedPositionDistance, Is.EqualTo(0));
-        Assert.That(compactPoint.ContainsRequestedPosition, Is.True);
+        Assert.That(compact.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
+        Assert.That(compact.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
+        Assert.That(compact.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
+        Assert.That(compact.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
+        Assert.That(compact.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
+        var compactPoint = compact.GetProperty("programPoints")[0];
+        Assert.That(compactPoint.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
+        Assert.That(compactPoint.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
+        Assert.That(compactPoint.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
+        Assert.That(compactPoint.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
+        Assert.That(compactPoint.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
 
         var invariantResult = result.ToInvariantQueryResult();
-        Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("point"));
-        Assert.That(invariantResult.Focus.FilePath, Is.EqualTo(result.FilePath));
-        Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
-        Assert.That(invariantResult.Focus.Line, Is.EqualTo(result.Line));
-        Assert.That(invariantResult.Focus.Column, Is.EqualTo(result.Column));
-        Assert.That(invariantResult.Focus.Position, Is.EqualTo(result.Position));
-        Assert.That(invariantResult.Focus.RequestedLine, Is.EqualTo(line));
-        Assert.That(invariantResult.Focus.RequestedColumn, Is.EqualTo(column));
-        Assert.That(invariantResult.Focus.RequestedPosition, Is.EqualTo(requestedPosition));
-        Assert.That(invariantResult.Focus.RequestedPositionDistance, Is.EqualTo(0));
-        Assert.That(invariantResult.Focus.ContainsRequestedPosition, Is.True);
-        Assert.That(invariantResult.Focus.NodeKind, Is.EqualTo("AddExpression"));
-        Assert.That(invariantResult.Focus.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-        Assert.That(invariantResult.Focus.ReachabilityStatus, Is.EqualTo(result.Reachability.ToString()));
-        Assert.That(invariantResult.Focus.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
-        Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(1));
+        var focus = invariantResult.GetProperty("focus");
+        Assert.That(focus.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
+        Assert.That(focus.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
+        Assert.That(focus.GetProperty("hasSourceLocation").GetBoolean(), Is.True);
+        Assert.That(focus.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
+        Assert.That(focus.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
+        Assert.That(focus.GetProperty("position").GetInt32(), Is.EqualTo(result.Position));
+        Assert.That(focus.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
+        Assert.That(focus.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
+        Assert.That(focus.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
+        Assert.That(focus.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
+        Assert.That(focus.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
+        Assert.That(focus.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+        Assert.That(focus.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(focus.GetProperty("reachabilityStatus").GetString(), Is.EqualTo(result.Reachability.ToString()));
+        Assert.That(focus.GetProperty("reachabilityReason").GetString(), Is.EqualTo(result.ReachabilityReason));
+        Assert.That(focus.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
     }
 
     [Test]
@@ -1495,11 +1496,16 @@ public class TestClass
         Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
         Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
 
-        var compact = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10));
-        var compactPoints = compact.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+        var compact = SymbolicCompactQueryProjection.Create(
+            filtered,
+            new SymbolicCompactQueryOptions(maxProgramPoints: 10));
+        var compactPoints = compact.Json.GetProperty("lines").EnumerateArray()
+            .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
+            .ToArray();
         Assert.That(compactPoints, Is.Not.Empty);
-        Assert.That(compactPoints.All(static point => point.MethodName == "First"), Is.True);
-        Assert.That(compactPoints.All(static point => point.ConservativeInvariant.Targets.Contains("value")), Is.True);
+        Assert.That(compactPoints.All(static point => point.GetProperty("methodName").GetString() == "First"), Is.True);
+        Assert.That(compactPoints.All(static point => point.GetProperty("conservativeInvariant")
+            .GetProperty("targets").EnumerateArray().Any(target => target.GetString() == "value")), Is.True);
     }
 
     [Test]
@@ -1566,12 +1572,16 @@ public class TestClass
         Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
 
-        var compactPoint = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10))
-            .Lines
-            .SelectMany(static line => line.ProgramPoints)
+        var compactPoint = SymbolicCompactQueryProjection.Create(
+                filtered,
+                new SymbolicCompactQueryOptions(maxProgramPoints: 10))
+            .Json.GetProperty("lines").EnumerateArray()
+            .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
             .Single();
-        Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-        Assert.That(compactPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        Assert.That(compactPoint.GetProperty("programPointKind").GetString(),
+            Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(compactPoint.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(),
+            Is.EqualTo(1));
     }
 
     [Test]
@@ -1620,12 +1630,12 @@ public class TestClass
             position,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compact = SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), new SymbolicCompactQueryOptions(
             maxProgramPoints: 0,
             maxFacts: 0,
             maxConditions: 0,
             maxProofs: 0));
-        var compactWithFacts = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compactWithFacts = SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), new SymbolicCompactQueryOptions(
             maxProgramPoints: 1,
             maxFacts: 1,
             maxConditions: 1,
@@ -1689,16 +1699,7 @@ public class TestClass
             Is.EqualTo("SymbolicRelationAtom"));
         Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
 
-        var json = JsonSerializer.Serialize(
-            compact,
-            new JsonSerializerOptions
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                Converters = { new JsonStringEnumConverter() }
-            });
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
+        var root = compact.Json;
         Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
         Assert.That(kind.GetString(), Is.EqualTo("point"));
         Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
@@ -1752,7 +1753,7 @@ public class TestClass
         var result = session.AnalyzeLine(
             "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
-        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxProgramPoints: 1,
             maxFacts: 1,
             maxConditions: 1,
@@ -1844,7 +1845,7 @@ public class TestClass
             compilation,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             1,
             1,
             0,
@@ -1919,7 +1920,7 @@ public class TestClass
             spanEnd,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0" });
-        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxProgramPoints: 2,
             maxFacts: 1,
             maxConditions: 2,
@@ -1997,7 +1998,7 @@ public class TestClass
             spanEnd,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0", "copy <= 0" });
-        var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+        var invariantResult = SymbolicInvariantQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxConditions: 1,
             maxProofs: 1));
 
@@ -2143,7 +2144,7 @@ public class TestClass
             result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
             Does.Contain("other"));
 
-        var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+        var invariantResult = SymbolicInvariantQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxConditions: 10,
             maxProofs: 10,
             invariantTargets: new[] { " copy ", "copy" }));
@@ -2240,7 +2241,7 @@ public class TestClass
             result.ConditionProofs.Select(static proof => proof.Target),
             Does.Contain("other"));
 
-        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxProgramPoints: 20,
             maxFacts: 20,
             maxConditions: 20,
@@ -2333,7 +2334,7 @@ public class TestClass
             compilation,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = result.ToCompactResult(SymbolicCompactQueryOptions.SummaryOnly);
+        var compact = SymbolicCompactQueryProjection.Create(result, SymbolicCompactQueryOptions.SummaryOnly);
 
         Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
         Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);

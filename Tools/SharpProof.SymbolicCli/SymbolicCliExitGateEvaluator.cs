@@ -152,7 +152,8 @@ internal static class SymbolicCliExitGateEvaluator
 
         var isTruncated = options.InvariantJson
             ? result is SymbolicQueryResult queryResult
-                ? queryResult.ToInvariantQueryResult(options.CreateCompactOptions()).QuerySummary.HasTruncatedOutput
+                ? SymbolicInvariantQueryProjection.Create(queryResult, options.CreateCompactOptions())
+                    .HasTruncatedOutput
                 : throw new InvalidOperationException("Unexpected invariant query result type.")
             : IsCompactResultTruncated(result, options);
         if (!isTruncated) return;
@@ -209,7 +210,8 @@ internal static class SymbolicCliExitGateEvaluator
     private static bool IsCompactResultTruncated(object result, SymbolicCliOptions options)
     {
         if (result is SymbolicQueryResult queryResult)
-            return queryResult.ToCompactResult(options.CreateCompactOptions()).Truncation.IsTruncated;
+            return SymbolicCompactQueryProjection.Create(queryResult, options.CreateCompactOptions())
+                .Truncation.IsTruncated;
 
         return result switch
         {

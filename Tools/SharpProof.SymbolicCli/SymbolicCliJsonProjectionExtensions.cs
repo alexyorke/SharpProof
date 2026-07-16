@@ -39,27 +39,29 @@ public static class SymbolicCliJsonProjectionExtensions
         return SymbolicCompactRuntimeHazardProjection.Create(result, options).Json;
     }
 
-    public static SymbolicCompactQueryResult ToCompactResult(
+    public static JsonElement ToCompactResult(
         this SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions? options = null)
     {
-        return SymbolicCompactQueryResult.FromPoint(result, options);
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        return SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
     }
 
-    public static SymbolicInvariantQueryResult ToInvariantQueryResult(
+    public static JsonElement ToInvariantQueryResult(
         this SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions? options = null)
     {
-        return SymbolicInvariantQueryResult.FromPoint(result, options);
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        return SymbolicInvariantQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
     }
 
-    public static SymbolicCompactQueryResult ToCompactResult(
+    public static JsonElement ToCompactResult(
         this SymbolicQueryResult result,
-        SymbolicCompactQueryOptions? options = null) => SymbolicCompactQueryResult.FromResult(result, options);
+        SymbolicCompactQueryOptions? options = null) => SymbolicCompactQueryProjection.Create(result, options).Json;
 
-    public static SymbolicInvariantQueryResult ToInvariantQueryResult(
+    public static JsonElement ToInvariantQueryResult(
         this SymbolicQueryResult result,
-        SymbolicCompactQueryOptions? options = null) => SymbolicInvariantQueryResult.FromResult(result, options);
+        SymbolicCompactQueryOptions? options = null) => SymbolicInvariantQueryProjection.Create(result, options).Json;
 
     private static Dictionary<string, object?> CreateMethodProjection(SymbolicMethodResult result, string kind) =>
         new()

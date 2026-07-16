@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -76,114 +77,72 @@ public sealed class SymbolicCompactQueryOptions
     }
 }
 
-public sealed class SymbolicCompactSourceQueryDescriptor
+internal sealed class SymbolicCompactSourceQueryDescriptor(
+    string kind,
+    string filePath,
+    int? line,
+    int? column,
+    int? position,
+    int? spanStart,
+    int? spanEnd,
+    int? spanLength,
+    int? startLine,
+    int? startColumn,
+    int? endLine,
+    int? endColumn,
+    string? nodeKind,
+    string? methodName,
+    string? programPointKind)
 {
-    private SymbolicCompactSourceQueryDescriptor(
-        string kind,
-        string filePath,
-        int? line,
-        int? column,
-        int? position,
-        int? spanStart,
-        int? spanEnd,
-        int? spanLength,
-        int? startLine,
-        int? startColumn,
-        int? endLine,
-        int? endColumn,
-        string? nodeKind,
-        string? methodName,
-        string? programPointKind)
+    public string Kind { get; } = kind ?? string.Empty;
+    public string FilePath { get; } = filePath ?? string.Empty;
+    public int? Line { get; } = line;
+    public int? Column { get; } = column;
+    public int? Position { get; } = position;
+    public int? SpanStart { get; } = spanStart;
+    public int? SpanEnd { get; } = spanEnd;
+    public int? SpanLength { get; } = spanLength;
+    public int? StartLine { get; } = startLine;
+    public int? StartColumn { get; } = startColumn;
+    public int? EndLine { get; } = endLine;
+    public int? EndColumn { get; } = endColumn;
+    public string? NodeKind { get; } = nodeKind;
+    public string? MethodName { get; } = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+    public string? ProgramPointKind { get; } = programPointKind;
+
+    internal static SymbolicCompactSourceQueryDescriptor FromScope(SymbolicCompactQueryScope scope)
     {
-        Kind = kind ?? string.Empty;
-        FilePath = filePath ?? string.Empty;
-        Line = line;
-        Column = column;
-        Position = position;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        SpanLength = spanLength;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-        NodeKind = nodeKind;
-        MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-        ProgramPointKind = programPointKind;
-    }
+        if (scope == null) throw new ArgumentNullException(nameof(scope));
 
-    public string Kind { get; }
-
-    public string FilePath { get; }
-
-    public int? Line { get; }
-
-    public int? Column { get; }
-
-    public int? Position { get; }
-
-    public int? SpanStart { get; }
-
-    public int? SpanEnd { get; }
-
-    public int? SpanLength { get; }
-
-    public int? StartLine { get; }
-
-    public int? StartColumn { get; }
-
-    public int? EndLine { get; }
-
-    public int? EndColumn { get; }
-
-    public string? NodeKind { get; }
-
-    public string? MethodName { get; }
-
-    public string? ProgramPointKind { get; }
-
-    internal static SymbolicCompactSourceQueryDescriptor FromCompactResult(SymbolicCompactQueryResult result)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
+        var isSpan = string.Equals(scope.Kind, "span", StringComparison.Ordinal);
 
         return new SymbolicCompactSourceQueryDescriptor(
-            result.Kind,
-            result.FilePath,
-            result.Line,
-            result.Column,
-            result.Position,
-            result.QuerySpanStart,
-            result.QuerySpanEnd,
-            result.QuerySpanLength,
-            result.QueryStartLine,
-            result.QueryStartColumn,
-            result.QueryEndLine,
-            result.QueryEndColumn,
-            result.NodeKind,
-            result.MethodName,
-            result.ProgramPointKind);
+            scope.Kind,
+            scope.FilePath,
+            scope.Line,
+            scope.Column,
+            scope.Position,
+            isSpan ? scope.NodeSpanStart : null,
+            isSpan ? scope.NodeSpanEnd : null,
+            isSpan ? scope.NodeSpanLength : null,
+            isSpan ? scope.NodeStartLine : null,
+            isSpan ? scope.NodeStartColumn : null,
+            isSpan ? scope.NodeEndLine : null,
+            isSpan ? scope.NodeEndColumn : null,
+            scope.NodeKind,
+            scope.MethodName,
+            scope.ProgramPointKind);
     }
 }
 
-public sealed class SymbolicInvariantQueryFocus
+internal sealed class SymbolicInvariantQueryFocus(
+    SymbolicCompactQueryProjection result,
+    string reachabilityStatus,
+    string reachabilityReason,
+    int reachabilityKnownCount)
 {
-    private readonly SymbolicCompactQueryResult _result;
-
-    private SymbolicInvariantQueryFocus(
-        SymbolicCompactQueryResult result,
-        string reachabilityStatus,
-        string reachabilityReason,
-        int reachabilityKnownCount)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-        ReachabilityStatus = reachabilityStatus ?? string.Empty;
-        ReachabilityReason = reachabilityReason ?? string.Empty;
-        ReachabilityKnownCount = reachabilityKnownCount;
-    }
-
-    public string ScopeKind => _result.Kind;
-
-    public string FilePath => _result.FilePath;
+    public string ScopeKind => result.Kind;
+    public string FilePath => result.FilePath;
 
     public bool HasSourceLocation =>
         Line.HasValue ||
@@ -191,53 +150,53 @@ public sealed class SymbolicInvariantQueryFocus
         SpanStart.HasValue ||
         StartLine.HasValue;
 
-    public int? Line => _result.Line;
+    public int? Line => result.Line;
 
-    public int? Column => _result.Column;
+    public int? Column => result.Column;
 
-    public int? Position => _result.Position;
+    public int? Position => result.Position;
 
-    public int? RequestedLine => _result.RequestedLine;
+    public int? RequestedLine => result.RequestedLine;
 
-    public int? RequestedColumn => _result.RequestedColumn;
+    public int? RequestedColumn => result.RequestedColumn;
 
-    public int? RequestedPosition => _result.RequestedPosition;
+    public int? RequestedPosition => result.RequestedPosition;
 
-    public int? RequestedPositionDistance => _result.RequestedPositionDistance;
+    public int? RequestedPositionDistance => result.RequestedPositionDistance;
 
-    public bool? ContainsRequestedPosition => _result.ContainsRequestedPosition;
+    public bool? ContainsRequestedPosition => result.ContainsRequestedPosition;
 
-    public int? SpanStart => _result.QuerySpanStart;
+    public int? SpanStart => result.QuerySpanStart;
 
-    public int? SpanEnd => _result.QuerySpanEnd;
+    public int? SpanEnd => result.QuerySpanEnd;
 
-    public int? SpanLength => _result.QuerySpanLength;
+    public int? SpanLength => result.QuerySpanLength;
 
-    public int? StartLine => _result.QueryStartLine;
+    public int? StartLine => result.QueryStartLine;
 
-    public int? StartColumn => _result.QueryStartColumn;
+    public int? StartColumn => result.QueryStartColumn;
 
-    public int? EndLine => _result.QueryEndLine;
+    public int? EndLine => result.QueryEndLine;
 
-    public int? EndColumn => _result.QueryEndColumn;
+    public int? EndColumn => result.QueryEndColumn;
 
-    public string? NodeKind => _result.NodeKind;
+    public string? NodeKind => result.NodeKind;
 
-    public string? MethodName => _result.MethodName;
+    public string? MethodName => result.MethodName;
 
-    public string? ProgramPointKind => _result.ProgramPointKind;
+    public string? ProgramPointKind => result.ProgramPointKind;
 
-    public string ReachabilityStatus { get; }
+    public string ReachabilityStatus { get; } = reachabilityStatus ?? string.Empty;
 
-    public string ReachabilityReason { get; }
+    public string ReachabilityReason { get; } = reachabilityReason ?? string.Empty;
 
-    public int ProgramPointCount => _result.ProgramPointCount;
+    public int ProgramPointCount => result.ProgramPointCount;
 
-    public int ReachabilityKnownCount { get; }
+    public int ReachabilityKnownCount { get; } = reachabilityKnownCount;
 
     public bool HasKnownReachability => ReachabilityKnownCount != 0;
 
-    internal static SymbolicInvariantQueryFocus FromCompactResult(SymbolicCompactQueryResult result)
+    internal static SymbolicInvariantQueryFocus FromProjection(SymbolicCompactQueryProjection result)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
@@ -249,7 +208,7 @@ public sealed class SymbolicInvariantQueryFocus
             result.Reachability.ReachableCount + result.Reachability.UnreachableCount);
     }
 
-    private static string ResolveReachabilityStatus(SymbolicCompactQueryResult result)
+    private static string ResolveReachabilityStatus(SymbolicCompactQueryProjection result)
     {
         if (!string.IsNullOrWhiteSpace(result.PointReachability)) return result.PointReachability!;
 
@@ -269,7 +228,7 @@ public sealed class SymbolicInvariantQueryFocus
     }
 
     private static string ResolveReachabilityReason(
-        SymbolicCompactQueryResult result,
+        SymbolicCompactQueryProjection result,
         string reachabilityStatus)
     {
         if (!string.IsNullOrWhiteSpace(result.ReachabilityReason)) return result.ReachabilityReason!;
@@ -338,139 +297,65 @@ internal sealed record SymbolicCompactQueryScope(
     }
 }
 
-public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
+internal sealed record SymbolicCompactQueryProjection(
+    SymbolicCompactQueryScope Scope,
+    int? LineCount,
+    int LinesWithProgramPoints,
+    int ProgramPointCount,
+    SymbolicCompactScopeProjection Projection,
+    IReadOnlyList<SymbolicCompactLineResult> Lines,
+    SymbolicAnalysisTruncationInfo AnalysisTruncation,
+    SymbolicCompactAnalysisSummary AnalysisSummary,
+    SymbolicCompactSourceQueryDescriptor QueryDescriptor,
+    JsonElement Json)
 {
-    private readonly SymbolicCompactScopeProjection _projection;
-    private readonly SymbolicCompactQueryScope _scope;
+    internal int SchemaVersion => 1;
+    internal int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+    internal string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    internal string Kind => Scope.Kind;
+    internal string FilePath => Scope.FilePath;
+    internal int? Line => Scope.Line;
+    internal int? Column => Scope.Column;
+    internal int? Position => Scope.Position;
+    internal int? RequestedLine => Scope.RequestedLine;
+    internal int? RequestedColumn => Scope.RequestedColumn;
+    internal int? RequestedPosition => Scope.RequestedPosition;
+    internal int? RequestedPositionDistance => Scope.RequestedPositionDistance;
+    internal bool? ContainsRequestedPosition => Scope.ContainsRequestedPosition;
+    internal string? NodeKind => Scope.NodeKind;
+    internal string? MethodName => Scope.MethodName;
+    internal string? ProgramPointKind => Scope.ProgramPointKind;
+    internal int? NodeSpanStart => Scope.NodeSpanStart;
+    internal int? NodeSpanEnd => Scope.NodeSpanEnd;
+    internal int? NodeSpanLength => Scope.NodeSpanLength;
+    internal int? NodeStartLine => Scope.NodeStartLine;
+    internal int? NodeStartColumn => Scope.NodeStartColumn;
+    internal int? NodeEndLine => Scope.NodeEndLine;
+    internal int? NodeEndColumn => Scope.NodeEndColumn;
+    internal int? QuerySpanStart => IsSpan ? Scope.NodeSpanStart : null;
+    internal int? QuerySpanEnd => IsSpan ? Scope.NodeSpanEnd : null;
+    internal int? QuerySpanLength => IsSpan ? Scope.NodeSpanLength : null;
+    internal int? QueryStartLine => IsSpan ? Scope.NodeStartLine : null;
+    internal int? QueryStartColumn => IsSpan ? Scope.NodeStartColumn : null;
+    internal int? QueryEndLine => IsSpan ? Scope.NodeEndLine : null;
+    internal int? QueryEndColumn => IsSpan ? Scope.NodeEndColumn : null;
+    internal string? PointReachability => Scope.PointReachability;
+    internal string? ReachabilityReason => Scope.ReachabilityReason;
+    internal SymbolicCompactInvariantSummary ObservedInvariant => Projection.ObservedInvariant;
+    internal SymbolicCompactInvariantSummary ConservativeInvariant => Projection.ConservativeInvariant;
+    internal SymbolicCompactInvariantQueryView InvariantQuery => Projection.InvariantQuery;
+    internal string MergedInvariantText => ConservativeInvariant.Text;
+    internal SymbolicReachabilitySummary Reachability => Projection.Reachability;
+    internal SymbolicProgramPointSummary ProgramPointSummary => Projection.ProgramPointSummary;
+    internal SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
+    internal IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => Projection.ConditionProofs;
+    internal IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => Projection.ProgramPoints;
+    internal SymbolicCompactSmtDiagnostics SmtDiagnostics => Projection.SmtDiagnostics;
+    internal SymbolicCompactOutputTruncation Truncation => Projection.Truncation;
 
-    private SymbolicCompactQueryResult(
-        SymbolicCompactQueryScope scope,
-        int? lineCount,
-        int linesWithProgramPoints,
-        int programPointCount,
-        SymbolicCompactScopeProjection projection,
-        IReadOnlyList<SymbolicCompactLineResult> lines,
-        SymbolicAnalysisTruncationInfo analysisTruncation)
-    {
-        _scope = scope ?? throw new ArgumentNullException(nameof(scope));
-        _projection = projection ?? throw new ArgumentNullException(nameof(projection));
-        LineCount = lineCount;
-        LinesWithProgramPoints = linesWithProgramPoints;
-        ProgramPointCount = programPointCount;
-        Lines = lines ?? throw new ArgumentNullException(nameof(lines));
-        AnalysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
-        AnalysisSummary = SymbolicCompactAnalysisSummary.From(
-            InvariantQuery,
-            ProgramPointSummary,
-            SmtDiagnostics,
-            AnalysisTruncation);
-        QueryDescriptor = SymbolicCompactSourceQueryDescriptor.FromCompactResult(this);
-    }
+    private bool IsSpan => string.Equals(Kind, "span", StringComparison.Ordinal);
 
-    [JsonPropertyOrder(-4)]
-    public override string Kind => _scope.Kind;
-
-    public string FilePath => _scope.FilePath;
-
-    public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
-
-    public int? Line => _scope.Line;
-
-    public int? Column => _scope.Column;
-
-    public int? Position => _scope.Position;
-
-    public int? RequestedLine => _scope.RequestedLine;
-
-    public int? RequestedColumn => _scope.RequestedColumn;
-
-    public int? RequestedPosition => _scope.RequestedPosition;
-
-    public int? RequestedPositionDistance => _scope.RequestedPositionDistance;
-
-    public bool? ContainsRequestedPosition => _scope.ContainsRequestedPosition;
-
-    public string? NodeKind => _scope.NodeKind;
-
-    public string? MethodName => _scope.MethodName;
-
-    public string? ProgramPointKind => _scope.ProgramPointKind;
-
-    public int? NodeSpanStart => _scope.NodeSpanStart;
-
-    public int? NodeSpanEnd => _scope.NodeSpanEnd;
-
-    public int? NodeSpanLength => _scope.NodeSpanLength;
-
-    public int? NodeStartLine => _scope.NodeStartLine;
-
-    public int? NodeStartColumn => _scope.NodeStartColumn;
-
-    public int? NodeEndLine => _scope.NodeEndLine;
-
-    public int? NodeEndColumn => _scope.NodeEndColumn;
-
-    public int? QuerySpanStart => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanStart : null;
-
-    public int? QuerySpanEnd => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanEnd : null;
-
-    public int? QuerySpanLength => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanLength : null;
-
-    public int? QueryStartLine => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeStartLine : null;
-
-    public int? QueryStartColumn => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeStartColumn : null;
-
-    public int? QueryEndLine => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeEndLine : null;
-
-    public int? QueryEndColumn => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeEndColumn : null;
-
-    public string? PointReachability => _scope.PointReachability;
-
-    public string? ReachabilityReason => _scope.ReachabilityReason;
-
-    public int? LineCount { get; }
-
-    public int LinesWithProgramPoints { get; }
-
-    public int ProgramPointCount { get; }
-
-    public SymbolicCompactInvariantSummary ObservedInvariant => _projection.ObservedInvariant;
-
-    public SymbolicCompactInvariantSummary ConservativeInvariant => _projection.ConservativeInvariant;
-
-    public SymbolicCompactInvariantQueryView InvariantQuery => _projection.InvariantQuery;
-
-    public string MergedInvariantText => ConservativeInvariant.Text;
-
-    public SymbolicReachabilitySummary Reachability => _projection.Reachability;
-
-    public SymbolicProgramPointSummary ProgramPointSummary => _projection.ProgramPointSummary;
-
-    public SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _projection.ConditionProofs;
-
-    public IReadOnlyList<SymbolicCompactLineResult> Lines { get; }
-
-    public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => _projection.ProgramPoints;
-
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _projection.SmtDiagnostics;
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
-
-    public SymbolicCompactOutputTruncation Truncation => _projection.Truncation;
-
-    public static SymbolicCompactQueryResult FromPoint(
-        SymbolicProgramPointResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-        return FromResult(SymbolicQueryResult.From(result), options);
-    }
-
-    internal static SymbolicCompactQueryResult FromResult(
+    internal static SymbolicCompactQueryProjection Create(
         SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -478,17 +363,86 @@ public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
         var scope = SymbolicCompactQueryScope.FromResult(result);
-        if (result.Scope.Kind == SymbolicQueryScopeKind.Point)
-            return FromPoint(scope, result.ProgramPoints.Single(), normalizedOptions);
-
-        var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File
-            ? result.Lines
-            : null;
-        return FromAggregate(scope, result, normalizedOptions, sourceLines);
+        var (lineCount, linesWithProgramPoints, programPointCount, projection, lines, truncation) =
+            result.Scope.Kind == SymbolicQueryScopeKind.Point
+                ? CreatePoint(result.ProgramPoints.Single(), normalizedOptions)
+                : CreateAggregate(result, normalizedOptions);
+        var analysisSummary = SymbolicCompactAnalysisSummary.From(
+            projection.InvariantQuery,
+            projection.ProgramPointSummary,
+            projection.SmtDiagnostics,
+            truncation);
+        var queryDescriptor = SymbolicCompactSourceQueryDescriptor.FromScope(scope);
+        var isSpan = string.Equals(scope.Kind, "span", StringComparison.Ordinal);
+        var json = JsonSerializer.SerializeToElement(new
+        {
+            Kind = scope.Kind,
+            SchemaVersion = 1,
+            EvidenceSchemaVersion = SharpProofEvidenceSchema.CurrentVersion,
+            EvidenceSchemaCompatibility = SharpProofEvidenceSchema.CompatibilityPolicy,
+            scope.FilePath,
+            QueryDescriptor = queryDescriptor,
+            scope.Line,
+            scope.Column,
+            scope.Position,
+            scope.RequestedLine,
+            scope.RequestedColumn,
+            scope.RequestedPosition,
+            scope.RequestedPositionDistance,
+            scope.ContainsRequestedPosition,
+            scope.NodeKind,
+            scope.MethodName,
+            scope.ProgramPointKind,
+            scope.NodeSpanStart,
+            scope.NodeSpanEnd,
+            scope.NodeSpanLength,
+            scope.NodeStartLine,
+            scope.NodeStartColumn,
+            scope.NodeEndLine,
+            scope.NodeEndColumn,
+            QuerySpanStart = isSpan ? scope.NodeSpanStart : null,
+            QuerySpanEnd = isSpan ? scope.NodeSpanEnd : null,
+            QuerySpanLength = isSpan ? scope.NodeSpanLength : null,
+            QueryStartLine = isSpan ? scope.NodeStartLine : null,
+            QueryStartColumn = isSpan ? scope.NodeStartColumn : null,
+            QueryEndLine = isSpan ? scope.NodeEndLine : null,
+            QueryEndColumn = isSpan ? scope.NodeEndColumn : null,
+            scope.PointReachability,
+            scope.ReachabilityReason,
+            LineCount = lineCount,
+            LinesWithProgramPoints = linesWithProgramPoints,
+            ProgramPointCount = programPointCount,
+            projection.ObservedInvariant,
+            projection.ConservativeInvariant,
+            projection.InvariantQuery,
+            MergedInvariantText = projection.ConservativeInvariant.Text,
+            projection.Reachability,
+            projection.ProgramPointSummary,
+            ProofOutcomes = projection.ProgramPointSummary.ProofOutcomes,
+            projection.ConditionProofs,
+            Lines = lines,
+            projection.ProgramPoints,
+            projection.SmtDiagnostics,
+            AnalysisTruncation = truncation,
+            AnalysisSummary = analysisSummary,
+            projection.Truncation
+        }, SymbolicCliProjectionJson.Options);
+        return new SymbolicCompactQueryProjection(
+            scope,
+            lineCount,
+            linesWithProgramPoints,
+            programPointCount,
+            projection,
+            lines,
+            truncation,
+            analysisSummary,
+            queryDescriptor,
+            json);
     }
 
-    private static SymbolicCompactQueryResult FromPoint(
-        SymbolicCompactQueryScope scope,
+    private static (int? LineCount, int LinesWithProgramPoints, int ProgramPointCount,
+        SymbolicCompactScopeProjection Projection, IReadOnlyList<SymbolicCompactLineResult> Lines,
+        SymbolicAnalysisTruncationInfo AnalysisTruncation) CreatePoint(
         SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions options)
     {
@@ -506,31 +460,23 @@ public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
             result.SmtDiagnostics,
             options,
             options.MaxProgramPoints);
-
-        return new SymbolicCompactQueryResult(
-            scope,
-            null,
-            1,
-            1,
-            projection,
-            Array.Empty<SymbolicCompactLineResult>(),
-            result.AnalysisTruncation);
+        return (null, 1, 1, projection, Array.Empty<SymbolicCompactLineResult>(), result.AnalysisTruncation);
     }
 
-    private static SymbolicCompactQueryResult FromAggregate(
-        SymbolicCompactQueryScope scope,
+    private static (int? LineCount, int LinesWithProgramPoints, int ProgramPointCount,
+        SymbolicCompactScopeProjection Projection, IReadOnlyList<SymbolicCompactLineResult> Lines,
+        SymbolicAnalysisTruncationInfo AnalysisTruncation) CreateAggregate(
         SymbolicQueryResult result,
-        SymbolicCompactQueryOptions options,
-        IReadOnlyList<SymbolicQueryResult>? sourceLines = null)
+        SymbolicCompactQueryOptions options)
     {
-        var lineResults = new List<SymbolicCompactLineResult>();
+        var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.Lines : null;
+        var lines = new List<SymbolicCompactLineResult>();
         var remainingProgramPoints = options.MaxProgramPoints;
         foreach (var line in sourceLines ?? Array.Empty<SymbolicQueryResult>())
         {
-            if (lineResults.Count >= options.MaxLines) break;
-
+            if (lines.Count >= options.MaxLines) break;
             var pointLimit = remainingProgramPoints;
-            lineResults.Add(SymbolicCompactLineResult.FromResult(line, options, pointLimit));
+            lines.Add(SymbolicCompactLineResult.FromResult(line, options, pointLimit));
             if (remainingProgramPoints > 0) remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
         }
 
@@ -548,18 +494,20 @@ public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
             result.SmtDiagnostics,
             options,
             isFile ? 0 : options.MaxProgramPoints);
-        var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
         if (isFile)
+        {
+            var selectedProgramPointCount = lines.Sum(static line => line.ProgramPoints.Count);
             projection = projection with
             {
                 Truncation = SymbolicCompactOutputTruncation.Combine(
                     new SymbolicCompactOutputTruncation(
-                        sourceLines!.Count > lineResults.Count,
+                        sourceLines!.Count > lines.Count,
                         result.ProgramPointCount > selectedProgramPointCount,
                         false, false, false),
                     projection.Truncation,
-                    SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)))
+                    SymbolicCompactOutputTruncation.Combine(lines.Select(static line => line.Truncation)))
             };
+        }
 
         var lineCount = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.LineCount : null;
         var linesWithProgramPoints = result.Scope.Kind switch
@@ -568,91 +516,76 @@ public sealed class SymbolicCompactQueryResult : SymbolicSchemaResultBase
             SymbolicQueryScopeKind.Span => result.ProgramPoints.Select(static point => point.Line).Distinct().Count(),
             _ => result.ProgramPointCount == 0 ? 0 : 1
         };
-        return new SymbolicCompactQueryResult(
-            scope,
-            lineCount,
-            linesWithProgramPoints,
-            result.ProgramPointCount,
-            projection,
-            lineResults,
+        return (lineCount, linesWithProgramPoints, result.ProgramPointCount, projection, lines,
             result.AnalysisTruncation);
     }
 }
 
-public sealed class SymbolicInvariantQueryResult : SymbolicSchemaResultBase
+internal sealed record SymbolicInvariantQueryProjection(
+    JsonElement Json,
+    SymbolicCompactQueryProjection Compact,
+    SymbolicInvariantQuerySummary QuerySummary,
+    SymbolicInvariantQueryFocus Focus)
 {
-    private readonly SymbolicCompactQueryResult _result;
+    internal string Kind => "invariantQuery";
+    internal int SchemaVersion => 1;
+    internal int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+    internal string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+    internal bool HasTruncatedOutput => QuerySummary.HasTruncatedOutput;
+    internal string ScopeKind => Compact.Kind;
+    internal string FilePath => Compact.FilePath;
+    internal SymbolicCompactSourceQueryDescriptor QueryDescriptor => Compact.QueryDescriptor;
+    internal string MergedInvariantText => Compact.InvariantQuery.Text;
+    internal SymbolicCompactInvariantQueryView InvariantQuery => Compact.InvariantQuery;
+    internal SymbolicCompactAnalysisSummary AnalysisSummary => Compact.AnalysisSummary;
+    internal SymbolicReachabilitySummary Reachability => Compact.Reachability;
+    internal SymbolicProgramPointSummary ProgramPointSummary => Compact.ProgramPointSummary;
+    internal SymbolicProofOutcomeSummary ProofOutcomes => Compact.ProofOutcomes;
+    internal int ConditionProofCount => Compact.ConditionProofs.Count;
+    internal IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => Compact.ConditionProofs;
+    internal bool ConditionProofsTruncated => Compact.Truncation.Proofs;
+    internal SymbolicCompactSmtDiagnostics SmtDiagnostics => Compact.SmtDiagnostics;
+    internal SymbolicAnalysisTruncationInfo AnalysisTruncation => Compact.AnalysisTruncation;
+    internal int? LineCount => Compact.LineCount;
+    internal int LinesWithProgramPoints => Compact.LinesWithProgramPoints;
+    internal int ProgramPointCount => Compact.ProgramPointCount;
 
-    private SymbolicInvariantQueryResult(
-        SymbolicCompactQueryResult result,
-        SymbolicInvariantQuerySummary querySummary,
-        SymbolicInvariantQueryFocus focus)
-    {
-        _result = result ?? throw new ArgumentNullException(nameof(result));
-        QuerySummary = querySummary ?? throw new ArgumentNullException(nameof(querySummary));
-        Focus = focus ?? throw new ArgumentNullException(nameof(focus));
-    }
-
-    [JsonPropertyOrder(-4)]
-    public override string Kind => "invariantQuery";
-
-    public string ScopeKind => _result.Kind;
-
-    public string FilePath => _result.FilePath;
-
-    public SymbolicCompactSourceQueryDescriptor QueryDescriptor => _result.QueryDescriptor;
-
-    public SymbolicInvariantQuerySummary QuerySummary { get; }
-
-    public SymbolicInvariantQueryFocus Focus { get; }
-
-    public string MergedInvariantText => _result.InvariantQuery.Text;
-
-    public SymbolicCompactInvariantQueryView InvariantQuery => _result.InvariantQuery;
-
-    public SymbolicCompactAnalysisSummary AnalysisSummary => _result.AnalysisSummary;
-
-    public SymbolicReachabilitySummary Reachability => _result.Reachability;
-
-    public SymbolicProgramPointSummary ProgramPointSummary => _result.ProgramPointSummary;
-
-    public SymbolicProofOutcomeSummary ProofOutcomes => _result.ProofOutcomes;
-
-    public int ConditionProofCount => ConditionProofs.Count;
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => _result.ConditionProofs;
-
-    public bool ConditionProofsTruncated => _result.Truncation.Proofs;
-
-    public SymbolicCompactSmtDiagnostics SmtDiagnostics => _result.SmtDiagnostics;
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation => _result.AnalysisTruncation;
-
-    public int? LineCount => _result.LineCount;
-
-    public int LinesWithProgramPoints => _result.LinesWithProgramPoints;
-
-    public int ProgramPointCount => _result.ProgramPointCount;
-
-    public static SymbolicInvariantQueryResult FromPoint(
-        SymbolicProgramPointResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-        return FromResult(SymbolicQueryResult.From(result), options);
-    }
-
-    internal static SymbolicInvariantQueryResult FromResult(
+    internal static SymbolicInvariantQueryProjection Create(
         SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
         var normalizedOptions = NormalizeOptions(options);
-        var compactResult = SymbolicCompactQueryResult.FromResult(result, normalizedOptions);
-        return new SymbolicInvariantQueryResult(
-            compactResult,
-            SymbolicInvariantQuerySummary.FromCompactResult(compactResult, normalizedOptions),
-            SymbolicInvariantQueryFocus.FromCompactResult(compactResult));
+        var compact = SymbolicCompactQueryProjection.Create(result, normalizedOptions);
+        var querySummary = SymbolicInvariantQuerySummary.FromCompactResult(compact, normalizedOptions);
+        var focus = SymbolicInvariantQueryFocus.FromProjection(compact);
+        var json = JsonSerializer.SerializeToElement(new
+        {
+            Kind = "invariantQuery",
+            SchemaVersion = 1,
+            EvidenceSchemaVersion = SharpProofEvidenceSchema.CurrentVersion,
+            EvidenceSchemaCompatibility = SharpProofEvidenceSchema.CompatibilityPolicy,
+            ScopeKind = compact.Kind,
+            compact.FilePath,
+            compact.QueryDescriptor,
+            QuerySummary = querySummary,
+            Focus = focus,
+            MergedInvariantText = compact.InvariantQuery.Text,
+            compact.InvariantQuery,
+            compact.AnalysisSummary,
+            compact.Reachability,
+            compact.ProgramPointSummary,
+            compact.ProofOutcomes,
+            ConditionProofCount = compact.ConditionProofs.Count,
+            compact.ConditionProofs,
+            ConditionProofsTruncated = compact.Truncation.Proofs,
+            compact.SmtDiagnostics,
+            compact.AnalysisTruncation,
+            compact.LineCount,
+            compact.LinesWithProgramPoints,
+            compact.ProgramPointCount
+        }, SymbolicCliProjectionJson.Options);
+        return new SymbolicInvariantQueryProjection(json, compact, querySummary, focus);
     }
 
     private static SymbolicCompactQueryOptions NormalizeOptions(SymbolicCompactQueryOptions? options)
@@ -668,104 +601,58 @@ public sealed class SymbolicInvariantQueryResult : SymbolicSchemaResultBase
     }
 }
 
-public sealed class SymbolicInvariantQuerySummary : SymbolicSmtDiagnosticsProjectionBase
+internal sealed class SymbolicInvariantQuerySummary(
+    int outputMaxFacts,
+    int outputMaxConditions,
+    int outputMaxProofs,
+    bool hasTruncatedOutput,
+    bool factsTruncated,
+    bool conditionsTruncated,
+    bool proofsTruncated,
+    bool hasUnresolvedAnalysis,
+    int programPointCount,
+    int totalPathConditionCount,
+    int maxPathConditionCount,
+    int proofTotalCount,
+    int proofUnknownCount,
+    int conservativeUnknownCount,
+    int targetCount,
+    IReadOnlyList<string> targets,
+    bool targetsTruncated,
+    int reasonCount,
+    IReadOnlyList<string> reasons,
+    bool reasonsTruncated,
+    SymbolicCompactSmtDiagnostics smtDiagnostics,
+    bool pathConditionBudgetExceeded)
+    : SymbolicSmtDiagnosticsProjectionBase(smtDiagnostics)
 {
     private const int MaxSummaryReasons = 16;
     private const int MaxSummaryTargets = 32;
 
-    private SymbolicInvariantQuerySummary(
-        int outputMaxFacts,
-        int outputMaxConditions,
-        int outputMaxProofs,
-        bool hasTruncatedOutput,
-        bool factsTruncated,
-        bool conditionsTruncated,
-        bool proofsTruncated,
-        bool hasUnresolvedAnalysis,
-        int programPointCount,
-        int totalPathConditionCount,
-        int maxPathConditionCount,
-        int proofTotalCount,
-        int proofUnknownCount,
-        int conservativeUnknownCount,
-        int targetCount,
-        IReadOnlyList<string> targets,
-        bool targetsTruncated,
-        int reasonCount,
-        IReadOnlyList<string> reasons,
-        bool reasonsTruncated,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        bool pathConditionBudgetExceeded)
-        : base(smtDiagnostics)
-    {
-        OutputMaxFacts = outputMaxFacts;
-        OutputMaxConditions = outputMaxConditions;
-        OutputMaxProofs = outputMaxProofs;
-        HasTruncatedOutput = hasTruncatedOutput;
-        FactsTruncated = factsTruncated;
-        ConditionsTruncated = conditionsTruncated;
-        ProofsTruncated = proofsTruncated;
-        HasUnresolvedAnalysis = hasUnresolvedAnalysis;
-        ProgramPointCount = programPointCount;
-        TotalPathConditionCount = totalPathConditionCount;
-        MaxPathConditionCount = maxPathConditionCount;
-        ProofTotalCount = proofTotalCount;
-        ProofUnknownCount = proofUnknownCount;
-        ConservativeUnknownCount = conservativeUnknownCount;
-        TargetCount = targetCount;
-        Targets = targets ?? throw new ArgumentNullException(nameof(targets));
-        TargetsTruncated = targetsTruncated;
-        ReasonCount = reasonCount;
-        Reasons = reasons ?? throw new ArgumentNullException(nameof(reasons));
-        ReasonsTruncated = reasonsTruncated;
-        PathConditionBudgetExceeded = pathConditionBudgetExceeded;
-    }
-
-    public int OutputMaxFacts { get; }
-
-    public int OutputMaxConditions { get; }
-
-    public int OutputMaxProofs { get; }
-
-    public bool HasTruncatedOutput { get; }
-
-    public bool FactsTruncated { get; }
-
-    public bool ConditionsTruncated { get; }
-
-    public bool ProofsTruncated { get; }
-
-    public bool HasUnresolvedAnalysis { get; }
-
-    public int ProgramPointCount { get; }
-
-    public int TotalPathConditionCount { get; }
-
-    public int MaxPathConditionCount { get; }
-
-    public int ProofTotalCount { get; }
-
-    public int ProofUnknownCount { get; }
-
-    public int ConservativeUnknownCount { get; }
-
-    public int TargetCount { get; }
-
-    public IReadOnlyList<string> Targets { get; }
-
-    public bool TargetsTruncated { get; }
-
-    public int ReasonCount { get; }
-
-    public IReadOnlyList<string> Reasons { get; }
-
-    public bool ReasonsTruncated { get; }
-
-    [JsonPropertyOrder(108)]
-    public bool PathConditionBudgetExceeded { get; }
+    public int OutputMaxFacts { get; } = outputMaxFacts;
+    public int OutputMaxConditions { get; } = outputMaxConditions;
+    public int OutputMaxProofs { get; } = outputMaxProofs;
+    public bool HasTruncatedOutput { get; } = hasTruncatedOutput;
+    public bool FactsTruncated { get; } = factsTruncated;
+    public bool ConditionsTruncated { get; } = conditionsTruncated;
+    public bool ProofsTruncated { get; } = proofsTruncated;
+    public bool HasUnresolvedAnalysis { get; } = hasUnresolvedAnalysis;
+    public int ProgramPointCount { get; } = programPointCount;
+    public int TotalPathConditionCount { get; } = totalPathConditionCount;
+    public int MaxPathConditionCount { get; } = maxPathConditionCount;
+    public int ProofTotalCount { get; } = proofTotalCount;
+    public int ProofUnknownCount { get; } = proofUnknownCount;
+    public int ConservativeUnknownCount { get; } = conservativeUnknownCount;
+    public int TargetCount { get; } = targetCount;
+    public IReadOnlyList<string> Targets { get; } = targets;
+    public bool TargetsTruncated { get; } = targetsTruncated;
+    public int ReasonCount { get; } = reasonCount;
+    public IReadOnlyList<string> Reasons { get; } = reasons;
+    public bool ReasonsTruncated { get; } = reasonsTruncated;
+    [JsonPropertyOrder(108)] public bool PathConditionBudgetExceeded { get; } = pathConditionBudgetExceeded;
 
     internal static SymbolicInvariantQuerySummary FromCompactResult(
-        SymbolicCompactQueryResult result,
+        SymbolicCompactQueryProjection result,
         SymbolicCompactQueryOptions options)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
@@ -826,7 +713,7 @@ public sealed class SymbolicInvariantQuerySummary : SymbolicSmtDiagnosticsProjec
             analysisSummary.MaxPathConditionCount > smtDiagnostics.MaxPathConditions);
     }
 
-    private static IEnumerable<string> GetTargets(SymbolicCompactQueryResult result)
+    private static IEnumerable<string> GetTargets(SymbolicCompactQueryProjection result)
     {
         var targets = result.ConservativeInvariant.Targets
             .Concat(result.ObservedInvariant.Targets)
@@ -861,7 +748,7 @@ public sealed class SymbolicInvariantQuerySummary : SymbolicSmtDiagnosticsProjec
             : target!.Trim();
     }
 
-    private static IEnumerable<string> GetReasons(SymbolicCompactQueryResult result)
+    private static IEnumerable<string> GetReasons(SymbolicCompactQueryProjection result)
     {
         var reasons = new List<string>();
         AddReason(reasons, result.InvariantQuery.StatusReason);

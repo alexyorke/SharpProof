@@ -36,8 +36,8 @@ public sealed class CompactDomainProjectionTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(result.ToCompactResult().Kind, Is.EqualTo(expectedKind));
-                Assert.That(result.ToInvariantQueryResult().ScopeKind, Is.EqualTo(expectedKind));
+                Assert.That(result.ToCompactResult().GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
+                Assert.That(result.ToInvariantQueryResult().GetProperty("scopeKind").GetString(), Is.EqualTo(expectedKind));
                 Assert.That(filtered.ScopeKind, Is.EqualTo(expectedKind));
             });
         }
@@ -102,8 +102,8 @@ public sealed class CompactDomainProjectionTests
         var invariantQuery = invariant.ToInvariantQueryResult();
         var compactResults = new[]
         {
-            (Kind: compactInvariant.Kind, Root: Serialize(compactInvariant)),
-            (Kind: invariantQuery.Kind, Root: Serialize(invariantQuery)),
+            (Kind: compactInvariant.GetProperty("kind").GetString()!, Root: compactInvariant),
+            (Kind: invariantQuery.GetProperty("kind").GetString()!, Root: invariantQuery),
             (Kind: "capabilities", Root: capability),
             (Kind: "complexity", Root: complexity),
             (Kind: "runtimeHazards", Root: runtimeHazards)

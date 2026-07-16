@@ -1,79 +1,25 @@
-using System.Collections.Immutable;
-using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicCompactInvariantTargetSummary
+internal sealed record SymbolicCompactInvariantTargetSummary(
+    string Target,
+    string Status,
+    string StatusReason,
+    string ReasonCode,
+    string Summary,
+    int MustFactCount,
+    IReadOnlyList<string> MustFacts,
+    int MaybeFactCount,
+    IReadOnlyList<string> MaybeFacts,
+    int UnknownFactCount,
+    IReadOnlyList<string> UnknownFacts,
+    bool MustFactsTruncated,
+    bool MaybeFactsTruncated,
+    bool UnknownFactsTruncated)
 {
-    private SymbolicCompactInvariantTargetSummary(
-        string target,
-        string status,
-        string statusReason,
-        string reasonCode,
-        string summary,
-        int mustFactCount,
-        IReadOnlyList<string> mustFacts,
-        int maybeFactCount,
-        IReadOnlyList<string> maybeFacts,
-        int unknownFactCount,
-        IReadOnlyList<string> unknownFacts,
-        bool mustFactsTruncated,
-        bool maybeFactsTruncated,
-        bool unknownFactsTruncated)
-    {
-        Target = target ?? string.Empty;
-        Status = status ?? string.Empty;
-        StatusReason = statusReason ?? string.Empty;
-        ReasonCode = reasonCode ?? string.Empty;
-        Summary = summary ?? string.Empty;
-        MustFactCount = mustFactCount;
-        MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
-        MaybeFactCount = maybeFactCount;
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        UnknownFactCount = unknownFactCount;
-        UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
-        MustFactsTruncated = mustFactsTruncated;
-        MaybeFactsTruncated = maybeFactsTruncated;
-        UnknownFactsTruncated = unknownFactsTruncated;
-    }
-
-    public string Target { get; }
-
-    public string Status { get; }
-
-    public string StatusReason { get; }
-
-    public string ReasonCode { get; }
-
-    public string Summary { get; }
-
-    public int MustFactCount { get; }
-
-    public IReadOnlyList<string> MustFacts { get; }
-
-    public int MaybeFactCount { get; }
-
-    public IReadOnlyList<string> MaybeFacts { get; }
-
-    public int UnknownFactCount { get; }
-
-    public IReadOnlyList<string> UnknownFacts { get; }
-
-    public bool MustFactsTruncated { get; }
-
-    public bool MaybeFactsTruncated { get; }
-
-    public bool UnknownFactsTruncated { get; }
-
     internal bool IsTruncated => MustFactsTruncated || MaybeFactsTruncated || UnknownFactsTruncated;
 
     internal static SymbolicCompactInvariantTargetSummary FromSummary(
@@ -98,98 +44,58 @@ public sealed class SymbolicCompactInvariantTargetSummary
     }
 }
 
-public sealed class SymbolicCompactInvariantTargetPathSummary
+internal sealed record SymbolicCompactInvariantTargetPathSummary(
+    string Target,
+    int PathConditionCount,
+    int SmtConditionCount,
+    int ConservativeUnknownCount,
+    int ProgramPointCount,
+    int ReachableProgramPointCount,
+    int ProofTotalCount,
+    int ProofUnknownCount,
+    int ProofProvenTrueCount,
+    int ProofProvenFalseCount,
+    int ProofUnreachableCount,
+    IReadOnlyList<string> Conditions,
+    bool ConditionsTruncated,
+    string StatusReason,
+    string ReasonCode,
+    string Summary)
 {
-    private readonly SymbolicInvariantTargetPathSummary _summary;
-
-    private SymbolicCompactInvariantTargetPathSummary(
-        SymbolicInvariantTargetPathSummary summary,
-        IReadOnlyList<string> conditions,
-        bool conditionsTruncated)
-    {
-        _summary = summary ?? throw new ArgumentNullException(nameof(summary));
-        Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
-        ConditionsTruncated = conditionsTruncated;
-    }
-
-    public string Target => _summary.Target;
-
-    public int PathConditionCount => _summary.PathConditionCount;
-
-    public int SmtConditionCount => _summary.SmtConditionCount;
-
-    public int ConservativeUnknownCount => _summary.ConservativeUnknownCount;
-
-    public int ProgramPointCount => _summary.ProgramPointCount;
-
-    public int ReachableProgramPointCount => _summary.ReachableProgramPointCount;
-
-    public int ProofTotalCount => _summary.ProofTotalCount;
-
-    public int ProofUnknownCount => _summary.ProofUnknownCount;
-
-    public int ProofProvenTrueCount => _summary.ProofProvenTrueCount;
-
-    public int ProofProvenFalseCount => _summary.ProofProvenFalseCount;
-
-    public int ProofUnreachableCount => _summary.ProofUnreachableCount;
-
-    public IReadOnlyList<string> Conditions { get; }
-
-    public bool ConditionsTruncated { get; }
-
-    public string StatusReason => _summary.StatusReason;
-
-    public string ReasonCode => _summary.ReasonCode;
-
-    public string Summary => _summary.Summary;
-
     internal static SymbolicCompactInvariantTargetPathSummary FromSummary(
         SymbolicInvariantTargetPathSummary summary,
         SymbolicCompactQueryOptions options)
     {
         var conditions = SymbolicCompactProjection.Take(summary.Conditions, options.MaxConditions);
         return new SymbolicCompactInvariantTargetPathSummary(
-            summary,
+            summary.Target,
+            summary.PathConditionCount,
+            summary.SmtConditionCount,
+            summary.ConservativeUnknownCount,
+            summary.ProgramPointCount,
+            summary.ReachableProgramPointCount,
+            summary.ProofTotalCount,
+            summary.ProofUnknownCount,
+            summary.ProofProvenTrueCount,
+            summary.ProofProvenFalseCount,
+            summary.ProofUnreachableCount,
             conditions,
-            summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count);
+            summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count,
+            summary.StatusReason,
+            summary.ReasonCode,
+            summary.Summary);
     }
 }
 
-public sealed class SymbolicCompactInvariantQueryDiagnostic
+internal sealed record SymbolicCompactInvariantQueryDiagnostic(
+    string Code,
+    string Severity,
+    string Message,
+    int Count,
+    int EvidenceTotalCount,
+    IReadOnlyList<string> Evidence,
+    bool EvidenceTruncated)
 {
-    private SymbolicCompactInvariantQueryDiagnostic(
-        string code,
-        string severity,
-        string message,
-        int count,
-        int evidenceTotalCount,
-        IReadOnlyList<string> evidence,
-        bool evidenceTruncated)
-    {
-        Code = code ?? string.Empty;
-        Severity = severity ?? string.Empty;
-        Message = message ?? string.Empty;
-        Count = count;
-        EvidenceTotalCount = evidenceTotalCount;
-        Evidence = evidence ?? throw new ArgumentNullException(nameof(evidence));
-        EvidenceTruncated = evidenceTruncated;
-    }
-
-    public string Code { get; }
-
-    public string Severity { get; }
-
-    public string Message { get; }
-
-    public int Count { get; }
-
-    public int EvidenceTotalCount { get; }
-
-    public IReadOnlyList<string> Evidence { get; }
-
-    public bool EvidenceTruncated { get; }
-
     internal static SymbolicCompactInvariantQueryDiagnostic FromDiagnostic(
         SymbolicInvariantQueryDiagnostic diagnostic,
         SymbolicCompactQueryOptions options)
@@ -205,129 +111,75 @@ public sealed class SymbolicCompactInvariantQueryDiagnostic
     }
 }
 
-public sealed class SymbolicCompactSmtDiagnostics
+internal sealed class SymbolicCompactSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
 {
-    private readonly SymbolicSmtDiagnosticsSnapshot _snapshot;
-
-    private SymbolicCompactSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
-    {
-        _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
-    }
-
-    public bool IsConfigured => _snapshot.IsConfigured;
-
-    public string Mode => _snapshot.Mode.ToString();
-
-    public bool IsEnabled => _snapshot.IsEnabled;
-
-    public int QueryTimeoutMs => _snapshot.QueryTimeoutMs;
-
-    public int MethodBudgetMs => _snapshot.MethodBudgetMs;
-
-    public int MaxPathConditions => _snapshot.MaxPathConditions;
-
-    public int MaxExpressionNodes => _snapshot.MaxExpressionNodes;
-
-    public int ExecutedQueryCount => _snapshot.ExecutedQueryCount;
-
-    public int CacheEntryCount => _snapshot.CacheEntryCount;
-
-    public SmtAnalysisHealth Health => _snapshot.Health;
-
-    public SmtSolverLifecycleOptions Lifecycle => _snapshot.Lifecycle;
+    public bool IsConfigured => snapshot.IsConfigured;
+    public string Mode => snapshot.Mode.ToString();
+    public bool IsEnabled => snapshot.IsEnabled;
+    public int QueryTimeoutMs => snapshot.QueryTimeoutMs;
+    public int MethodBudgetMs => snapshot.MethodBudgetMs;
+    public int MaxPathConditions => snapshot.MaxPathConditions;
+    public int MaxExpressionNodes => snapshot.MaxExpressionNodes;
+    public int ExecutedQueryCount => snapshot.ExecutedQueryCount;
+    public int CacheEntryCount => snapshot.CacheEntryCount;
+    public SmtAnalysisHealth Health => snapshot.Health;
+    public SmtSolverLifecycleOptions Lifecycle => snapshot.Lifecycle;
 
     internal static SymbolicCompactSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
     {
-        if (diagnostics == null) throw new ArgumentNullException(nameof(diagnostics));
-
+        ArgumentNullException.ThrowIfNull(diagnostics);
         return new SymbolicCompactSmtDiagnostics(diagnostics.Snapshot);
     }
 }
 
-public abstract class SymbolicSmtDiagnosticsProjectionBase(SymbolicCompactSmtDiagnostics smtDiagnostics)
+internal abstract class SymbolicSmtDiagnosticsProjectionBase(SymbolicCompactSmtDiagnostics smtDiagnostics)
 {
-    private SymbolicCompactSmtDiagnostics SmtDiagnostics { get; } =
-        smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
-
-    [JsonPropertyOrder(100)] public bool SmtConfigured => SmtDiagnostics.IsConfigured;
-    [JsonPropertyOrder(101)] public bool SmtEnabled => SmtDiagnostics.IsEnabled;
-    [JsonPropertyOrder(102)] public int SmtExecutedQueryCount => SmtDiagnostics.ExecutedQueryCount;
-    [JsonPropertyOrder(103)] public int SmtCacheEntryCount => SmtDiagnostics.CacheEntryCount;
-    [JsonPropertyOrder(104)] public int SmtQueryTimeoutMs => SmtDiagnostics.QueryTimeoutMs;
-    [JsonPropertyOrder(105)] public int SmtMethodBudgetMs => SmtDiagnostics.MethodBudgetMs;
-    [JsonPropertyOrder(106)] public int SmtMaxPathConditions => SmtDiagnostics.MaxPathConditions;
-    [JsonPropertyOrder(107)] public int SmtMaxExpressionNodes => SmtDiagnostics.MaxExpressionNodes;
+    [JsonPropertyOrder(100)] public bool SmtConfigured => smtDiagnostics.IsConfigured;
+    [JsonPropertyOrder(101)] public bool SmtEnabled => smtDiagnostics.IsEnabled;
+    [JsonPropertyOrder(102)] public int SmtExecutedQueryCount => smtDiagnostics.ExecutedQueryCount;
+    [JsonPropertyOrder(103)] public int SmtCacheEntryCount => smtDiagnostics.CacheEntryCount;
+    [JsonPropertyOrder(104)] public int SmtQueryTimeoutMs => smtDiagnostics.QueryTimeoutMs;
+    [JsonPropertyOrder(105)] public int SmtMethodBudgetMs => smtDiagnostics.MethodBudgetMs;
+    [JsonPropertyOrder(106)] public int SmtMaxPathConditions => smtDiagnostics.MaxPathConditions;
+    [JsonPropertyOrder(107)] public int SmtMaxExpressionNodes => smtDiagnostics.MaxExpressionNodes;
 }
 
-public sealed class SymbolicCompactAnalysisSummary : SymbolicSmtDiagnosticsProjectionBase
+internal sealed class SymbolicCompactAnalysisSummary(
+    SymbolicCompactInvariantQueryView invariantQuery,
+    SymbolicProgramPointSummary programPointSummary,
+    SymbolicCompactSmtDiagnostics smtDiagnostics,
+    SymbolicAnalysisTruncationInfo analysisTruncation)
+    : SymbolicSmtDiagnosticsProjectionBase(smtDiagnostics)
 {
-    private readonly SymbolicAnalysisTruncationInfo _analysisTruncation;
-    private readonly SymbolicCompactInvariantQueryView _invariantQuery;
-    private readonly SymbolicProgramPointSummary _programPointSummary;
-
-    private SymbolicCompactAnalysisSummary(
-        SymbolicCompactInvariantQueryView invariantQuery,
-        SymbolicProgramPointSummary programPointSummary,
-        SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicAnalysisTruncationInfo analysisTruncation)
-        : base(smtDiagnostics)
-    {
-        _invariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        _programPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        _analysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
-    }
-
-    public int ProgramPointCount => _programPointSummary.ProgramPointCount;
-
+    public int ProgramPointCount => programPointSummary.ProgramPointCount;
     public int InvariantConditionCount => MustFactCount + UnknownFactCount;
-
     public int ConservativeUnknownCount => UnknownFactCount;
-
-    public int MustFactCount => _invariantQuery.MustFactCount;
-
-    public int MaybeFactCount => _invariantQuery.MaybeFactCount;
-
-    public int UnknownFactCount => _invariantQuery.UnknownFactCount;
-
-    public string InvariantStatus => _invariantQuery.Status;
-
-    public string InvariantStatusReason => _invariantQuery.StatusReason;
-
-    public string InvariantSummary => _invariantQuery.Summary;
-
-    public int InvariantDiagnosticCount => _invariantQuery.DiagnosticCount;
-
-    public int TotalPathConditionCount => _programPointSummary.TotalPathConditionCount;
-
-    public int MaxPathConditionCount => _programPointSummary.MaxPathConditionCount;
-
+    public int MustFactCount => invariantQuery.MustFactCount;
+    public int MaybeFactCount => invariantQuery.MaybeFactCount;
+    public int UnknownFactCount => invariantQuery.UnknownFactCount;
+    public string InvariantStatus => invariantQuery.Status;
+    public string InvariantStatusReason => invariantQuery.StatusReason;
+    public string InvariantSummary => invariantQuery.Summary;
+    public int InvariantDiagnosticCount => invariantQuery.DiagnosticCount;
+    public int TotalPathConditionCount => programPointSummary.TotalPathConditionCount;
+    public int MaxPathConditionCount => programPointSummary.MaxPathConditionCount;
     public int ReachabilityCheckedCount =>
-        _programPointSummary.Reachability.ReachableCount +
-        _programPointSummary.Reachability.UnreachableCount +
-        _programPointSummary.Reachability.UnknownCount;
-
+        programPointSummary.Reachability.ReachableCount +
+        programPointSummary.Reachability.UnreachableCount +
+        programPointSummary.Reachability.UnknownCount;
     public int ReachabilityKnownCount =>
-        _programPointSummary.Reachability.ReachableCount +
-        _programPointSummary.Reachability.UnreachableCount;
-
-    public int ReachabilityUnknownCount => _programPointSummary.Reachability.UnknownCount;
-
-    public int ReachabilityNotCheckedCount => _programPointSummary.Reachability.NotCheckedCount;
-
-    public int ProofTotalCount => _programPointSummary.ProofOutcomes.TotalCount;
-
+        programPointSummary.Reachability.ReachableCount + programPointSummary.Reachability.UnreachableCount;
+    public int ReachabilityUnknownCount => programPointSummary.Reachability.UnknownCount;
+    public int ReachabilityNotCheckedCount => programPointSummary.Reachability.NotCheckedCount;
+    public int ProofTotalCount => programPointSummary.ProofOutcomes.TotalCount;
     public int ProofResolvedCount =>
-        _programPointSummary.ProofOutcomes.ProvenTrueCount +
-        _programPointSummary.ProofOutcomes.ProvenFalseCount +
-        _programPointSummary.ProofOutcomes.UnreachableCount;
+        programPointSummary.ProofOutcomes.ProvenTrueCount +
+        programPointSummary.ProofOutcomes.ProvenFalseCount +
+        programPointSummary.ProofOutcomes.UnreachableCount;
+    public int ProofUnknownCount => programPointSummary.ProofOutcomes.UnknownCount;
 
-    public int ProofUnknownCount => _programPointSummary.ProofOutcomes.UnknownCount;
-
-    [JsonPropertyOrder(108)]
-    public bool AnalysisTruncated => _analysisTruncation.IsTruncated;
-
-    [JsonPropertyOrder(109)]
-    public bool HasUnresolvedAnalysis =>
+    [JsonPropertyOrder(108)] public bool AnalysisTruncated => analysisTruncation.IsTruncated;
+    [JsonPropertyOrder(109)] public bool HasUnresolvedAnalysis =>
         ConservativeUnknownCount != 0 ||
         ReachabilityUnknownCount != 0 ||
         ReachabilityNotCheckedCount != 0 ||
@@ -340,54 +192,24 @@ public sealed class SymbolicCompactAnalysisSummary : SymbolicSmtDiagnosticsProje
         SymbolicCompactSmtDiagnostics smtDiagnostics,
         SymbolicAnalysisTruncationInfo analysisTruncation)
     {
-        if (invariantQuery == null) throw new ArgumentNullException(nameof(invariantQuery));
-
-        if (programPointSummary == null) throw new ArgumentNullException(nameof(programPointSummary));
-
-        if (smtDiagnostics == null) throw new ArgumentNullException(nameof(smtDiagnostics));
-
-        if (analysisTruncation == null) throw new ArgumentNullException(nameof(analysisTruncation));
-
-        return new SymbolicCompactAnalysisSummary(
-            invariantQuery,
-            programPointSummary,
-            smtDiagnostics,
+        return new SymbolicCompactAnalysisSummary(invariantQuery, programPointSummary, smtDiagnostics,
             analysisTruncation);
     }
 }
 
-public sealed class SymbolicCompactOutputTruncation
+internal sealed class SymbolicCompactOutputTruncation(
+    bool lines,
+    bool programPoints,
+    bool facts,
+    bool conditions,
+    bool proofs)
 {
-    public SymbolicCompactOutputTruncation(
-        bool lines,
-        bool programPoints,
-        bool facts,
-        bool conditions,
-        bool proofs)
-    {
-        Lines = lines;
-        ProgramPoints = programPoints;
-        Facts = facts;
-        Conditions = conditions;
-        Proofs = proofs;
-    }
-
-    public bool Lines { get; }
-
-    public bool ProgramPoints { get; }
-
-    public bool Facts { get; }
-
-    public bool Conditions { get; }
-
-    public bool Proofs { get; }
-
-    public bool IsTruncated =>
-        Lines ||
-        ProgramPoints ||
-        Facts ||
-        Conditions ||
-        Proofs;
+    public bool Lines { get; } = lines;
+    public bool ProgramPoints { get; } = programPoints;
+    public bool Facts { get; } = facts;
+    public bool Conditions { get; } = conditions;
+    public bool Proofs { get; } = proofs;
+    public bool IsTruncated => Lines || ProgramPoints || Facts || Conditions || Proofs;
 
     internal static SymbolicCompactOutputTruncation FromInvariant(SymbolicCompactInvariantSummary invariant)
     {
@@ -395,39 +217,28 @@ public sealed class SymbolicCompactOutputTruncation
             false,
             false,
             invariant.RawFactsTruncated,
-            invariant.ConditionsTruncated ||
-            invariant.TargetsTruncated ||
-            (invariant.MergedPathFacts != null && invariant.MergedPathFacts.IsTruncated),
+            invariant.ConditionsTruncated || invariant.TargetsTruncated || invariant.MergedPathFactsTruncated,
             false);
     }
 
     internal static SymbolicCompactOutputTruncation Combine(
         IEnumerable<SymbolicCompactOutputTruncation> truncations)
     {
-        if (truncations == null) throw new ArgumentNullException(nameof(truncations));
-
-        var lines = false;
-        var programPoints = false;
-        var facts = false;
-        var conditions = false;
-        var proofs = false;
+        ArgumentNullException.ThrowIfNull(truncations);
+        var result = new bool[5];
         foreach (var truncation in truncations)
         {
             if (truncation == null) continue;
-
-            lines |= truncation.Lines;
-            programPoints |= truncation.ProgramPoints;
-            facts |= truncation.Facts;
-            conditions |= truncation.Conditions;
-            proofs |= truncation.Proofs;
+            result[0] |= truncation.Lines;
+            result[1] |= truncation.ProgramPoints;
+            result[2] |= truncation.Facts;
+            result[3] |= truncation.Conditions;
+            result[4] |= truncation.Proofs;
         }
 
-        return new SymbolicCompactOutputTruncation(lines, programPoints, facts, conditions, proofs);
+        return new SymbolicCompactOutputTruncation(result[0], result[1], result[2], result[3], result[4]);
     }
 
     internal static SymbolicCompactOutputTruncation Combine(
-        params SymbolicCompactOutputTruncation[] truncations)
-    {
-        return Combine((IEnumerable<SymbolicCompactOutputTruncation>)truncations);
-    }
+        params SymbolicCompactOutputTruncation[] truncations) => Combine(truncations.AsEnumerable());
 }

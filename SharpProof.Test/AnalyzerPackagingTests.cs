@@ -1852,7 +1852,7 @@ namespace TestNamespace {
             ("SymbolicCliJsonRequest.cs", "MaxItems"),
             ("SymbolicCliExplainReport.cs", "public override string Kind => \"explain\""),
             ("SymbolicCompactDomainResults.cs", "public int SchemaVersion => 1"),
-            ("SymbolicCliExplainReport.cs", "SymbolicCompactQueryResult Invariant"),
+            ("SymbolicCliExplainReport.cs", "public JsonElement Invariant"),
             ("SymbolicCliExplainReport.cs", "public JsonElement RuntimeHazards"),
             ("SymbolicCompactDomainResults.cs", "SymbolicCompactRuntimeHazardProjection"),
             ("SymbolicCliExplainReport.cs", "ToSarif()"),

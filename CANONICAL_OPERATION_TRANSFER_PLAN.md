@@ -896,6 +896,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 cached execution-root trace scaffold | This commit | 106,418 | -1,258 |
 | Phase 7 canonical invalidated-if completion | This commit | 106,367 | -1,309 |
 | Phase 7 direct compact domain projection | This commit | 105,957 | -1,719 |
+| Phase 7 internal compact query projection graph | This commit | 105,643 | -2,033 |
 
 ## Validation Ledger
 
@@ -1120,6 +1121,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 compact projection characterization | Commit `c5735f57` locks normalized JSON bytes for compact and invariant point/line/span/file projections plus runtime-hazard, capability, and complexity compact results in eleven named inline-hash cases. Existing full JSON and explain JSON/SARIF byte fixtures remain complementary. The new gate passes 11/11 and establishes the deletion boundary for the 2,062-line forwarding-DTO island. Production LOC remains 106,067. |
 | Phase 7 direct compact domain projection | Capability, complexity, and runtime-hazard compact output now serializes directly from the canonical domain results. The runtime-hazard materializer retains one bounded internal projection for explain Markdown/SARIF and exit-gate consumers; the public forwarding DTO graph is deleted. Eleven compact hashes and the existing explain hashes remain byte-identical, the focused main fixtures pass 22/22, the broader CLI projection gate passes 123/123, the complete Tooling lane passes 604/604, and the Release warning-as-error solution build has zero warnings/errors. Production LOC falls by 110 to 105,957, or -1,719 from the rewrite start; tracked test LOC is 145,213. |
 | Phase 7 filtered compact deletion boundary | Two additional inline hashes lock compact and invariant line projection with one target filter and zero fact, condition, and proof limits. They preserve the file-wide point budget, matched/unmatched filter bookkeeping, nested truncation flags, null omission, and exact JSON order before the forwarding-model deletion. The complete compact byte gate passes 13/13. Production LOC remains 105,957; tracked test LOC is 145,215. |
+| Phase 7 internal compact query projection graph | Compact and invariant public extensions now return ordered `JsonElement` roots directly. Explain keeps the raw invariant JSON plus one private bounded projection for Markdown/SARIF, and exit gates consume internal truncation metrics. The remaining query, line, point, invariant, diagnostic, and summary forwarding types are internal primary-constructor or positional-record nodes, eliminating their constructor/property boilerplate without changing the serializer graph. All 13 compact/invariant hashes and both explain hashes remain byte-identical; the complete Tooling lane passes 606/606, the focused main analysis/source-shape gate passes 10/10, and the Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 314 to 105,643, or -2,033 from the rewrite start; tracked test LOC is 145,217. |
 
 ## Current Checkpoint
 
@@ -1458,12 +1460,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   lane, and the Release warning-as-error solution build are green. Production
   LOC is 105,957 and tracked test LOC is 145,213. Two further target-filtered,
   zero-limit compact/invariant hashes raise the deletion gate to 13/13 and the
-  tracked test LOC to 145,215.
-- Next cheapest step: replace the remaining compact query/program-point and
-  invariant forwarding models with one internal projection document. Dual-
-  render point/line/span/file output against the eight compact/invariant hashes
-  plus full/explain gates, then delete each superseded model file in the same
-  green tranche.
+  tracked test LOC to 145,215. Compact and invariant roots now serialize as
+  ordered `JsonElement` documents, and their former public forwarding graph is
+  internalized and compressed. The 15 byte hashes, full 606-case Tooling lane,
+  focused main gate, and Release warning-as-error build are green. Production
+  LOC is 105,643 and tracked test LOC is 145,217.
+- Next cheapest step: replace the remaining internal line, point, invariant,
+  diagnostic, and summary projection nodes with direct ordered JSON leaf
+  builders plus the small explain/exit metric record. Remove their linked test
+  sources and stale inventory/adjudication entries only after the same 15 byte
+  hashes and full Tooling gate remain green.
 - Blockers: the 11,000-line production target still requires 9,281 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major

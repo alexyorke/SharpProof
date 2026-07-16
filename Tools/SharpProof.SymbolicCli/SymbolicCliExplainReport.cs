@@ -9,13 +9,14 @@ using SharpProof.Symbolic.Smt;
 
 internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 {
+    private readonly SymbolicCompactQueryProjection _invariant;
     private readonly SymbolicCompactRuntimeHazardProjection _runtimeHazards;
 
     private SymbolicCliExplainReport(
         SymbolicCliExplainSource source,
         SymbolicCliExplainTarget target,
         SymbolicCliExplainProject? project,
-        SymbolicCompactQueryResult invariant,
+        SymbolicCompactQueryProjection invariant,
         SymbolicCompactRuntimeHazardProjection runtimeHazards,
         SymbolicCliExplainCapabilityResult capabilities,
         SymbolicCliExplainComplexityResult complexity,
@@ -26,7 +27,8 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         Source = source;
         Target = target;
         Project = project;
-        Invariant = invariant;
+        _invariant = invariant;
+        Invariant = invariant.Json;
         _runtimeHazards = runtimeHazards;
         RuntimeHazards = runtimeHazards.Json;
         Capabilities = capabilities;
@@ -45,7 +47,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 
     public SymbolicCliExplainProject? Project { get; }
 
-    public SymbolicCompactQueryResult Invariant { get; }
+    public JsonElement Invariant { get; }
 
     public JsonElement RuntimeHazards { get; }
 
@@ -94,7 +96,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
             maxConditions: itemLimit,
             maxProofs: itemLimit,
             invariantTargets: options.InvariantTargets);
-        var invariant = pointResult.ToCompactResult(compactOptions);
+        var invariant = SymbolicCompactQueryProjection.Create(pointResult, compactOptions);
 
         var runtimeHazards = service.QueryRuntimeHazards(
             new SymbolicQueryContext(
@@ -198,12 +200,12 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 }));
         }
 
-        if (Invariant.InvariantQuery.HasUnresolvedAnalysis || Invariant.AnalysisTruncation.IsTruncated)
+        if (_invariant.InvariantQuery.HasUnresolvedAnalysis || _invariant.AnalysisTruncation.IsTruncated)
         {
             results.Add(CreateSarifResult(
                 "SPQ-INVARIANT-UNKNOWN",
                 "warning",
-                Invariant.InvariantQuery.Summary,
+                _invariant.InvariantQuery.Summary,
                 Source.FilePath,
                 Target.ResolvedLine,
                 Target.ResolvedColumn,
@@ -321,10 +323,10 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         builder.AppendLine();
         builder.AppendLine("## Invariant and reachability");
         builder.AppendLine();
-        builder.AppendLine($"- Invariant: `{EscapeInline(Invariant.MergedInvariantText)}`");
-        builder.AppendLine($"- Invariant status: `{Invariant.InvariantQuery.Status}` - {EscapeInline(Invariant.InvariantQuery.StatusReason)}");
-        builder.AppendLine($"- Reachability: `{Invariant.PointReachability}` - {EscapeInline(Invariant.ReachabilityReason ?? string.Empty)}");
-        builder.AppendLine($"- Proof outcomes: {Invariant.ProofOutcomes.TotalCount} total, {Invariant.ProofOutcomes.ProvenTrueCount} true, {Invariant.ProofOutcomes.ProvenFalseCount} false, {Invariant.ProofOutcomes.UnknownCount} unknown");
+        builder.AppendLine($"- Invariant: `{EscapeInline(_invariant.MergedInvariantText)}`");
+        builder.AppendLine($"- Invariant status: `{_invariant.InvariantQuery.Status}` - {EscapeInline(_invariant.InvariantQuery.StatusReason)}");
+        builder.AppendLine($"- Reachability: `{_invariant.PointReachability}` - {EscapeInline(_invariant.ReachabilityReason ?? string.Empty)}");
+        builder.AppendLine($"- Proof outcomes: {_invariant.ProofOutcomes.TotalCount} total, {_invariant.ProofOutcomes.ProvenTrueCount} true, {_invariant.ProofOutcomes.ProvenFalseCount} false, {_invariant.ProofOutcomes.UnknownCount} unknown");
 
         builder.AppendLine();
         builder.AppendLine("## Runtime hazards");
