@@ -354,12 +354,13 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        AddThrowGuardedExpressionStateFacts(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
+            state,
             expressionSyntax,
             foreachBody,
             semanticModel,
-            cancellationToken);
+            cancellationToken,
+            "ir.path.foreach-entry.throw-guarded-not-null").State;
         SymbolicProgramPointFacts.AddReferenceNullCondition(
             ref state,
             expressionSyntax,
@@ -482,25 +483,6 @@ internal static class SymbolicLoopStateTransfer
                 "ir.path.foreach-entry.finite-domain").State;
     }
 
-    internal static void AddThrowGuardedExpressionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        StatementSyntax guardedStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string nonNullProvenance = "ir.path.foreach-entry.throw-guarded-not-null")
-    {
-        var transition = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
-            state,
-            expression,
-            guardedStatement,
-            semanticModel,
-            cancellationToken,
-            nonNullProvenance);
-        if (transition.IsExact)
-            state = transition.State;
-    }
-
     private static void AddForeachLengthPositiveStateFact(
         ref SymbolicState state,
         ExpressionSyntax expressionSyntax,
@@ -601,13 +583,13 @@ internal static class SymbolicLoopStateTransfer
                     "ir.path.for-initializer",
                     out _);
             if (initializer.IsDeclaration)
-                SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                    ref state,
+                state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                    state,
                     initializer.Value,
                     forStatement.Statement,
                     includeThrowGuardFacts: false,
                     semanticModel,
-                    cancellationToken);
+                    cancellationToken).State;
         }
 
         return state.Normalize();

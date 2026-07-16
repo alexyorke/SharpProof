@@ -469,13 +469,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     target.Key))))
             return false;
         state = SymbolicStateInvalidator.ApplyNestedMutationInvalidations(state, invalidations);
-        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+            state,
             expressionStatement.Expression,
             expressionStatement,
             includeThrowGuardFacts: true,
             semanticModel,
-            cancellationToken);
+            cancellationToken).State;
         return true;
     }
 
@@ -514,14 +514,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         state = completedState;
 
         if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
-            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                ref state,
+            state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                state,
                 assignment.Right,
                 statement,
                 semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is
                     not (ILocalSymbol or IParameterSymbol),
                 semanticModel,
-                cancellationToken);
+                cancellationToken).State;
         else if (site is BlockSyntax)
             AddOperationNormalCompletionFacts(
                 ref state,
@@ -544,11 +544,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return false;
         SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state, expression, semanticModel, cancellationToken);
-        SymbolicNormalCompletionStateTransfer.ApplyConditions(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyConditions(
+            state,
             plan.AfterDoesNotReturnIf,
             expression,
-            "ir.path.expression-completion.member-not-null");
+            "ir.path.expression-completion.member-not-null").State;
         return true;
     }
 
@@ -562,13 +562,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             { Expression: AssignmentExpressionSyntax assignment } statement)
             return;
         var target = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+            state,
             assignment.Right,
             statement,
             target is not (ILocalSymbol or IParameterSymbol),
             semanticModel,
-            cancellationToken);
+            cancellationToken).State;
     }
 
     private static bool IsForInitializerSyntax(
@@ -619,13 +619,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 assignmentTarget))
             return;
 
-        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+            state,
             value,
             forStatement.Statement,
             includeThrowGuardFacts: false,
             semanticModel,
-            cancellationToken);
+            cancellationToken).State;
     }
 
     private static bool TryApplyCurrentDeclarationCompletion(
@@ -674,13 +674,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     declaratorSymbol);
             }
 
-            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                ref completedState,
+            completedState = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                completedState,
                 initializer.Value,
                 declaration,
                 false,
                 semanticModel,
-                cancellationToken);
+                cancellationToken).State;
         }
 
         state = completedState;

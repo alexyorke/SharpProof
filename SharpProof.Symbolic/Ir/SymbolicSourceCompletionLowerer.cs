@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
@@ -12,6 +13,106 @@ internal sealed record SymbolicSourceCompletionPlan(
 
 internal static class SymbolicSourceCompletionLowerer
 {
+    internal static SymbolicOperationTransitionResult ApplyNormalCompletion(
+        SymbolicState state,
+        ExpressionSyntax expression,
+        StatementSyntax statement,
+        bool includeThrowGuardFacts,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var provenance = ImmutableArray.CreateBuilder<SymbolicLoweringProvenance>();
+        if (includeThrowGuardFacts)
+            AdoptExact(
+                ref state,
+                provenance,
+                ApplyThrowGuard(
+                    state,
+                    expression,
+                    statement,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.normal-completion.throw-guarded-not-null"));
+
+        var frameworkLowering = SymbolicFrameworkPostconditionLowerer.Lower(
+            expression,
+            statement,
+            semanticModel,
+            cancellationToken);
+        if (frameworkLowering is { IsExact: true, Value: { } frameworkPlan })
+            AdoptExact(
+                ref state,
+                provenance,
+                ApplyConditions(
+                    state,
+                    frameworkPlan.BeforeDoesNotReturnIf,
+                    expression,
+                    "ir.path.normal-completion.framework-before"));
+
+        foreach (var (_, _, parameter, argumentSyntax) in
+                 SymbolicFrameworkPostconditionLowerer.EnumerateExplicitInvocationArguments(
+                     expression,
+                     semanticModel,
+                     cancellationToken))
+        {
+            if (parameter.RefKind != RefKind.None ||
+                !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
+                SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                    argumentSyntax.Expression,
+                    statement,
+                    semanticModel,
+                    cancellationToken))
+                continue;
+
+            AdoptExact(
+                ref state,
+                provenance,
+                SymbolicReachabilityLowerer.Apply(
+                    state,
+                    argumentSyntax.Expression,
+                    !doesNotReturnWhen,
+                    semanticModel,
+                    cancellationToken));
+        }
+
+        if (frameworkLowering is { IsExact: true, Value: { } afterPlan })
+            AdoptExact(
+                ref state,
+                provenance,
+                ApplyConditions(
+                    state,
+                    afterPlan.AfterDoesNotReturnIf,
+                    expression,
+                    "ir.path.normal-completion.framework-after"));
+
+        var sourceLowering = Lower(expression, statement, semanticModel, cancellationToken);
+        if (sourceLowering is { IsExact: true, Value: { } sourcePlan })
+            AdoptExact(
+                ref state,
+                provenance,
+                ApplyConditions(
+                    state,
+                    sourcePlan.Conditions,
+                    expression,
+                    "ir.path.normal-completion.source"));
+
+        return SymbolicOperationTransitionResult.Exact(state, provenance);
+    }
+
+    internal static SymbolicOperationTransitionResult ApplyConditions(
+        SymbolicState state,
+        ImmutableArray<SymbolicCondition> conditions,
+        SyntaxNode source,
+        string provenance) =>
+        conditions.IsDefaultOrEmpty
+            ? Exact(state, source, "no-conditions")
+            : SymbolicOperationTransferKernel.AssumeAll(
+                state,
+                conditions,
+                source.Span,
+                provenance);
+
     internal static SymbolicOperationTransitionResult ApplyThrowGuard(
         SymbolicState state,
         ExpressionSyntax expression,
@@ -221,6 +322,17 @@ internal static class SymbolicSourceCompletionLowerer
         CancellationToken cancellationToken) =>
         semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation
             { TargetMethod.ReducedFrom: not null };
+
+    private static void AdoptExact(
+        ref SymbolicState state,
+        ImmutableArray<SymbolicLoweringProvenance>.Builder provenance,
+        SymbolicOperationTransitionResult transition)
+    {
+        if (!transition.IsExact)
+            return;
+        state = transition.State;
+        provenance.AddRange(transition.Provenance);
+    }
 
     private static SymbolicOperationTransitionResult Exact(
         SymbolicState state,

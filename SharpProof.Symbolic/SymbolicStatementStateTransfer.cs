@@ -167,13 +167,13 @@ internal static class SymbolicStatementStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        SymbolicLoopStateTransfer.AddThrowGuardedExpressionStateFacts(
-            ref state,
+        state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
+            state,
             expression,
             statement,
             semanticModel,
             cancellationToken,
-            "ir.path.using-entry.throw-guarded-not-null");
+            "ir.path.using-entry.throw-guarded-not-null").State;
     }
 
     internal static void AddUsingStatementDeclarationStateFacts(
@@ -212,13 +212,13 @@ internal static class SymbolicStatementStateTransfer
         var effectiveInitializer = throwGuardedValue.EffectiveValueExpression;
         if (throwGuardedValue.HasGuard)
         {
-            SymbolicLoopStateTransfer.AddThrowGuardedExpressionStateFacts(
-                ref state,
+            state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
+                state,
                 initializer,
                 usingBody,
                 semanticModel,
                 cancellationToken,
-                "ir.path.using-entry.throw-guarded-not-null");
+                "ir.path.using-entry.throw-guarded-not-null").State;
         }
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -371,24 +371,24 @@ internal static class SymbolicStatementStateTransfer
         if (statement is UsingStatementSyntax completedUsingStatement)
         {
             if (completedUsingStatement.Expression != null)
-                SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                    ref state,
+                state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                    state,
                     completedUsingStatement.Expression,
                     completedUsingStatement,
                     true,
                     semanticModel,
-                    cancellationToken);
+                    cancellationToken).State;
 
             if (completedUsingStatement.Declaration != null)
                 foreach (var declarator in completedUsingStatement.Declaration.Variables)
                     if (declarator.Initializer != null)
-                        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                            ref state,
+                        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                            state,
                             declarator.Initializer.Value,
                             completedUsingStatement,
                             true,
                             semanticModel,
-                            cancellationToken);
+                            cancellationToken).State;
 
             return;
         }

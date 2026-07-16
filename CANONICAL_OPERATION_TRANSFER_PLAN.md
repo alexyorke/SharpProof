@@ -575,6 +575,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Delete the generic `IOperation` assignment-lowering facade after exact
     search proved its only three callers were tests. Move those fixtures to the
     production assignment adapter and delete the facade's two orphaned helpers.
+  - [x] Move ordered throw-guard, framework, `DoesNotReturnIf`, and source
+    successful-completion sequencing into `SymbolicSourceCompletionLowerer`.
+    Route CFG, loop, statement, using, and declaration callers through its
+    immutable canonical transition, then delete
+    `SymbolicNormalCompletionStateTransfer` and the loop throw-guard wrapper.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -995,6 +1000,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 post-assignment deletion and architecture audit | Three independent read-only audits found no defensible 250-line behavior-preserving cut. The largest structural fallback island is 948 physical lines, but the recorded finally-multipath, completed-loop, and coalesce gaps alone require at least 771 replacement lines before pricing other unsupported shapes, limiting theoretical net removal to 177. All remaining statement, assignment, branch, and loop methods have production callers. Analyzer assignment/adaptor/merge owners total 1,012 live lines and uniquely retain delegate, capture, resource, alias, mutation-evidence, and metadata-merge policy; a full rewrite has a defensible best-case net of 147 lines. Hazard candidate factories are source/order adapters and create no independent hazard operations. `SymbolicOperationLowerer` was the sole file-size violation and is now split into 996-line hazard and 1,275-line assignment files as one two-part canonical owner. Metrics report no file above 2,000 lines, no partial above 3,000 aggregate lines or eight parts, and no dependency/module assignment violations. Direct lowerer tests pass 61/61, impacted-selection tooling passes 39/39, and the Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,037, or -1,639 from the rewrite start; tracked test LOC remains 144,693. |
 | Phase 7 final semantic-owner audit and facade deletion | The second bounded semantic-owner audit found no high/medium parallel implementation. ProofCore's concrete preprocessor and Symbolic's syntactic classifier consume the same centralized affine, interval, comparison, and fixed-point policy but intentionally own backend preprocessing versus solver-avoidance classification. EffectSummary IL identities and Analyzer Roslyn identities remain distinct language boundaries. The only clone is an eight-line unsupported-transition wrapper; it is intentional because reachability and source completion own different provenance roots, and centralizing it saves at most 10-12 lines while spreading owner selection across seven callers. Exact caller/reflection search did accept one deletion: the generic `SymbolicOperationLowerer.Lower(IOperation, ...)` facade and its direct-target/unsupported helpers had only three test callers. Those tests now use the production `ApplyAssignment` adapter with unchanged names and assertions. The focused fixture passes 44/44. Production LOC is 105,982, down 55 in this tranche and 1,694 from the rewrite start; tracked test LOC is 144,700. The two-audit low-yield stop condition is met. |
 | Final contract determinism and VSIX manifest gate | Two identical 1,200-iteration fuzz processes first reproduced different `coverage.json` hashes because `HashCode.Combine` randomized string hashing per process. Fuzz seed mixing now uses one explicit stable integer/string mixer, and a typed 1,200-case source SHA-256 fixture locks `66FEA38D21307DC787ABC9347627FA0F3C1DADECB705DAC7424548AA497924EA`. Independent post-fix processes both produce coverage SHA-256 `E120E933AD5BBE73C7F6CCB6176AA67D370634C1AB904904DBE612D45BEFDE9B`. The real VSIX is now checked against its complete 31-entry required payload manifest before the harness loads and runs the analyzer; the harness still produces SP0002 and no AD0001. Required and graceful Windows package consumers both pass with native SMT ready and three executed queries. Public API analysis, CLI/JSON/SARIF and diagnostic/evidence fixtures, NuGet/native packaging, and all six lanes pass on the same binaries: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,936 plus two documented skips, and Tooling 592, for 6,102 passes. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,043, or -1,633 from the rewrite start; tracked test LOC is 144,706. |
+| Phase 7 canonical normal-completion coordinator | Ordered throw-guard, framework-before, inverse `DoesNotReturnIf`, framework-after, and source successful-completion conditions now compose in `SymbolicSourceCompletionLowerer` and enter state only through canonical operation transitions. CFG, loop, statement, using, and declaration callers consume the immutable result directly; the 127-line `SymbolicNormalCompletionStateTransfer` owner and the loop throw-guard wrapper are deleted. Unsupported component discovery still contributes no optimistic fact and does not prevent later independent guaranteed facts. The focused program-point/CFG/operation batch passes 330/330; all six lanes pass 6,102 tests with the same two documented skips; and the Release solution build has zero warnings and errors. Production LOC falls to 106,009, or -1,667 from the rewrite start; tracked test LOC remains 144,706. GitHub PR #79 is green: the prior README inventory race was already fixed by `1ebaebea`, so no redundant CI change was made. |
 
 ## Current Checkpoint
 
@@ -1266,17 +1272,22 @@ the unused preview .NET API may break when it obstructs the canonical design.
   exercise the production assignment adapter and pass 44/44. The second final
   semantic-owner audit found no high/medium parallel implementation. Production
   LOC is 105,982, or -1,694 from the rewrite start; tracked test LOC is 144,700.
-- Next cheapest step: stop the Phase 7 broad consolidation search under its two-
-  audit low-yield condition. The remaining structural fallback and Analyzer
-  wrappers are live behavior boundaries, and replacing them cannot meet the
-  250-line deletion gate without losing supported facts/evidence. The final
-  behavior, build, test, API, serialization, fuzz, package, native, and VSIX
-  gates are green. Reassess the 11,000-line production target and the required
-  legacy-fallback deletion before authorizing another net-positive engine
-  rewrite.
-- Blockers: the 11,000-line production target still requires 9,367 lines, while
+  Normal-completion sequencing now has one canonical coordinator. Every CFG,
+  loop, statement, using, and declaration caller consumes its immutable
+  transition directly, and the legacy 127-line owner plus loop wrapper are
+  deleted. The focused batch passes 330/330, all six lanes pass 6,102 tests with
+  the same two documented skips, and the Release solution build has zero
+  warnings and errors. Production LOC is 106,009, or -1,667 from the rewrite
+  start; tracked test LOC remains 144,706. GitHub PR #79 is independently green.
+- Next cheapest step: use the newly authorized major rewrite to replace the
+  specialized CFG statement/loop/finally schedulers and structural fallback
+  with one target-aware region worklist. Preserve target cursors, continuation
+  identity, bounded fixed points, exact normalized state/evidence/version
+  parity, and typed conservative `Unsupported` results before deleting each old
+  region interpreter.
+- Blockers: the 11,000-line production target still requires 9,333 lines, while
   two bounded semantic-owner audits found no remaining 250-line safe cut. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
-  for typed CFG `Unsupported` cases; deleting them now requires recreating live
-  semantics and is net-positive under the measured prototypes. MainSmtFlow
-  passes 257/257; the prior SP0010 baseline is no longer a blocker.
+  for typed CFG `Unsupported` cases. The user has authorized the required major
+  rearchitecture; its remaining blocker is differential parity, not permission.
+  MainSmtFlow passes 257/257; the prior SP0010 baseline is no longer a blocker.
