@@ -453,6 +453,11 @@ public class FuzzToolTests
                 AppendValue(payload, fuzzCase.Family);
                 AppendValue(payload, fuzzCase.Source);
                 AppendValue(payload, fuzzCase.AllowUnsafe);
+                AppendValue(payload, fuzzCase.Expectation.Sp0002);
+                AppendValue(payload, fuzzCase.Expectation.Sp0010);
+                AppendValues(payload, fuzzCase.Expectation.RequiredSp0002Properties);
+                AppendValues(payload, fuzzCase.Expectation.RequiredSp0010Properties);
+                AppendValues(payload, fuzzCase.Expectation.RequiredAnySp0010Properties);
                 AppendValues(payload, fuzzCase.PrimaryShapeIds);
                 AppendValues(payload, fuzzCase.ExpectedOperationKinds);
                 AppendValues(payload, fuzzCase.ExpectedSyntaxKinds);
@@ -460,7 +465,7 @@ public class FuzzToolTests
         }
 
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload.ToString())));
-        Assert.That(hash, Is.EqualTo("A997A5C3644EC859A883975E11DD10E7E04BE7550B9A2616B65378CE1F542539"));
+        Assert.That(hash, Is.EqualTo("A8BFBFAF5402C6DC383F82789DEEE189FCCF1796054A124E970CF2726CB63BC7"));
     }
 
     [Test]

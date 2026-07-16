@@ -63,174 +63,110 @@ public sealed class FuzzCaseGenerator
             allowEffectPreservingWrappers, (_, _, className) => BuildClass(className, member));
     }
 
+    private static ShapeRegistryEntry MethodEntry(
+        string id,
+        OperationKind[] primaryShapes,
+        string[] operationKinds,
+        string[] syntaxKinds,
+        FuzzExpectation expectation,
+        bool allowUnsafe,
+        bool allowEffectPreservingWrappers,
+        string returnType,
+        string parameters,
+        string body)
+    {
+        return StaticEntry(
+            id, primaryShapes, operationKinds, syntaxKinds, expectation, allowUnsafe,
+            allowEffectPreservingWrappers,
+            $$"""
+                  [EnforcePure]
+                  public {{returnType}} TestMethod({{parameters}})
+                  {
+              {{Indent(body, 8)}}
+                  }
+              """);
+    }
+
     public static ImmutableArray<ShapeRegistryEntry> RegistryEntries { get; } = ImmutableArray.Create(
         Entry("PureArithmetic", [OperationKind.Binary], ["Binary"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureArithmetic),
         Entry("PureStringConcat", [OperationKind.Binary], ["Binary"], ["AddExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureStringConcat),
         Entry("PureListPattern", [OperationKind.ListPattern], ["ListPattern"], ["ListPattern"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureListPattern),
-        StaticEntry("PureCollectionExpression", [OperationKind.CollectionExpression], ["CollectionExpression"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    int[] values = [1, x, 3];
-                    return values.Length;
-                }
-            """),
+        MethodEntry("PureCollectionExpression", [OperationKind.CollectionExpression], ["CollectionExpression"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "int[] values = [1, x, 3];\nreturn values.Length;"),
         Entry("PureInterpolatedString", [OperationKind.InterpolatedString], ["InterpolatedString"], ["InterpolatedStringExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureInterpolatedString),
-        StaticEntry("PureUtf8String", [OperationKind.Utf8String], ["Utf8String"], ["Utf8StringLiteralExpression"], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    return "abc"u8.Length;
-                }
-            """),
-        StaticEntry("PureArrayCreation", [OperationKind.ArrayCreation], ["ArrayCreation"], ["ArrayCreationExpression"], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var values = new int[] { 1, x, 3 };
-                    return values[1];
-                }
-            """),
+        MethodEntry("PureUtf8String", [OperationKind.Utf8String], ["Utf8String"], ["Utf8StringLiteralExpression"], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "", "return \"abc\"u8.Length;"),
+        MethodEntry("PureArrayCreation", [OperationKind.ArrayCreation], ["ArrayCreation"], ["ArrayCreationExpression"], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var values = new int[] { 1, x, 3 };\nreturn values[1];"),
         Entry("PureNestedOwnershipChain", [OperationKind.PropertyReference], ["PropertyReference", "SimpleAssignment", "ObjectCreation"], ["SimpleMemberAccessExpression", "SimpleAssignmentExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureNestedOwnershipChain),
         Entry("ImpureOwnershipEscapeChain", [OperationKind.ObjectCreation], ["ObjectCreation", "PropertyReference", "Return"], ["ObjectCreationExpression"], FuzzExpectation.DefinitelyImpure(), false, true, BuildImpureOwnershipEscapeChain),
-        StaticEntry("ImpureConsoleWrite", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, true,
-            """
-                [EnforcePure]
-                public void TestMethod()
-                {
-                    Console.WriteLine("impure");
-                }
-            """),
-        StaticEntry("ImpureDynamicDispatch", [OperationKind.DynamicInvocation], ["DynamicInvocation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public string TestMethod(dynamic value)
-                {
-                    return value.ToString();
-                }
-            """),
-        StaticEntry("ImpureDelegateInvoke", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public void TestMethod(Action action)
-                {
-                    action();
-                }
-            """),
-        StaticEntry("ImpureThrowExpression", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    throw new InvalidOperationException("fuzz");
-                }
-            """),
-        StaticEntry("ExceptionDirectThrowInvalidOperation", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    throw new InvalidOperationException("fuzz");
-                }
-            """),
-        StaticEntry("ExceptionGuardedThrowArgumentNull", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(string text)
-                {
-                    if (text == null)
-                    {
-                        throw new ArgumentNullException(nameof(text));
-                    }
+        MethodEntry("ImpureConsoleWrite", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, true,
+            "void", "", "Console.WriteLine(\"impure\");"),
+        MethodEntry("ImpureDynamicDispatch", [OperationKind.DynamicInvocation], ["DynamicInvocation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            "string", "dynamic value", "return value.ToString();"),
+        MethodEntry("ImpureDelegateInvoke", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            "void", "Action action", "action();"),
+        MethodEntry("ImpureThrowExpression", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
+            "int", "", "throw new InvalidOperationException(\"fuzz\");"),
+        MethodEntry("ExceptionDirectThrowInvalidOperation", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
+            "int", "", "throw new InvalidOperationException(\"fuzz\");"),
+        MethodEntry("ExceptionGuardedThrowArgumentNull", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
+            "int", "string text", """
+            if (text == null)
+            {
+                throw new ArgumentNullException(nameof(text));
+            }
 
-                    return text.Length;
-                }
+            return text.Length;
             """),
-        StaticEntry("ExceptionThrowExpressionFormatException", [OperationKind.Throw], ["Throw"], ["ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(string text)
-                {
-                    return string.IsNullOrWhiteSpace(text)
-                        ? throw new FormatException("fuzz")
-                        : text.Length;
-                }
+        MethodEntry("ExceptionThrowExpressionFormatException", [OperationKind.Throw], ["Throw"], ["ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false,
+            "int", "string text", """
+            return string.IsNullOrWhiteSpace(text)
+                ? throw new FormatException("fuzz")
+                : text.Length;
             """),
-        StaticEntry("ExceptionCaughtInternalThrow", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause", "Throw"], ["TryStatement", "CatchClause", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    try
-                    {
-                        throw new InvalidOperationException("fuzz");
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        return 1;
-                    }
-                }
+        MethodEntry("ExceptionCaughtInternalThrow", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause", "Throw"], ["TryStatement", "CatchClause", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
+            "int", "", """
+            try
+            {
+                throw new InvalidOperationException("fuzz");
+            }
+            catch (InvalidOperationException)
+            {
+                return 1;
+            }
             """),
-        StaticEntry("ExceptionDeadBranchThrow", [OperationKind.Throw], ["Conditional", "Throw"], ["IfStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    if (false)
-                    {
-                        throw new InvalidOperationException("fuzz");
-                    }
+        MethodEntry("ExceptionDeadBranchThrow", [OperationKind.Throw], ["Conditional", "Throw"], ["IfStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
+            "int", "", """
+            if (false)
+            {
+                throw new InvalidOperationException("fuzz");
+            }
 
-                    return 1;
-                }
+            return 1;
             """),
-        StaticEntry("ExceptionGuardedSafeDivideByZeroExcluded", [OperationKind.Binary], ["Conditional", "Binary"], ["IfStatement", "DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int divisor)
-                {
-                    if (divisor != 0)
-                    {
-                        return 10 / divisor;
-                    }
+        MethodEntry("ExceptionGuardedSafeDivideByZeroExcluded", [OperationKind.Binary], ["Conditional", "Binary"], ["IfStatement", "DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
+            "int", "int divisor", """
+            if (divisor != 0)
+            {
+                return 10 / divisor;
+            }
 
-                    return 1;
-                }
+            return 1;
             """),
-        StaticEntry("ExceptionGuardedNullDereferenceExcluded", [OperationKind.PropertyReference], ["Conditional", "PropertyReference"], ["IfStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(string text)
-                {
-                    if (text == null)
-                    {
-                        return 0;
-                    }
+        MethodEntry("ExceptionGuardedNullDereferenceExcluded", [OperationKind.PropertyReference], ["Conditional", "PropertyReference"], ["IfStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false,
+            "int", "string text", """
+            if (text == null)
+            {
+                return 0;
+            }
 
-                    return text.Length;
-                }
+            return text.Length;
             """),
-        StaticEntry("ExceptionDefiniteDivideByZero", [OperationKind.Binary], ["Binary"], ["DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    var zero = 0;
-                    return 10 / zero;
-                }
-            """),
-        StaticEntry("ExceptionDefiniteNullReference", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    string text = null;
-                    return text.Length;
-                }
-            """),
+        MethodEntry("ExceptionDefiniteDivideByZero", [OperationKind.Binary], ["Binary"], ["DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false,
+            "int", "", "var zero = 0;\nreturn 10 / zero;"),
+        MethodEntry("ExceptionDefiniteNullReference", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false,
+            "int", "", "string text = null;\nreturn text.Length;"),
         StaticEntry("ExceptionUsingDisposeThrows", [OperationKind.UsingDeclaration], ["UsingDeclaration"], ["LocalDeclarationStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false,
             """
                 private sealed class ThrowingDisposable : IDisposable
@@ -248,28 +184,17 @@ public sealed class FuzzCaseGenerator
                     return 1;
                 }
             """),
-        StaticEntry("ExceptionInvokedLocalFunctionThrow", [OperationKind.LocalFunction, OperationKind.Throw], ["LocalFunction", "Throw"], ["LocalFunctionStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    int Local()
-                    {
-                        throw new InvalidOperationException("fuzz");
-                    }
+        MethodEntry("ExceptionInvokedLocalFunctionThrow", [OperationKind.LocalFunction, OperationKind.Throw], ["LocalFunction", "Throw"], ["LocalFunctionStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false,
+            "int", "", """
+            int Local()
+            {
+                throw new InvalidOperationException("fuzz");
+            }
 
-                    return Local();
-                }
+            return Local();
             """),
-        StaticEntry("ExceptionInvokedLambdaThrow", [OperationKind.AnonymousFunction, OperationKind.Throw], ["AnonymousFunction", "Throw"], ["ParenthesizedLambdaExpression", "ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    Func<int> local = () => throw new FormatException("fuzz");
-                    return local();
-                }
-            """),
+        MethodEntry("ExceptionInvokedLambdaThrow", [OperationKind.AnonymousFunction, OperationKind.Throw], ["AnonymousFunction", "Throw"], ["ParenthesizedLambdaExpression", "ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false,
+            "int", "", "Func<int> local = () => throw new FormatException(\"fuzz\");\nreturn local();"),
         StaticEntry("ImpureFieldWrite", [OperationKind.SimpleAssignment, OperationKind.FieldReference], ["SimpleAssignment", "FieldReference"], ["SimpleAssignmentExpression"], FuzzExpectation.DefinitelyImpure(), false, false,
             """
                 private int _value;
@@ -295,135 +220,62 @@ public sealed class FuzzCaseGenerator
                     }
                 }
             """),
-        StaticEntry("ImpureUsingStandardOutput", [OperationKind.UsingDeclaration], ["UsingDeclaration"], ["LocalDeclarationStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
+        MethodEntry("ImpureUsingStandardOutput", [OperationKind.UsingDeclaration], ["UsingDeclaration"], ["LocalDeclarationStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
+            "int", "", "using var stream = Console.OpenStandardOutput();\nreturn 1;"),
+        MethodEntry("ImpureTryCatch", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause"], ["TryStatement", "CatchClause"], FuzzExpectation.DefinitelyImpure(), false, false,
+            "int", "int x", """
+            try
+            {
+                if (x < 0)
                 {
-                    using var stream = Console.OpenStandardOutput();
-                    return 1;
+                    throw new ArgumentOutOfRangeException(nameof(x));
                 }
-            """),
-        StaticEntry("ImpureTryCatch", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause"], ["TryStatement", "CatchClause"], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    try
-                    {
-                        if (x < 0)
-                        {
-                            throw new ArgumentOutOfRangeException(nameof(x));
-                        }
 
-                        return x + 1;
-                    }
-                    catch (ArgumentOutOfRangeException)
-                    {
-                        return 0;
-                    }
-                }
+                return x + 1;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return 0;
+            }
             """),
-        StaticEntry("PureConditionalAccessCoalesce", [OperationKind.ConditionalAccess, OperationKind.Coalesce], ["ConditionalAccess", "Coalesce"], ["ConditionalAccessExpression", "CoalesceExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(string text, string fallback)
-                {
-                    return text?.Trim().Length ?? fallback.Length;
-                }
-            """),
-        StaticEntry("PureIsTypeCheck", [OperationKind.IsType], ["IsType"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(object value)
-                {
-                    return value is string ? 1 : 0;
-                }
-            """),
-        StaticEntry("PureNegatedPattern", [OperationKind.NegatedPattern], ["NegatedPattern"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(object value)
-                {
-                    return value is not int ? 1 : 0;
-                }
-            """),
-        StaticEntry("PureSwitchStatement", [OperationKind.Switch], ["Switch", "SwitchCase"], ["SwitchStatement"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int value)
-                {
-                    switch (value)
-                    {
-                        case 0:
-                            return 0;
-                        case 1:
-                        case 2:
-                            return 1;
-                        default:
-                            return value;
-                    }
-                }
-            """),
-        StaticEntry("ImpureUsingStatement", [OperationKind.Using], ["Using"], ["UsingStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    using (var writer = new System.IO.StringWriter())
-                    {
-                        return 1;
-                    }
-                }
-            """),
-        StaticEntry("PureCompoundAssignment", [OperationKind.CompoundAssignment], ["CompoundAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var value = x;
-                    value += 2;
+        MethodEntry("PureConditionalAccessCoalesce", [OperationKind.ConditionalAccess, OperationKind.Coalesce], ["ConditionalAccess", "Coalesce"], ["ConditionalAccessExpression", "CoalesceExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "string text, string fallback", "return text?.Trim().Length ?? fallback.Length;"),
+        MethodEntry("PureIsTypeCheck", [OperationKind.IsType], ["IsType"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "object value", "return value is string ? 1 : 0;"),
+        MethodEntry("PureNegatedPattern", [OperationKind.NegatedPattern], ["NegatedPattern"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "object value", "return value is not int ? 1 : 0;"),
+        MethodEntry("PureSwitchStatement", [OperationKind.Switch], ["Switch", "SwitchCase"], ["SwitchStatement"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int value", """
+            switch (value)
+            {
+                case 0:
+                    return 0;
+                case 1:
+                case 2:
+                    return 1;
+                default:
                     return value;
-                }
+            }
             """),
-        StaticEntry("PureCoalesceAssignment", [OperationKind.CoalesceAssignment], ["CoalesceAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public string TestMethod(string value)
-                {
-                    value ??= "fallback";
-                    return value;
-                }
+        MethodEntry("ImpureUsingStatement", [OperationKind.Using], ["Using"], ["UsingStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
+            "int", "", """
+            using (var writer = new System.IO.StringWriter())
+            {
+                return 1;
+            }
             """),
-        StaticEntry("PureDeconstructionAssignment", [OperationKind.DeconstructionAssignment], ["DeconstructionAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x, int y)
-                {
-                    var left = x;
-                    var right = y;
-                    (left, right) = (right, left);
-                    return left - right;
-                }
-            """),
+        MethodEntry("PureCompoundAssignment", [OperationKind.CompoundAssignment], ["CompoundAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var value = x;\nvalue += 2;\nreturn value;"),
+        MethodEntry("PureCoalesceAssignment", [OperationKind.CoalesceAssignment], ["CoalesceAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "string", "string value", "value ??= \"fallback\";\nreturn value;"),
+        MethodEntry("PureDeconstructionAssignment", [OperationKind.DeconstructionAssignment], ["DeconstructionAssignment"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x, int y", "var left = x;\nvar right = y;\n(left, right) = (right, left);\nreturn left - right;"),
         Entry("PureIncrement", [OperationKind.Increment], ["Increment"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureIncrement),
         Entry("PureDecrement", [OperationKind.Decrement], ["Decrement"], [], FuzzExpectation.DefinitelyPure(), false, true, BuildPureDecrement),
-        StaticEntry("ImpureDeclarationExpression", [OperationKind.DeclarationExpression], ["DeclarationExpression"], [], FuzzExpectation.DefinitelyImpure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(string text)
-                {
-                    return int.TryParse(text, out var value) ? value : 0;
-                }
-            """),
-        StaticEntry("PureDeclarationPattern", [OperationKind.DeclarationPattern], ["DeclarationPattern"], ["DeclarationPattern"], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(object value)
-                {
-                    return value is int number ? number : 0;
-                }
-            """),
+        MethodEntry("ImpureDeclarationExpression", [OperationKind.DeclarationExpression], ["DeclarationExpression"], [], FuzzExpectation.DefinitelyImpure(), false, true,
+            "int", "string text", "return int.TryParse(text, out var value) ? value : 0;"),
+        MethodEntry("PureDeclarationPattern", [OperationKind.DeclarationPattern], ["DeclarationPattern"], ["DeclarationPattern"], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "object value", "return value is int number ? number : 0;"),
         StaticEntry("ImpureTypeParameterObjectCreation", [OperationKind.TypeParameterObjectCreation], ["TypeParameterObjectCreation"], [], FuzzExpectation.DefinitelyImpure(), false, true,
             """
                 [EnforcePure]
@@ -433,108 +285,40 @@ public sealed class FuzzCaseGenerator
                 }
             """),
         Entry("ImpureEventAssignment", [OperationKind.EventAssignment], ["EventAssignment", "EventReference"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureEventAssignment),
-        StaticEntry("PureAnonymousObjectCreation", [OperationKind.AnonymousObjectCreation], ["AnonymousObjectCreation"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var item = new { Value = x, Next = x + 1 };
-                    return item.Value + item.Next;
-                }
-            """),
-        StaticEntry("PureDefaultValue", [OperationKind.DefaultValue], ["DefaultValue"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    return default(int);
-                }
-            """),
-        StaticEntry("PureSizeOf", [OperationKind.SizeOf], ["SizeOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    return sizeof(int);
-                }
-            """),
-        StaticEntry("PureTypeOf", [OperationKind.TypeOf], ["TypeOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    return typeof(int).Name.Length;
-                }
-            """),
-        StaticEntry("PureNameOf", [OperationKind.NameOf], ["NameOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int value)
-                {
-                    return nameof(value).Length;
-                }
-            """),
-        StaticEntry("ImpureDynamicIndexerAccess", [OperationKind.DynamicIndexerAccess], ["DynamicIndexerAccess"], [], FuzzExpectation.DefinitelyImpure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(dynamic values)
-                {
-                    return values[0];
-                }
-            """),
+        MethodEntry("PureAnonymousObjectCreation", [OperationKind.AnonymousObjectCreation], ["AnonymousObjectCreation"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var item = new { Value = x, Next = x + 1 };\nreturn item.Value + item.Next;"),
+        MethodEntry("PureDefaultValue", [OperationKind.DefaultValue], ["DefaultValue"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "", "return default(int);"),
+        MethodEntry("PureSizeOf", [OperationKind.SizeOf], ["SizeOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "", "return sizeof(int);"),
+        MethodEntry("PureTypeOf", [OperationKind.TypeOf], ["TypeOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "", "return typeof(int).Name.Length;"),
+        MethodEntry("PureNameOf", [OperationKind.NameOf], ["NameOf"], [], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int value", "return nameof(value).Length;"),
+        MethodEntry("ImpureDynamicIndexerAccess", [OperationKind.DynamicIndexerAccess], ["DynamicIndexerAccess"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            "int", "dynamic values", "return values[0];"),
         Entry("ImpureDynamicObjectCreation", [OperationKind.DynamicObjectCreation], ["DynamicObjectCreation"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureDynamicObjectCreation),
-        StaticEntry("PureTuple", [OperationKind.Tuple], ["Tuple"], ["TupleExpression"], FuzzExpectation.DefinitelyPure(), false, true,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var pair = (Left: x, Right: x + 1);
-                    return pair.Left + pair.Right;
-                }
-            """),
+        MethodEntry("PureTuple", [OperationKind.Tuple], ["Tuple"], ["TupleExpression"], FuzzExpectation.DefinitelyPure(), false, true,
+            "int", "int x", "var pair = (Left: x, Right: x + 1);\nreturn pair.Left + pair.Right;"),
         Entry("ImpureInterfaceGetter", [OperationKind.PropertyReference], ["PropertyReference"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureInterfaceGetter),
         Entry("PureRecursivePattern", [OperationKind.RecursivePattern], ["RecursivePattern"], ["RecursivePattern"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureRecursivePattern),
-        StaticEntry("PureSpreadCollectionExpression", [OperationKind.CollectionExpression, OperationKind.Spread], ["CollectionExpression", "Spread"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int[] values)
-                {
-                    int[] copy = [0, .. values, 9];
-                    return copy.Length;
-                }
+        MethodEntry("PureSpreadCollectionExpression", [OperationKind.CollectionExpression, OperationKind.Spread], ["CollectionExpression", "Spread"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int[] values", "int[] copy = [0, .. values, 9];\nreturn copy.Length;"),
+        MethodEntry("PureSwitchExpression", [OperationKind.SwitchExpression], ["SwitchExpression"], ["SwitchExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int x", """
+            return x switch
+            {
+                < 0 => -1,
+                0 => 0,
+                _ => 1
+            };
             """),
-        StaticEntry("PureSwitchExpression", [OperationKind.SwitchExpression], ["SwitchExpression"], ["SwitchExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    return x switch
-                    {
-                        < 0 => -1,
-                        0 => 0,
-                        _ => 1
-                    };
-                }
-            """),
-        StaticEntry("PureRangeSlice", [OperationKind.Range], ["Range"], ["RangeExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(string text)
-                {
-                    return text[1..^1].Length;
-                }
-            """),
+        MethodEntry("PureRangeSlice", [OperationKind.Range], ["Range"], ["RangeExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "string text", "return text[1..^1].Length;"),
         Entry("PureYieldReturn", [OperationKind.YieldReturn], ["YieldReturn"], ["YieldReturnStatement"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureYieldReturn),
         Entry("ImpureWithExpression", [OperationKind.With], ["With"], ["WithExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureWithExpression),
-        StaticEntry("PureAnonymousFunction", [OperationKind.AnonymousFunction], ["AnonymousFunction"], ["SimpleLambdaExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    Func<int, int> project = static value => value + 1;
-                    return project(x);
-                }
-            """),
+        MethodEntry("PureAnonymousFunction", [OperationKind.AnonymousFunction], ["AnonymousFunction"], ["SimpleLambdaExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int x", "Func<int, int> project = static value => value + 1;\nreturn project(x);"),
         StaticEntry("PureDelegateCreation", [OperationKind.DelegateCreation], ["DelegateCreation"], [], FuzzExpectation.DefinitelyPure(), false, false,
             """
                 [EnforcePure]
@@ -554,38 +338,30 @@ public sealed class FuzzCaseGenerator
         Entry("ImpureAddressOf", [OperationKind.AddressOf], ["AddressOf"], [], FuzzExpectation.DefinitelyImpure(), true, false, BuildImpureAddressOf),
         Entry("PureInlineArrayAccess", [OperationKind.InlineArrayAccess], ["InlineArrayAccess"], ["ElementAccessExpression"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureInlineArrayAccess),
         Entry("ImpureFunctionPointer", [OperationKind.FunctionPointerInvocation], ["FunctionPointerInvocation"], ["FunctionPointerType"], FuzzExpectation.DefinitelyImpure(), true, false, BuildImpureFunctionPointer),
-        StaticEntry("PureNestedLambdaLocalFunction", [OperationKind.AnonymousFunction, OperationKind.LocalFunction], ["AnonymousFunction", "LocalFunction"], ["SimpleLambdaExpression", "LocalFunctionStatement"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
+        MethodEntry("PureNestedLambdaLocalFunction", [OperationKind.AnonymousFunction, OperationKind.LocalFunction], ["AnonymousFunction", "LocalFunction"], ["SimpleLambdaExpression", "LocalFunctionStatement"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int x", """
+            int Outer(int seed)
+            {
+                Func<int, int> addSeed = value =>
                 {
-                    int Outer(int seed)
-                    {
-                        Func<int, int> addSeed = value =>
-                        {
-                            Func<int, int> inner = local => local + seed;
-                            return inner(value);
-                        };
+                    Func<int, int> inner = local => local + seed;
+                    return inner(value);
+                };
 
-                        return addSeed(x);
-                    }
+                return addSeed(x);
+            }
 
-                    return Outer(1);
-                }
+            return Outer(1);
             """),
-        StaticEntry("PureTuplePatternSwitch", [OperationKind.Tuple, OperationKind.SwitchExpression], ["Tuple", "SwitchExpression"], ["TupleExpression", "SwitchExpression"], FuzzExpectation.DefinitelyPure(), false, false,
-            """
-                [EnforcePure]
-                public int TestMethod(int x, int y)
-                {
-                    var pair = (x, y);
-                    return pair switch
-                    {
-                        (> 0, > 0) => 1,
-                        (0, _) => 0,
-                        _ => -1
-                    };
-                }
+        MethodEntry("PureTuplePatternSwitch", [OperationKind.Tuple, OperationKind.SwitchExpression], ["Tuple", "SwitchExpression"], ["TupleExpression", "SwitchExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            "int", "int x, int y", """
+            var pair = (x, y);
+            return pair switch
+            {
+                (> 0, > 0) => 1,
+                (0, _) => 0,
+                _ => -1
+            };
             """),
         Entry("ImpureUsingAwaitDelegateFlow", [OperationKind.UsingDeclaration, OperationKind.Await, OperationKind.AnonymousFunction], ["UsingDeclaration", "Await", "AnonymousFunction"], ["LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureUsingAwaitDelegateFlow));
 
