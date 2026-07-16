@@ -73,6 +73,15 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static readonly object Gate = new(); static void M() { int value = 0; try { lock (Gate) { value = 1; } } finally { int marker = value; } } }"
     };
 
+    private static readonly (string Source, string[] Invalidated, string? Restored, long RestoredValue)[]
+        FinallyLocalMultipleRegularPathCases =
+        {
+            ("static class C { static void M(bool condition) { int value = 1; int retained = 7; try { if (condition) value = 2; else value = 3; } finally { int marker = retained; } } }",
+                new[] { "value" }, "retained", 7),
+            ("static class C { static void M(bool condition) { int first = 1; int second = 2; try { if (condition) first = 3; else { second = 4; second = 5; } } finally { first = 9; int marker = first; } } }",
+                new[] { "second" }, "first", 9)
+        };
+
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
     {
@@ -1601,6 +1610,59 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         AssertStateParity(routed, structural);
         Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(direct.Value!, value, out var current), Is.True);
         Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(3)));
+    }
+
+    [TestCaseSource(nameof(FinallyLocalMultipleRegularPathCases))]
+    public void FinallyLocalMultipleRegularPaths_RemainConservativeFallback(
+        (string Source, string[] Invalidated, string? Restored, long RestoredValue) testCase)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            testCase.Source,
+            nameof(FinallyLocalMultipleRegularPaths_RemainConservativeFallback));
+        var site = GetFinallyMarkerSite(fixture);
+
+        var direct = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var structural = CollectStructuralState(fixture, site);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(direct.IsUnsupported, Is.True, direct.Provenance.Single().Detail);
+        Assert.That(direct.Value, Is.Null);
+        Assert.That(direct.Provenance.Single().Detail, Is.EqualTo("finally-local-target"));
+        AssertStateParity(routed, structural);
+        foreach (var name in testCase.Invalidated)
+            Assert.That(
+                SymbolicStateValueFacts.TryGetCurrentValue(
+                    structural,
+                    GetLocal(fixture, name),
+                    out _),
+                Is.False,
+                name);
+        if (testCase.Restored != null)
+        {
+            Assert.That(
+                SymbolicStateValueFacts.TryGetCurrentValue(
+                    structural,
+                    GetLocal(fixture, testCase.Restored),
+                    out var restored),
+                Is.True);
+            Assert.That(restored, Is.EqualTo(new SymbolicIntegerConstantTerm(testCase.RestoredValue)));
+        }
+
+        var condition = (IParameterSymbol)fixture.SemanticModel.GetDeclaredSymbol(
+            fixture.Root.DescendantNodes()
+                .OfType<ParameterSyntax>()
+                .Single(parameter => parameter.Identifier.ValueText == "condition"))!;
+        var conditionKey = SymbolicFactFactory.GetSmtVariableName(condition);
+        Assert.That(structural.Facts.Any(fact =>
+            SymbolicIrReferenceScanner.ContainsVariableOrMember(fact, conditionKey)), Is.False);
+        Assert.That(structural.PathConditions.Any(pathCondition =>
+            SymbolicIrReferenceScanner.ContainsVariableOrMember(pathCondition, conditionKey)), Is.False);
     }
 
     [TestCaseSource(nameof(FinallyLocalFallbackCases))]
