@@ -300,10 +300,10 @@ internal static class SymbolicOperationLowerer
                 elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
                 elementAccess,
                 context);
-            if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm } &&
-                bounds is { IsExact: true, Value: { } inRange })
+            if (bounds is { IsExact: true, Value: { } inRange })
             {
-                subject = receiverTerm;
+                if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm })
+                    subject = receiverTerm;
                 trigger = new SymbolicNotCondition(inRange);
                 provenance = "ir.runtime-hazard.index.multidimensional-out-of-range";
             }
