@@ -60,8 +60,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 out nestedBlockCompletionOperation,
                 out nestedBlockCompletionEdges))
             return Unsupported(site, "nested-block-completion");
-        if (targetIsCompletedRootBlock &&
-            graph.Blocks.Count(static block => block.Operations.Length != 0 || block.BranchValue != null) != 1)
+        if (targetIsCompletedRootBlock && !SupportsRootBlockCompletion(graph))
             return Unsupported(site, "root-block-control-flow");
 
         var state = initialState ?? new SymbolicState();
@@ -1324,6 +1323,20 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (block.ConditionalSuccessor != null &&
             !ReferenceEquals(block.ConditionalSuccessor, block.FallThroughSuccessor))
             yield return block.ConditionalSuccessor;
+    }
+
+    private static bool SupportsRootBlockCompletion(ControlFlowGraph graph)
+    {
+        if (graph.Blocks.Count(static block =>
+                block.Operations.Length != 0 || block.BranchValue != null) <= 1)
+            return true;
+        if (graph.Blocks.Any(static block =>
+                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 1))
+            return false;
+
+        return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
+            branch.Semantics == ControlFlowBranchSemantics.Regular &&
+            (branch.Destination == null || branch.Destination.Ordinal > source.Ordinal)));
     }
 
     private static bool AllRegularPathsReachExit(

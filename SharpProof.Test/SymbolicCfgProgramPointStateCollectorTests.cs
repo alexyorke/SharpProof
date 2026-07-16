@@ -225,6 +225,10 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
 
     [TestCase("static class C { static void M() { int value = 7; value = 9; } }")]
     [TestCase("static class C { static void M() { int value = 7; value = 9; return; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) value = 1; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) value = 1; else value = 2; } }")]
     public void RootBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -351,9 +355,14 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
     }
 
-    [TestCase("static class C { static void M() { System.Console.WriteLine(); } }")]
     [TestCase(
-        "static class C { static void M(bool condition) { int value = 0; if (condition) value = 1; } }")]
+        "static class C { static void M() { System.Console.WriteLine(); } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; if (condition) return 1; value = 2; return value; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; while (condition) value = 1; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition) { int value = 0; if (condition) value = 1; int marker = 2; } }")]
     public void UnsupportedRootBlockCompletion_RemainsConservativeFallback(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
