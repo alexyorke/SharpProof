@@ -589,7 +589,7 @@ internal sealed record SymbolicInvariantQuerySummary(
         var targets = result.ConservativeInvariant.Targets
             .Concat(result.ObservedInvariant.Targets)
             .Concat(result.ConditionProofs.Select(static proof => proof.Target))
-            .Concat(result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target))
+            .Concat(result.InvariantQuery.TargetPathTargets)
             .Where(static target => IsSummaryTarget(target))
             .Where(static target => !string.IsNullOrWhiteSpace(target));
 
@@ -624,11 +624,7 @@ internal sealed record SymbolicInvariantQuerySummary(
         var reasons = new List<string>();
         AddReason(reasons, result.InvariantQuery.StatusReason);
 
-        foreach (var diagnostic in result.InvariantQuery.Diagnostics)
-            AddReason(reasons, diagnostic.Code + ": " + diagnostic.Message);
-
-        foreach (var diagnostic in result.InvariantQuery.UnknownDiagnostics)
-            AddReason(reasons, diagnostic.UnknownText + ": " + diagnostic.Reason);
+        foreach (var reason in result.InvariantQuery.ReasonDetails) AddReason(reasons, reason);
 
         if (result.AnalysisSummary.ReachabilityUnknownCount != 0)
             AddReason(reasons,

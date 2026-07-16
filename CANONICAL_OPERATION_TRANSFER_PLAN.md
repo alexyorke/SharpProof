@@ -897,6 +897,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical invalidated-if completion | This commit | 106,367 | -1,309 |
 | Phase 7 direct compact domain projection | This commit | 105,957 | -1,719 |
 | Phase 7 internal compact query projection graph | This commit | 105,643 | -2,033 |
+| Phase 7 direct compact query leaves | `ddfb64c4` | 105,531 | -2,145 |
+| Phase 7 direct invariant-query view | This commit | 105,458 | -2,218 |
 
 ## Validation Ledger
 
@@ -1123,6 +1125,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 filtered compact deletion boundary | Two additional inline hashes lock compact and invariant line projection with one target filter and zero fact, condition, and proof limits. They preserve the file-wide point budget, matched/unmatched filter bookkeeping, nested truncation flags, null omission, and exact JSON order before the forwarding-model deletion. The complete compact byte gate passes 13/13. Production LOC remains 105,957; tracked test LOC is 145,215. |
 | Phase 7 internal compact query projection graph | Compact and invariant public extensions now return ordered `JsonElement` roots directly. Explain keeps the raw invariant JSON plus one private bounded projection for Markdown/SARIF, and exit gates consume internal truncation metrics. The remaining query, line, point, invariant, diagnostic, and summary forwarding types are internal primary-constructor or positional-record nodes, eliminating their constructor/property boilerplate without changing the serializer graph. All 13 compact/invariant hashes and both explain hashes remain byte-identical; the complete Tooling lane passes 606/606, the focused main analysis/source-shape gate passes 10/10, and the Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 314 to 105,643, or -2,033 from the rewrite start; tracked test LOC is 145,217. |
 | Phase 7 direct compact query leaves | Ordered raw JSON leaves now replace the remaining descriptor, focus, analysis-summary, line, point, invariant-summary, diagnostic, and truncation serialization boilerplate. The retained metric fields are only those consumed by explain, exit gates, and aggregate construction; query scope metadata is read from its single canonical scope record instead of 29 forwarding properties. All 13 compact/invariant hashes and both explain hashes remain byte-identical; the complete Tooling lane passes 606/606, the focused main analysis/source-shape gate passes 10/10, and the Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 112 to 105,531, or -2,145 from the rewrite start; tracked test LOC is 145,250. A parallel hosted CI/CD audit found PR #79 and both push/PR package-consumer workflows green, so no workflow edit was warranted. |
+| Phase 7 direct invariant-query view | One ordered raw JSON document now owns the compact invariant-query shape; the three target, target-path, and diagnostic forwarding carriers are deleted. Explain and exit-gate callers retain only their typed counts, status, target names, and preformatted reason details. All 13 compact/invariant and both explain byte hashes pass 15/15; `SymbolicSourceQueryLineTests` pass 96/96. The Release package rebuild is clean and restores the package-byte test, after which the canonical Tooling lane passes 606/606. The Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 73 to 105,458, or -2,218 from the rewrite start; tracked test LOC is 145,267 because compact-view assertions now verify the canonical JSON document directly. |
 
 ## Current Checkpoint
 
@@ -1471,12 +1474,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
   one owner instead of a forwarding surface. The same 15 byte hashes, full
   606-case Tooling lane, focused 10-case main gate, and Release warning-as-error
   build are green. Production LOC is 105,531 and tracked test LOC is 145,250.
-- Next cheapest step: collapse the remaining invariant-query view and compact
-  scope projection into one raw document plus the minimal explain/exit metrics.
+  The compact invariant-query view and its three query-only leaf carriers are
+  now one ordered raw JSON document plus only the metrics required by explain,
+  exit gates, and aggregate summaries. The 15 byte hashes, 96 source-query
+  tests, canonical 606-case Tooling lane, package-byte check, and Release
+  warning-as-error solution build are green. Production LOC is 105,458 across
+  444 files and tracked test LOC is 145,267.
+- Next cheapest step: collapse the remaining compact scope projection into its
+  canonical raw document plus the minimal construction metrics.
   Delete obsolete linked projection sources and refresh clone/test-impact
   inventories only after typed callers and the same byte/full-lane gates are
   gone or green.
-- Blockers: the 11,000-line production target still requires 8,855 lines. The
+- Blockers: the 11,000-line production target still requires 8,782 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.

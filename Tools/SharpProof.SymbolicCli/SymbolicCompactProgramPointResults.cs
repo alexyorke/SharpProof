@@ -247,58 +247,14 @@ internal sealed record SymbolicCompactConservativeUnknownDiagnostic(
 }
 
 internal sealed record SymbolicCompactInvariantQueryView(
-    string Text,
-    string MergeKind,
-    int MustFactCount,
-    IReadOnlyList<string> MustFacts,
-    int MaybeFactCount,
-    IReadOnlyList<string> MaybeFacts,
-    int UnknownFactCount,
-    IReadOnlyList<string> UnknownFacts,
-    IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> UnknownDiagnostics,
-    int TargetSummaryCount,
-    IReadOnlyList<SymbolicCompactInvariantTargetSummary> TargetSummaries,
-    int TargetPathSummaryCount,
-    IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> TargetPathSummaries,
-    IReadOnlyList<string> TargetFilters,
-    int TargetFilterCount,
-    bool HasTargetFilter,
-    bool TargetFilterMatched,
-    int MatchedTargetFilterCount,
-    IReadOnlyList<string> MatchedTargetFilters,
-    int UnmatchedTargetFilterCount,
-    IReadOnlyList<string> UnmatchedTargetFilters,
-    int UnfilteredTargetSummaryCount,
-    int UnfilteredTargetPathSummaryCount,
-    int DiagnosticCount,
-    IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> Diagnostics,
-    int CandidateProgramPointCount,
-    int UnreachableProgramPointCount,
-    bool IsUnreachable,
-    string Status,
-    string StatusReason,
-    string Summary,
-    bool HasMaybeFacts,
-    bool HasUnknowns,
-    bool HasUnresolvedAnalysis,
-    bool MustFactsTruncated,
-    bool MaybeFactsTruncated,
-    bool UnknownFactsTruncated,
-    bool UnknownDiagnosticsTruncated,
-    bool TargetSummariesTruncated,
-    bool TargetPathSummariesTruncated,
-    bool MatchedTargetFiltersTruncated,
-    bool UnmatchedTargetFiltersTruncated,
-    bool DiagnosticsTruncated)
+    JsonElement Json, string Text,
+    int MustFactCount, int MaybeFactCount, int UnknownFactCount,
+    int TargetSummaryCount, int TargetPathSummaryCount,
+    IReadOnlyList<string> TargetFilters, bool HasTargetFilter, int DiagnosticCount,
+    string Status, string StatusReason, string Summary,
+    bool HasUnresolvedAnalysis, bool IsTruncated, IReadOnlyList<string> TargetPathTargets,
+    IReadOnlyList<string> ReasonDetails) : ISymbolicRawJsonProjection
 {
-    public bool IsTruncated =>
-        MustFactsTruncated || MaybeFactsTruncated || UnknownFactsTruncated || UnknownDiagnosticsTruncated ||
-        TargetSummariesTruncated || TargetPathSummariesTruncated || MatchedTargetFiltersTruncated ||
-        UnmatchedTargetFiltersTruncated || DiagnosticsTruncated ||
-        Diagnostics.Any(static diagnostic => diagnostic.EvidenceTruncated) ||
-        UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
-        TargetSummaries.Any(static target => target.IsTruncated) ||
-        TargetPathSummaries.Any(static target => target.ConditionsTruncated);
 
     internal static SymbolicCompactInvariantQueryView FromQueryView(
         SymbolicInvariantQueryView query,
@@ -320,64 +276,135 @@ internal sealed record SymbolicCompactInvariantQueryView(
         var unknownDiagnostics = SymbolicCompactProjection.Take(unknownSource, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
-        var targetSummaries = SymbolicCompactProjection.Take(targets, options.MaxConditions)
-            .Select(target => SymbolicCompactInvariantTargetSummary.FromSummary(target, options))
-            .ToArray();
+        var visibleTargetSummaries = SymbolicCompactProjection.Take(targets, options.MaxConditions);
+        var targetSummaries = visibleTargetSummaries.Select(target => ProjectTargetSummary(target, options)).ToArray();
         var pathTargets = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetPathSummaries, options.InvariantTargets, static summary => summary.Target);
-        var pathSummaries = SymbolicCompactProjection.Take(pathTargets, options.MaxConditions)
-            .Select(target => SymbolicCompactInvariantTargetPathSummary.FromSummary(target, options))
-            .ToArray();
-        var diagnostics = SymbolicCompactProjection.Take(query.Diagnostics, options.MaxConditions)
-            .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
-            .ToArray();
+        var visiblePathTargets = SymbolicCompactProjection.Take(pathTargets, options.MaxConditions);
+        var pathSummaries = visiblePathTargets.Select(target => ProjectTargetPathSummary(target, options)).ToArray();
+        var visibleDiagnostics = SymbolicCompactProjection.Take(query.Diagnostics, options.MaxConditions);
+        var diagnostics = visibleDiagnostics.Select(diagnostic => ProjectDiagnostic(diagnostic, options)).ToArray();
         var matched = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(query, options.InvariantTargets);
         var unmatched = SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matched);
         var visibleMatched = SymbolicCompactProjection.Take(matched, options.MaxConditions);
         var visibleUnmatched = SymbolicCompactProjection.Take(unmatched, options.MaxConditions);
+        var visibleMustFacts = SymbolicCompactProjection.Take(mustFacts, options.MaxConditions);
+        var visibleMaybeFacts = SymbolicCompactProjection.Take(maybeFacts, options.MaxConditions);
+        var visibleUnknownFacts = SymbolicCompactProjection.Take(unknownFacts, options.MaxConditions);
+        var mustFactsTruncated = mustFacts.Count > options.MaxConditions;
+        var maybeFactsTruncated = maybeFacts.Count > options.MaxConditions;
+        var unknownFactsTruncated = unknownFacts.Count > options.MaxConditions;
+        var unknownDiagnosticsTruncated = unknownSource.Count > options.MaxConditions;
+        var targetSummariesTruncated = targets.Count > targetSummaries.Length;
+        var targetPathSummariesTruncated = pathTargets.Count > pathSummaries.Length;
+        var matchedTargetFiltersTruncated = matched.Count > visibleMatched.Count;
+        var unmatchedTargetFiltersTruncated = unmatched.Count > visibleUnmatched.Count;
+        var diagnosticsTruncated = query.Diagnostics.Count > options.MaxConditions;
+        var isTruncated =
+            mustFactsTruncated || maybeFactsTruncated || unknownFactsTruncated || unknownDiagnosticsTruncated ||
+            targetSummariesTruncated || targetPathSummariesTruncated || matchedTargetFiltersTruncated ||
+            unmatchedTargetFiltersTruncated || diagnosticsTruncated ||
+            visibleDiagnostics.Any(diagnostic =>
+                diagnostic.EvidenceTruncated || diagnostic.Evidence.Count > options.MaxConditions) ||
+            unknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
+            visibleTargetSummaries.Any(target =>
+                target.MustFactCount > options.MaxConditions ||
+                target.MaybeFactCount > options.MaxConditions ||
+                target.UnknownFactCount > options.MaxConditions) ||
+            visiblePathTargets.Any(target =>
+                target.ConditionsTruncated || target.Conditions.Count > options.MaxConditions);
+        var status = query.Status.ToString();
+        var reasonDetails = visibleDiagnostics
+            .Select(static diagnostic => diagnostic.Code + ": " + diagnostic.Message)
+            .Concat(unknownDiagnostics.Select(static diagnostic =>
+                diagnostic.UnknownText + ": " + diagnostic.Reason))
+            .ToArray();
+        var json = SymbolicOrderedJson.Object(
+            ("text", text), ("mergeKind", query.MergeKind.ToString()),
+            ("mustFactCount", mustFacts.Count), ("mustFacts", visibleMustFacts),
+            ("maybeFactCount", maybeFacts.Count), ("maybeFacts", visibleMaybeFacts),
+            ("unknownFactCount", unknownFacts.Count), ("unknownFacts", visibleUnknownFacts),
+            ("unknownDiagnostics", unknownDiagnostics), ("targetSummaryCount", targets.Count),
+            ("targetSummaries", targetSummaries), ("targetPathSummaryCount", pathTargets.Count),
+            ("targetPathSummaries", pathSummaries), ("targetFilters", options.InvariantTargets),
+            ("targetFilterCount", options.InvariantTargets.Count), ("hasTargetFilter", options.HasInvariantTargetFilter),
+            ("targetFilterMatched", !options.HasInvariantTargetFilter || matched.Count != 0),
+            ("matchedTargetFilterCount", matched.Count), ("matchedTargetFilters", visibleMatched),
+            ("unmatchedTargetFilterCount", unmatched.Count), ("unmatchedTargetFilters", visibleUnmatched),
+            ("unfilteredTargetSummaryCount", query.TargetSummaryCount),
+            ("unfilteredTargetPathSummaryCount", query.TargetPathSummaryCount),
+            ("diagnosticCount", query.DiagnosticCount), ("diagnostics", diagnostics),
+            ("candidateProgramPointCount", query.CandidateProgramPointCount),
+            ("unreachableProgramPointCount", query.UnreachableProgramPointCount),
+            ("isUnreachable", query.IsUnreachable), ("status", status),
+            ("statusReason", query.StatusReason), ("summary", query.Summary),
+            ("hasMaybeFacts", maybeFacts.Count != 0), ("hasUnknowns", unknownFacts.Count != 0),
+            ("hasUnresolvedAnalysis", query.HasUnresolvedAnalysis),
+            ("mustFactsTruncated", mustFactsTruncated), ("maybeFactsTruncated", maybeFactsTruncated),
+            ("unknownFactsTruncated", unknownFactsTruncated),
+            ("unknownDiagnosticsTruncated", unknownDiagnosticsTruncated),
+            ("targetSummariesTruncated", targetSummariesTruncated),
+            ("targetPathSummariesTruncated", targetPathSummariesTruncated),
+            ("matchedTargetFiltersTruncated", matchedTargetFiltersTruncated),
+            ("unmatchedTargetFiltersTruncated", unmatchedTargetFiltersTruncated),
+            ("diagnosticsTruncated", diagnosticsTruncated),
+            ("isTruncated", isTruncated));
         return new SymbolicCompactInvariantQueryView(
-            text,
-            query.MergeKind.ToString(),
-            mustFacts.Count,
-            SymbolicCompactProjection.Take(mustFacts, options.MaxConditions),
-            maybeFacts.Count,
-            SymbolicCompactProjection.Take(maybeFacts, options.MaxConditions),
-            unknownFacts.Count,
-            SymbolicCompactProjection.Take(unknownFacts, options.MaxConditions),
-            unknownDiagnostics,
-            targets.Count,
-            targetSummaries,
-            pathTargets.Count,
-            pathSummaries,
-            options.InvariantTargets,
-            options.InvariantTargets.Count,
-            options.HasInvariantTargetFilter,
-            !options.HasInvariantTargetFilter || matched.Count != 0,
-            matched.Count,
-            visibleMatched,
-            unmatched.Count,
-            visibleUnmatched,
-            query.TargetSummaryCount,
-            query.TargetPathSummaryCount,
-            query.DiagnosticCount,
-            diagnostics,
-            query.CandidateProgramPointCount,
-            query.UnreachableProgramPointCount,
-            query.IsUnreachable,
-            query.Status.ToString(),
-            query.StatusReason,
-            query.Summary,
-            maybeFacts.Count != 0,
-            unknownFacts.Count != 0,
-            query.HasUnresolvedAnalysis,
-            mustFacts.Count > options.MaxConditions,
-            maybeFacts.Count > options.MaxConditions,
-            unknownFacts.Count > options.MaxConditions,
-            unknownSource.Count > options.MaxConditions,
-            targets.Count > targetSummaries.Length,
-            pathTargets.Count > pathSummaries.Length,
-            matched.Count > visibleMatched.Count,
-            unmatched.Count > visibleUnmatched.Count,
-            query.Diagnostics.Count > options.MaxConditions);
+            json, text,
+            mustFacts.Count, maybeFacts.Count, unknownFacts.Count,
+            targets.Count, pathTargets.Count,
+            options.InvariantTargets, options.HasInvariantTargetFilter, query.DiagnosticCount,
+            status, query.StatusReason, query.Summary, query.HasUnresolvedAnalysis, isTruncated,
+            visiblePathTargets.Select(static target => target.Target).ToArray(),
+            reasonDetails);
+    }
+
+    private static JsonElement ProjectTargetSummary(
+        SymbolicInvariantTargetSummary summary,
+        SymbolicCompactQueryOptions options) => SymbolicOrderedJson.Object(
+        ("target", summary.Target), ("status", summary.Status.ToString()),
+        ("statusReason", summary.StatusReason), ("reasonCode", summary.ReasonCode),
+        ("summary", summary.Summary), ("mustFactCount", summary.MustFactCount),
+        ("mustFacts", SymbolicCompactProjection.Take(summary.MustFacts, options.MaxConditions)),
+        ("maybeFactCount", summary.MaybeFactCount),
+        ("maybeFacts", SymbolicCompactProjection.Take(summary.MaybeFacts, options.MaxConditions)),
+        ("unknownFactCount", summary.UnknownFactCount),
+        ("unknownFacts", SymbolicCompactProjection.Take(summary.UnknownFacts, options.MaxConditions)),
+        ("mustFactsTruncated", summary.MustFactCount > options.MaxConditions),
+        ("maybeFactsTruncated", summary.MaybeFactCount > options.MaxConditions),
+        ("unknownFactsTruncated", summary.UnknownFactCount > options.MaxConditions));
+
+    private static JsonElement ProjectTargetPathSummary(
+        SymbolicInvariantTargetPathSummary summary,
+        SymbolicCompactQueryOptions options)
+    {
+        var conditions = SymbolicCompactProjection.Take(summary.Conditions, options.MaxConditions);
+        var truncated = summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count;
+        return SymbolicOrderedJson.Object(
+            ("target", summary.Target), ("pathConditionCount", summary.PathConditionCount),
+            ("smtConditionCount", summary.SmtConditionCount),
+            ("conservativeUnknownCount", summary.ConservativeUnknownCount),
+            ("programPointCount", summary.ProgramPointCount),
+            ("reachableProgramPointCount", summary.ReachableProgramPointCount),
+            ("proofTotalCount", summary.ProofTotalCount), ("proofUnknownCount", summary.ProofUnknownCount),
+            ("proofProvenTrueCount", summary.ProofProvenTrueCount),
+            ("proofProvenFalseCount", summary.ProofProvenFalseCount),
+            ("proofUnreachableCount", summary.ProofUnreachableCount), ("conditions", conditions),
+            ("conditionsTruncated", truncated), ("statusReason", summary.StatusReason),
+            ("reasonCode", summary.ReasonCode),
+            ("summary", summary.Summary));
+    }
+
+    private static JsonElement ProjectDiagnostic(
+        SymbolicInvariantQueryDiagnostic diagnostic,
+        SymbolicCompactQueryOptions options)
+    {
+        var evidence = SymbolicCompactProjection.Take(diagnostic.Evidence, options.MaxConditions);
+        var truncated = diagnostic.EvidenceTruncated || diagnostic.Evidence.Count > options.MaxConditions;
+        return SymbolicOrderedJson.Object(
+            ("code", diagnostic.Code), ("severity", diagnostic.Severity),
+            ("message", diagnostic.Message), ("count", diagnostic.Count),
+            ("evidenceTotalCount", diagnostic.EvidenceTotalCount), ("evidence", evidence),
+            ("evidenceTruncated", truncated));
     }
 }
