@@ -1220,7 +1220,9 @@ internal static class SymbolicOperationLowerer
             SymbolicAssignmentOperationKind.Simple,
             IsChecked: false,
             new SymbolicOperationOrigin(valueExpression.Span, sequence, provenance),
-            propagations.ToImmutable());
+            propagations.ToImmutable(),
+            ImmutableArray.Create(new SymbolicInvalidationTarget(
+                SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition))));
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
             new SymbolicLoweringProvenance("roslyn-to-operation", valueExpression.Span, provenance));

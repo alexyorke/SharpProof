@@ -106,7 +106,8 @@ internal sealed record SymbolicAssignmentOperation(
     SymbolicAssignmentOperationKind AssignmentKind,
     bool IsChecked,
     SymbolicOperationOrigin Origin,
-    ImmutableArray<SymbolicTermPropagation> Propagations = default) : SymbolicOperationDescriptor(Origin);
+    ImmutableArray<SymbolicTermPropagation> Propagations = default,
+    ImmutableArray<SymbolicInvalidationTarget> Invalidations = default) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicMutationOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,

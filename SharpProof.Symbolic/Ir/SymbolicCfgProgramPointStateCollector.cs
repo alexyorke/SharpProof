@@ -167,7 +167,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                         ref state,
                         operation,
                         GetActiveGuard(currentPath.GuardFrame),
-                        targetIsInsideBranch || targetIsCompletedNestedBlock,
+                        true,
                         targetIsCompletedNestedBlock,
                         semanticModel,
                         cancellationToken,

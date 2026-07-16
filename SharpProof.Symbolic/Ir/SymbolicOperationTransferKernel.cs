@@ -222,6 +222,7 @@ internal static class SymbolicOperationTransferKernel
         ref SymbolicState state,
         SymbolicAssignmentOperation assignment)
     {
+        ApplyInvalidations(ref state, assignment.Invalidations);
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
             state = state.AddPathCondition(postcondition);
@@ -238,14 +239,7 @@ internal static class SymbolicOperationTransferKernel
         ref SymbolicState state,
         SymbolicMutationOperation mutation)
     {
-        foreach (var target in mutation.Invalidations)
-        {
-            state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
-                ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
-                : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
-            if (target.DefinitionVersion is { } definitionVersion)
-                state = state.WithSymbolVersion(target.Key, definitionVersion);
-        }
+        ApplyInvalidations(ref state, mutation.Invalidations);
         if (!TryApplyBindings(ref state, mutation.Bindings, mutation.Origin)) return false;
         if (mutation.MutationKind != SymbolicMutationOperationKind.CallerVisible) return true;
         if (mutation.Subject == null) return false;
@@ -259,6 +253,21 @@ internal static class SymbolicOperationTransferKernel
             mutation.Symbol,
             mutation.EvidenceKey));
         return true;
+    }
+
+    private static void ApplyInvalidations(
+        ref SymbolicState state,
+        ImmutableArray<SymbolicInvalidationTarget> targets)
+    {
+        if (targets.IsDefaultOrEmpty) return;
+        foreach (var target in targets)
+        {
+            state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
+                ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
+                : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
+            if (target.DefinitionVersion is { } definitionVersion)
+                state = state.WithSymbolVersion(target.Key, definitionVersion);
+        }
     }
 
     private static bool TryApplyLifetime(

@@ -418,6 +418,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     nested block whose canonical merge can discard the invalidated inner frame.
     Direct branch-local mutation and mutation of an enclosing reference guard
     retain typed fallback.
+  - [x] Make target invalidation explicit on canonical assignment descriptors
+    before bindings, postconditions, and propagations apply. Postcondition-only
+    guarded reference assignments now discard stale projections before their
+    branch join and match structural state, evidence, and version identity.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -601,7 +605,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 abrupt nested-block completion | `264e1eb9` | 106,189 | -1,487 |
 | Phase 7 all-terminal nested-block completion | `5f3967f9` | 106,255 | -1,421 |
 | Phase 7 frame-selective nested guard invalidation | `4c184542` | 106,257 | -1,419 |
-| Phase 7 nested reference guard invalidation | This commit | 106,270 | -1,406 |
+| Phase 7 nested reference guard invalidation | `ac41a1a1` | 106,270 | -1,406 |
+| Phase 7 canonical assignment invalidation | This commit | 106,281 | -1,395 |
 
 ## Validation Ledger
 
@@ -779,6 +784,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 all-terminal nested-block completion | A nested block consisting of one explicit `if/else` now records scoped terminal paths separately from root completion, validates that every CFG path terminates, collapses sibling guard frames, and applies canonical contradictory completion. Exhaustive return/return and return/throw branches match structural normalized state and evidence. A later sequential throw and a lone return intentionally remain typed `Unsupported` after focused differentials proved the structural collector preserves their enclosing guard. Direct collector fixtures pass 80/80 and the broader program-point/invariant/operation/reachability batch passes 232/232. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,804 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,255, or -1,421 from the rewrite start; authoritative tracked test LOC is 143,386. |
 | Phase 7 frame-selective nested guard invalidation | CFG assignment/update transfer now returns the exact mutated guard symbol rather than a Boolean that caused every enclosing guard frame to be marked invalid. Frame invalidation tests each guard independently. The existing inner `nested` guard-mutation fixture moves from typed fallback to exact structural normalized state and evidence while the outer `condition` mutation remains explicitly unsupported. Direct collector fixtures pass 81/81 and the broader program-point/invariant/operation/reachability batch passes 233/233. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,805 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,257, or -1,419 from the rewrite start; authoritative tracked test LOC is 143,388. |
 | Phase 7 nested reference guard invalidation | Guarded reference assignment now distinguishes stable guarded use from permission to mutate the guard. Only nested-block completion enables the latter, allowing its canonical inner-frame merge to remove the invalidated null guard while retaining the enclosing Boolean guard. A matching enclosing-reference mutation and the existing direct branch-local mutation remain typed `Unsupported`. Direct collector fixtures pass 83/83 and the broader program-point/invariant/operation/reachability batch passes 235/235. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,270, or -1,406 from the rewrite start; authoritative tracked test LOC is 143,392. |
+| Phase 7 canonical assignment invalidation | Simple-assignment lowering now emits an explicit target invalidation owned by `SymbolicAssignmentOperation`; the kernel applies the same typed invalidation helper for assignment and mutation events. This fixes postcondition-only array/reference assignments that previously retained stale target projections across a guarded join, while unsupported lowering still publishes no partial state. The exact normalized-state/evidence differential passes, direct collector fixtures pass 83/83, and the broader program-point/invariant/operation/reachability batch passes 235/235. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,807 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,281, or -1,395 from the rewrite start; authoritative tracked test LOC is 143,415. |
 
 ## Current Checkpoint
 
@@ -852,8 +858,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   invalidations; queries after mutation-independent while and do loops now use
   bounded canonical CFG revisits; counted-for loops additionally retain their
   typed monotonic initializer invariants. Loop-local targets, abrupt exits,
-  condition-dependent while/do mutations, nullable reassignment, guarded
-  reference projection and finally-local targets remain conservative fallbacks.
+  condition-dependent while/do mutations, nullable reassignment, and
+  finally-local targets remain conservative fallbacks.
   Finite foreach entry domains now lower to typed conditions and enter state only
   through the canonical loop-edge transition. Finally regions run through typed saved continuations before
   their destinations. Pattern binding has one typed canonical owner; the
@@ -863,8 +869,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   source-derived array/dereference completion facts, `DoesNotReturnIf`, inline
   assignments, and throw guards now have typed owners and enter state through
   canonical transitions. Stable branch-local source-query targets now use the
-  CFG collector; guard-mutating references, guarded post-join projections,
-  loop-local targets, and finally-local targets remain conservative fallbacks.
+  CFG collector; guard-mutating references, nullable reassignment, loop-local
+  targets, and finally-local targets remain conservative fallbacks.
   The orphaned exception mutation partial, seven migrated private helpers, and
   745 physical lines of declaration-only internal migration APIs are deleted.
   Branch completion, execution visibility, and purity CFG share the canonical
@@ -933,11 +939,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   invalidate: an inner guard mutation reaches exact structural parity while an
   enclosing guard mutation remains fallback. Nested reference assignment may
   mutate its inner guard only when the completed-block merge can discard that
-  frame; direct or enclosing-reference mutations stay fallback. Production LOC
-  is 106,270, or -1,406 from the rewrite start; authoritative tracked test LOC
-  is 143,392.
-- Next cheapest step: characterize the post-join guarded-reference projection
-  fallback and migrate it only if canonical state, evidence, and version identity
-  match structural transfer exactly.
+  frame; direct or enclosing-reference mutations stay fallback. Canonical
+  assignment descriptors now invalidate their target before applying bindings,
+  postconditions, and propagations, so postcondition-only guarded reference
+  reassignment reaches exact post-join structural parity without stale length
+  facts. Production LOC is 106,281, or -1,395 from the rewrite start;
+  authoritative tracked test LOC is 143,415.
+- Next cheapest step: characterize the remaining nullable reassignment fallback
+  and migrate it only if canonical state, evidence, and version identity match
+  structural transfer exactly.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
