@@ -1587,10 +1587,7 @@ internal static class SymbolicCfgProgramPointStateCollector
             IParameterSymbol parameter => parameter.Type,
             _ => null
         };
-        return type is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-        } || guard != null &&
+        return guard != null &&
             type?.IsReferenceType == true &&
             (!allowGuardedReferenceAssignments ||
              !allowGuardMutation && GuardReferencesTarget(guard, target));

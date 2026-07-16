@@ -726,19 +726,32 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
     }
 
-    [TestCase(
-        "static class C { static int M(int? input) { int? value = null; value = input; return value.Value; } }")]
-    public void AssignmentShapesWithoutStateParity_RemainConservativeFallback(string source)
+    [Test]
+    public void NullableReassignment_MatchesStructuralCollector()
     {
-        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AssignmentShapesWithoutStateParity_RemainConservativeFallback));
+        const string source = "static class C { static int M(int? input) { int? value = null; value = input; return value.Value; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NullableReassignment_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
 
-        Assert.That(result.IsUnsupported, Is.True);
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
     [Test]
