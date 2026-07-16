@@ -129,9 +129,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "cfg-empty");
         if (targetIsCompletedRootBlock)
         {
-            if (!SupportsRootBlockCompletion(graph) ||
-                CSharpSyntaxFacts.DescendantNodesInExecution(site, includeSelf: false)
-                    .Any(static node => node is InvocationExpressionSyntax))
+            if (!SupportsRootBlockCompletion(graph, (BlockSyntax)site))
                 return Unsupported(site, "root-block-control-flow");
             var completedRootState = initialState ?? new SymbolicState();
             SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(

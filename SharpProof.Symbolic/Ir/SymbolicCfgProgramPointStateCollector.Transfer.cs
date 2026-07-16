@@ -1345,9 +1345,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             ControlFlowBranchSemantics.Rethrow or
             ControlFlowBranchSemantics.ProgramTermination;
 
-    private static bool SupportsRootBlockCompletion(ControlFlowGraph graph)
+    private static bool SupportsRootBlockCompletion(ControlFlowGraph graph, BlockSyntax block)
     {
-        if (ContainsRegionKind(graph.Root, ControlFlowRegionKind.TryAndCatch))
+        if (EnumerateRegions(graph.Root).Any(static region =>
+                region.Kind == ControlFlowRegionKind.TryAndCatch) ||
+            CSharpSyntaxFacts.DescendantNodesInExecution(block, includeSelf: false)
+                .Any(static node => node is InvocationExpressionSyntax))
             return false;
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
@@ -1386,9 +1389,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken));
     }
-
-    private static bool ContainsRegionKind(ControlFlowRegion region, ControlFlowRegionKind kind) =>
-        region.Kind == kind || region.NestedRegions.Any(nested => ContainsRegionKind(nested, kind));
 
     private static bool IsWithinRegion(BasicBlock block, ControlFlowRegionKind kind)
     {
