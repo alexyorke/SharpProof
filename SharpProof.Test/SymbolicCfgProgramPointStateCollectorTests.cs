@@ -292,7 +292,43 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
     }
 
     [TestCase(
+        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; int marker = 2; } } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; else value = 2; int marker = 3; } } }")]
+    public void InternallyBranchingNestedBlockCompletion_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(InternallyBranchingNestedBlockCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().First().Statement;
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [TestCase(
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; } } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; int marker = 2; } return 0; } }")]
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { if (condition) { if (nested) nested = false; int marker = 2; } } }")]
     [TestCase(
         "static class C { static void M(bool condition) { int value = 0; if (condition) { System.Console.WriteLine(); value = 2; } } }")]
     public void ComplexNestedBlockCompletion_RemainsConservativeFallback(string source)

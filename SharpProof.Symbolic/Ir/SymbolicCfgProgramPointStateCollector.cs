@@ -53,7 +53,7 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "cfg-empty");
         IOperation? nestedBlockCompletionOperation = null;
         if (targetIsCompletedNestedBlock &&
-            !TryGetLinearNestedBlockCompletionOperation(
+            !TryGetNestedBlockCompletionOperation(
                 graph,
                 (BlockSyntax)site,
                 out nestedBlockCompletionOperation))
@@ -72,7 +72,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         var entryPoint = new CfgTraversalPoint(graph.Blocks[0], null);
         var incoming = new Dictionary<CfgTraversalPoint, List<CfgPathState>>
         {
-            [entryPoint] = new List<CfgPathState> { new(state, null, null, null, false) }
+            [entryPoint] = new List<CfgPathState> { new(state, null) }
         };
         var queue = new Queue<CfgTraversalPoint>();
         var queued = new HashSet<CfgTraversalPoint> { entryPoint };
@@ -116,14 +116,15 @@ internal static class SymbolicCfgProgramPointStateCollector
                         semanticModel,
                         cancellationToken))
                 {
-                    if (targetIsInsideBranch && currentPath.GuardInvalidated)
+                    if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
+                    var activeGuard = GetActiveGuard(currentPath.GuardFrame);
                     if (includeCurrentStatementCompletionFacts &&
                         !(site is LocalDeclarationStatementSyntax declaration
                             ? TryApplyCurrentDeclarationCompletion(
                                 ref state,
                                 declaration,
-                                currentPath.Guard,
+                                activeGuard,
                                 allowGuardedReferenceAssignments: true,
                                 semanticModel,
                                 cancellationToken)
@@ -131,13 +132,13 @@ internal static class SymbolicCfgProgramPointStateCollector
                                 ref state,
                                 site,
                                 operation,
-                                currentPath.Guard,
+                                activeGuard,
                                 targetIsInsideBranch,
                                 semanticModel,
                                 cancellationToken)))
                         return Unsupported(site, "current-completion");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
-                    if (currentPath.Guard == null || targetIsInsideBranch)
+                    if (currentPath.GuardFrame == null || targetIsInsideBranch)
                         targetState = observedState;
                     else
                         guardedTargetState = observedState;
@@ -152,16 +153,17 @@ internal static class SymbolicCfgProgramPointStateCollector
                 if (!TryApplyOperation(
                         ref state,
                         operation,
-                        currentPath.Guard,
+                        GetActiveGuard(currentPath.GuardFrame),
                         targetIsInsideBranch,
                         semanticModel,
                         cancellationToken,
                         out var guardInvalidated))
                     return Unsupported(operation.Syntax, "operation-" + operation.Kind);
-                currentPath = currentPath with
-                {
-                    GuardInvalidated = currentPath.GuardInvalidated || guardInvalidated
-                };
+                if (guardInvalidated)
+                    currentPath = currentPath with
+                    {
+                        GuardFrame = InvalidateGuards(currentPath.GuardFrame)
+                    };
                 if (targetIsCompletedNestedBlock && site.Span.Contains(operation.Syntax.SpanStart))
                     AddOperationNormalCompletionFacts(
                         ref state,
@@ -178,12 +180,14 @@ internal static class SymbolicCfgProgramPointStateCollector
                 if (!targetIsCompletedRootBlock &&
                     ContainsSite(block.BranchValue.Syntax, site) &&
                     !(includeCurrentStatementCompletionFacts &&
-                      site is LocalDeclarationStatementSyntax))
+                      (site is LocalDeclarationStatementSyntax ||
+                       targetIsCompletedNestedBlock &&
+                       site.Span.Contains(block.BranchValue.Syntax.SpanStart))))
                 {
-                    if (targetIsInsideBranch && currentPath.GuardInvalidated)
+                    if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                         return Unsupported(site, "branch-guard-mutation");
                     var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
-                    if (currentPath.Guard == null || targetIsInsideBranch)
+                    if (currentPath.GuardFrame == null || targetIsInsideBranch)
                         targetState = observedState;
                     else
                         guardedTargetState = observedState;
@@ -237,8 +241,6 @@ internal static class SymbolicCfgProgramPointStateCollector
     {
         if (block.ConditionKind != ControlFlowConditionKind.None)
         {
-            if (path.Guard != null)
-                return false;
             if (block.BranchValue is not { } condition)
                 return false;
 
@@ -265,10 +267,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                        activeContinuation,
                        new CfgPathState(
                            conditionalState,
-                           path.State,
-                           conditionalGuard,
-                           conditionalIsTrue,
-                           false),
+                           new CfgGuardFrame(
+                               path.State,
+                               conditionalGuard,
+                               conditionalIsTrue,
+                               false,
+                               path.GuardFrame)),
                        graph,
                        incoming,
                        queue,
@@ -281,10 +285,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                        activeContinuation,
                        new CfgPathState(
                            fallThroughState,
-                           path.State,
-                           fallThroughGuard,
-                           !conditionalIsTrue,
-                           false),
+                           new CfgGuardFrame(
+                               path.State,
+                               fallThroughGuard,
+                               !conditionalIsTrue,
+                               false,
+                               path.GuardFrame)),
                        graph,
                        incoming,
                        queue,
@@ -478,14 +484,17 @@ internal static class SymbolicCfgProgramPointStateCollector
             incoming.Add(destination, states);
         }
 
-        var guardKey = path.Guard == null
+        var activeGuard = GetActiveGuard(path.GuardFrame);
+        var guardKey = activeGuard == null
             ? string.Empty
-            : SymbolicState.CreateProofConditionKey(path.Guard);
+            : SymbolicState.CreateProofConditionKey(activeGuard);
         if (states.Any(existing =>
                 existing.State.NormalizedProofKey == path.State.NormalizedProofKey &&
-                (existing.Guard == null
+                (GetActiveGuard(existing.GuardFrame) is not { } existingGuard
                     ? string.Empty
-                    : SymbolicState.CreateProofConditionKey(existing.Guard)) == guardKey))
+                    : SymbolicState.CreateProofConditionKey(existingGuard)) == guardKey &&
+                HasInvalidatedGuard(existing.GuardFrame) ==
+                HasInvalidatedGuard(path.GuardFrame)))
             return true;
         states.Add(path);
         if (queued.Add(destination))
@@ -540,7 +549,7 @@ internal static class SymbolicCfgProgramPointStateCollector
             state = transition.State;
         }
 
-        backEdgePath = new CfgPathState(state, null, null, null, false);
+        backEdgePath = new CfgPathState(state, null);
         return true;
     }
 
@@ -653,33 +662,33 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (paths.Count == 1)
             return paths[0];
 
-        var baseline = paths[0].Baseline;
-        if (baseline != null &&
-            paths.All(path => path.Guard != null &&
-                              path.Baseline?.NormalizedProofKey == baseline.NormalizedProofKey))
+        var frame = paths[0].GuardFrame;
+        if (frame != null &&
+            paths.All(path => path.GuardFrame is { } candidate &&
+                              candidate.Baseline.NormalizedProofKey == frame.Baseline.NormalizedProofKey) &&
+            TryMergeGuardFrames(
+                paths.Select(static path => path.GuardFrame!.Parent).ToArray(),
+                out var parentFrame))
         {
             var orderedPaths = paths
-                .OrderByDescending(static path => path.GuardWhenTrue == true)
+                .OrderByDescending(static path => path.GuardFrame!.GuardWhenTrue)
                 .ToArray();
             var completedStates = orderedPaths.Select(static path => path.State).ToArray();
             var mergeBaseline = SymbolicStateMerger.MergeCommonStates(
                 new SymbolicState(),
                 completedStates);
-            if (paths.Any(static path => path.GuardInvalidated))
-                return new CfgPathState(mergeBaseline, null, null, null, false);
+            if (paths.Any(static path => path.GuardFrame!.GuardInvalidated))
+                return new CfgPathState(mergeBaseline, parentFrame);
             return new CfgPathState(
                 SymbolicStateMerger.MergeGuardedStates(
                     mergeBaseline,
                     orderedPaths.Select(path =>
-                        new SymbolicStateMerger.GuardedState(path.Guard!, path.State)).ToArray(),
+                        new SymbolicStateMerger.GuardedState(path.GuardFrame!.Guard, path.State)).ToArray(),
                     source,
                     SymbolicAnalysisLimitKind.IfElseFactMerge,
                     SymbolicAnalysisLimitContext.Limits.MaxMergedIfElseFacts,
                     "cfg-program-point.if-merge"),
-                null,
-                null,
-                null,
-                false);
+                parentFrame);
         }
 
         return new CfgPathState(
@@ -687,30 +696,97 @@ internal static class SymbolicCfgProgramPointStateCollector
                 paths.Select(static path => path.State).ToArray(),
                 SymbolicStateMerger.AreEvidenceEquivalentFacts,
                 source.SpanStart),
-            null,
-            null,
-            null,
-            false);
+            null);
     }
 
     private static SymbolicState OrderTargetState(
         SymbolicState state,
         CfgPathState path,
         bool targetIsInsideBranch) =>
-        targetIsInsideBranch && path.Guard != null
+        targetIsInsideBranch && path.GuardFrame != null
             ? new SymbolicState(
                 state.Facts,
-                new[] { path.Guard }.Concat(state.PathConditions),
+                GetGuardsOuterToInner(path.GuardFrame).Concat(state.PathConditions),
                 state.SymbolVersions,
                 state.IsContradictory)
             : state;
 
     private readonly record struct CfgPathState(
         SymbolicState State,
-        SymbolicState? Baseline,
-        SymbolicCondition? Guard,
-        bool? GuardWhenTrue,
-        bool GuardInvalidated);
+        CfgGuardFrame? GuardFrame);
+
+    private sealed record CfgGuardFrame(
+        SymbolicState Baseline,
+        SymbolicCondition Guard,
+        bool GuardWhenTrue,
+        bool GuardInvalidated,
+        CfgGuardFrame? Parent);
+
+    private static SymbolicCondition? GetActiveGuard(CfgGuardFrame? frame)
+    {
+        if (frame == null)
+            return null;
+
+        var parent = GetActiveGuard(frame.Parent);
+        return parent == null
+            ? frame.Guard
+            : new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                parent,
+                frame.Guard);
+    }
+
+    private static IReadOnlyList<SymbolicCondition> GetGuardsOuterToInner(CfgGuardFrame frame)
+    {
+        var guards = new List<SymbolicCondition>();
+        for (var current = frame; current != null; current = current.Parent)
+            guards.Add(current.Guard);
+        guards.Reverse();
+        return guards;
+    }
+
+    private static bool HasInvalidatedGuard(CfgGuardFrame? frame) =>
+        frame != null && (frame.GuardInvalidated || HasInvalidatedGuard(frame.Parent));
+
+    private static CfgGuardFrame? InvalidateGuards(CfgGuardFrame? frame) =>
+        frame == null
+            ? null
+            : frame with
+            {
+                GuardInvalidated = true,
+                Parent = InvalidateGuards(frame.Parent)
+            };
+
+    private static bool TryMergeGuardFrames(
+        IReadOnlyList<CfgGuardFrame?> frames,
+        out CfgGuardFrame? merged)
+    {
+        var first = frames[0];
+        if (first == null)
+        {
+            merged = null;
+            return frames.All(static frame => frame == null);
+        }
+        if (frames.Any(frame => frame == null ||
+                frame.GuardWhenTrue != first.GuardWhenTrue ||
+                frame.Baseline.NormalizedProofKey != first.Baseline.NormalizedProofKey ||
+                SymbolicState.CreateProofConditionKey(frame.Guard) !=
+                SymbolicState.CreateProofConditionKey(first.Guard)) ||
+            !TryMergeGuardFrames(
+                frames.Select(static frame => frame!.Parent).ToArray(),
+                out var parent))
+        {
+            merged = null;
+            return false;
+        }
+
+        merged = first with
+        {
+            GuardInvalidated = frames.Any(static frame => frame!.GuardInvalidated),
+            Parent = parent
+        };
+        return true;
+    }
 
     private readonly record struct CfgTraversalPoint(
         BasicBlock Block,
@@ -1144,26 +1220,81 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
 
-    private static bool TryGetLinearNestedBlockCompletionOperation(
+    private static bool TryGetNestedBlockCompletionOperation(
         ControlFlowGraph graph,
         BlockSyntax block,
         out IOperation completionOperation)
     {
         var operations = graph.Blocks
-            .SelectMany(static cfgBlock => cfgBlock.Operations)
-            .Where(operation => block.Span.Contains(operation.Syntax.SpanStart))
+            .SelectMany(cfgBlock => cfgBlock.Operations.Select((operation, index) =>
+                new NestedBlockOperation(cfgBlock, operation, index)))
+            .Where(candidate => block.Span.Contains(candidate.Operation.Syntax.SpanStart))
+            .OrderBy(static candidate => candidate.Operation.Syntax.SpanStart)
+            .ThenBy(static candidate => candidate.Block.Ordinal)
+            .ThenBy(static candidate => candidate.Index)
             .ToArray();
-        if (operations.Length == 0 || graph.Blocks.Any(cfgBlock =>
-                cfgBlock.BranchValue != null &&
-                block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart)))
+        if (operations.Length == 0)
         {
             completionOperation = null!;
             return false;
         }
 
-        completionOperation = operations[operations.Length - 1];
+        var completion = operations[operations.Length - 1];
+        var internalBranches = graph.Blocks.Where(cfgBlock =>
+            cfgBlock.BranchValue != null &&
+            block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart));
+        if (internalBranches.Any(branch =>
+                branch.Ordinal >= completion.Block.Ordinal ||
+                !AllRegularPathsReach(branch.ConditionalSuccessor, completion.Block) ||
+                !AllRegularPathsReach(branch.FallThroughSuccessor, completion.Block)))
+        {
+            completionOperation = null!;
+            return false;
+        }
+
+        completionOperation = completion.Operation;
         return true;
     }
+
+    private static bool AllRegularPathsReach(
+        ControlFlowBranch? branch,
+        BasicBlock destination) =>
+        AllRegularPathsReach(branch, destination, new HashSet<BasicBlock>());
+
+    private static bool AllRegularPathsReach(
+        ControlFlowBranch? branch,
+        BasicBlock destination,
+        ISet<BasicBlock> visiting) =>
+        branch is
+        {
+            Semantics: ControlFlowBranchSemantics.Regular,
+            Destination: { } successor
+        } && AllRegularPathsReach(successor, destination, visiting);
+
+    private static bool AllRegularPathsReach(
+        BasicBlock block,
+        BasicBlock destination,
+        ISet<BasicBlock> visiting)
+    {
+        if (ReferenceEquals(block, destination))
+            return true;
+        if (block.Ordinal >= destination.Ordinal || !visiting.Add(block))
+            return false;
+
+        var reachesDestination = block.ConditionKind == ControlFlowConditionKind.None
+            ? AllRegularPathsReach(block.FallThroughSuccessor, destination, visiting) &&
+              (block.ConditionalSuccessor == null ||
+               AllRegularPathsReach(block.ConditionalSuccessor, destination, visiting))
+            : AllRegularPathsReach(block.ConditionalSuccessor, destination, visiting) &&
+              AllRegularPathsReach(block.FallThroughSuccessor, destination, visiting);
+        visiting.Remove(block);
+        return reachesDestination;
+    }
+
+    private readonly record struct NestedBlockOperation(
+        BasicBlock Block,
+        IOperation Operation,
+        int Index);
 
     private static bool IsTargetOperation(
         IOperation operation,

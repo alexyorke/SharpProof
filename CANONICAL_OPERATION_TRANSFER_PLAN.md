@@ -356,6 +356,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
     its final CFG operation after prior operations and their typed successful-
     completion facts have transferred. Internally branching or unsupported
     blocks remain conservative fallbacks without exposing partial state.
+  - [x] Route internally branching nested-block completion when one final CFG
+    operation post-dominates every regular internal branch path. Nested guard
+    frames now restore enclosing guards after each canonical merge; guard
+    mutation, abrupt completion, missing post-merge operations, and unsupported
+    transfers remain typed conservative fallbacks.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -524,7 +529,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 atomic multi-declarator completion | `2721fce0` | 105,361 | -2,315 |
 | Phase 7 canonical throw-guarded completion | `ec4ff168` | 105,553 | -2,123 |
 | Phase 7 single-operation nested-block completion | `32cf2529` | 105,597 | -2,079 |
-| Phase 7 linear nested-block completion | This commit | 105,623 | -2,053 |
+| Phase 7 linear nested-block completion | `6776aa8e` | 105,623 | -2,053 |
+| Phase 7 nested CFG guard joins | This commit | 105,740 | -1,936 |
 
 ## Validation Ledger
 
@@ -687,6 +693,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical throw-guarded completion | Assignment lowering now unwraps coalesce and either conditional throw arm to the value produced on successful completion, then appends the matching non-null or branch condition after assignment evidence. The CFG collector no longer mistakes an initializer's internal branch value for a completed declaration: it waits for Roslyn's implicit declared-symbol assignment, ignores compiler flow captures, and lowers `IIsNullOperation` through the canonical reachability owner. Coalesce, both conditional throw-arm shapes, and multi-declarator consumption match structural normalized state and evidence exactly; unsupported invocation initializers remain typed fallback. Direct collector/operation fixtures pass 40/40, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,761 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,553, or -2,123 from the rewrite start; test LOC is 143,250. |
 | Phase 7 single-operation nested-block completion | A nested block with exactly one CFG operation and no block-local branch value now consumes that operation plus its typed successful-completion facts before observation. The existing enclosing branch guard remains ordered first, and declaration, assignment, and array-index completion cases match structural normalized state and evidence exactly. Multi-operation and internally branching blocks remain typed fallback rather than exposing a partial state. Direct collector fixtures pass 41/41, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,765 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,597, or -2,079 from the rewrite start; test LOC is 143,282. |
 | Phase 7 linear nested-block completion | The CFG collector now designates the last operation in a branch-free nested block as its completion point. Earlier operations transfer normally through the worklist and immediately apply their typed successful-completion facts, so ordered assignments and an array-index declaration followed by a dependent declaration match structural normalized state and evidence. An internal branch or unsupported earlier invocation still returns typed fallback before partial state escapes. Direct collector fixtures pass 43/43, the broader program-point/reachability/operation differential passes 253/253, MainGeneral passes 3,767 with the same two explicit skips, and the Release developer/test warning-as-error build has zero warnings. Production LOC is 105,623, or -2,053 from the rewrite start; test LOC is 143,286. |
+| Phase 7 nested CFG guard joins | Internally branching nested blocks now retain a stack of enclosing branch guards, merge the innermost guarded states canonically, and restore the parent guard before observing a final operation that every regular internal path reaches. The post-dominance check rejects a branch-only block and any abrupt path; unsupported operations still fail before state publication. A guard-mutating branch reproduced a parent-frame divergence, so equivalent parent frames now merge invalidation conservatively and force typed fallback. Direct collector fixtures pass 47/47; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,771 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. This nested-guard scaffold raises production LOC to 105,740, or -1,936 from the rewrite start; test LOC is 143,322. |
 
 ## Current Checkpoint
 
@@ -790,7 +797,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 105,623, or -2,053 from the rewrite start. Assignment-expression current
+  now 105,740, or -1,936 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -800,8 +807,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   completion condition. The CFG collector waits for the declared-symbol
   assignment after initializer control flow and shares operation-aware null
   branching with the canonical reachability owner. External member writes,
-  active guards, unsupported initializer invocations, internally branching or
-  unsupported nested blocks, branching root blocks, loop-local targets,
+  active guards, unsupported initializer invocations, unsupported nested
+  blocks, branching root blocks, loop-local targets,
   finally-local targets, and implicit
   constructor/bare-return CFG shapes remain conservative structural fallbacks.
   Multi-declarator completion now applies all implicit assignments and
@@ -811,9 +818,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
   explicit completion instead of stopping at their first contained operation.
   Branch-free nested blocks now observe their final CFG operation after every
   prior canonical operation and successful-completion plan has transferred
-  under the stable enclosing guard. Test LOC is 143,286.
-- Next cheapest step: characterize internally branching nested-block completion
-  and identify the exact post-merge CFG region exit; retain typed fallback for
-  paths whose guard, abrupt completion, or operation support cannot match.
+  under the stable enclosing guard. Internally branching nested blocks now use
+  nested guard frames and observe a trailing operation only when it post-
+  dominates every regular internal branch path. Guard mutation, abrupt paths,
+  branch-only blocks, and unsupported operations retain typed fallback. Test LOC
+  is 143,322.
+- Next cheapest step: characterize branch-only nested-block completion and
+  identify a typed normal region-exit observation point without inventing a
+  synthetic operation; retain fallback for abrupt, guard-mutating, and
+  unsupported paths.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.
