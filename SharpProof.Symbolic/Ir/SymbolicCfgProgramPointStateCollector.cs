@@ -167,7 +167,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                         ref state,
                         operation,
                         GetActiveGuard(currentPath.GuardFrame),
-                        targetIsInsideBranch,
+                        targetIsInsideBranch || targetIsCompletedNestedBlock,
+                        targetIsCompletedNestedBlock,
                         semanticModel,
                         cancellationToken,
                         out var invalidatedGuardTarget))
@@ -1186,6 +1187,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         IOperation operation,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
+        bool allowGuardMutation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ISymbol? invalidatedGuardTarget)
@@ -1203,10 +1205,11 @@ internal static class SymbolicCfgProgramPointStateCollector
                         value,
                         guard,
                         allowGuardedReferenceAssignments,
-                         semanticModel,
-                         cancellationToken,
-                         "ir.path.prior-statement",
-                         out var declaratorInvalidatedGuardTarget))
+                        allowGuardMutation,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.prior-statement",
+                        out var declaratorInvalidatedGuardTarget))
                     return false;
                 invalidatedGuardTarget ??= declaratorInvalidatedGuardTarget;
             }
@@ -1228,6 +1231,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     assignment.Value,
                     guard,
                     allowGuardedReferenceAssignments,
+                    allowGuardMutation,
                     semanticModel,
                     cancellationToken,
                     "ir.path.prior-statement",
@@ -1322,6 +1326,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 operation,
                 guard,
                 allowGuardedReferenceAssignments,
+                false,
                 semanticModel,
                 cancellationToken,
                 out _))
@@ -1401,6 +1406,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                     value,
                     guard,
                     allowGuardedReferenceAssignments,
+                    false,
                     semanticModel,
                     cancellationToken,
                     "ir.path.prior-statement",
@@ -1493,12 +1499,17 @@ internal static class SymbolicCfgProgramPointStateCollector
         IOperation value,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
+        bool allowGuardMutation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string provenance,
         out ISymbol? invalidatedGuardTarget)
     {
-        if (RequiresStructuralAssignmentFallback(target, guard, allowGuardedReferenceAssignments))
+        if (RequiresStructuralAssignmentFallback(
+                target,
+                guard,
+                allowGuardedReferenceAssignments,
+                allowGuardMutation))
         {
             invalidatedGuardTarget = null;
             return false;
@@ -1567,7 +1578,8 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool RequiresStructuralAssignmentFallback(
         ISymbol target,
         SymbolicCondition? guard,
-        bool allowGuardedReferenceAssignments)
+        bool allowGuardedReferenceAssignments,
+        bool allowGuardMutation)
     {
         var type = target switch
         {
@@ -1580,7 +1592,8 @@ internal static class SymbolicCfgProgramPointStateCollector
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
         } || guard != null &&
             type?.IsReferenceType == true &&
-            (!allowGuardedReferenceAssignments || GuardReferencesTarget(guard, target));
+            (!allowGuardedReferenceAssignments ||
+             !allowGuardMutation && GuardReferencesTarget(guard, target));
     }
 
     private static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>
