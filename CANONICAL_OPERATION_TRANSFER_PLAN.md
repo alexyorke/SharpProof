@@ -401,6 +401,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
   - [x] Characterize nested finally stacks and terminal overrides. Multiple
     pending regions, a throw overriding an earlier return, and an outer-finally
     terminal all match structural state and evidence without additional policy.
+  - [x] Route nested-block completion when one inner path returns or throws and
+    another reaches the regular block exit. Conditional blocks now require a
+    non-`None` condition kind, so return/throw value blocks are not misclassified;
+    one terminal taxonomy validates both root and nested completion.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -580,7 +584,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 direct-throw root completion boundary | `ec56f433` | 106,154 | -1,522 |
 | Phase 7 structured finally root completion | `395902d0` | 106,162 | -1,514 |
 | Phase 7 terminal identity through finally | `71243345` | 106,182 | -1,494 |
-| Phase 7 nested finally hierarchy characterization | This commit | 106,182 | -1,494 |
+| Phase 7 nested finally hierarchy characterization | `8dfde48a` | 106,182 | -1,494 |
+| Phase 7 abrupt nested-block completion | This commit | 106,189 | -1,487 |
 
 ## Validation Ledger
 
@@ -754,6 +759,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 structured finally root completion | Root completion now admits Roslyn structured exception-handling edges outside `TryAndCatch` regions. A normal `try`/`finally` and a conditional throw originating inside `finally` match structural normalized state and evidence exactly. A return leaving `try` with pending finally regions reproduced a reversed surviving guard, so that terminal-edge shape remains typed `Unsupported` until its original completion identity survives the continuation. Direct collector fixtures pass 70/70 and the broader program-point/invariant/operation/reachability differential passes 204/204. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,794 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,162, or -1,514 from the rewrite start; authoritative tracked test LOC is 143,366. |
 | Phase 7 terminal identity through finally | `CfgFinallyContinuation` now retains the original terminal branch while its ordered finally regions execute. Completion records that branch in the root's direct-versus-earlier terminal partition instead of propagating it to the normal exit. Mixed early return, mixed early throw, and exhaustive return/throw through finally now match structural normalized state and evidence; the temporary pending-finally fallback is removed. Direct collector fixtures pass 72/72 and the broader program-point/invariant/operation/reachability differential passes 206/206. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,796 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,182, or -1,494 from the rewrite start; authoritative tracked test LOC is 143,370. |
 | Phase 7 nested finally hierarchy characterization | Three direct structural differentials lock a return crossing nested finally regions, a throw inside finally overriding the pending return, and an outer-finally throw overriding an inner terminal. All reuse the terminal-aware continuation without new production policy. Direct collector fixtures pass 75/75, the broader program-point/invariant/operation/reachability differential passes 209/209, and MainGeneral passes 3,799 with the same two explicit skips. The preceding production slice's Oracle, Analyzer, Flow, and warning-as-error gates remain authoritative because this commit changes tests only. Production LOC remains 106,182, or -1,494 from the rewrite start; authoritative tracked test LOC is 143,376. |
+| Phase 7 abrupt nested-block completion | Nested completion validation now accepts each inner path that either reaches a typed regular block-exit edge or has a recognized terminal return/throw/program-termination edge. Roslyn return/throw value blocks are no longer mistaken for conditional branches because internal branch discovery requires a non-`None` condition kind. The runtime keeps terminal paths out of `nestedBlockCompletedPaths`, so only the surviving regular path determines the completed nested-block state. Direct collector fixtures pass 76/76 and the broader program-point/invariant/operation/reachability differential passes 210/210. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,800 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,189, or -1,487 from the rewrite start; authoritative tracked test LOC is 143,378. |
 
 ## Current Checkpoint
 
@@ -857,7 +863,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 106,182, or -1,494 from the rewrite start. Assignment-expression current
+  now 106,189, or -1,487 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -881,7 +887,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
   under the stable enclosing guard. Internally branching nested blocks now use
   nested guard frames and observe a trailing operation only when it post-
   dominates every regular internal branch path. Branch-only nested blocks now
-  observe validated regular CFG exit edges before the enclosing branch join.
+  observe validated regular CFG exit edges before the enclosing branch join;
+  an inner return or throw is isolated from the surviving regular completion.
   Root blocks with terminal acyclic regular branches now observe their guarded
   merge at the canonical CFG exit. Acyclic inputs are owned per predecessor
   edge, so one intermediate join can retract stale output and continue through
@@ -899,10 +906,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
   no longer re-enter the normal CFG exit. Nested finally stacks and terminal
   overrides are directly characterized at exact parity. Loop graphs retain bounded
   historical convergence; guard mutation, abrupt paths, cycles, and unsupported
-  operations retain typed fallback. Production LOC is 106,182, or -1,494 from
-  the rewrite start; authoritative tracked test LOC is 143,376.
-- Next cheapest step: migrate nested-block completion with one abrupt path and
-  one regular exit, reusing the terminal-path partition without allowing an
-  abrupt branch to leak into the enclosing block's normal completion.
+  operations retain typed fallback. Production LOC is 106,189, or -1,487 from
+  the rewrite start; authoritative tracked test LOC is 143,378.
+- Next cheapest step: characterize a nested block whose every path completes
+  abruptly, and produce canonical contradictory completion only if its guard
+  hierarchy, normalized state, and evidence match structural transfer exactly.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

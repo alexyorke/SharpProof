@@ -351,6 +351,10 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) value = 1; else value = 2; } } }")]
     [TestCase(
         "static class C { static void M(bool condition, bool nested) { int value = 0; if (condition) { if (nested) { value = 1; value = 2; } } } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; int marker = 2; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) throw new System.Exception(); int marker = 2; } return 0; } }")]
     public void InternallyBranchingNestedBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -379,8 +383,6 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
-    [TestCase(
-        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; int marker = 2; } return 0; } }")]
     [TestCase(
         "static class C { static void M(bool condition, bool nested) { if (condition) { if (nested) nested = false; int marker = 2; } } }")]
     [TestCase(

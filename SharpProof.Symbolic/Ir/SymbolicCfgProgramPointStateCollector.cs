@@ -453,6 +453,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (branch.Semantics is not (ControlFlowBranchSemantics.Regular or
             ControlFlowBranchSemantics.StructuredExceptionHandling))
         {
+            if (!IsTerminalCompletionBranch(branch))
+                return false;
             RecordTerminalPath(branch, path, rootCompletion, completedPaths, terminalPaths);
             return true;
         }
@@ -1590,6 +1592,7 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         var completion = operations[operations.Length - 1];
         var internalBranches = graph.Blocks.Where(cfgBlock =>
+            cfgBlock.ConditionKind != ControlFlowConditionKind.None &&
             cfgBlock.BranchValue != null &&
             block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart)).ToArray();
         if (internalBranches.All(branch =>
@@ -1615,8 +1618,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                 branch.Destination!.Ordinal)));
         if (edges.Count == 0 || internalBranches.Any(branch =>
                 branch.Ordinal >= completion.Block.Ordinal ||
-                !AllRegularPathsReachExit(branch, branch.ConditionalSuccessor, edges) ||
-                !AllRegularPathsReachExit(branch, branch.FallThroughSuccessor, edges)))
+                !AllPathsReachExitOrComplete(branch, branch.ConditionalSuccessor, edges) ||
+                !AllPathsReachExitOrComplete(branch, branch.FallThroughSuccessor, edges)))
         {
             completionOperation = null;
             completionEdges = new HashSet<CfgEdge>();
@@ -1642,6 +1645,13 @@ internal static class SymbolicCfgProgramPointStateCollector
             yield return block.ConditionalSuccessor;
     }
 
+    private static bool IsTerminalCompletionBranch(ControlFlowBranch branch) =>
+        branch.Semantics is
+            ControlFlowBranchSemantics.Return or
+            ControlFlowBranchSemantics.Throw or
+            ControlFlowBranchSemantics.Rethrow or
+            ControlFlowBranchSemantics.ProgramTermination;
+
     private static bool SupportsRootBlockCompletion(ControlFlowGraph graph)
     {
         if (ContainsRegionKind(graph.Root, ControlFlowRegionKind.TryAndCatch))
@@ -1654,11 +1664,7 @@ internal static class SymbolicCfgProgramPointStateCollector
                 ControlFlowBranchSemantics.Regular or
                 ControlFlowBranchSemantics.StructuredExceptionHandling
                 ? branch.Destination == null || branch.Destination.Ordinal > source.Ordinal
-                : branch.Semantics is
-                    ControlFlowBranchSemantics.Return or
-                    ControlFlowBranchSemantics.Throw or
-                    ControlFlowBranchSemantics.Rethrow or
-                    ControlFlowBranchSemantics.ProgramTermination));
+                : IsTerminalCompletionBranch(branch)));
     }
 
     private static bool ContainsRegionKind(ControlFlowRegion region, ControlFlowRegionKind kind) =>
@@ -1695,18 +1701,20 @@ internal static class SymbolicCfgProgramPointStateCollector
         return new CfgRootCompletionPlan(preservedLocals, completionBranch);
     }
 
-    private static bool AllRegularPathsReachExit(
+    private static bool AllPathsReachExitOrComplete(
         BasicBlock source,
         ControlFlowBranch? branch,
         ISet<CfgEdge> exits) =>
-        AllRegularPathsReachExit(source, branch, exits, new HashSet<BasicBlock>());
+        AllPathsReachExitOrComplete(source, branch, exits, new HashSet<BasicBlock>());
 
-    private static bool AllRegularPathsReachExit(
+    private static bool AllPathsReachExitOrComplete(
         BasicBlock source,
         ControlFlowBranch? branch,
         ISet<CfgEdge> exits,
         ISet<BasicBlock> visiting)
     {
+        if (branch != null && IsTerminalCompletionBranch(branch))
+            return true;
         if (branch is not
             {
                 Semantics: ControlFlowBranchSemantics.Regular,
@@ -1720,7 +1728,7 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         var successors = GetSuccessors(destination).ToArray();
         var reachesExit = successors.Length != 0 && successors.All(successor =>
-            AllRegularPathsReachExit(destination, successor, exits, visiting));
+            AllPathsReachExitOrComplete(destination, successor, exits, visiting));
         visiting.Remove(destination);
         return reachesExit;
     }
