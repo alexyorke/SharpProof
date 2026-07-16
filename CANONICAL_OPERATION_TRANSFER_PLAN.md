@@ -644,8 +644,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
       `Unsupported` with no partial value after any nested analysis-limit event.
       Three missing terminal/do-loop matrix rows plus direct seed/cache and
       truncation/cache invariants raise the collector fixture from 236 to 241
-      passing cases. The facade still delegates to the legacy region core; the
-      scheduler deletion remains the next step.
+      passing cases. This characterization landed before the direct worklist in
+      the following substep.
+    - [x] Execute the seeded statement slice in `SymbolicCfgExecutionTrace` and
+      remove completed-statement setup, operation slicing, terminal collection,
+      loop finalization, and switch finalization from the generic point collector.
+      The trace reuses the canonical operation, branch, loop-edge, merge, scope,
+      and finally-continuation helpers. Collector tests pass 241/241, focused
+      loop/switch/reachability tests pass 138/138, and MainSmtFlow passes 257/257.
+      Production LOC is temporarily 106,438 while the now trace-only topology and
+      finalizer helpers remain to be compacted in the deletion half of this slice.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -1084,6 +1092,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 cached execution-root trace scaffold | Seedless, default-limit, acyclic before-current queries now share one immutable trace per semantic model and execution root instead of replaying the CFG for every point. The trace reuses the canonical collector worklist and transfer operations, records first lexical observations while replacing revisits, rebases method-entry evidence per site, publishes outside the traversal lock, and preserves typed structural fallback for unsupported shapes. A new isolated analysis-limit scope prevents trace-wide truncation events from contaminating point-query telemetry; custom limits bypass both point and trace caches. Cancellation, concurrent-root isolation, cache/evidence/version parity, unsupported-loop atomic fallback, and limit isolation are characterized. The focused trace/limit gate passes 10/10; analysis-limit/source-query/full-JSON coverage passes 323/323; all six lanes pass 6,128 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,962 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. Production LOC is 106,418, or -1,258 from the rewrite start; tracked handwritten test LOC is 145,042. There are no oversized files or partial types, and the collector partial remains 2,986 lines. The scaffold is intentionally +300 production lines; the next seeded completed-statement slice is the first deletion closure large enough to amortize it. CI/CD was independently rechecked green at the current hosted SHA, so no workflow patch was warranted. |
 | Phase 7 canonical invalidated-if completion | The completed-region worklist already invalidates mutated guards and merges surviving paths canonically, so its older 54-line syntax summary is deleted. The 36-case completion differential, complete collector fixture (236/236), analysis-limit/source-query/full-JSON gate (323/323), MainSmtFlow (257/257), and all six lanes remain green at 6,128 passes plus the two documented MainGeneral skips. Three deliberately broader deletions were rejected with evidence: raw loop exits changed six proof outcomes, removing abrupt-if completion broke finally/guarded-hazard diagnostics, and removing switch terminal exclusions changed one reachability result. The Release warning-as-error build remains at zero warnings and errors. Production LOC falls to 106,367, or -1,309 from the rewrite start; test LOC remains 145,042. |
 | Phase 7 seeded completion facade and atomic truncation | If/switch/while/do/for completion now enters through an uncached seeded execution-trace facade. Caller state and evidence remain exact, structural-cache telemetry is unchanged, and any nested limit event downgrades the result atomically to typed `Unsupported` with null value. Both-terminal if, all-terminal switch, do break/continue with a scoped local, caller seed, and truncation/cache cases close the characterization gaps; the full collector fixture passes 241/241. This scaffold is intentionally intermediate and still delegates to the legacy region core. Production LOC is 106,403, or -1,273 from the rewrite start; tracked test LOC is 145,113. |
+| Phase 7 direct seeded completion worklist | The seeded facade now owns its statement-slice worklist directly, and the generic program-point collector no longer carries completed-statement setup, operation slicing, terminal collection, loop finalization, or switch finalization. It reuses canonical operation, branch, loop-edge, merge, scope-exit, and finally-continuation policy. Collector tests pass 241/241, focused loop/switch/reachability coverage passes 138/138, and MainSmtFlow passes 257/257. Production LOC is temporarily 106,438 while the trace-only topology/finalizer closure is compacted; tracked test LOC is 145,108. |
 
 ## Current Checkpoint
 
@@ -1403,15 +1412,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
   start; all six lanes pass 6,128 tests with the same two documented MainGeneral
   skips. The trace scaffold is not fully amortized until its next capability
   deletes the superseded completion owners. The uncached seeded facade and its
-  five missing invariants are now green at 241/241 focused cases; it still calls
-  the legacy region core. Production LOC is 106,403 and test LOC is 145,113.
-- Next cheapest step: replace that legacy core with caller-seeded statement-exit
-  observations for if/switch/while/do/for in the shared worklist.
+  five missing invariants are now green at 241/241 focused cases. The trace now
+  executes the seeded worklist directly and the generic collector's completion
+  scheduler is deleted; trace-only topology and finalizer helpers remain.
+  Production LOC is 106,438 and test LOC is 145,108.
+- Next cheapest step: compact the trace-only region topology and finalizers, then
+  delete their superseded plan/summary closure and complete the 873-line cut.
   Shadow-compare normalized states, evidence, versions, terminal/abrupt flow,
   scope exit, fallback identity, and truncation, then delete the 873-line
   completed-region scheduler/summary closure in the same green slice. Do not take
   the smaller for-initial-entry extension, which removes only 80-125 net lines.
-- Blockers: the 11,000-line production target still requires 9,727 lines. The
+- Blockers: the 11,000-line production target still requires 9,762 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.

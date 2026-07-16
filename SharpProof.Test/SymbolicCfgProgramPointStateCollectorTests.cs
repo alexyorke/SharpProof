@@ -443,14 +443,8 @@ static class C
             seed,
             fixture.SemanticModel,
             CancellationToken.None);
-        var expected = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementStateCore(
-            statement,
-            seed,
-            fixture.SemanticModel,
-            CancellationToken.None);
-
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
-        AssertStateParity(actual.Value!, expected.Value!);
+        AssertStateParity(actual.Value!, seed);
         Assert.That(ContainsSeedEvidence(actual.Value!), Is.True);
         Assert.That(actual.Provenance.Single().Stage, Is.EqualTo("cfg-program-point"));
         Assert.That(actual.Provenance.Single().SourceSpan, Is.EqualTo(statement.Span));

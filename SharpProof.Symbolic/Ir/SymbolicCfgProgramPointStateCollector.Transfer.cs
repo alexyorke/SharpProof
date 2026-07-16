@@ -11,7 +11,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicCfgProgramPointStateCollector
 {
-    private static bool TryCollectAbruptIfCompletionState(
+    internal static bool TryCollectAbruptIfCompletionState(
         IfStatementSyntax statement,
         SymbolicState entryState,
         SemanticModel semanticModel,
@@ -552,7 +552,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static void AddOperationNormalCompletionFacts(
+    internal static void AddOperationNormalCompletionFacts(
         ref SymbolicState state,
         IOperation operation,
         SemanticModel semanticModel,
@@ -918,17 +918,15 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return true;
     }
 
-    private static bool TryCreateRegionPlan(
+    internal static bool TryCreateRegionPlan(
         ControlFlowGraph graph,
         SyntaxNode target,
-        CfgProgramPointTargetKind targetKind,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out CfgRegionPlan plan,
         out string failure)
     {
-        if (targetKind != CfgProgramPointTargetKind.CompletedStatement ||
-            target is not StatementSyntax statement)
+        if (target is not StatementSyntax statement)
             return Fail("statement-region.kind", out plan, out failure);
         if (!TryValidateStatementRegionShape(
                 graph,
@@ -1076,7 +1074,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return Fail("statement-region.exit", out plan, out failure);
 
         plan = new CfgRegionPlan(
-            targetKind,
             target,
             entryPoint,
             slices,
@@ -1133,7 +1130,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return Exact(state, statement);
     }
 
-    private static bool TryApplyCompletedSwitchExitExclusions(
+    internal static bool TryApplyCompletedSwitchExitExclusions(
         ref SymbolicState state,
         SwitchStatementSyntax statement,
         SemanticModel semanticModel,
@@ -1399,7 +1396,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     }
 
     internal sealed record CfgRegionPlan(
-        CfgProgramPointTargetKind TargetKind,
         SyntaxNode Target,
         CfgTraversalPoint EntryPoint,
         IReadOnlyDictionary<int, (
@@ -1483,7 +1479,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     {
         BeforeCurrent,
         CurrentCompletion,
-        ForInitialEntry,
-        CompletedStatement
+        ForInitialEntry
     }
 }
