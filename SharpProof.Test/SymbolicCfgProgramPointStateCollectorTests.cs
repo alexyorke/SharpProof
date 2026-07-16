@@ -355,6 +355,10 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; int marker = 2; } return 0; } }")]
     [TestCase(
         "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) throw new System.Exception(); int marker = 2; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; else return 2; } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; else throw new System.Exception(); } return 0; } }")]
     public void InternallyBranchingNestedBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -387,6 +391,10 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static void M(bool condition, bool nested) { if (condition) { if (nested) nested = false; int marker = 2; } } }")]
     [TestCase(
         "static class C { static void M(bool condition) { int value = 0; if (condition) { System.Console.WriteLine(); value = 2; } } }")]
+    [TestCase(
+        "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; throw new System.Exception(); } return 0; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { if (condition) { return 1; } return 0; } }")]
     public void ComplexNestedBlockCompletion_RemainsConservativeFallback(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(

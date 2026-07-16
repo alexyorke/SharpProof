@@ -53,12 +53,14 @@ internal static class SymbolicCfgProgramPointStateCollector
             return Unsupported(site, "cfg-empty");
         IOperation? nestedBlockCompletionOperation = null;
         ISet<CfgEdge> nestedBlockCompletionEdges = new HashSet<CfgEdge>();
+        ISet<ControlFlowBranch> nestedBlockTerminalBranches = new HashSet<ControlFlowBranch>();
         if (targetIsCompletedNestedBlock &&
             !TryGetNestedBlockCompletionTarget(
                 graph,
                 (BlockSyntax)site,
                 out nestedBlockCompletionOperation,
-                out nestedBlockCompletionEdges))
+                out nestedBlockCompletionEdges,
+                out nestedBlockTerminalBranches))
             return Unsupported(site, "nested-block-completion");
         if (targetIsCompletedRootBlock && !SupportsRootBlockCompletion(graph))
             return Unsupported(site, "root-block-control-flow");
@@ -86,6 +88,7 @@ internal static class SymbolicCfgProgramPointStateCollector
         var completedPaths = new List<CfgPathState>();
         var terminalPaths = new List<CfgPathState>();
         var nestedBlockCompletedPaths = new List<CfgPathState>();
+        var nestedBlockTerminalPaths = new List<CfgPathState>();
         queue.Enqueue(entryPoint);
         SymbolicState? targetState = null;
         SymbolicState? guardedTargetState = null;
@@ -219,6 +222,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                     terminalPaths,
                     nestedBlockCompletionEdges,
                     nestedBlockCompletedPaths,
+                    nestedBlockTerminalBranches,
+                    nestedBlockTerminalPaths,
                     rootCompletion,
                     loopPlans))
                 return Unsupported(block.BranchValue?.Syntax ?? site, "control-flow");
@@ -239,6 +244,16 @@ internal static class SymbolicCfgProgramPointStateCollector
             if (targetIsInsideBranch && HasInvalidatedGuard(completedPath.GuardFrame))
                 return Unsupported(site, "branch-guard-mutation");
             targetState = OrderTargetState(completedPath.State, completedPath, targetIsInsideBranch);
+        }
+        else if (targetIsCompletedNestedBlock && nestedBlockTerminalPaths.Count != 0)
+        {
+            var completedPath = CollapseTerminalCompletionPaths(nestedBlockTerminalPaths, site);
+            if (targetIsInsideBranch && HasInvalidatedGuard(completedPath.GuardFrame))
+                return Unsupported(site, "branch-guard-mutation");
+            var completedState = SymbolicOperationTransferKernel.Complete(
+                completedPath.State,
+                site.Span).State;
+            targetState = OrderTargetState(completedState, completedPath, targetIsInsideBranch);
         }
         targetState ??= guardedTargetState;
         if (targetState == null &&
@@ -268,6 +283,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         ICollection<CfgPathState> terminalPaths,
         ISet<CfgEdge> nestedBlockCompletionEdges,
         ICollection<CfgPathState> nestedBlockCompletedPaths,
+        ISet<ControlFlowBranch> nestedBlockTerminalBranches,
+        ICollection<CfgPathState> nestedBlockTerminalPaths,
         CfgRootCompletionPlan? rootCompletion,
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
@@ -314,6 +331,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        terminalPaths,
                        nestedBlockCompletionEdges,
                        nestedBlockCompletedPaths,
+                       nestedBlockTerminalBranches,
+                       nestedBlockTerminalPaths,
                        rootCompletion,
                        loopPlans) &&
                    TryPropagate(
@@ -337,6 +356,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                        terminalPaths,
                        nestedBlockCompletionEdges,
                        nestedBlockCompletedPaths,
+                       nestedBlockTerminalBranches,
+                       nestedBlockTerminalPaths,
                        rootCompletion,
                        loopPlans);
         }
@@ -355,6 +376,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    terminalPaths,
                    nestedBlockCompletionEdges,
                    nestedBlockCompletedPaths,
+                   nestedBlockTerminalBranches,
+                   nestedBlockTerminalPaths,
                    rootCompletion,
                    loopPlans) &&
                TryPropagate(
@@ -371,6 +394,8 @@ internal static class SymbolicCfgProgramPointStateCollector
                    terminalPaths,
                    nestedBlockCompletionEdges,
                    nestedBlockCompletedPaths,
+                   nestedBlockTerminalBranches,
+                   nestedBlockTerminalPaths,
                    rootCompletion,
                    loopPlans);
     }
@@ -416,6 +441,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         ICollection<CfgPathState> terminalPaths,
         ISet<CfgEdge> nestedBlockCompletionEdges,
         ICollection<CfgPathState> nestedBlockCompletedPaths,
+        ISet<ControlFlowBranch> nestedBlockTerminalBranches,
+        ICollection<CfgPathState> nestedBlockTerminalPaths,
         CfgRootCompletionPlan? rootCompletion,
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans)
     {
@@ -455,6 +482,11 @@ internal static class SymbolicCfgProgramPointStateCollector
         {
             if (!IsTerminalCompletionBranch(branch))
                 return false;
+            if (nestedBlockTerminalBranches.Contains(branch))
+            {
+                nestedBlockTerminalPaths.Add(path);
+                return true;
+            }
             RecordTerminalPath(branch, path, rootCompletion, completedPaths, terminalPaths);
             return true;
         }
@@ -1573,7 +1605,8 @@ internal static class SymbolicCfgProgramPointStateCollector
         ControlFlowGraph graph,
         BlockSyntax block,
         out IOperation? completionOperation,
-        out ISet<CfgEdge> completionEdges)
+        out ISet<CfgEdge> completionEdges,
+        out ISet<ControlFlowBranch> completionTerminalBranches)
     {
         var operations = graph.Blocks
             .SelectMany(cfgBlock => cfgBlock.Operations.Select((operation, index) =>
@@ -1583,26 +1616,29 @@ internal static class SymbolicCfgProgramPointStateCollector
             .ThenBy(static candidate => candidate.Block.Ordinal)
             .ThenBy(static candidate => candidate.Index)
             .ToArray();
-        if (operations.Length == 0)
-        {
-            completionOperation = null;
-            completionEdges = new HashSet<CfgEdge>();
-            return false;
-        }
-
-        var completion = operations[operations.Length - 1];
         var internalBranches = graph.Blocks.Where(cfgBlock =>
             cfgBlock.ConditionKind != ControlFlowConditionKind.None &&
             cfgBlock.BranchValue != null &&
             block.Span.Contains(cfgBlock.BranchValue.Syntax.SpanStart)).ToArray();
-        if (internalBranches.All(branch =>
-                branch.Ordinal < completion.Block.Ordinal &&
-                AllRegularPathsReach(branch.ConditionalSuccessor, completion.Block) &&
-                AllRegularPathsReach(branch.FallThroughSuccessor, completion.Block)))
+        var terminalBranches = new HashSet<ControlFlowBranch>(graph.Blocks
+            .Where(cfgBlock => BlockContainsSyntax(cfgBlock, block))
+            .SelectMany(GetSuccessors)
+            .Where(branch =>
+                branch.FinallyRegions.IsDefaultOrEmpty &&
+                IsTerminalCompletionBranch(branch)));
+        if (operations.Length != 0)
         {
-            completionOperation = completion.Operation;
-            completionEdges = new HashSet<CfgEdge>();
-            return true;
+            var completion = operations[operations.Length - 1];
+            if (internalBranches.All(branch =>
+                    branch.Ordinal < completion.Block.Ordinal &&
+                    AllRegularPathsReach(branch.ConditionalSuccessor, completion.Block) &&
+                    AllRegularPathsReach(branch.FallThroughSuccessor, completion.Block)))
+            {
+                completionOperation = completion.Operation;
+                completionEdges = new HashSet<CfgEdge>();
+                completionTerminalBranches = new HashSet<ControlFlowBranch>();
+                return true;
+            }
         }
 
         var edges = new HashSet<CfgEdge>(graph.Blocks
@@ -1616,18 +1652,35 @@ internal static class SymbolicCfgProgramPointStateCollector
             .Select(static branch => new CfgEdge(
                 branch.Source.Ordinal,
                 branch.Destination!.Ordinal)));
-        if (edges.Count == 0 || internalBranches.Any(branch =>
-                branch.Ordinal >= completion.Block.Ordinal ||
-                !AllPathsReachExitOrComplete(branch, branch.ConditionalSuccessor, edges) ||
-                !AllPathsReachExitOrComplete(branch, branch.FallThroughSuccessor, edges)))
+        var completesOnlyThroughTerminalStatement = edges.Count == 0 &&
+            operations.Length == 0 &&
+            terminalBranches.Count >= 2 &&
+            block.Statements is { Count: 1 } &&
+            block.Statements[0] is IfStatementSyntax { Else: not null };
+        if (edges.Count == 0 && !completesOnlyThroughTerminalStatement ||
+            internalBranches.Any(branch =>
+                operations.Length != 0 &&
+                branch.Ordinal >= operations[operations.Length - 1].Block.Ordinal ||
+                !AllPathsReachExitOrComplete(
+                    branch,
+                    branch.ConditionalSuccessor,
+                    edges,
+                    terminalBranches) ||
+                !AllPathsReachExitOrComplete(
+                    branch,
+                    branch.FallThroughSuccessor,
+                    edges,
+                    terminalBranches)))
         {
             completionOperation = null;
             completionEdges = new HashSet<CfgEdge>();
+            completionTerminalBranches = new HashSet<ControlFlowBranch>();
             return false;
         }
 
         completionOperation = null;
         completionEdges = edges;
+        completionTerminalBranches = terminalBranches;
         return true;
     }
 
@@ -1704,16 +1757,23 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool AllPathsReachExitOrComplete(
         BasicBlock source,
         ControlFlowBranch? branch,
-        ISet<CfgEdge> exits) =>
-        AllPathsReachExitOrComplete(source, branch, exits, new HashSet<BasicBlock>());
+        ISet<CfgEdge> exits,
+        ISet<ControlFlowBranch> terminalBranches) =>
+        AllPathsReachExitOrComplete(
+            source,
+            branch,
+            exits,
+            terminalBranches,
+            new HashSet<BasicBlock>());
 
     private static bool AllPathsReachExitOrComplete(
         BasicBlock source,
         ControlFlowBranch? branch,
         ISet<CfgEdge> exits,
+        ISet<ControlFlowBranch> terminalBranches,
         ISet<BasicBlock> visiting)
     {
-        if (branch != null && IsTerminalCompletionBranch(branch))
+        if (branch != null && terminalBranches.Contains(branch))
             return true;
         if (branch is not
             {
@@ -1728,7 +1788,12 @@ internal static class SymbolicCfgProgramPointStateCollector
 
         var successors = GetSuccessors(destination).ToArray();
         var reachesExit = successors.Length != 0 && successors.All(successor =>
-            AllPathsReachExitOrComplete(destination, successor, exits, visiting));
+            AllPathsReachExitOrComplete(
+                destination,
+                successor,
+                exits,
+                terminalBranches,
+                visiting));
         visiting.Remove(destination);
         return reachesExit;
     }
