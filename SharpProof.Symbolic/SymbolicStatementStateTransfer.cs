@@ -51,15 +51,70 @@ internal static class SymbolicStatementStateTransfer
         CancellationToken cancellationToken)
     {
         RemoveStateFactsInvalidatedByForLoopEntry(ref state, block, semanticModel, cancellationToken);
-        if (TryAddContainingBlockEntryInlineAssignmentStateFacts(
+
+        ExpressionSyntax? condition = null;
+        var branchWhenTrue = true;
+        StatementSyntax? loopStatement = null;
+        switch (block.Parent)
+        {
+            case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
+                condition = ifStatement.Condition;
+                break;
+            case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
+                when ReferenceEquals(statement, block):
+                condition = ifStatement.Condition;
+                branchWhenTrue = false;
+                break;
+            case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
+                condition = whileStatement.Condition;
+                loopStatement = whileStatement;
+                break;
+            case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
+                condition = forStatement.Condition;
+                loopStatement = forStatement;
+                break;
+        }
+
+        if (condition != null &&
+            SymbolicProgramPointFacts.TryAddInlineAssignmentReachabilityState(
                 ref state,
-                block,
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken))
+        {
+            if (loopStatement != null)
+                SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
+                    ref state,
+                    loopStatement,
+                    SymbolicLoopEdgeKind.Entry,
+                    semanticModel,
+                    cancellationToken);
+            return;
+        }
+
+        if (condition != null)
+            RemoveConditionAssignmentTargetFacts(
+                ref state,
+                condition,
+                semanticModel,
+                cancellationToken);
+
+        if (SymbolicLoopStateTransfer.TryApplyLoopBodyEntryStateFacts(
+                ref state,
+                block.Parent!,
+                siteSpanStart: null,
                 semanticModel,
                 cancellationToken))
             return;
 
-        RemoveStateFactsInvalidatedByContainingBlockEntry(ref state, block, semanticModel, cancellationToken);
-        AddContainingBlockEntryStateFacts(ref state, block, semanticModel, cancellationToken);
+        if (condition != null)
+            SymbolicProgramPointFacts.AddReachabilityCondition(
+                ref state,
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken);
     }
 
     private static void RemoveStateFactsInvalidatedByForLoopEntry(
@@ -248,102 +303,12 @@ internal static class SymbolicStatementStateTransfer
                 yield return (IParameterSymbol)parameter.OriginalDefinition;
     }
 
-    private static void RemoveStateFactsInvalidatedByContainingBlockEntry(
+    private static void RemoveConditionAssignmentTargetFacts(
         ref SymbolicState state,
-        BlockSyntax block,
+        ExpressionSyntax condition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var symbol in GetContainingBlockEntryAssignedSymbols(block, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
-    }
-
-    private static bool TryAddContainingBlockEntryInlineAssignmentStateFacts(
-        ref SymbolicState state,
-        BlockSyntax block,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (block.Parent)
-        {
-            case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
-                return SymbolicProgramPointFacts.TryAddInlineAssignmentReachabilityState(
-                    ref state,
-                    ifStatement.Condition,
-                    true,
-                    semanticModel,
-                    cancellationToken);
-            case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
-                when ReferenceEquals(statement, block):
-                return SymbolicProgramPointFacts.TryAddInlineAssignmentReachabilityState(
-                    ref state,
-                    ifStatement.Condition,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-            case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
-                if (!SymbolicProgramPointFacts.TryAddInlineAssignmentReachabilityState(
-                        ref state,
-                        whileStatement.Condition,
-                        true,
-                        semanticModel,
-                        cancellationToken))
-                    return false;
-
-                SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
-                    ref state,
-                    whileStatement,
-                    SymbolicLoopEdgeKind.Entry,
-                    semanticModel,
-                    cancellationToken);
-                return true;
-            case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
-                if (forStatement.Condition == null ||
-                    !SymbolicProgramPointFacts.TryAddInlineAssignmentReachabilityState(
-                        ref state,
-                        forStatement.Condition,
-                        true,
-                        semanticModel,
-                        cancellationToken))
-                    return false;
-
-                SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
-                    ref state,
-                    forStatement,
-                    SymbolicLoopEdgeKind.Entry,
-                    semanticModel,
-                    cancellationToken);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static IEnumerable<ISymbol> GetContainingBlockEntryAssignedSymbols(
-        BlockSyntax block,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        ExpressionSyntax? condition = null;
-        switch (block.Parent)
-        {
-            case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
-                condition = ifStatement.Condition;
-                break;
-            case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
-                when ReferenceEquals(statement, block):
-                condition = ifStatement.Condition;
-                break;
-            case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
-                condition = whileStatement.Condition;
-                break;
-            case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
-                condition = forStatement.Condition;
-                break;
-        }
-
-        if (condition == null) yield break;
-
         foreach (var assignment in condition
                      .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                      .OfType<AssignmentExpressionSyntax>())
@@ -351,33 +316,8 @@ internal static class SymbolicStatementStateTransfer
             if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)) continue;
 
             var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-            if (assignedSymbol is ILocalSymbol or IParameterSymbol) yield return assignedSymbol.OriginalDefinition;
-        }
-    }
-
-    private static void AddContainingBlockEntryStateFacts(
-        ref SymbolicState state,
-        BlockSyntax block,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (SymbolicLoopStateTransfer.TryApplyLoopBodyEntryStateFacts(
-                ref state,
-                block.Parent!,
-                siteSpanStart: null,
-                semanticModel,
-                cancellationToken))
-            return;
-
-        switch (block.Parent)
-        {
-            case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
-                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, ifStatement.Condition, true, semanticModel, cancellationToken);
-                break;
-            case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
-                when ReferenceEquals(statement, block):
-                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, ifStatement.Condition, false, semanticModel, cancellationToken);
-                break;
+            if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                state = SymbolicStateValueFacts.RemoveReferences(state, assignedSymbol.OriginalDefinition);
         }
     }
 

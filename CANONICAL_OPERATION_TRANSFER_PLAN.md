@@ -526,6 +526,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
     pre-invalidation value snapshot; statement transfer retains reference
     removal on unsupported updates; CFG transfer retains direct-target,
     expression-syntax, and guard-invalidation gates.
+  - [x] Consolidate containing-block entry transfer. One parent-shape router now
+    selects the condition, branch polarity, and optional loop owner before
+    applying inline-assignment reachability, condition-target invalidation,
+    canonical loop entry, or ordinary reachability in the existing semantic
+    order. The three superseded routing/enumeration helpers are deleted while
+    `for`, `while`, `do`, `foreach`, `if`, and `else` fallback behavior remains
+    conservative.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -724,7 +731,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical self-reference prior values | `a39f1574` | 106,769 | -907 |
 | Phase 7 canonical purity null conditions | `c87b5963` | 106,739 | -937 |
 | Phase 7 completed-loop-exit adjudication | `cab599ae` | 106,739 | -937 |
-| Phase 7 canonical computed-update application | This commit | 106,687 | -989 |
+| Phase 7 canonical computed-update application | `61337f7c` | 106,687 | -989 |
+| Phase 7 containing-block entry consolidation | This commit | 106,631 | -1,045 |
 
 ## Validation Ledger
 
@@ -917,6 +925,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical purity null conditions | `SymbolicStateFactBuilder` now constructs reference-null conditions from either an expression or an already-versioned reference term, including optional Analyzer evidence. Purity CFG branching, coalesce, and conditional access retain constant-null short-circuiting, owned/not-disposed infeasibility, tracked symbol and flow-capture eligibility, current versions, conservative unsupported behavior, SMT infeasibility, provenance, and evidence while deleting their single-use term helper and manual relation. Pre-edit and post-edit path-expression characterization passes 24/24; MainSmtAnalyzer passes 487/487; the Release solution warning-as-error build has zero warnings and errors. The authoritative production metric falls by 30 to 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 completed-loop-exit adjudication | The proposed seeded completed-loop target was implemented against the existing CFG worklist and then reverted. Roslyn represents break and continue as regular branches, so exact classification requires the loop header's false-polarity successor as one recorded exit block; continue remains an internal edge, while only another proven loop-member edge to that same block can be a break. The prototype reached 25/33 focused cases but failed direct-break suppression and mutation-sensitive guarded break/continue parity. It also added 339 net production lines before legacy deletion, leaving less than the required 250-line reduction after removing the guarded walker. Recreating guard invalidation and target-membership policy would duplicate the structural engine, so the fallback remains authoritative. The reverted baseline passes the full loop-exit characterization 33/33. Production LOC remains 106,739, or -937 from the rewrite start; tracked test LOC remains 144,488. |
 | Phase 7 canonical computed-update application | Expression, statement, and CFG transfer now share one computed-update classifier and exact transition owner. Non-overloaded Roslyn increment/decrement and compound operations retain checked overflow, target-width wrapping, signed division, update kind, provenance, direct-target rejection, current-value versioning, and guard invalidation. Expression transfer supplies its pre-invalidation snapshot; statement fallback still removes references; CFG still rejects non-expression and indirect targets before publication. The pre-edit and post-edit focused characterization passes 8/8, the expanded program-point/invariant/operation/reachability batch passes 419/419, MainSmtOracle passes 573/573, and the Release solution warning-as-error build has zero warnings and errors. The production diff removes 52 authoritative lines to 106,687, or -989 from the rewrite start; tracked test LOC remains 144,488. |
+| Phase 7 containing-block entry consolidation | Containing-block entry now classifies the parent once and preserves the required sequence: for-initializer invalidation, exact inline-assignment reachability, loop invariant application, condition-assignment invalidation, canonical loop-entry fallback, and ordinary branch reachability. Three routing/enumeration helpers were deleted; `do`, `foreach`, conditionless `for`, and unsupported shapes still flow through the canonical conservative loop owner. The pre-edit and post-edit structural batch passes 151/151; CFG/JSON fixtures pass 176/176; tooling source-query/full-JSON fixtures pass 100/100; MainSmtOracle passes 573/573; MainSmtFlow passes 257/257; and the Release warning-as-error solution build has zero warnings and errors. The production diff is 63 insertions and 123 deletions, while the authoritative metric falls by 56 to 106,631, or -1,045 from the rewrite start; tracked test LOC remains 144,488. |
 
 ## Current Checkpoint
 
@@ -1144,14 +1153,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   Computed updates now have one semantic classifier and exact transition owner
   across expression, statement, and CFG transfer. The three callers preserve
   their distinct snapshot, invalidation, direct-target, and guard boundaries.
-  Focused characterization passes 8/8, the expanded affected batch passes
-  419/419, MainSmtOracle passes 573/573, and the Release solution warning-as-error
-  build is clean. Production LOC is 106,687, or -989 from the rewrite start;
-  authoritative tracked test LOC is 144,488.
-- Next cheapest step: re-rank expression and statement transfer deletion now
-  that computed-update classification and application have one owner. Keep the
-  completed-loop/lock structural owner until a shared CFG target-membership and
-  guard-invalidation design can remove at least 250 production lines; require
-  at least 50 net production lines from the next accepted slice.
+  Containing-block entry now has one parent-shape router and one ordered path
+  through inline assignment, condition invalidation, loop entry, and ordinary
+  reachability; the superseded routing and enumeration helpers are deleted.
+  Focused structural, CFG/JSON, tooling, Oracle, and Flow gates pass, and the
+  Release solution warning-as-error build is clean. Production LOC is 106,631,
+  or -1,045 from the rewrite start; authoritative tracked test LOC is 144,488.
+- Next cheapest step: re-rank the assignment and normal-completion owners after
+  the containing-block consolidation. Keep the completed-loop/lock structural
+  owner until a shared CFG target-membership and guard-invalidation design can
+  remove at least 250 production lines; require at least 50 net production lines
+  from the next accepted slice.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.
