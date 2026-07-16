@@ -1112,6 +1112,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 direct seeded completion worklist | The seeded facade now owns its statement-slice worklist directly, and the generic program-point collector no longer carries completed-statement setup, operation slicing, terminal collection, loop finalization, or switch finalization. It reuses canonical operation, branch, loop-edge, merge, scope-exit, and finally-continuation policy. Collector tests pass 241/241, focused loop/switch/reachability coverage passes 138/138, and MainSmtFlow passes 257/257. Production LOC is temporarily 106,438 while the trace-only topology/finalizer closure is compacted; tracked test LOC is 145,108. |
 | Phase 7 topology-derived seeded exits | Completion and terminal branch identity sets are deleted; the shared propagator derives target exits from the seeded block map, including finally continuation completion and opposite guarded loop exits. CFG construction and typed failure classification are shared by cached traces, seeded traces, and completed try routing. The Release warning-as-error solution build has zero warnings/errors. All six lanes pass 6,133 tests plus two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,967 plus two skips, and Tooling 592. Production LOC is 106,435, or -1,241 from the rewrite start; tracked test LOC is 145,108. |
 | Phase 7 typed seeded topology consolidation | Statement-region planning now uses typed block slices, one materialized operation inventory, one connector-closure implementation, and one topology-derived edge validator. Four table cases lock nested/multilabel switch, nested abrupt-if, and externally owned finally fallback identities. The measured rewrite removes 22 net production lines rather than the projected 105, so the remaining finalizer/topology surface is recorded as a correctness-sensitive low-yield boundary. Collector tests pass 244/244, focused loop/switch/reachability tests pass 138/138, MainSmtFlow passes 257/257, and the Release warning-as-error solution build has zero warnings/errors. Production LOC is 106,413, or -1,263 from the rewrite start; tracked test LOC is 145,112. |
+| Phase 7 exhaustive fuzz manifest characterization | Commit `e1049a5d` adds one inline SHA-256 characterization over all 70 registry entries in declaration order and variants zero through three. The payload locks entry and generated-case identity, ordered operation/syntax/primary-shape metadata, expectation enums and required-property arrays, flags, and exact source bytes without an external snapshot file. The direct characterization passes 1/1. Production LOC remains 106,413; tracked test LOC is 145,163. |
+| Phase 7 typed fuzz method manifest | Commit `f068d3da` replaces 43 raw method-shaped source blocks with one typed method emitter while preserving the deliberately unusual historical indentation and mixed newline bytes. Guarded, try/catch, switch, local-function, lambda, tuple, pattern, and straight-line bodies retain their exact source text and registry metadata. The exhaustive manifest hash passes, and the complete fuzz/shape gate passes 28/28. `FuzzCaseGenerator` falls by 225 nonblank production lines to 794; repository production LOC is 106,188, or -1,488 from the rewrite start. |
+| Phase 7 fuzz expression and mutation manifest | Commit `1abd017e` replaces four RNG-sensitive expression builders with one descriptor that deliberately avoids a random draw for fixed expressions, and emits increment/decrement through the typed method path. The byte-distinct string-concat renderer remains specialized. The exhaustive hash and 28-case fuzz/shape gate pass. Production LOC falls to 106,156, or -1,520 from the rewrite start. |
+| Phase 7 fuzz compilation-unit manifest | Commit `8fc63e01` folds randomized ownership and twelve custom class/auxiliary-type builders into the ordered shape manifest through one LF-stable compilation-unit renderer. Every registry identity, order, RNG draw, source byte, shape classification, expectation, flag, and seeded sample remains unchanged. `FuzzCaseGenerator` is now 762 physical / 673 nonblank lines, down 395 physical / 346 nonblank from the pre-rewrite file. The exact manifest hash passes, the complete fuzz/shape gate passes 28/28, and the Release warning-as-error solution build has zero warnings/errors. Production LOC is 106,067, or -1,609 from the rewrite start; tracked test LOC is 145,163. |
 
 ## Current Checkpoint
 
@@ -1434,17 +1438,20 @@ the unused preview .NET API may break when it obstructs the canonical design.
   five missing invariants are now green at 241/241 focused cases. The trace now
   executes the seeded worklist directly and the generic collector's completion
   scheduler is deleted; trace-only topology and finalizer helpers remain.
-  Production LOC is 106,413 and test LOC is 145,112. The last complete six-lane
+  The fuzz generator now stores method, expression, mutation, ownership, and
+  compilation-unit shapes in one ordered typed manifest. Its exhaustive
+  entry/variant hash and the 28-case fuzz/shape gate are green, and the Release
+  warning-as-error solution build remains clean. The file falls from 1,157
+  physical / 1,019 nonblank lines to 762 / 673 without changing source bytes.
+  Production LOC is 106,067 and test LOC is 145,163. The last complete six-lane
   gate passed 6,133 tests plus the two documented MainGeneral skips; the three
   added fallback cases pass in the 244-case collector gate. Release
   warning-as-error is clean. The remaining topology and finalizers are an
   evidence-backed low-yield boundary after two bounded audits.
-- Next cheapest step: rewrite `FuzzCaseGenerator` as a typed shape manifest plus
-  one byte-stable source emitter. Its 1,157-line surface has a conservative
-  400-500-line net deletion budget; preserve every registry identity, ordering,
-  source byte, shape classification, expectation, and seeded output before
-  deleting the raw-source registry and narrow builders.
-- Blockers: the 11,000-line production target still requires 9,737 lines. The
+- Next cheapest step: use the whole-solution call graph and independent semantic
+  and tooling audits to choose the next rewrite with at least 250 net production
+  lines; do not return to the measured low-yield completion/finalizer boundary.
+- Blockers: the 11,000-line production target still requires 9,391 lines. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
   for typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.
