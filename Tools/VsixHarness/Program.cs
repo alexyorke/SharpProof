@@ -78,6 +78,41 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
 
 internal static class Program
 {
+    private static readonly ImmutableHashSet<string> RequiredVsixEntries = new[]
+    {
+        "[Content_Types].xml",
+        "catalog.json",
+        "extension.vsixmanifest",
+        "Humanizer.dll",
+        "libz3.dll",
+        "manifest.json",
+        "Microsoft.Bcl.AsyncInterfaces.dll",
+        "Microsoft.Z3.dll",
+        "SharpProof.Analyzer.dll",
+        "SharpProof.Analyzer.pdb",
+        "SharpProof.Attributes.dll",
+        "SharpProof.Attributes.pdb",
+        "SharpProof.CodeFixes.dll",
+        "SharpProof.CodeFixes.pdb",
+        "SharpProof.ProofCore.dll",
+        "SharpProof.ProofCore.pdb",
+        "SharpProof.Symbolic.dll",
+        "SharpProof.Symbolic.pdb",
+        "SharpProof.Symbolic.xml",
+        "System.Buffers.dll",
+        "System.Collections.Immutable.dll",
+        "System.IO.Pipelines.dll",
+        "System.Memory.dll",
+        "System.Numerics.Vectors.dll",
+        "System.Reflection.Metadata.dll",
+        "System.Runtime.CompilerServices.Unsafe.dll",
+        "System.Text.Encoding.CodePages.dll",
+        "System.Text.Encodings.Web.dll",
+        "System.Text.Json.dll",
+        "System.Threading.Channels.dll",
+        "System.Threading.Tasks.Extensions.dll"
+    }.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
     private static int Main(string[] args)
     {
         try
@@ -109,7 +144,7 @@ internal static class Program
 
         try
         {
-            var payload = ExtractVsixPayload(vsixPath);
+            var payload = ExtractVsixPayload(vsixPath, simulatedVsixDirectory == null);
             try
             {
                 var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", configuration,
@@ -217,7 +252,7 @@ internal static class Program
             .Select(static path => MetadataReference.CreateFromFile(path));
     }
 
-    private static ExtractedVsixPayload ExtractVsixPayload(string vsixPath)
+    private static ExtractedVsixPayload ExtractVsixPayload(string vsixPath, bool validateManifest)
     {
         var directory = Directory.CreateTempSubdirectory("SharpProofVsixHarness");
         try
@@ -226,6 +261,10 @@ internal static class Program
             string? analyzerPath = null;
 
             using (var archive = ZipFile.OpenRead(vsixPath))
+            {
+                if (validateManifest)
+                    ValidateVsixManifest(archive);
+
                 foreach (var entry in archive.Entries)
                 {
                     if (entry.Name.Length == 0 ||
@@ -243,6 +282,7 @@ internal static class Program
                     if (entry.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase))
                         analyzerPath = destinationPath;
                 }
+            }
 
             if (analyzerPath == null)
                 throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
@@ -268,6 +308,20 @@ internal static class Program
             TryDeleteDirectory(directory.FullName);
             throw;
         }
+    }
+
+    private static void ValidateVsixManifest(ZipArchive archive)
+    {
+        var actualEntries = archive.Entries
+            .Where(static entry => entry.Name.Length != 0)
+            .Select(static entry => entry.FullName.Replace('\\', '/'))
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = RequiredVsixEntries.Except(actualEntries).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        var unexpected = actualEntries.Except(RequiredVsixEntries).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (missing.Length != 0 || unexpected.Length != 0)
+            throw new InvalidDataException(
+                $"VSIX payload differs from the required manifest. Missing: [{string.Join(", ", missing)}]. " +
+                $"Unexpected: [{string.Join(", ", unexpected)}].");
     }
 
     private static string FindRepoRoot()
