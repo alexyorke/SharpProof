@@ -269,6 +269,12 @@ public sealed class SymbolicCfgProgramPointStateCollectorTests
         "static class C { static int M(bool condition) { int value = 0; try { if (condition) return 1; throw new System.Exception(); } finally { value = 2; } } }")]
     [TestCase(
         "static class C { static int M(bool condition) { int value = 0; try { value = 1; } finally { if (condition) throw new System.Exception(); value = 2; } return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; try { try { if (condition) return 1; value = 2; } finally { value = 3; } } finally { value = 4; } return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; try { if (condition) return 1; value = 2; } finally { if (condition) throw new System.Exception(); value = 3; } return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; try { try { if (condition) return 1; value = 2; } finally { value = 3; } } finally { if (condition) throw new System.Exception(); value = 4; } return value; } }")]
     public void RootBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
