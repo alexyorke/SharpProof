@@ -374,6 +374,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     observes subsequent operations; loop fixed points retain their characterized
     bounded history, while multi-join and three-predecessor roots remain typed
     fallbacks until nested guard-shape parity migrates.
+  - [x] Merge nested sibling guard frames before their enclosing frame instead
+    of flattening three or more incoming paths. Single-join nested if, if/else,
+    and if/else-if roots now preserve structural normalized state and evidence;
+    roots with multiple intermediate joins remain typed fallback.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -546,7 +550,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 nested CFG guard joins | `f953aecb` | 105,740 | -1,936 |
 | Phase 7 branch-only nested-block exits | `2e9148c3` | 105,837 | -1,839 |
 | Phase 7 terminal root-block branches | `c979ab14` | 105,848 | -1,828 |
-| Phase 7 current predecessor-edge states | This commit | 105,906 | -1,770 |
+| Phase 7 current predecessor-edge states | `4fb90284` | 105,906 | -1,770 |
+| Phase 7 hierarchical nested root joins | This commit | 105,947 | -1,729 |
 
 ## Validation Ledger
 
@@ -713,6 +718,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 branch-only nested-block exits | A nested block no longer needs a synthetic trailing operation to expose its completed state. The target plan identifies regular CFG edges leaving the nested syntax region, proves that every acyclic internal branch path reaches one, intercepts those paths before the enclosing branch join, and merges their nested guard frames canonically. Branch-only if, if/else, and path-local multi-assignment states match the structural collector exactly; abrupt return, guard mutation, and unsupported invocation fixtures remain fallback. Direct collector fixtures pass 49/49; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,773 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. The typed edge scaffold raises production LOC to 105,837, or -1,839 from the rewrite start; test LOC is 143,328. |
 | Phase 7 terminal root-block branches | Root-block current completion now accepts acyclic regular branches that converge only at the CFG exit. Direct if and if/else states match structural guarded choices exactly. A branch followed by another operation reproduced append-only incoming-state pollution: the join first propagates one predecessor, then downstream input retains that stale state after the merged revisit. Such intermediate joins now remain typed fallback, as do abrupt returns, loops, and unsupported invocations. Direct collector fixtures pass 53/53; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,777 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,848, or -1,828 from the rewrite start; test LOC is 143,339. |
 | Phase 7 current predecessor-edge states | Acyclic worklist inputs now replace the current state for a stable branch/continuation edge, retracting a join's stale first-predecessor output before downstream operations execute. Root-block if, if/else, and two post-join-operation cases match structural normalized state and evidence exactly. Existing loop behavior initially diverged when back-edge history was replaced, so loop graphs deliberately retain their characterized bounded-history key until loop merging migrates separately. A nested three-predecessor root exposed a distinct guard-shape mismatch and remains typed fallback. Direct collector fixtures pass 56/56; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,780 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,906, or -1,770 from the rewrite start; authoritative tracked test LOC is 143,338. |
+| Phase 7 hierarchical nested root joins | Incoming paths with compatible immediate baselines and parent guard frames now merge as siblings before the reduced path set merges at its enclosing frame. This reproduces the structural engine's nested order for three-predecessor if/if and if/if-else joins plus a recursively reduced four-predecessor if/else-if join, without flattening their conditions. A root with two distinct intermediate joins is explicitly characterized as typed fallback. Direct collector fixtures pass 59/59; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the four-worker full MainGeneral lane passes 3,782 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,947, or -1,729 from the rewrite start; authoritative tracked test LOC is 143,344. |
 
 ## Current Checkpoint
 
@@ -816,7 +822,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 105,906, or -1,770 from the rewrite start. Assignment-expression current
+  now 105,947, or -1,729 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -827,7 +833,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   assignment after initializer control flow and shares operation-aware null
   branching with the canonical reachability owner. External member writes,
   active guards, unsupported initializer invocations, unsupported nested
-  blocks, root blocks with multiple joins or three-way predecessors,
+  blocks and root blocks with multiple intermediate joins,
   loop-local targets,
   finally-local targets, and implicit
   constructor/bare-return CFG shapes remain conservative structural fallbacks.
@@ -844,15 +850,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
   observe validated regular CFG exit edges before the enclosing branch join.
   Root blocks with terminal acyclic regular branches now observe their guarded
   merge at the canonical CFG exit. Acyclic inputs are owned per predecessor
-  edge, so one two-way intermediate join can retract stale output and continue
-  through later operations. Loop graphs retain bounded historical convergence;
-  guard mutation, abrupt paths, cycles, multiple intermediate joins,
-  three-predecessor joins, and unsupported operations retain typed fallback.
-  Production LOC is 105,906, or -1,770 from the rewrite start; authoritative
-  tracked test LOC is 143,338.
-- Next cheapest step: characterize the nested three-predecessor root join and
-  normalize its nested guard shape to structural parity before relaxing that
-  explicit fallback; keep multi-join roots conservative until each merge frame
-  has the same normalized state and evidence order.
+  edge, so one intermediate join can retract stale output and continue through
+  later operations. Nested sibling guards merge before their enclosing guard,
+  preserving structural state/evidence for three- and four-predecessor joins.
+  Loop graphs retain bounded historical convergence; guard mutation, abrupt
+  paths, cycles, multiple intermediate joins, and unsupported operations retain
+  typed fallback. Production LOC is 105,947, or -1,729 from the rewrite start;
+  authoritative tracked test LOC is 143,344.
+- Next cheapest step: characterize the root with an inner join, a subsequent
+  operation inside the outer branch, an outer join, and a final operation; then
+  let per-edge replacement carry the first reduced join through the second only
+  if normalized state and evidence match exactly.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

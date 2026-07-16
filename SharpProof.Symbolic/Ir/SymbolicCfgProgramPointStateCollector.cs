@@ -735,7 +735,54 @@ internal static class SymbolicCfgProgramPointStateCollector
     {
         if (paths.Count == 1)
             return paths[0];
+        if (TryMergeGuardedPaths(paths, source, out var merged))
+            return merged;
 
+        for (var firstIndex = 0; firstIndex < paths.Count; firstIndex++)
+        {
+            var firstFrame = paths[firstIndex].GuardFrame;
+            if (firstFrame == null)
+                continue;
+
+            var siblingIndexes = Enumerable.Range(firstIndex, paths.Count - firstIndex)
+                .Where(index => paths[index].GuardFrame is { } candidate &&
+                    candidate.Baseline.NormalizedProofKey == firstFrame.Baseline.NormalizedProofKey &&
+                    TryMergeGuardFrames(
+                        new[] { firstFrame.Parent, candidate.Parent },
+                        out _))
+                .ToArray();
+            if (siblingIndexes.Length <= 1 ||
+                !TryMergeGuardedPaths(
+                    siblingIndexes.Select(index => paths[index]).ToArray(),
+                    source,
+                    out var siblingMerge))
+                continue;
+
+            var siblingSet = new HashSet<int>(siblingIndexes);
+            var reduced = new List<CfgPathState>(paths.Count - siblingIndexes.Length + 1);
+            for (var index = 0; index < paths.Count; index++)
+            {
+                if (index == firstIndex)
+                    reduced.Add(siblingMerge);
+                else if (!siblingSet.Contains(index))
+                    reduced.Add(paths[index]);
+            }
+            return MergeIncomingStates(reduced, source);
+        }
+
+        return new CfgPathState(
+            SymbolicStateMerger.MergePathStatesAcrossAll(
+                paths.Select(static path => path.State).ToArray(),
+                SymbolicStateMerger.AreEvidenceEquivalentFacts,
+                source.SpanStart),
+            null);
+    }
+
+    private static bool TryMergeGuardedPaths(
+        IReadOnlyList<CfgPathState> paths,
+        SyntaxNode source,
+        out CfgPathState merged)
+    {
         var frame = paths[0].GuardFrame;
         if (frame != null &&
             paths.All(path => path.GuardFrame is { } candidate &&
@@ -752,8 +799,11 @@ internal static class SymbolicCfgProgramPointStateCollector
                 new SymbolicState(),
                 completedStates);
             if (paths.Any(static path => path.GuardFrame!.GuardInvalidated))
-                return new CfgPathState(mergeBaseline, parentFrame);
-            return new CfgPathState(
+            {
+                merged = new CfgPathState(mergeBaseline, parentFrame);
+                return true;
+            }
+            merged = new CfgPathState(
                 SymbolicStateMerger.MergeGuardedStates(
                     mergeBaseline,
                     orderedPaths.Select(path =>
@@ -763,14 +813,11 @@ internal static class SymbolicCfgProgramPointStateCollector
                     SymbolicAnalysisLimitContext.Limits.MaxMergedIfElseFacts,
                     "cfg-program-point.if-merge"),
                 parentFrame);
+            return true;
         }
 
-        return new CfgPathState(
-            SymbolicStateMerger.MergePathStatesAcrossAll(
-                paths.Select(static path => path.State).ToArray(),
-                SymbolicStateMerger.AreEvidenceEquivalentFacts,
-                source.SpanStart),
-            null);
+        merged = default;
+        return false;
     }
 
     private static SymbolicState OrderTargetState(
@@ -1392,10 +1439,6 @@ internal static class SymbolicCfgProgramPointStateCollector
         if (graph.Blocks.Count(static block =>
                 block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 1) > 1)
             return false;
-        if (graph.Blocks.Any(static block =>
-                block.Kind != BasicBlockKind.Exit && block.Predecessors.Length > 2))
-            return false;
-
         return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
             branch.Semantics == ControlFlowBranchSemantics.Regular &&
             (branch.Destination == null || branch.Destination.Ordinal > source.Ordinal)));
