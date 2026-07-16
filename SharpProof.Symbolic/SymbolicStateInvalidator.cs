@@ -62,7 +62,7 @@ internal static class SymbolicStateInvalidator
                         "operation-transfer.mutation-invalidation"));
             }
 
-            foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
+            foreach (var receiverSymbol in GetPotentiallyMutatedReferenceSymbols(node, semanticModel, cancellationToken))
                 steps.Add(new SymbolicMutationInvalidationStep(
                     ImmutableArray.Create(ForSymbol(receiverSymbol)),
                     node.Span,
@@ -197,7 +197,7 @@ internal static class SymbolicStateInvalidator
         if (receiverSymbol is ILocalSymbol or IParameterSymbol) yield return receiverSymbol;
     }
 
-    private static IEnumerable<ISymbol> GetPotentiallyMutatedArraySymbols(
+    private static IEnumerable<ISymbol> GetPotentiallyMutatedReferenceSymbols(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -206,25 +206,25 @@ internal static class SymbolicStateInvalidator
         {
             case InvocationExpressionSyntax invocation:
                 if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-                    foreach (var symbol in GetReferencedArraySymbols(memberAccess.Expression, semanticModel,
+                    foreach (var symbol in GetReferencedMutableReferenceSymbols(memberAccess.Expression, semanticModel,
                                  cancellationToken))
                         yield return symbol;
 
                 foreach (var argument in invocation.ArgumentList.Arguments)
-                    foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
+                    foreach (var symbol in GetReferencedMutableReferenceSymbols(argument.Expression, semanticModel, cancellationToken))
                         yield return symbol;
 
                 break;
             case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
                 foreach (var argument in argumentList.Arguments)
-                    foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
+                    foreach (var symbol in GetReferencedMutableReferenceSymbols(argument.Expression, semanticModel, cancellationToken))
                         yield return symbol;
 
                 break;
         }
     }
 
-    private static IEnumerable<ISymbol> GetReferencedArraySymbols(
+    private static IEnumerable<ISymbol> GetReferencedMutableReferenceSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -233,7 +233,7 @@ internal static class SymbolicStateInvalidator
                      root,
                      semanticModel,
                      cancellationToken))
-            if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is IArrayTypeSymbol)
+            if (IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
                 yield return symbol;
     }
 

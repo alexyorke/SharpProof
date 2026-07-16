@@ -160,6 +160,198 @@ sealed class C
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expectedState)));
     }
 
+    [Test]
+    public void SwitchExitBeforeNestedBranch_RoutedFallbackIsUnreachable()
+    {
+        const string source = @"
+using System;
+static class C
+{
+    static void M(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return;
+        }
+        if (value == 0)
+            Console.WriteLine(value);
+    }
+}";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(SwitchExitBeforeNestedBranch_RoutedFallbackIsUnreachable));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var completedSwitch = fixture.Root.DescendantNodes().OfType<SwitchStatementSyntax>().Single();
+        var completion = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
+            completedSwitch,
+            new SymbolicState(),
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsUnsupported, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(
+            SymbolicReachabilityService.ClassifyStateFeasibility(routed, null).Info.Status,
+            Is.EqualTo(SymbolicProofStatus.Unreachable),
+            routed.NormalizedProofKey + Environment.NewLine +
+            completion.Provenance.Single().Detail + Environment.NewLine +
+            completion.Value?.NormalizedProofKey);
+    }
+
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; if (condition) value = 2; else value = 3; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; if (condition) value.ToString(); else value = 3; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool choose) { int value = 1; if (condition) value = choose ? 2 : 3; else value = 4; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool first, bool second) { int value = 1; if (first) { if (second) value = 2; else value = 3; } else value = 4; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool first, bool second) { int value = 1; if (first) { int inner = 2; if (second) value = inner; } else value = 4; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; if (condition) return value; value = 2; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; if (condition) throw new System.Exception(); value = 2; return value; } }",
+        typeof(IfStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int input) { int value = 1; switch (input) { case 0: value = 2; break; default: value = 3; break; } return value; } }",
+        typeof(SwitchStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int value) { switch (value) { case 0: return 0; } return 10 / value; } }",
+        typeof(SwitchStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int value) { switch (value) { case 0: return 0; default: value = 0; break; } return value; } }",
+        typeof(SwitchStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(object input) { int value = 1; switch (input) { case int _: value = 2; break; default: value = 3; break; } return value; } }",
+        typeof(SwitchStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; while (condition) value = 2; return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool stop) { int value = 1; while (condition) { if (stop) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool skip, bool stop) { int value = 1; while (condition) { if (skip) continue; if (stop) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool stop) { int value = 1; for (;;) { if (stop) break; value = 2; } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool ready, bool done) { int value = 1; for (;;) { if (!ready) continue; ready = false; if (done) break; } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool ready, bool blocked, bool done) { int value = 1; for (;;) { if (!ready) continue; if (blocked) continue; if (done) break; } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool ready, bool blocked) { int value = 1; for (;;) { if (ready) { if (blocked) continue; } break; } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool first, bool second) { int value = 1; while (condition) { if (first) { if (second) break; } value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool first, bool second) { int value = 1; while (condition) { if (first) break; if (second) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool stop) { int value = 1; while (condition) { stop = false; if (stop) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool stop) { int value = 1; while (condition) { if (stop) return value; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int[] values, int index) { while (index < values.Length) { if (index < 0) return -1; index++; } return index; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int[] values, int index) { while (index < values.Length) { if (index < 0) throw new System.Exception(); index++; } return index; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool stop) { int value = 1; while (condition) { try { if (stop) break; value = 2; } finally { value = 3; } } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool outer, bool inner, bool stop) { int value = 1; while (outer) { while (inner) { break; } if (stop) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition, bool stop, int input) { int value = 1; while (condition) { switch (input) { case 0: break; } if (stop) break; value = 2; } return value; } }",
+        typeof(WhileStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; do value = 2; while (condition); return value; } }",
+        typeof(DoStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 1; for (; condition;) value = 2; return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int count) { int value = -1; for (value = 0; value < count; value++) { break; } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int count) { int value = -1; for (value = 0; value < count; value++) { } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M() { int value = 1; for (;;) { } return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value = index; return value; } }",
+        typeof(ForStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(int[] values) { int value = 1; foreach (var item in values) value = item; return value; } }",
+        typeof(ForEachStatementSyntax))]
+    [TestCase(
+        "static class C { static int M((int, int)[] values) { int value = 1; foreach (var (left, right) in values) value = left + right; return value; } }",
+        typeof(ForEachVariableStatementSyntax))]
+    [TestCase(
+        "static class C { static int M(object gate) { int value = 1; lock (gate) value = 2; return value; } }",
+        typeof(LockStatementSyntax))]
+    public void CompletedStatementRegion_MatchesStructuralCompletion(
+        string source,
+        Type statementType)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CompletedStatementRegion_MatchesStructuralCompletion));
+        var statement = (StatementSyntax)fixture.Root.DescendantNodes()
+            .First(node => node.GetType() == statementType);
+        var entryState = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                statement,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                statement,
+                fixture.SemanticModel,
+                CancellationToken.None));
+        var expected = entryState;
+        SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
+            ref expected,
+            statement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
+            statement,
+            entryState,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected);
+    }
+
     [TestCaseSource(nameof(SeededPathCases))]
     public void SeededState_MatchesCfgStructuralAndRoutedCollectors(
         (string Source, string Target, string Parameter, SeedKind Kind, bool SeedSurvives) testCase)

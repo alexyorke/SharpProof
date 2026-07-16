@@ -381,12 +381,13 @@ public sealed class NotNullIfNotNullIndexer
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
-        var state = new SymbolicState();
-        SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts(
-            ref state,
+        var result = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
             loopStatement,
+            new SymbolicState(),
             context.SemanticModel,
             CancellationToken.None);
+        if (result is not { IsExact: true, Value: { } state })
+            throw new InvalidOperationException(result.Provenance.Single().Detail);
 
         return state
             .Normalize()

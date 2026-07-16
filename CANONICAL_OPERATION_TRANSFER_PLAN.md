@@ -289,7 +289,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
     reachability, and conditional/coalesce throw guards through typed canonical
     transitions. Their structural callers now only adopt exact transition
     states and retain unsupported shapes as conservative fallbacks.
-- [ ] Migrate source queries, invariant/reachability analysis, exception paths,
+- [x] Migrate source queries, invariant/reachability analysis, exception paths,
   and Analyzer purity CFG consumers in behavior-locked vertical slices.
   - [x] Route branch-local source-query targets through the CFG collector when
     their guard remains stable. Guard-mutating reference assignments,
@@ -533,7 +533,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
     order. The three superseded routing/enumeration helpers are deleted while
     `for`, `while`, `do`, `foreach`, `if`, and `else` fallback behavior remains
     conservative.
-  - [ ] Replace the completed-if/switch/loop/lock structural policy as one
+  - [x] Replace the completed-if/switch/loop/lock structural policy as one
     CFG-backed completion-summary owner, then delete the completion-specific
     regions of `SymbolicBranchCompletionStateTransfer` and
     `SymbolicControlFlowCompletionStateTransfer`. Three independent inventories
@@ -554,7 +554,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
       transfer loop now begins at the point cursor. This is behavior-neutral for
       current callers and permits a seeded statement entry or back edge to skip
       operations outside the owned statement when both share one Roslyn block.
-    - [ ] Add a seeded statement-region CFG traversal with operation cursors,
+    - [x] Add a seeded statement-region CFG traversal with operation cursors,
       exact entry/exit membership, loop/finally continuation ownership, and
       typed `Unsupported` results. Route completed if/switch/loop/lock through
       it, prove differential parity, then delete the legacy completion regions.
@@ -971,6 +971,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 residual query-metadata adjudication | Three independent read-only audits rejected flattening the live `SymbolicQueryScope` plus `SymbolicQueryLineGroup` boundary under the 50-line gate. Removing the 54-line preview scope carrier requires carrying and assigning its eleven metadata values through the canonical result and factories, leaving only 24-30 net lines; line-group replacement contributes effectively zero to 12 lines. More importantly, file queries intentionally rebuild every nested line from grouped points after all queries finish so each child receives the final file-level SMT diagnostics. Directly storing the intermediate line results changes serialized lifecycle/counter/health fields. The exact point/line/span/file full-JSON plus explain/SARIF/source-query characterization passes 102/102. No production or test code changed; production LOC remains 106,526, or -1,150 from the rewrite start, and tracked test LOC remains 144,471. |
 | Phase 7 completion-owner deletion ranking and CI preflight | Three read-only call-graph inventories prove that `SymbolicProgramPointFacts` remains reachable for every CFG `Unsupported` family and would save at most 95 lines after replacement; Analyzer assignment/resource/state/merge owners retain Roslyn metadata, evidence, lifetime, and convergence policy and save at most 233 lines; exception adapters save at most 54. The only accepted cut is the combined completed-if/switch/loop/lock owner: 1,056 gross legacy lines with a conservative 600-750-line replacement, or 306-456 net deletion. Standalone branch or loop cuts remain below the 250-line gate. The pre-rewrite focused main parity batch passes 325/325 and the runtime-hazard/source-query/full-and-explain-JSON tooling batch passes 267/267. Separately, GitHub PR #79 is green at 8/8 checks: the historical README race was already fixed by commit `1ebaebea`, which replaced recursive transient-`bin` enumeration with `git ls-files`; local README verification and its focused test pass. No production or test code changed, so production LOC remains 106,526 and tracked test LOC remains 144,471. |
 | Phase 7 CFG operation cursors | `CfgTraversalPoint` now includes an operation cursor and block transfer starts at that index. Every existing construction defaults to zero, preserving current graph entry, successor, loop, and finally behavior while making mixed-block statement entry representable without replaying an outside prefix. The direct CFG/program-point focused gate passes 249/249. Production LOC is 106,530, or -1,146 from the rewrite start; tracked test LOC remains 144,471. |
+| Phase 7 canonical completed-statement owner | The CFG statement-region traversal now owns completed if, switch, while, do, for, foreach, foreach-variable, and lock behavior through operation slices, exact region membership, loop/finally continuation ownership, switch-label conditions, and typed conservative fallback. The 637-line `SymbolicControlFlowCompletionStateTransfer` is deleted, as are the completion-specific if/switch regions in `SymbolicBranchCompletionStateTransfer`. Full lanes exposed and locked two semantic boundaries in the canonical owner: a sole continuing switch section keeps its mutation while proven exiting sections contribute exclusions only when the governing value remains stable, and abrupt if completion preserves only the surviving branch state and condition. The collector is split into two files below 2,000 lines each and below 3,000 aggregate partial lines. The focused completion/branch/loop/switch/program-point batch passes 339/339. MainSmtOracle passes 573/573, MainSmtAnalyzer 487/487, MainSmtFlow 257/257, MainSmtCore 257/257, MainGeneral 3,935 plus the same two documented skips, and Tooling 592/592, for 6,101 passes. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,279, down 251 in this tranche and 1,397 from the rewrite start; tracked test LOC is 144,658. GitHub PR #79 and its push/PR workflows are independently green; no CI edit was required because the prior README inventory race was already repaired by `1ebaebea`. |
 
 ## Current Checkpoint
 
@@ -1210,27 +1211,21 @@ the unused preview .NET API may break when it obstructs the canonical design.
   the residual scope and line metadata at only 30-49 safe lines; retaining final
   file-level SMT diagnostics in every nested line is a byte-compatibility
   boundary. The authorized query-wrapper fallback is therefore exhausted.
-  Three new whole-owner inventories reject the residual program-point,
-  Analyzer-state, and exception-adapter cuts below the 250-line gate. The next
-  implementation tranche is the single combined branch/control-flow completion
-  summary: it must replace completed if, switch, loop, and lock policy together
-  and delete 1,056 gross legacy lines only after differential parity. GitHub CI
-  is independently confirmed green at 8/8 checks; its prior README inventory
-  race is already repaired upstream, while the local commits remain unpushed and
-  therefore have not run in Actions.
-  Its pre-rewrite state/branch/loop/finally baseline passes 325/325, and its
-  runtime-hazard/source-query/full-and-explain-JSON baseline passes 267/267.
-  Canonical CFG traversal points now carry an operation cursor; every existing
-  caller remains at zero and the 249-case direct collector/program-point gate is
-  green. This unlocks seeded statement entry without replaying a shared block's
-  outside prefix.
-  Production LOC is 106,530, or -1,146 from the rewrite start; authoritative
-  tracked test LOC is 144,471.
-- Next cheapest step: characterize and implement the combined completed-
-  statement summary over CFG target/exit membership, landing it only when the
-  focused branch, switch, loop, lock, analysis-limit, source-query, and JSON
-  parity gates permit deletion of both completion-specific legacy regions with
-  at least 250 net production lines removed. Do not split it into the rejected
-  sub-gate branch-only or loop-only cuts.
+  The combined completed-statement CFG owner is now landed locally. It owns
+  completed if/switch/loop/lock policy plus foreach protocol completion, and the
+  637-line control-flow completion owner and completion-specific branch regions
+  are deleted. Switch exclusions and abrupt-if completion were corrected from
+  full-lane reproductions before the legacy paths were removed. The focused
+  batch passes 339/339; all six lanes pass 6,101 tests with the same two
+  documented skips; and the Release warning-as-error solution build is clean.
+  Production LOC is 106,279, or -1,397 from the rewrite start; authoritative
+  tracked test LOC is 144,658. GitHub PR #79 remains green at 8/8 checks; no CI
+  edit was necessary because commit `1ebaebea` already fixed the README race.
+- Next cheapest step: recompute production reachability after the completion-
+  owner deletion, then take the first behavior-locked vertical cut that can
+  delete at least 250 net lines from `SymbolicProgramPointFacts`, the remaining
+  statement/expression/assignment/branch/loop transfer family, or Analyzer
+  assignment/state wrappers. If no such cut remains, record the call-graph
+  evidence and proceed to the final architecture and parity audit.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

@@ -19,15 +19,16 @@ internal static class SymbolicLoopTransferLowerer
     internal static SymbolicLoweringResult<SymbolicLoopTransferPlan> Lower(
         StatementSyntax loop,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowAbruptCompletion = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetCondition(loop, out var condition))
             return Unsupported(loop, "loop-kind");
-        if (CSharpSyntaxFacts.DescendantNodesInExecution(loop).Any(static node =>
+        if (!allowAbruptCompletion &&
+            CSharpSyntaxFacts.DescendantNodesInExecution(loop).Any(static node =>
                 node is BreakStatementSyntax or ContinueStatementSyntax))
             return Unsupported(loop, "abrupt-completion");
-
         SymbolicCondition entryCondition;
         SymbolicCondition exitCondition;
         if (condition == null)
@@ -58,15 +59,19 @@ internal static class SymbolicLoopTransferLowerer
             loop,
             semanticModel,
             cancellationToken);
-        if (invariantLowering is not { IsExact: true, Value: { } invariantPlan })
+        if (invariantLowering is not { IsExact: true, Value: { } invariantPlan } &&
+            !allowAbruptCompletion)
             return Unsupported(loop, "invariants");
+        var invariants = invariantLowering is { IsExact: true, Value: { } exactInvariantPlan }
+            ? exactInvariantPlan.Conditions
+            : ImmutableArray<SymbolicCondition>.Empty;
         return SymbolicLoweringResult<SymbolicLoopTransferPlan>.Exact(
             new SymbolicLoopTransferPlan(
                 loop,
                 entryCondition,
                 exitCondition,
                 invalidations,
-                invariantPlan.Conditions),
+                invariants),
             Provenance(loop, "exact"));
     }
 

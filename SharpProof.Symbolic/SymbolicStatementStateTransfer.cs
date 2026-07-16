@@ -340,33 +340,13 @@ internal static class SymbolicStatementStateTransfer
             return;
         }
 
-        if (statement is ExpressionStatementSyntax expressionStatement &&
-            expressionStatement.Expression is AssignmentExpressionSyntax assignment)
+        if (statement is ExpressionStatementSyntax expressionStatement)
         {
-            SymbolicExpressionStateTransfer.AddAssignmentExpressionStateFacts(
+            AddCompletedExpressionStatementStateFacts(
                 ref state,
-                assignment,
                 expressionStatement,
                 semanticModel,
                 cancellationToken);
-            return;
-        }
-
-        if (statement is ExpressionStatementSyntax unaryExpressionStatement &&
-            SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
-                unaryExpressionStatement.Expression,
-                semanticModel,
-                cancellationToken,
-                out var mutatedSymbol,
-                out _))
-        {
-            if (!SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
-                    ref state,
-                    mutatedSymbol,
-                    unaryExpressionStatement.Expression,
-                    semanticModel,
-                    cancellationToken))
-                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
             return;
         }
 
@@ -390,7 +370,19 @@ internal static class SymbolicStatementStateTransfer
             return;
         }
 
-        var stateBeforeStatement = state;
+        if (statement is IfStatementSyntax or SwitchStatementSyntax or
+            WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax or
+            ForEachStatementSyntax or ForEachVariableStatementSyntax or LockStatementSyntax &&
+            SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
+                statement,
+                state,
+                semanticModel,
+                cancellationToken) is { IsExact: true, Value: { } completedControlFlowState })
+        {
+            state = completedControlFlowState;
+            return;
+        }
+
         SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             statement,
@@ -421,42 +413,65 @@ internal static class SymbolicStatementStateTransfer
             return;
         }
 
-        if (statement is IfStatementSyntax completedIfStatement)
-        {
-            SymbolicBranchCompletionStateTransfer.AddCompletedIfStatementStateFacts(
-                ref state,
-                completedIfStatement,
-                stateBeforeStatement,
+        if (statement is IfStatementSyntax completedIf &&
+            SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                completedIf.Condition,
+                completedIf,
                 semanticModel,
-                cancellationToken);
-            return;
-        }
+                cancellationToken))
+            foreach (var symbol in SymbolicLoopStateTransfer.GetConditionDependencySymbols(
+                         completedIf.Condition,
+                         semanticModel,
+                         cancellationToken))
+                SymbolicStateInvalidator.InvalidateSymbol(ref state, symbol, completedIf);
+    }
 
-        if (statement is SwitchStatementSyntax completedSwitchStatement)
+    internal static void AddCompletedExpressionStatementStateFacts(
+        ref SymbolicState state,
+        ExpressionStatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (statement.Expression is AssignmentExpressionSyntax assignment)
         {
-            SymbolicBranchCompletionStateTransfer.AddCompletedSwitchStatementStateFacts(
+            SymbolicExpressionStateTransfer.AddAssignmentExpressionStateFacts(
                 ref state,
-                completedSwitchStatement,
-                stateBeforeStatement,
-                semanticModel,
-                cancellationToken);
-            return;
-        }
-
-        if (statement is ExpressionStatementSyntax completedExpressionStatement)
-            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                ref state,
-                completedExpressionStatement.Expression,
-                completedExpressionStatement,
-                true,
-                semanticModel,
-                cancellationToken);
-        else
-            SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts(
-                ref state,
+                assignment,
                 statement,
                 semanticModel,
                 cancellationToken);
+            return;
+        }
+
+        if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
+                statement.Expression,
+                semanticModel,
+                cancellationToken,
+                out var mutatedSymbol,
+                out _))
+        {
+            if (!SymbolicAssignmentValueUpdater.TryApplyComputedUpdate(
+                    ref state,
+                    mutatedSymbol,
+                    statement.Expression,
+                    semanticModel,
+                    cancellationToken))
+                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
+            return;
+        }
+
+        SymbolicStateInvalidator.InvalidateNestedMutations(
+            ref state,
+            statement,
+            semanticModel,
+            cancellationToken);
+        SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+            ref state,
+            statement.Expression,
+            statement,
+            true,
+            semanticModel,
+            cancellationToken);
     }
 
     private static void AddCompletedTryStatementStateFacts(

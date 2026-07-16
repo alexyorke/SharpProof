@@ -41,6 +41,31 @@ internal static class SwitchPathConditionBuilder
             context);
     }
 
+    internal static bool TryCreateSwitchStatementLabelSymbolicCondition(
+        ExpressionSyntax governingExpression,
+        SwitchLabelSyntax label,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition condition,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        condition = null!;
+        return TryLowerCanonicalSwitchGoverningValue(
+                   governingExpression,
+                   semanticModel,
+                   cancellationToken,
+                   getSymbolVersion,
+                   out var governingValue,
+                   out var governingType,
+                   out var context) &&
+               TryCreateCanonicalSwitchLabelCondition(
+                   governingValue,
+                   governingType,
+                   label,
+                   context,
+                   out condition);
+    }
+
     internal static bool TryCreateSwitchExpressionArmSymbolicCondition(
         ExpressionSyntax governingExpression,
         SwitchExpressionArmSyntax arm,
