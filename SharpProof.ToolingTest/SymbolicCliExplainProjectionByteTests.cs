@@ -31,7 +31,7 @@ public sealed class SymbolicCliExplainProjectionByteTests
     {
         var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
             "explain",
-            "--source-text", Source,
+            "--source-text", Source.Replace("\r\n", "\n", StringComparison.Ordinal),
             "--source-file-name", "ExplainProjection.cs",
             "--line", "5",
             "--column", "20",
