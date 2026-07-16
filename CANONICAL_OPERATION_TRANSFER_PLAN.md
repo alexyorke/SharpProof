@@ -594,6 +594,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
     exclude a catch only when the thrown runtime type is proven exact. Delete
     the static-type catch classifier, which was unsound for a base-typed local
     holding a derived exception.
+  - [x] Adjudicate completed `using` as a standalone cut. Its unique owner is
+    only 24 physical / 20 nonblank lines; a safe replacement must additionally
+    model resource flow captures or assignments, initializer completion facts,
+    scope cleanup, reverse disposal, abrupt flow, and implicit exception paths.
+    Defer it to a joint using/foreach/lock protocol-region rewrite because a
+    standalone typed plan is necessarily net-positive.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -1025,6 +1031,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 nested block completion adjudication | A second prototype retained the exact structural block-entry state, added block topology to `CfgRegionPlan`, and distinguished internal versus target scope exits. It reduced failures from 31 to 8 but still changed guarded-choice normalization/evidence, array completion facts, and all-terminal branch results. The prototype was reverted completely under the two-failure pivot rule; the clean 53-case block gate remains green. Nested structural completion is therefore an evidence-backed semantic owner until guard-choice finalization itself is unified, not merely adapted at plan entry. Production LOC remains 105,989. |
 | Phase 7 residual legacy call-graph pivot | Three independent exact caller/LOC audits found no non-block legacy island with an existing canonical replacement and at least 50 net removable lines. The 339-line ancestor-reachability island remains the guard-sensitive fallback for every typed CFG `Unsupported`; completed-try is 90 gross lines but needs typed exception-to-catch routing; using entry is 77 gross lines but retains unique binding/evidence semantics; branch/loop candidates top out at 29 safe lines. No production change was made. The next foundational slice is typed CFG exception-region/catch routing, characterized before any completed-try deletion. |
 | Phase 7 typed CFG exception-region routing | Commit `d2726997` adds a typed plan over Roslyn `TryAndCatch`, `Catch`, `FilterAndHandler`, and `Finally` regions, explicitly seeds disconnected handler paths, and deletes the 97-line completed-try owner plus its static-type catch classifier. Exact/base/incompatible catches, constant and unknown filters, ordered multiple catches, normal and throwing finally blocks, base-typed exact runtime values, unresolved runtime types, and unknown potentially throwing calls are characterized in 13 named cases with normalized state, evidence/provenance, version, contradiction, and current-value checks. Catch exclusion now requires `SymbolicRuntimeTypeFacts.TryGetExactRuntimeType`; unresolved values retain every possible completion path. The focused collector/program-point gate passes 298/298. Exception/oracle coverage passed 848/849 with the known while-exit flake immediately green in isolated serial rerun; limits pass 9/9 and impacted-selection passes 39/39. All six lanes pass 6,118 tests with the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,952 plus two skips, and Tooling 592. The Release warning-as-error solution build has zero warnings and errors. The correctness scaffold is +129 production lines, leaving production LOC at 106,118, or -1,558 from the rewrite start; tracked nonblank test LOC is 144,823. The collector partial remains under its limit at 2,986 lines. Independent GitHub inspection found PR #79 green; no CI edit was warranted because `1ebaebea` already fixed the historical README inventory race. |
+| Phase 7 completed-using standalone adjudication | Two read-only audits map the owner to 24 physical / 20 nonblank lines in `SymbolicStatementStateTransfer`. Roslyn lowers expression resources through flow captures, declaration resources through assignments, multiple resources through nested `TryAndFinally` regions with reverse disposal, returns through explicit finally continuations, and throws without an exposed disposal edge. The legacy path uniquely invalidates all nested mutations before reapplying every resource initializer's normal-completion facts; the generic CFG path does not preserve those facts, evidence, or versions, and scope-local cleanup plus implicit `Dispose` lifetime/throw behavior would require additional policy. Existing tests cover three proof outcomes but not a complete differential matrix. A safe standalone plan therefore adds more code than it deletes and is rejected before characterization churn. No code, metric, or validated behavior changed. |
 
 ## Current Checkpoint
 
@@ -1330,11 +1337,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
   thrown-type exclusion with proven exact runtime identity. Production LOC is
   106,118, or -1,558 from the rewrite start; all six lanes pass 6,118 tests with
   the same two documented MainGeneral skips.
-- Next cheapest step: characterize completed `using` expression and declaration
-  forms across normal completion, nested mutation invalidation, resource
-  binding/evidence, and abrupt bodies. Introduce one typed using-completion plan
-  and delete the 77-line statement-owned island only if exact state, evidence,
-  provenance, versions, and conservative fallback identity match.
+- Next cheapest step: audit one joint region-protocol plan for synchronous
+  `using`, foreach, and lock completion. Proceed only if a shared typed resource
+  evaluation/finally/scope-cleanup owner can delete at least 50 net lines while
+  preserving initializer completion, lifetime, evidence, version, abrupt-flow,
+  and conservative unsupported behavior. Keep `await using`, pattern disposal,
+  and implicit exceptional disposal visibly unsupported until characterized.
 - Blockers: the 11,000-line production target still requires 9,442 lines, while
   two bounded semantic-owner audits found no remaining 250-line safe cut. The
   structural fallback and Analyzer assignment/merge wrappers remain reachable
