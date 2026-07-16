@@ -1619,11 +1619,19 @@ internal static class SymbolicCfgProgramPointStateCollector
     {
         if (ContainsRegionKind(graph.Root, ControlFlowRegionKind.TryAndCatch))
             return false;
+        if (graph.Blocks.SelectMany(GetSuccessors).Any(branch =>
+                !branch.FinallyRegions.IsDefaultOrEmpty &&
+                branch.Semantics is not (
+                    ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling)))
+            return false;
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
             return true;
         return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
-            branch.Semantics == ControlFlowBranchSemantics.Regular
+            branch.Semantics is
+                ControlFlowBranchSemantics.Regular or
+                ControlFlowBranchSemantics.StructuredExceptionHandling
                 ? branch.Destination == null || branch.Destination.Ordinal > source.Ordinal
                 : branch.Semantics is
                     ControlFlowBranchSemantics.Return or
