@@ -123,8 +123,24 @@ public sealed class FuzzCaseGenerator
             "int", "", "return \"abc\"u8.Length;"),
         MethodEntry("PureArrayCreation", [OperationKind.ArrayCreation], ["ArrayCreation"], ["ArrayCreationExpression"], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "int x", "var values = new int[] { 1, x, 3 };\nreturn values[1];"),
-        Entry("PureNestedOwnershipChain", [OperationKind.PropertyReference], ["PropertyReference", "SimpleAssignment", "ObjectCreation"], ["SimpleMemberAccessExpression", "SimpleAssignmentExpression"], FuzzExpectation.DefinitelyPure(), false, true, BuildPureNestedOwnershipChain),
-        Entry("ImpureOwnershipEscapeChain", [OperationKind.ObjectCreation], ["ObjectCreation", "PropertyReference", "Return"], ["ObjectCreationExpression"], FuzzExpectation.DefinitelyImpure(), false, true, BuildImpureOwnershipEscapeChain),
+        Entry("PureNestedOwnershipChain", [OperationKind.PropertyReference], ["PropertyReference", "SimpleAssignment", "ObjectCreation"], ["SimpleMemberAccessExpression", "SimpleAssignmentExpression"], FuzzExpectation.DefinitelyPure(), false, true,
+            (_, _, className) => BuildOwnershipChainCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                    outer.Value.Value.Value = 1;
+                    return outer.Value.Value.Value;
+                }
+                """)),
+        Entry("ImpureOwnershipEscapeChain", [OperationKind.ObjectCreation], ["ObjectCreation", "PropertyReference", "Return"], ["ObjectCreationExpression"], FuzzExpectation.DefinitelyImpure(), false, true,
+            (_, _, className) => BuildOwnershipChainCompilationUnit(className, $$"""
+                [EnforcePure]
+                public {{className}}Outer TestMethod()
+                {
+                    return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                }
+                """)),
         MethodEntry("ImpureConsoleWrite", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, true,
             "void", "", "Console.WriteLine(\"impure\");"),
         MethodEntry("ImpureDynamicDispatch", [OperationKind.DynamicInvocation], ["DynamicInvocation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
@@ -232,7 +248,15 @@ public sealed class FuzzCaseGenerator
             """),
         ExpressionEntry("ImpureAmbientDateTime", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.DefinitelyImpure(), false,
             "int x", ["DateTime.Now.Day"]),
-        Entry("ImpureAwaitTaskDelay", [OperationKind.Await], ["Await"], ["AwaitExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureAwaitTaskDelay),
+        Entry("ImpureAwaitTaskDelay", [OperationKind.Await], ["Await"], ["AwaitExpression"], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, """
+                [EnforcePure]
+                public async Task<int> TestMethod()
+                {
+                    await Task.Delay(1);
+                    return 1;
+                }
+                """, ["System", "System.Threading.Tasks"])),
         StaticEntry("ImpureLockSection", [OperationKind.Lock], ["Lock"], ["LockStatement"], FuzzExpectation.DefinitelyImpure(), false, false,
             """
                 private readonly object _gate = new object();
@@ -312,7 +336,25 @@ public sealed class FuzzCaseGenerator
                     return new T();
                 }
             """),
-        Entry("ImpureEventAssignment", [OperationKind.EventAssignment], ["EventAssignment", "EventReference"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureEventAssignment),
+        Entry("ImpureEventAssignment", [OperationKind.EventAssignment], ["EventAssignment", "EventReference"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public void TestMethod({{className}}Source source)
+                {
+                    source.Changed += Handle;
+                }
+
+                private static void Handle(object sender, EventArgs args) { }
+                """, ["System"], prefix: $$"""
+                public sealed class {{className}}Source
+                {
+                    public event EventHandler Changed
+                    {
+                        add { }
+                        remove { }
+                    }
+                }
+                """)),
         MethodEntry("PureAnonymousObjectCreation", [OperationKind.AnonymousObjectCreation], ["AnonymousObjectCreation"], [], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "int x", "var item = new { Value = x, Next = x + 1 };\nreturn item.Value + item.Next;"),
         MethodEntry("PureDefaultValue", [OperationKind.DefaultValue], ["DefaultValue"], [], FuzzExpectation.DefinitelyPure(), false, true,
@@ -325,11 +367,51 @@ public sealed class FuzzCaseGenerator
             "int", "int value", "return nameof(value).Length;"),
         MethodEntry("ImpureDynamicIndexerAccess", [OperationKind.DynamicIndexerAccess], ["DynamicIndexerAccess"], [], FuzzExpectation.DefinitelyImpure(), false, false,
             "int", "dynamic values", "return values[0];"),
-        Entry("ImpureDynamicObjectCreation", [OperationKind.DynamicObjectCreation], ["DynamicObjectCreation"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureDynamicObjectCreation),
+        Entry("ImpureDynamicObjectCreation", [OperationKind.DynamicObjectCreation], ["DynamicObjectCreation"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod(dynamic value)
+                {
+                    var widget = new {{className}}Widget(value);
+                    return 1;
+                }
+                """, [], prefix: $$"""
+                public sealed class {{className}}Widget
+                {
+                    public {{className}}Widget(int value)
+                    {
+                    }
+                }
+                """)),
         MethodEntry("PureTuple", [OperationKind.Tuple], ["Tuple"], ["TupleExpression"], FuzzExpectation.DefinitelyPure(), false, true,
             "int", "int x", "var pair = (Left: x, Right: x + 1);\nreturn pair.Left + pair.Right;"),
-        Entry("ImpureInterfaceGetter", [OperationKind.PropertyReference], ["PropertyReference"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureInterfaceGetter),
-        Entry("PureRecursivePattern", [OperationKind.RecursivePattern], ["RecursivePattern"], ["RecursivePattern"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureRecursivePattern),
+        Entry("ImpureInterfaceGetter", [OperationKind.PropertyReference], ["PropertyReference"], [], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod(I{{className}}Value value)
+                {
+                    return value.Value;
+                }
+                """, [], prefix: $$"""
+                public interface I{{className}}Value
+                {
+                    int Value { get; }
+                }
+                """)),
+        Entry("PureRecursivePattern", [OperationKind.RecursivePattern], ["RecursivePattern"], ["RecursivePattern"], FuzzExpectation.DefinitelyPure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod({{className}}Node node)
+                {
+                    return node is { Next: { Value: > 0 } } ? 1 : 0;
+                }
+                """, [], prefix: $$"""
+                public sealed class {{className}}Node
+                {
+                    public {{className}}Node? Next { get; set; }
+                    public int Value { get; set; }
+                }
+                """)),
         MethodEntry("PureSpreadCollectionExpression", [OperationKind.CollectionExpression, OperationKind.Spread], ["CollectionExpression", "Spread"], ["CollectionExpression"], FuzzExpectation.DefinitelyPure(), false, false,
             "int", "int[] values", "int[] copy = [0, .. values, 9];\nreturn copy.Length;"),
         MethodEntry("PureSwitchExpression", [OperationKind.SwitchExpression], ["SwitchExpression"], ["SwitchExpression"], FuzzExpectation.DefinitelyPure(), false, false,
@@ -343,8 +425,24 @@ public sealed class FuzzCaseGenerator
             """),
         MethodEntry("PureRangeSlice", [OperationKind.Range], ["Range"], ["RangeExpression"], FuzzExpectation.DefinitelyPure(), false, false,
             "int", "string text", "return text[1..^1].Length;"),
-        Entry("PureYieldReturn", [OperationKind.YieldReturn], ["YieldReturn"], ["YieldReturnStatement"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureYieldReturn),
-        Entry("ImpureWithExpression", [OperationKind.With], ["With"], ["WithExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureWithExpression),
+        Entry("PureYieldReturn", [OperationKind.YieldReturn], ["YieldReturn"], ["YieldReturnStatement"], FuzzExpectation.DefinitelyPure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, """
+                [EnforcePure]
+                public IEnumerable<int> TestMethod(int x)
+                {
+                    yield return x + 1;
+                    yield break;
+                }
+                """, ["System.Collections.Generic"])),
+        Entry("ImpureWithExpression", [OperationKind.With], ["With"], ["WithExpression"], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod({{className}}Data data, int x)
+                {
+                    var updated = data with { Value = x };
+                    return updated.Value;
+                }
+                """, ["System"], prefix: $"public record {className}Data(int Value, int Other);")),
         MethodEntry("PureAnonymousFunction", [OperationKind.AnonymousFunction], ["AnonymousFunction"], ["SimpleLambdaExpression"], FuzzExpectation.DefinitelyPure(), false, false,
             "int", "int x", "Func<int, int> project = static value => value + 1;\nreturn project(x);"),
         StaticEntry("PureDelegateCreation", [OperationKind.DelegateCreation], ["DelegateCreation"], [], FuzzExpectation.DefinitelyPure(), false, false,
@@ -361,11 +459,71 @@ public sealed class FuzzCaseGenerator
                     return value + 1;
                 }
             """),
-        Entry("PureImplicitIndexerReference", [OperationKind.ImplicitIndexerReference], ["ImplicitIndexerReference"], ["ElementAccessExpression"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureImplicitIndexerReference),
-        Entry("PureInterpolatedStringHandler", [OperationKind.InterpolatedStringHandlerCreation, OperationKind.InterpolatedStringAddition, OperationKind.InterpolatedStringAppendLiteral, OperationKind.InterpolatedStringAppendFormatted, OperationKind.InterpolatedStringHandlerArgumentPlaceholder], ["InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"], ["InterpolatedStringExpression"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureInterpolatedStringHandler),
-        Entry("ImpureAddressOf", [OperationKind.AddressOf], ["AddressOf"], [], FuzzExpectation.DefinitelyImpure(), true, false, BuildImpureAddressOf),
-        Entry("PureInlineArrayAccess", [OperationKind.InlineArrayAccess], ["InlineArrayAccess"], ["ElementAccessExpression"], FuzzExpectation.DefinitelyPure(), false, false, BuildPureInlineArrayAccess),
-        Entry("ImpureFunctionPointer", [OperationKind.FunctionPointerInvocation], ["FunctionPointerInvocation"], ["FunctionPointerType"], FuzzExpectation.DefinitelyImpure(), true, false, BuildImpureFunctionPointer),
+        Entry("PureImplicitIndexerReference", [OperationKind.ImplicitIndexerReference], ["ImplicitIndexerReference"], ["ElementAccessExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod({{className}}Bag bag)
+                {
+                    return bag[^1];
+                }
+                """, ["System"], prefix: $$"""
+                public sealed class {{className}}Bag
+                {
+                    public int Length => 3;
+                    public int this[int index] => index + 10;
+                }
+                """)),
+        Entry("PureInterpolatedStringHandler", [OperationKind.InterpolatedStringHandlerCreation, OperationKind.InterpolatedStringAddition, OperationKind.InterpolatedStringAppendLiteral, OperationKind.InterpolatedStringAppendFormatted, OperationKind.InterpolatedStringHandlerArgumentPlaceholder], ["InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"], ["InterpolatedStringExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public void TestMethod(int value)
+                {
+                    Log(value, $"left={value}" + $"right={value}");
+                }
+
+                private void Log(int value, [InterpolatedStringHandlerArgument("value")] {{className}}Handler handler) { }
+                """, ["System", "System.Runtime.CompilerServices"], prefix: $$"""
+                [InterpolatedStringHandler]
+                public ref struct {{className}}Handler
+                {
+                    public {{className}}Handler(int literalLength, int formattedCount, int value) { }
+                    public void AppendLiteral(string value) { }
+                    public void AppendFormatted<T>(T value) { }
+                }
+                """)),
+        Entry("ImpureAddressOf", [OperationKind.AddressOf], ["AddressOf"], [], FuzzExpectation.DefinitelyImpure(), true, false,
+            (_, _, className) => BuildCompilationUnit(className, """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    int value = 1;
+                    int* pointer = &value;
+                    return *pointer;
+                }
+                """, [], "public unsafe class")),
+        Entry("PureInlineArrayAccess", [OperationKind.InlineArrayAccess], ["InlineArrayAccess"], ["ElementAccessExpression"], FuzzExpectation.DefinitelyPure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, $$"""
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    {{className}}Buffer buffer = default;
+                    return buffer[0];
+                }
+                """, ["System.Runtime.CompilerServices"], prefix: $$"""
+                [InlineArray(4)]
+                public struct {{className}}Buffer
+                {
+                    private int _element0;
+                }
+                """)),
+        Entry("ImpureFunctionPointer", [OperationKind.FunctionPointerInvocation], ["FunctionPointerInvocation"], ["FunctionPointerType"], FuzzExpectation.DefinitelyImpure(), true, false,
+            (_, _, className) => BuildCompilationUnit(className, """
+                [EnforcePure]
+                public int TestMethod(delegate*<int, int> pointer)
+                {
+                    return pointer(1);
+                }
+                """, [], "public unsafe class")),
         MethodEntry("PureNestedLambdaLocalFunction", [OperationKind.AnonymousFunction, OperationKind.LocalFunction], ["AnonymousFunction", "LocalFunction"], ["SimpleLambdaExpression", "LocalFunctionStatement"], FuzzExpectation.DefinitelyPure(), false, false,
             "int", "int x", """
             int Outer(int seed)
@@ -391,7 +549,21 @@ public sealed class FuzzCaseGenerator
                 _ => -1
             };
             """),
-        Entry("ImpureUsingAwaitDelegateFlow", [OperationKind.UsingDeclaration, OperationKind.Await, OperationKind.AnonymousFunction], ["UsingDeclaration", "Await", "AnonymousFunction"], ["LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureUsingAwaitDelegateFlow));
+        Entry("ImpureUsingAwaitDelegateFlow", [OperationKind.UsingDeclaration, OperationKind.Await, OperationKind.AnonymousFunction], ["UsingDeclaration", "Await", "AnonymousFunction"], ["LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"], FuzzExpectation.DefinitelyImpure(), false, false,
+            (_, _, className) => BuildCompilationUnit(className, """
+                [EnforcePure]
+                public async Task<int> TestMethod()
+                {
+                    using var stream = Console.OpenStandardOutput();
+                    Func<Task<int>> factory = async () =>
+                    {
+                        await Task.Delay(1);
+                        return stream.CanWrite ? 1 : 0;
+                    };
+
+                    return await factory();
+                }
+                """, ["System", "System.Threading.Tasks"])));
 
     public FuzzCase Next(int index)
     {
@@ -443,60 +615,12 @@ public sealed class FuzzCaseGenerator
               """);
     }
 
-    private static string BuildPureNestedOwnershipChain(int index, Random random, string className)
-    {
-        return BuildOwnershipChainClass(
-            className,
-            $$"""
-                [EnforcePure]
-                public int TestMethod()
-                {
-                    var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-                    outer.Value.Value.Value = 1;
-                    return outer.Value.Value.Value;
-                }
-            """);
-    }
 
-    private static string BuildImpureOwnershipEscapeChain(int index, Random random, string className)
-    {
-        return BuildOwnershipChainClass(
-            className,
-            $$"""
-                [EnforcePure]
-                public {{className}}Outer TestMethod()
-                {
-                    return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-                }
-            """);
-    }
 
-    private static string BuildOwnershipChainClass(string className, string testMethod)
-    {
-        return $$"""
-                 {{BuildUsings()}}
 
-                 public sealed class {{className}}Box
-                 {
-                     public int Value;
-                 }
 
-                 public sealed class {{className}}Middle
-                 {
-                     public {{className}}Box Value { get; init; }
-                 }
 
-                 public sealed class {{className}}Outer
-                 {
-                     public {{className}}Middle Value { get; init; }
-                 }
 
-                 public class {{className}}
-                 {
-                 {{testMethod}}
-                 }
-                 """;
-    }
 
 
 
@@ -516,22 +640,7 @@ public sealed class FuzzCaseGenerator
 
 
 
-    private static string BuildImpureAwaitTaskDelay(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System", "System.Threading.Tasks")}}
 
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public async Task<int> TestMethod()
-                     {
-                         await Task.Delay(1);
-                         return 1;
-                     }
-                 }
-                 """;
-    }
 
 
 
@@ -547,277 +656,9 @@ public sealed class FuzzCaseGenerator
 
 
 
-    private static string BuildImpureEventAssignment(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System")}}
 
-                 public sealed class {{className}}Source
-                 {
-                     public event EventHandler Changed
-                     {
-                         add { }
-                         remove { }
-                     }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public void TestMethod({{className}}Source source)
-                     {
-                         source.Changed += Handle;
-                     }
-
-                     private static void Handle(object sender, EventArgs args) { }
-                 }
-                 """;
-    }
-
-
-
-
-
-
-
-    private static string BuildImpureDynamicObjectCreation(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings()}}
-
-                 public sealed class {{className}}Widget
-                 {
-                     public {{className}}Widget(int value)
-                     {
-                     }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod(dynamic value)
-                     {
-                         var widget = new {{className}}Widget(value);
-                         return 1;
-                     }
-                 }
-                 """;
-    }
-
-
-    private static string BuildImpureInterfaceGetter(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings()}}
-
-                 public interface I{{className}}Value
-                 {
-                     int Value { get; }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod(I{{className}}Value value)
-                     {
-                         return value.Value;
-                     }
-                 }
-                 """;
-    }
-
-    private static string BuildPureRecursivePattern(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings()}}
-
-                 public sealed class {{className}}Node
-                 {
-                     public {{className}}Node? Next { get; set; }
-                     public int Value { get; set; }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod({{className}}Node node)
-                     {
-                         return node is { Next: { Value: > 0 } } ? 1 : 0;
-                     }
-                 }
-                 """;
-    }
-
-
-
-
-    private static string BuildPureYieldReturn(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System.Collections.Generic")}}
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public IEnumerable<int> TestMethod(int x)
-                     {
-                         yield return x + 1;
-                         yield break;
-                     }
-                 }
-                 """;
-    }
-
-    private static string BuildImpureWithExpression(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System")}}
-
-                 public record {{className}}Data(int Value, int Other);
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod({{className}}Data data, int x)
-                     {
-                         var updated = data with { Value = x };
-                         return updated.Value;
-                     }
-                 }
-                 """;
-    }
-
-
-
-    private static string BuildPureImplicitIndexerReference(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System")}}
-
-                 public sealed class {{className}}Bag
-                 {
-                     public int Length => 3;
-                     public int this[int index] => index + 10;
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod({{className}}Bag bag)
-                     {
-                         return bag[^1];
-                     }
-                 }
-                 """;
-    }
-
-    private static string BuildPureInterpolatedStringHandler(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System", "System.Runtime.CompilerServices")}}
-
-                 [InterpolatedStringHandler]
-                 public ref struct {{className}}Handler
-                 {
-                     public {{className}}Handler(int literalLength, int formattedCount, int value) { }
-                     public void AppendLiteral(string value) { }
-                     public void AppendFormatted<T>(T value) { }
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public void TestMethod(int value)
-                     {
-                         Log(value, $"left={value}" + $"right={value}");
-                     }
-
-                     private void Log(int value, [InterpolatedStringHandlerArgument("value")] {{className}}Handler handler) { }
-                 }
-                 """;
-    }
-
-    private static string BuildImpureAddressOf(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings()}}
-
-                 public unsafe class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod()
-                     {
-                         int value = 1;
-                         int* pointer = &value;
-                         return *pointer;
-                     }
-                 }
-                 """;
-    }
-
-    private static string BuildPureInlineArrayAccess(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System.Runtime.CompilerServices")}}
-
-                 [InlineArray(4)]
-                 public struct {{className}}Buffer
-                 {
-                     private int _element0;
-                 }
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod()
-                     {
-                         {{className}}Buffer buffer = default;
-                         return buffer[0];
-                     }
-                 }
-                 """;
-    }
-
-    private static string BuildImpureFunctionPointer(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings()}}
-
-                 public unsafe class {{className}}
-                 {
-                     [EnforcePure]
-                     public int TestMethod(delegate*<int, int> pointer)
-                     {
-                         return pointer(1);
-                     }
-                 }
-                 """;
-    }
-
-
-
-    private static string BuildImpureUsingAwaitDelegateFlow(int index, Random random, string className)
-    {
-        return $$"""
-                 {{BuildUsings("System", "System.Threading.Tasks")}}
-
-                 public class {{className}}
-                 {
-                     [EnforcePure]
-                     public async Task<int> TestMethod()
-                     {
-                         using var stream = Console.OpenStandardOutput();
-                         Func<Task<int>> factory = async () =>
-                         {
-                             await Task.Delay(1);
-                             return stream.CanWrite ? 1 : 0;
-                         };
-
-                         return await factory();
-                     }
-                 }
-                 """;
-    }
+
+
 
     private Random CreateRandom(int index)
     {
@@ -873,16 +714,48 @@ public sealed class FuzzCaseGenerator
                  """;
     }
 
+    private static string BuildCompilationUnit(
+        string className,
+        string members,
+        string[] namespaces,
+        string classDeclaration = "public class",
+        string? prefix = null)
+    {
+        var prefixSection = prefix is null ? "" : prefix + "\n\n";
+        return $"{BuildUsings(namespaces)}\n\n{prefixSection}{classDeclaration} {className}\n{{\n" +
+               Indent(members, 4, "\n") + "\n}";
+    }
+
+    private static string BuildOwnershipChainCompilationUnit(string className, string members)
+    {
+        return BuildCompilationUnit(className, members, [], prefix: $$"""
+            public sealed class {{className}}Box
+            {
+                public int Value;
+            }
+
+            public sealed class {{className}}Middle
+            {
+                public {{className}}Box Value { get; init; }
+            }
+
+            public sealed class {{className}}Outer
+            {
+                public {{className}}Middle Value { get; init; }
+            }
+            """);
+    }
+
     private static string BuildUsings(params string[] namespaces) =>
         string.Join("\n", namespaces
             .Append("SharpProof.Attributes")
             .Select(static value => $"using {value};"));
 
-    private static string Indent(string text, int spaces)
+    private static string Indent(string text, int spaces, string? newline = null)
     {
         var padding = new string(' ', spaces);
         return string.Join(
-            Environment.NewLine,
+            newline ?? Environment.NewLine,
             text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
                 .Select(line => line.Length == 0 ? line : padding + line));
     }
