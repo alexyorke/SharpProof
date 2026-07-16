@@ -1119,6 +1119,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 fuzz compilation-unit manifest | Commit `8fc63e01` folds randomized ownership and twelve custom class/auxiliary-type builders into the ordered shape manifest through one LF-stable compilation-unit renderer. Every registry identity, order, RNG draw, source byte, shape classification, expectation, flag, and seeded sample remains unchanged. `FuzzCaseGenerator` is now 762 physical / 673 nonblank lines, down 395 physical / 346 nonblank from the pre-rewrite file. The exact manifest hash passes, the complete fuzz/shape gate passes 28/28, and the Release warning-as-error solution build has zero warnings/errors. All six lanes pass 6,137 tests plus the same two documented MainGeneral skips: Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,970 plus two skips, and Tooling 593. Production LOC is 106,067, or -1,609 from the rewrite start; tracked test LOC is 145,163. |
 | Phase 7 compact projection characterization | Commit `c5735f57` locks normalized JSON bytes for compact and invariant point/line/span/file projections plus runtime-hazard, capability, and complexity compact results in eleven named inline-hash cases. Existing full JSON and explain JSON/SARIF byte fixtures remain complementary. The new gate passes 11/11 and establishes the deletion boundary for the 2,062-line forwarding-DTO island. Production LOC remains 106,067. |
 | Phase 7 direct compact domain projection | Capability, complexity, and runtime-hazard compact output now serializes directly from the canonical domain results. The runtime-hazard materializer retains one bounded internal projection for explain Markdown/SARIF and exit-gate consumers; the public forwarding DTO graph is deleted. Eleven compact hashes and the existing explain hashes remain byte-identical, the focused main fixtures pass 22/22, the broader CLI projection gate passes 123/123, the complete Tooling lane passes 604/604, and the Release warning-as-error solution build has zero warnings/errors. Production LOC falls by 110 to 105,957, or -1,719 from the rewrite start; tracked test LOC is 145,213. |
+| Phase 7 filtered compact deletion boundary | Two additional inline hashes lock compact and invariant line projection with one target filter and zero fact, condition, and proof limits. They preserve the file-wide point budget, matched/unmatched filter bookkeeping, nested truncation flags, null omission, and exact JSON order before the forwarding-model deletion. The complete compact byte gate passes 13/13. Production LOC remains 105,957; tracked test LOC is 145,215. |
 
 ## Current Checkpoint
 
@@ -1455,7 +1456,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
   explain and exit-gate consumers share one bounded internal hazard projection.
   All compact/explain byte hashes, 145 focused tests, the full 604-case Tooling
   lane, and the Release warning-as-error solution build are green. Production
-  LOC is 105,957 and tracked test LOC is 145,213.
+  LOC is 105,957 and tracked test LOC is 145,213. Two further target-filtered,
+  zero-limit compact/invariant hashes raise the deletion gate to 13/13 and the
+  tracked test LOC to 145,215.
 - Next cheapest step: replace the remaining compact query/program-point and
   invariant forwarding models with one internal projection document. Dual-
   render point/line/span/file output against the eight compact/invariant hashes
