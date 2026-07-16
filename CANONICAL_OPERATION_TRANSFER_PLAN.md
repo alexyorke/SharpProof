@@ -410,6 +410,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     program termination. Sequential terminal statements and a lone terminal
     retain typed fallback because the structural collector preserves their
     enclosing guard instead of publishing contradictory completion.
+  - [x] Carry the exact scalar mutation symbol out of CFG operation transfer and
+    invalidate only guard frames that reference it. An inner-guard assignment
+    now drops that guard at its canonical merge while preserving the enclosing
+    guard; mutation of the enclosing guard remains typed fallback.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -591,7 +595,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 terminal identity through finally | `71243345` | 106,182 | -1,494 |
 | Phase 7 nested finally hierarchy characterization | `8dfde48a` | 106,182 | -1,494 |
 | Phase 7 abrupt nested-block completion | `264e1eb9` | 106,189 | -1,487 |
-| Phase 7 all-terminal nested-block completion | This commit | 106,255 | -1,421 |
+| Phase 7 all-terminal nested-block completion | `5f3967f9` | 106,255 | -1,421 |
+| Phase 7 frame-selective nested guard invalidation | This commit | 106,257 | -1,419 |
 
 ## Validation Ledger
 
@@ -767,6 +772,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 nested finally hierarchy characterization | Three direct structural differentials lock a return crossing nested finally regions, a throw inside finally overriding the pending return, and an outer-finally throw overriding an inner terminal. All reuse the terminal-aware continuation without new production policy. Direct collector fixtures pass 75/75, the broader program-point/invariant/operation/reachability differential passes 209/209, and MainGeneral passes 3,799 with the same two explicit skips. The preceding production slice's Oracle, Analyzer, Flow, and warning-as-error gates remain authoritative because this commit changes tests only. Production LOC remains 106,182, or -1,494 from the rewrite start; authoritative tracked test LOC is 143,376. |
 | Phase 7 abrupt nested-block completion | Nested completion validation now accepts each inner path that either reaches a typed regular block-exit edge or has a recognized terminal return/throw/program-termination edge. Roslyn return/throw value blocks are no longer mistaken for conditional branches because internal branch discovery requires a non-`None` condition kind. The runtime keeps terminal paths out of `nestedBlockCompletedPaths`, so only the surviving regular path determines the completed nested-block state. Direct collector fixtures pass 76/76 and the broader program-point/invariant/operation/reachability differential passes 210/210. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,800 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,189, or -1,487 from the rewrite start; authoritative tracked test LOC is 143,378. |
 | Phase 7 all-terminal nested-block completion | A nested block consisting of one explicit `if/else` now records scoped terminal paths separately from root completion, validates that every CFG path terminates, collapses sibling guard frames, and applies canonical contradictory completion. Exhaustive return/return and return/throw branches match structural normalized state and evidence. A later sequential throw and a lone return intentionally remain typed `Unsupported` after focused differentials proved the structural collector preserves their enclosing guard. Direct collector fixtures pass 80/80 and the broader program-point/invariant/operation/reachability batch passes 232/232. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,804 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,255, or -1,421 from the rewrite start; authoritative tracked test LOC is 143,386. |
+| Phase 7 frame-selective nested guard invalidation | CFG assignment/update transfer now returns the exact mutated guard symbol rather than a Boolean that caused every enclosing guard frame to be marked invalid. Frame invalidation tests each guard independently. The existing inner `nested` guard-mutation fixture moves from typed fallback to exact structural normalized state and evidence while the outer `condition` mutation remains explicitly unsupported. Direct collector fixtures pass 81/81 and the broader program-point/invariant/operation/reachability batch passes 233/233. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,805 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,257, or -1,419 from the rewrite start; authoritative tracked test LOC is 143,388. |
 
 ## Current Checkpoint
 
@@ -916,11 +922,13 @@ the unused preview .NET API may break when it obstructs the canonical design.
   operations retain typed fallback. A nested block containing one explicit
   `if/else` whose validated paths all terminate now collapses its scoped sibling
   guards before canonical contradictory completion; sequential and lone
-  terminals keep typed fallback where structural behavior differs. Production
-  LOC is 106,255, or -1,421 from the rewrite start; authoritative tracked test
-  LOC is 143,386.
-- Next cheapest step: characterize guard-mutating nested-block completion and
-  migrate it only if canonical invalidation preserves the structural normalized
-  state and evidence exactly.
+  terminals keep typed fallback where structural behavior differs. Scalar CFG
+  mutations now identify their exact target, so only referencing guard frames
+  invalidate: an inner guard mutation reaches exact structural parity while an
+  enclosing guard mutation remains fallback. Production LOC is 106,257, or
+  -1,419 from the rewrite start; authoritative tracked test LOC is 143,388.
+- Next cheapest step: characterize a reference-valued nested guard mutation and
+  migrate it only if canonical assignment plus frame-selective invalidation
+  preserves structural state and evidence exactly.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

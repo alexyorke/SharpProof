@@ -170,12 +170,14 @@ internal static class SymbolicCfgProgramPointStateCollector
                         targetIsInsideBranch,
                         semanticModel,
                         cancellationToken,
-                        out var guardInvalidated))
+                        out var invalidatedGuardTarget))
                     return Unsupported(operation.Syntax, "operation-" + operation.Kind);
-                if (guardInvalidated)
+                if (invalidatedGuardTarget != null)
                     currentPath = currentPath with
                     {
-                        GuardFrame = InvalidateGuards(currentPath.GuardFrame)
+                        GuardFrame = InvalidateGuards(
+                            currentPath.GuardFrame,
+                            invalidatedGuardTarget)
                     };
                 if (targetIsCompletedNestedBlock && site.Span.Contains(operation.Syntax.SpanStart))
                     AddOperationNormalCompletionFacts(
@@ -1128,13 +1130,13 @@ internal static class SymbolicCfgProgramPointStateCollector
     private static bool HasInvalidatedGuard(CfgGuardFrame? frame) =>
         frame != null && (frame.GuardInvalidated || HasInvalidatedGuard(frame.Parent));
 
-    private static CfgGuardFrame? InvalidateGuards(CfgGuardFrame? frame) =>
+    private static CfgGuardFrame? InvalidateGuards(CfgGuardFrame? frame, ISymbol target) =>
         frame == null
             ? null
             : frame with
             {
-                GuardInvalidated = true,
-                Parent = InvalidateGuards(frame.Parent)
+                GuardInvalidated = frame.GuardInvalidated || GuardReferencesTarget(frame.Guard, target),
+                Parent = InvalidateGuards(frame.Parent, target)
             };
 
     private static bool TryMergeGuardFrames(
@@ -1186,9 +1188,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         bool allowGuardedReferenceAssignments,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out bool guardInvalidated)
+        out ISymbol? invalidatedGuardTarget)
     {
-        guardInvalidated = false;
+        invalidatedGuardTarget = null;
         if (operation is IVariableDeclarationGroupOperation declarations)
         {
             foreach (var declarator in declarations.Declarations
@@ -1201,12 +1203,12 @@ internal static class SymbolicCfgProgramPointStateCollector
                         value,
                         guard,
                         allowGuardedReferenceAssignments,
-                        semanticModel,
-                        cancellationToken,
-                        "ir.path.prior-statement",
-                        out var declaratorInvalidatedGuard))
+                         semanticModel,
+                         cancellationToken,
+                         "ir.path.prior-statement",
+                         out var declaratorInvalidatedGuardTarget))
                     return false;
-                guardInvalidated |= declaratorInvalidatedGuard;
+                invalidatedGuardTarget ??= declaratorInvalidatedGuardTarget;
             }
 
             return true;
@@ -1229,14 +1231,14 @@ internal static class SymbolicCfgProgramPointStateCollector
                     semanticModel,
                     cancellationToken,
                     "ir.path.prior-statement",
-                    out guardInvalidated)
+                    out invalidatedGuardTarget)
                 : TryApplyExplicitTargetAssignment(
                     ref state,
                     assignment,
                     guard,
                     semanticModel,
                     cancellationToken,
-                    out guardInvalidated);
+                    out invalidatedGuardTarget);
 
         var increment = operation switch
         {
@@ -1270,9 +1272,9 @@ internal static class SymbolicCfgProgramPointStateCollector
                            : SymbolicComputedUpdateKind.Decrement,
                        isChecked,
                        increment.Kind == OperationKind.Increment
-                           ? "ir.path.prior-statement.increment"
-                           : "ir.path.prior-statement.decrement",
-                       out guardInvalidated);
+                            ? "ir.path.prior-statement.increment"
+                            : "ir.path.prior-statement.decrement",
+                        out invalidatedGuardTarget);
 
         var compound = operation switch
         {
@@ -1301,9 +1303,9 @@ internal static class SymbolicCfgProgramPointStateCollector
                    semanticModel,
                    cancellationToken,
                    SymbolicComputedUpdateKind.CompoundAssignment,
-                   compoundIsChecked,
-                   "ir.path.prior-statement.compound-assignment",
-                   out guardInvalidated);
+                    compoundIsChecked,
+                    "ir.path.prior-statement.compound-assignment",
+                    out invalidatedGuardTarget);
     }
 
     private static bool TryApplyCurrentCompletion(
@@ -1465,9 +1467,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         SymbolicComputedUpdateKind updateKind,
         bool isChecked,
         string provenance,
-        out bool guardInvalidated)
+        out ISymbol? invalidatedGuardTarget)
     {
-        guardInvalidated = GuardReferencesTarget(guard, target);
+        invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
         var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
             state,
             target,
@@ -1494,15 +1496,15 @@ internal static class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string provenance,
-        out bool guardInvalidated)
+        out ISymbol? invalidatedGuardTarget)
     {
         if (RequiresStructuralAssignmentFallback(target, guard, allowGuardedReferenceAssignments))
         {
-            guardInvalidated = false;
+            invalidatedGuardTarget = null;
             return false;
         }
 
-        guardInvalidated = GuardReferencesTarget(guard, target);
+        invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
         if (value.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression ||
             SymbolMutationFacts.ExpressionReferencesSymbol(
                 expression,
@@ -1534,9 +1536,9 @@ internal static class SymbolicCfgProgramPointStateCollector
         SymbolicCondition? guard,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out bool guardInvalidated)
+        out ISymbol? invalidatedGuardTarget)
     {
-        guardInvalidated = false;
+        invalidatedGuardTarget = null;
         if (guard != null || assignment.Syntax is not AssignmentExpressionSyntax syntax)
             return false;
 
