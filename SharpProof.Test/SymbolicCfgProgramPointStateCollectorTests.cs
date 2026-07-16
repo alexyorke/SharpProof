@@ -558,8 +558,7 @@ static class C
                 includeCurrentStatementCompletionFacts: true));
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
-        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
-        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+        AssertStateParity(actual.Value!, expected);
     }
 
     [TestCase(
@@ -801,8 +800,7 @@ static class C
                 includeCurrentStatementCompletionFacts: true));
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
-        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
-        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+        AssertStateParity(actual.Value!, expected);
     }
 
     [Test]
@@ -832,8 +830,7 @@ static class C
                 includeCurrentStatementCompletionFacts: true));
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
-        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
-        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+        AssertStateParity(actual.Value!, expected);
     }
 
     [TestCase(
@@ -1133,6 +1130,40 @@ static class C
             includeCurrentStatementCompletionFacts: true);
 
         Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+    }
+
+    [TestCase(false, "root-block-control-flow")]
+    [TestCase(true, "nested-block-completion")]
+    public void BlockCurrentCompletion_UnsupportedIdentityIsStable(
+        bool nested,
+        string expectedDetail)
+    {
+        var source = nested
+            ? "static class C { static void M(bool condition) { if (condition) { System.Console.WriteLine(); } } }"
+            : "static class C { static void M() { System.Console.WriteLine(); } }";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(BlockCurrentCompletion_UnsupportedIdentityIsStable));
+        SyntaxNode site = nested
+            ? fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Statement
+            : fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
+
+        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsUnsupported, Is.True);
+            Assert.That(result.Value, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            var provenance = result.Provenance.Single();
+            Assert.That(provenance.Stage, Is.EqualTo("cfg-program-point"));
+            Assert.That(provenance.SourceSpan, Is.EqualTo(site.Span));
+            Assert.That(provenance.Detail, Is.EqualTo(expectedDetail));
+        });
     }
 
     [Test]
