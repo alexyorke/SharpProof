@@ -566,6 +566,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
     assignments, and computed updates. Delete `SymbolicExpressionStateTransfer`
     and `SymbolicAssignmentValueUpdater`; retain conservative structural fallback
     for unsupported values and keep independent normal-completion facts.
+  - [x] Recompute deletion economics after assignment completion. The 948-line
+    structural fallback needs at least 771 replacement lines for three already
+    measured gaps, and the 1,012-line Analyzer wrapper/merge surface retains
+    unique metadata/evidence policy; neither supports a 250-line safe cut. Split
+    the canonical operation lowerer by hazard versus assignment domain to clear
+    the sole remaining file-size violation without changing callers or policy.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -780,7 +786,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 residual query-metadata adjudication | `a0d75e05` | 106,526 | -1,150 |
 | Phase 7 CFG operation cursors | `e340c5fb` | 106,530 | -1,146 |
 | Phase 7 canonical completed-statement owner | `8cd632c8` | 106,279 | -1,397 |
-| Phase 7 canonical assignment completion | This commit | 106,026 | -1,650 |
+| Phase 7 canonical assignment completion | `b1bae16d` | 106,026 | -1,650 |
+| Phase 7 final architecture split | This commit | 106,037 | -1,639 |
 
 ## Validation Ledger
 
@@ -980,6 +987,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 CFG operation cursors | `CfgTraversalPoint` now includes an operation cursor and block transfer starts at that index. Every existing construction defaults to zero, preserving current graph entry, successor, loop, and finally behavior while making mixed-block statement entry representable without replaying an outside prefix. The direct CFG/program-point focused gate passes 249/249. Production LOC is 106,530, or -1,146 from the rewrite start; tracked test LOC remains 144,471. |
 | Phase 7 canonical completed-statement owner | The CFG statement-region traversal now owns completed if, switch, while, do, for, foreach, foreach-variable, and lock behavior through operation slices, exact region membership, loop/finally continuation ownership, switch-label conditions, and typed conservative fallback. The 637-line `SymbolicControlFlowCompletionStateTransfer` is deleted, as are the completion-specific if/switch regions in `SymbolicBranchCompletionStateTransfer`. Full lanes exposed and locked two semantic boundaries in the canonical owner: a sole continuing switch section keeps its mutation while proven exiting sections contribute exclusions only when the governing value remains stable, and abrupt if completion preserves only the surviving branch state and condition. The collector is split into two files below 2,000 lines each and below 3,000 aggregate partial lines. The focused completion/branch/loop/switch/program-point batch passes 339/339. MainSmtOracle passes 573/573, MainSmtAnalyzer 487/487, MainSmtFlow 257/257, MainSmtCore 257/257, MainGeneral 3,935 plus the same two documented skips, and Tooling 592/592, for 6,101 passes. The Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,279, down 251 in this tranche and 1,397 from the rewrite start; tracked test LOC is 144,658. GitHub PR #79 and its push/PR workflows are independently green; no CI edit was required because the prior README inventory race was already repaired by `1ebaebea`. |
 | Phase 7 canonical assignment completion | CFG operation transfer now owns declaration, expression-statement, coalesce, deconstruction, simple-assignment, and computed-update completion. The 166-line `SymbolicExpressionStateTransfer` and 253-line `SymbolicAssignmentValueUpdater` are deleted; one stateful assignment helper retains the required snapshots and checked/unchecked integral semantics. Full-lane reproductions exposed unsupported invocation/await/index RHS values dropping independent normal-completion facts; those values now invalidate conservatively while normal-completion conditions survive, and the direct CFG collector retains typed `Unsupported` rather than publishing partial precision. A focused invariant locks unsupported current assignment-expression fallback. The static impacted-test inventory is regenerated so selection maps the new owner and no longer names either deleted file; its focused tooling gate passes 39/39. The focused differential batch passes 458/458 and the final operation-transfer batch 44/44. All six lanes pass 6,101 tests with the same two documented skips (Oracle 573, Analyzer 487, Flow 257, Core 257, MainGeneral 3,936 plus two skips, Tooling 591). The Release solution warning-as-error build has zero warnings and errors. No partial type exceeds 3,000 aggregate lines. Production LOC is 106,026, down 253 in this tranche and 1,650 from the rewrite start; tracked test LOC is 144,693. |
+| Phase 7 post-assignment deletion and architecture audit | Three independent read-only audits found no defensible 250-line behavior-preserving cut. The largest structural fallback island is 948 physical lines, but the recorded finally-multipath, completed-loop, and coalesce gaps alone require at least 771 replacement lines before pricing other unsupported shapes, limiting theoretical net removal to 177. All remaining statement, assignment, branch, and loop methods have production callers. Analyzer assignment/adaptor/merge owners total 1,012 live lines and uniquely retain delegate, capture, resource, alias, mutation-evidence, and metadata-merge policy; a full rewrite has a defensible best-case net of 147 lines. Hazard candidate factories are source/order adapters and create no independent hazard operations. `SymbolicOperationLowerer` was the sole file-size violation and is now split into 996-line hazard and 1,275-line assignment files as one two-part canonical owner. Metrics report no file above 2,000 lines, no partial above 3,000 aggregate lines or eight parts, and no dependency/module assignment violations. Direct lowerer tests pass 61/61, impacted-selection tooling passes 39/39, and the Release solution warning-as-error build has zero warnings and errors. Production LOC is 106,037, or -1,639 from the rewrite start; tracked test LOC remains 144,693. |
 
 ## Current Checkpoint
 
@@ -1238,10 +1246,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   458/458, all six lanes pass 6,101 tests with two documented skips, and the
   Release warning-as-error solution build is clean. Production LOC is 106,026,
   or -1,650 from the rewrite start; authoritative tracked test LOC is 144,693.
-- Next cheapest step: recompute reachability in the remaining assignment,
-  branch, loop, program-point, and Analyzer wrapper families. Take the first
-  behavior-locked cut worth at least 250 net lines; if the prior sub-gate audits
-  remain conclusive, record them and proceed to the final architecture/parity
-  audit rather than creating a net-positive replacement.
+  Three post-change audits then proved no remaining 250-line behavior-preserving
+  cut in the structural fallback, Analyzer wrapper/merge, or runtime-hazard
+  adapter families. The canonical operation lowerer is split by hazard and
+  assignment domain, clearing the sole file-size violation. Production LOC is
+  106,037, or -1,639 from the rewrite start; no file or partial type violates
+  the architecture limits.
+- Next cheapest step: adjudicate the residual eight-line `Unsupported` helper
+  clone and the test-only `SymbolicOperationLowerer.Lower(IOperation, ...)`
+  entry point, then run the second final semantic-owner audit. Stop this Phase 7
+  search if that audit also finds no high/medium parallel semantic owner.
 - Blockers: none. MainSmtFlow now passes 257/257; the prior SP0010 baseline has
   been repaired and is no longer a current blocker.

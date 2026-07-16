@@ -5038,6 +5038,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicOperationLowerer.Assignments.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicOperationLowerer"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SymbolicOperationLowerer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicOperationLowerer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -8943,6 +8954,18 @@
                                                    "SymbolicOperationSequence"
                                                ],
                                     "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicOperationLowerer.Assignments.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests",
+                                                                 "SymbolicSemanticPipelineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicOperationLowerer"
+                                               ],
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicOperationLowerer.cs",
