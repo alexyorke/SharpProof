@@ -386,6 +386,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
     A surviving regular path now exclusively determines normal root completion,
     while exhaustive return paths collapse their guard hierarchy to the pre-
     branch baseline before canonical unreachable completion is applied.
+  - [x] Route direct throw branches through the same terminal-path boundary.
+    Reject any root containing a Roslyn `TryAndCatch` region after a focused
+    differential proved the CFG worklist omitted the exceptional alternative;
+    the structural collector remains the conservative fallback for that shape.
 - [ ] Delete `SymbolicProgramPointFacts`, the statement/expression/assignment,
   branch/loop/completion transfer family, and Analyzer assignment/state wrappers
   once no semantic caller reaches them.
@@ -561,7 +565,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 current predecessor-edge states | `4fb90284` | 105,906 | -1,770 |
 | Phase 7 hierarchical nested root joins | `08decbfd` | 105,947 | -1,729 |
 | Phase 7 root scope-exit joins | `ef4413d3` | 106,044 | -1,632 |
-| Phase 7 mixed terminal root completion | This commit | 106,150 | -1,526 |
+| Phase 7 mixed terminal root completion | `179fc4e4` | 106,150 | -1,526 |
+| Phase 7 direct-throw root completion boundary | This commit | 106,154 | -1,522 |
 
 ## Validation Ledger
 
@@ -731,6 +736,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 hierarchical nested root joins | Incoming paths with compatible immediate baselines and parent guard frames now merge as siblings before the reduced path set merges at its enclosing frame. This reproduces the structural engine's nested order for three-predecessor if/if and if/if-else joins plus a recursively reduced four-predecessor if/else-if join, without flattening their conditions. A root with two distinct intermediate joins is explicitly characterized as typed fallback. Direct collector fixtures pass 59/59; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the four-worker full MainGeneral lane passes 3,782 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 105,947, or -1,729 from the rewrite start; authoritative tracked test LOC is 143,344. |
 | Phase 7 root scope-exit joins | Acyclic root completion no longer limits the number of intermediate joins. Sequential independent joins and nested inner/outer joins now reach exact structural parity. The focused diff exposed a leaked branch-local declaration after its lexical scope: root-completion propagation now consumes Roslyn `ControlFlowRegion.Locals`, applies canonical invalidation to the path and guard baselines, and preserves only locals visible immediately before the root closing brace. This removes the leaked guarded `inner` equality without changing ordinary loop queries. Direct collector fixtures pass 61/61; MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; the four-worker full MainGeneral lane passes 3,785 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,044, or -1,632 from the rewrite start; authoritative tracked test LOC is 143,348. |
 | Phase 7 mixed terminal root completion | Root completion now records the direct final return separately from earlier terminal paths. Mixed early-return roots publish only the surviving normal path, while exhaustive if/else returns recursively collapse matching true/false guard frames to their structural pre-branch baseline before canonical contradictory completion. Direct collector fixtures pass 63/63 and the broader program-point/invariant/operation/reachability differential passes 197/197. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,787 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,150, or -1,526 from the rewrite start; authoritative tracked test LOC is 143,352. |
+| Phase 7 direct-throw root completion boundary | Mixed early-throw roots and exhaustive throw/return roots match structural normalized state and evidence through the canonical terminal-path split. A `try`/`catch` reproduction initially returned `Exact` while omitting the catch alternative; root completion now detects Roslyn `TryAndCatch` regions and returns typed `Unsupported` so the structural collector remains authoritative. Direct collector fixtures pass 67/67 and the broader program-point/invariant/operation/reachability differential passes 201/201. MainSmtOracle passes 573/573; MainSmtAnalyzer passes 487/487; MainGeneral passes 3,791 with the same two explicit skips; MainSmtFlow remains at its recorded 256 passes plus the documented SP0010 baseline failure. The Release solution warning-as-error build has zero warnings. Production LOC is 106,154, or -1,522 from the rewrite start; authoritative tracked test LOC is 143,360. |
 
 ## Current Checkpoint
 
@@ -834,7 +840,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
   The final residual graph contains only 43 candidate span lines, all known
   reflection, initializer, serializer, or public-result boundaries, so another
   dead-island sweep is below the 50-line stop threshold. Production LOC is
-  now 106,150, or -1,526 from the rewrite start. Assignment-expression current
+  now 106,154, or -1,522 from the rewrite start. Assignment-expression current
   completion crosses the canonical CFG cut with normalized-state and evidence
   parity. Current-instance member and element writes now share one explicit
   target lowerer across CFG and structural transfer. Exact single-declarator
@@ -867,12 +873,15 @@ the unused preview .NET API may break when it obstructs the canonical design.
   Multiple acyclic joins now compose, with CFG-region scope exit removing
   branch-local facts while preserving root locals. Mixed early-return roots
   retain only the surviving normal state; exhaustive returns collapse their
-  guard hierarchy before canonical unreachable completion. Loop graphs retain bounded
+  guard hierarchy before canonical unreachable completion. Direct throw
+  branches share that terminal boundary. Roots containing `TryAndCatch` regions
+  select typed fallback after differential evidence exposed a missing catch
+  alternative. Loop graphs retain bounded
   historical convergence; guard mutation, abrupt paths, cycles, and unsupported
-  operations retain typed fallback. Production LOC is 106,150, or -1,526 from
-  the rewrite start; authoritative tracked test LOC is 143,352.
-- Next cheapest step: characterize mixed root completion with an early direct
-  throw and a surviving regular path, then retain typed fallback for exception-
-  handling regions whose completion ordering is not yet exact.
+  operations retain typed fallback. Production LOC is 106,154, or -1,522 from
+  the rewrite start; authoritative tracked test LOC is 143,360.
+- Next cheapest step: characterize root `try`/`finally` completion with normal
+  and overriding terminal continuations, preserving typed fallback unless its
+  normalized state and evidence match the structural collector exactly.
 - Blockers: none. The known SP0010 focused failure must be tracked as baseline,
   not attributed to the rewrite without new evidence.

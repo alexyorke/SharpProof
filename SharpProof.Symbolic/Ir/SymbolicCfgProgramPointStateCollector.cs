@@ -1617,6 +1617,8 @@ internal static class SymbolicCfgProgramPointStateCollector
 
     private static bool SupportsRootBlockCompletion(ControlFlowGraph graph)
     {
+        if (ContainsRegionKind(graph.Root, ControlFlowRegionKind.TryAndCatch))
+            return false;
         if (graph.Blocks.Count(static block =>
                 block.Operations.Length != 0 || block.BranchValue != null) <= 1)
             return true;
@@ -1629,6 +1631,9 @@ internal static class SymbolicCfgProgramPointStateCollector
                     ControlFlowBranchSemantics.Rethrow or
                     ControlFlowBranchSemantics.ProgramTermination));
     }
+
+    private static bool ContainsRegionKind(ControlFlowRegion region, ControlFlowRegionKind kind) =>
+        region.Kind == kind || region.NestedRegions.Any(nested => ContainsRegionKind(nested, kind));
 
     private static CfgRootCompletionPlan CreateRootCompletionPlan(
         ControlFlowGraph graph,
