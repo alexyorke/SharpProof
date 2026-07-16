@@ -96,6 +96,70 @@ sealed class C
                 new[] { "second" }, "first", 9)
         };
 
+    private static IEnumerable<TestCaseData> CompletedTryCases()
+    {
+        yield return CompletedTryCase(
+            "ExactCatch",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.ArgumentException) { value = 2; } } }",
+            expectedInteger: 2);
+        yield return CompletedTryCase(
+            "BaseCatch",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.Exception) { value = 3; } } }",
+            expectedInteger: 3);
+        yield return CompletedTryCase(
+            "IncompatibleCatch",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.InvalidOperationException) { value = 4; } } }",
+            expectedContradictory: true);
+        yield return CompletedTryCase(
+            "ConstantFalseFilterFallsThrough",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.ArgumentException) when (false) { value = 2; } catch (System.Exception) { value = 3; } } }",
+            expectedInteger: 3);
+        yield return CompletedTryCase(
+            "ConstantTrueFilter",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.ArgumentException) when (true) { value = 4; } } }",
+            expectedInteger: 4);
+        yield return CompletedTryCase(
+            "UnknownFilterAndLaterCatch",
+            "static class C { static void M(bool filter) { int value = 0; try { throw new System.ArgumentException(); } catch (System.ArgumentException) when (filter) { value = 2; } catch (System.Exception) { value = 3; } } }",
+            expectedInteger: null);
+        yield return CompletedTryCase(
+            "IncompatibleThenBaseCatch",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.InvalidOperationException) { value = 2; } catch (System.Exception) { value = 3; } } }",
+            expectedInteger: 3);
+        yield return CompletedTryCase(
+            "EarlierExactAndLaterBaseCatch",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.ArgumentException) { value = 2; } catch (System.Exception) { value = 3; } } }",
+            expectedInteger: null);
+        yield return CompletedTryCase(
+            "BaseTypedExactRuntimeCatch",
+            "static class C { static void M() { int value = 0; System.Exception error = new System.ArgumentException(); try { throw error; } catch (System.ArgumentException) { value = 2; } } }",
+            expectedInteger: 2);
+        yield return CompletedTryCase(
+            "UnknownRuntimeTypeCatch",
+            "static class C { static void M(System.Exception error) { int value = 0; try { throw error; } catch (System.ArgumentException) { value = 2; } } }",
+            expectedInteger: 2);
+        yield return CompletedTryCase(
+            "CatchThenFinally",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.Exception) { value = 3; } finally { value = 4; } } }",
+            expectedInteger: 4);
+        yield return CompletedTryCase(
+            "ThrowingFinally",
+            "static class C { static void M() { int value = 0; try { throw new System.ArgumentException(); } catch (System.Exception) { value = 3; } finally { throw new System.InvalidOperationException(); } } }",
+            expectedContradictory: true);
+        yield return CompletedTryCase(
+            "UnknownPotentialThrow",
+            "static class C { static void Touch() { } static void M() { int value = 0; try { value = 1; Touch(); } catch { value = 2; } } }",
+            expectedInteger: null);
+    }
+
+    private static TestCaseData CompletedTryCase(
+        string name,
+        string source,
+        long? expectedInteger = null,
+        bool expectedContradictory = false) =>
+        new TestCaseData(source, expectedInteger, expectedContradictory)
+            .SetName($"CompletedTry_{name}");
+
     private static IEnumerable<TestCaseData> CoalesceAssignmentCompletionCases()
     {
         yield return CoalesceCase(
@@ -350,6 +414,49 @@ static class C
 
         Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
         AssertStateParity(actual.Value!, expected);
+    }
+
+    [TestCaseSource(nameof(CompletedTryCases))]
+    public void CompletedTry_MatchesStructuralCompletion(
+        string source,
+        long? expectedInteger,
+        bool expectedContradictory)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CompletedTry_MatchesStructuralCompletion));
+        var statement = fixture.Root.DescendantNodes().OfType<TryStatementSyntax>().Single();
+        var entryState = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                statement,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                statement,
+                fixture.SemanticModel,
+                CancellationToken.None));
+        var expected = entryState;
+        SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
+            ref expected,
+            statement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
+            statement,
+            entryState,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected);
+        Assert.That(actual.Value!.IsContradictory, Is.EqualTo(expectedContradictory));
+        if (expectedInteger.HasValue)
+        {
+            var value = GetLocal(fixture, "value");
+            Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(actual.Value, value, out var current), Is.True);
+            Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(expectedInteger.Value)));
+        }
     }
 
     [Test]

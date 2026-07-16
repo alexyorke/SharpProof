@@ -340,17 +340,7 @@ internal static class SymbolicStatementStateTransfer
             return;
         }
 
-        if (statement is TryStatementSyntax completedTryStatement)
-        {
-            AddCompletedTryStatementStateFacts(
-                ref state,
-                completedTryStatement,
-                semanticModel,
-                cancellationToken);
-            return;
-        }
-
-        if (statement is IfStatementSyntax or SwitchStatementSyntax or
+        if (statement is TryStatementSyntax or IfStatementSyntax or SwitchStatementSyntax or
             WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax or
             ForEachStatementSyntax or ForEachVariableStatementSyntax or LockStatementSyntax &&
             SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
@@ -404,97 +394,6 @@ internal static class SymbolicStatementStateTransfer
                          semanticModel,
                          cancellationToken))
                 SymbolicStateInvalidator.InvalidateSymbol(ref state, symbol, completedIf);
-    }
-
-    private static void AddCompletedTryStatementStateFacts(
-        ref SymbolicState state,
-        TryStatementSyntax tryStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var entryState = state;
-        var completionStates = new List<SymbolicState>();
-        AddCompletion(tryStatement.Block, invalidateTryMutations: false);
-
-        void AddCompletion(BlockSyntax block, bool invalidateTryMutations)
-        {
-            if (SymbolicControlFlowFacts.StatementDefinitelyExits(block, semanticModel, cancellationToken)) return;
-            var branchState = entryState;
-            if (invalidateTryMutations)
-                SymbolicStateInvalidator.InvalidateNestedMutations(
-                    ref branchState, tryStatement.Block, semanticModel, cancellationToken);
-            AddCompletedBlockStateFacts(ref branchState, block, semanticModel, cancellationToken);
-            if (!branchState.IsContradictory) completionStates.Add(branchState);
-        }
-
-        foreach (var catchClause in tryStatement.Catches)
-        {
-            var branchLimit = SymbolicAnalysisLimitContext.Limits.MaxTryCompletionBranches;
-            if (completionStates.Count >= branchLimit)
-            {
-                SymbolicAnalysisLimitContext.Record(
-                    SymbolicAnalysisLimitKind.TryCompletionBranches,
-                    branchLimit,
-                    completionStates.Count + 1,
-                    tryStatement,
-                    "program_point.try_completion_branches");
-                break;
-            }
-
-            if (CatchClauseCanHandleKnownThrow(tryStatement, catchClause, semanticModel, cancellationToken))
-                AddCompletion(catchClause.Block, invalidateTryMutations: true);
-        }
-
-        if (completionStates.Count == 0)
-        {
-            state = SymbolicOperationTransferKernel.Complete(entryState, tryStatement.Span).State;
-            return;
-        }
-
-        state = SymbolicOperationTransferKernel.Merge(
-            entryState,
-            completionStates.ToImmutableArray(),
-            tryStatement).State;
-        if (tryStatement.Finally?.Block is { } finallyBlock)
-        {
-            AddCompletedBlockStateFacts(
-                ref state,
-                finallyBlock,
-                semanticModel,
-                cancellationToken);
-            if (SymbolicControlFlowFacts.StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
-                state = SymbolicOperationTransferKernel.Complete(state, finallyBlock.Span).State;
-        }
-
-        foreach (var hiddenSymbol in SymbolicBranchCompletionStateTransfer.GetLocalsDeclaredInside(
-                     tryStatement,
-                     semanticModel,
-                     cancellationToken))
-            state = SymbolicStateValueFacts.RemoveReferences(state, hiddenSymbol);
-    }
-
-    private static bool CatchClauseCanHandleKnownThrow(
-        TryStatementSyntax tryStatement,
-        CatchClauseSyntax catchClause,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (catchClause.Filter?.FilterExpression is { } filterExpression)
-        {
-            var filterValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
-            if (filterValue is { HasValue: true, Value: false }) return false;
-        }
-
-        if (catchClause.Declaration?.Type is not { } caughtTypeSyntax ||
-            tryStatement.Block.Statements.Count != 1 ||
-            tryStatement.Block.Statements[0] is not ThrowStatementSyntax { Expression: { } thrownExpression })
-            return true;
-
-        var thrownType = semanticModel.GetTypeInfo(thrownExpression, cancellationToken).Type;
-        var caughtType = semanticModel.GetTypeInfo(caughtTypeSyntax, cancellationToken).Type;
-        if (thrownType == null || caughtType == null) return true;
-
-        return semanticModel.Compilation.ClassifyConversion(thrownType, caughtType).IsImplicit;
     }
 
     internal static void AddCompletedBlockStateFacts(

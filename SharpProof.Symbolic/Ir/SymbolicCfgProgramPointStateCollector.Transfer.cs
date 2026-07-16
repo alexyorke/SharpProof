@@ -163,7 +163,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                SymbolEqualityComparer.Default.Equals(typeInfo.Type, typeInfo.ConvertedType);
     }
 
-    private static IEnumerable<ControlFlowRegion> EnumerateRegions(ControlFlowRegion region)
+    internal static IEnumerable<ControlFlowRegion> EnumerateRegions(ControlFlowRegion region)
     {
         yield return region;
         foreach (var nested in region.NestedRegions)
@@ -171,7 +171,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 yield return descendant;
     }
 
-    private static bool RegionContainsSyntax(
+    internal static bool RegionContainsSyntax(
         ControlFlowRegion region,
         ControlFlowGraph graph,
         SyntaxNode syntax)

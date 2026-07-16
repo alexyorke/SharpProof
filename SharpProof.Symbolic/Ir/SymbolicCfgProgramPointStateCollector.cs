@@ -80,11 +80,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (completedStatement != null &&
             completedStatement is not (IfStatementSyntax or SwitchStatementSyntax or
                 WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax or
-                ForEachStatementSyntax or ForEachVariableStatementSyntax or LockStatementSyntax))
+                ForEachStatementSyntax or ForEachVariableStatementSyntax or LockStatementSyntax or
+                TryStatementSyntax))
             return Unsupported(site, "statement-region.kind");
         IReadOnlyList<SymbolicLoopTransferPlan> loopPlans;
         if (completedStatement is ForEachStatementSyntax or
-            ForEachVariableStatementSyntax or LockStatementSyntax)
+            ForEachVariableStatementSyntax or LockStatementSyntax or TryStatementSyntax)
             loopPlans = Array.Empty<SymbolicLoopTransferPlan>();
         else if (!TryLowerLoopPlans(
                      completedStatement ?? executionRoot,
@@ -127,6 +128,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        if (completedStatement is TryStatementSyntax completedTry)
+            return SymbolicCfgExceptionRegionTransfer.CollectCompletedTryState(
+                graph,
+                completedTry,
+                initialState!,
+                semanticModel,
+                cancellationToken);
         if (targetIsCompletedRootBlock)
         {
             if (!SupportsRootBlockCompletion(graph, (BlockSyntax)site))

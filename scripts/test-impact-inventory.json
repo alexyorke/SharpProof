@@ -4579,6 +4579,19 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicCfgExceptionRegionTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "CfgCatchRoute",
+                                                  "CfgExceptionRegionPlan",
+                                                  "SymbolicCfgExceptionRegionTransfer"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
