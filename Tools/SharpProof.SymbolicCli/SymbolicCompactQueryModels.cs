@@ -235,7 +235,15 @@ internal sealed record SymbolicCompactQueryProjection(
     int? LineCount,
     int LinesWithProgramPoints,
     int ProgramPointCount,
-    SymbolicCompactScopeProjection Projection,
+    SymbolicCompactInvariantSummary ObservedInvariant,
+    SymbolicCompactInvariantSummary ConservativeInvariant,
+    SymbolicCompactInvariantQueryView InvariantQuery,
+    SymbolicReachabilitySummary Reachability,
+    SymbolicProgramPointSummary ProgramPointSummary,
+    IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs,
+    IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints,
+    SymbolicCompactSmtDiagnostics SmtDiagnostics,
+    SymbolicCompactOutputTruncation Truncation,
     IReadOnlyList<SymbolicCompactLineResult> Lines,
     SymbolicAnalysisTruncationInfo AnalysisTruncation,
     SymbolicCompactAnalysisSummary AnalysisSummary,
@@ -245,17 +253,8 @@ internal sealed record SymbolicCompactQueryProjection(
     internal int SchemaVersion => 1;
     internal int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
     internal string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
-    internal SymbolicCompactInvariantSummary ObservedInvariant => Projection.ObservedInvariant;
-    internal SymbolicCompactInvariantSummary ConservativeInvariant => Projection.ConservativeInvariant;
-    internal SymbolicCompactInvariantQueryView InvariantQuery => Projection.InvariantQuery;
     internal string MergedInvariantText => ConservativeInvariant.Text;
-    internal SymbolicReachabilitySummary Reachability => Projection.Reachability;
-    internal SymbolicProgramPointSummary ProgramPointSummary => Projection.ProgramPointSummary;
     internal SymbolicProofOutcomeSummary ProofOutcomes => ProgramPointSummary.ProofOutcomes;
-    internal IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs => Projection.ConditionProofs;
-    internal IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => Projection.ProgramPoints;
-    internal SymbolicCompactSmtDiagnostics SmtDiagnostics => Projection.SmtDiagnostics;
-    internal SymbolicCompactOutputTruncation Truncation => Projection.Truncation;
 
     internal static SymbolicCompactQueryProjection Create(
         SymbolicQueryResult result,
@@ -265,15 +264,78 @@ internal sealed record SymbolicCompactQueryProjection(
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
         var scope = SymbolicCompactQueryScope.FromResult(result);
-        var (lineCount, linesWithProgramPoints, programPointCount, projection, lines, truncation) =
-            result.Scope.Kind == SymbolicQueryScopeKind.Point
-                ? CreatePoint(result.ProgramPoints.Single(), normalizedOptions)
-                : CreateAggregate(result, normalizedOptions);
+        var point = result.Scope.Kind == SymbolicQueryScopeKind.Point
+            ? result.ProgramPoints.Single()
+            : null;
+        var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.Lines : null;
+        var lines = new List<SymbolicCompactLineResult>();
+        var remainingProgramPoints = normalizedOptions.MaxProgramPoints;
+        foreach (var line in sourceLines ?? Array.Empty<SymbolicQueryResult>())
+        {
+            if (lines.Count >= normalizedOptions.MaxLines) break;
+            var pointLimit = remainingProgramPoints;
+            lines.Add(CreateLineResult(line, normalizedOptions, pointLimit));
+            if (remainingProgramPoints > 0)
+                remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
+        }
+
+        var isFile = sourceLines != null;
+        IReadOnlyList<SymbolicProgramPointResult> sourceProgramPoints = point != null
+            ? new[] { point }
+            : isFile ? Array.Empty<SymbolicProgramPointResult>() : result.ProgramPoints;
+        var observedInvariant = point != null
+            ? SymbolicInvariantResult.FromFacts(point.Facts)
+            : result.ObservedInvariant;
+        var observedFacts = point != null
+            ? point.Facts
+            : result.ObservedInvariant.Conditions.Select(static condition => condition.Text).ToArray();
+        var conservativeInvariant = point?.Invariant ?? result.MergedInvariant;
+        var mergedPathFacts = point == null ? result.MergedPathFacts : null;
+        var sourceInvariantQuery = point?.InvariantQuery ?? result.InvariantQuery;
+        var reachability = point == null
+            ? result.Reachability
+            : SymbolicReachabilitySummary.FromProgramPoints(sourceProgramPoints);
+        var programPointSummary = point == null
+            ? result.ProgramPointSummary
+            : SymbolicProgramPointSummary.FromProgramPoints(sourceProgramPoints);
+        IReadOnlyList<SymbolicConditionProofSummary> conditionProofSummaries = point == null
+            ? result.ConditionProofs
+            : SymbolicConditionProofSummary.FromProgramPoints(sourceProgramPoints);
+        var smtDiagnostics = point?.SmtDiagnostics ?? result.SmtDiagnostics;
+        var maxProgramPoints = isFile ? 0 : normalizedOptions.MaxProgramPoints;
+        var (compactObservedInvariant, compactConservativeInvariant, compactInvariantQuery,
+            compactConditionProofs, compactProgramPoints, compactSmtDiagnostics, outputTruncation) =
+            CreateScopeData(
+                observedInvariant, observedFacts, conservativeInvariant, mergedPathFacts,
+                sourceInvariantQuery, conditionProofSummaries, sourceProgramPoints,
+                smtDiagnostics, normalizedOptions, maxProgramPoints);
+        if (isFile)
+        {
+            var selectedProgramPointCount = lines.Sum(static line => line.ProgramPoints.Count);
+            outputTruncation = SymbolicCompactOutputTruncation.Combine(
+                new SymbolicCompactOutputTruncation(
+                    sourceLines!.Count > lines.Count,
+                    result.ProgramPointCount > selectedProgramPointCount,
+                    false, false, false),
+                outputTruncation,
+                SymbolicCompactOutputTruncation.Combine(lines.Select(static line => line.Truncation)));
+        }
+
+        var lineCount = isFile ? result.LineCount : null;
+        var linesWithProgramPoints = result.Scope.Kind switch
+        {
+            SymbolicQueryScopeKind.Point => 1,
+            SymbolicQueryScopeKind.File => sourceLines!.Count,
+            SymbolicQueryScopeKind.Span => result.ProgramPoints.Select(static value => value.Line).Distinct().Count(),
+            _ => result.ProgramPointCount == 0 ? 0 : 1
+        };
+        var programPointCount = point == null ? result.ProgramPointCount : 1;
+        var analysisTruncation = result.AnalysisTruncation;
         var analysisSummary = SymbolicCompactAnalysisSummary.From(
-            projection.InvariantQuery,
-            projection.ProgramPointSummary,
-            projection.SmtDiagnostics,
-            truncation);
+            compactInvariantQuery,
+            programPointSummary,
+            compactSmtDiagnostics,
+            analysisTruncation);
         var queryDescriptor = SymbolicCompactSourceQueryDescriptor.FromScope(scope);
         var isSpan = string.Equals(scope.Kind, "span", StringComparison.Ordinal);
         var json = JsonSerializer.SerializeToElement(new
@@ -314,112 +376,119 @@ internal sealed record SymbolicCompactQueryProjection(
             LineCount = lineCount,
             LinesWithProgramPoints = linesWithProgramPoints,
             ProgramPointCount = programPointCount,
-            projection.ObservedInvariant,
-            projection.ConservativeInvariant,
-            projection.InvariantQuery,
-            MergedInvariantText = projection.ConservativeInvariant.Text,
-            projection.Reachability,
-            projection.ProgramPointSummary,
-            ProofOutcomes = projection.ProgramPointSummary.ProofOutcomes,
-            projection.ConditionProofs,
+            ObservedInvariant = compactObservedInvariant,
+            ConservativeInvariant = compactConservativeInvariant,
+            InvariantQuery = compactInvariantQuery,
+            MergedInvariantText = compactConservativeInvariant.Text,
+            Reachability = reachability,
+            ProgramPointSummary = programPointSummary,
+            ProofOutcomes = programPointSummary.ProofOutcomes,
+            ConditionProofs = compactConditionProofs,
             Lines = lines,
-            projection.ProgramPoints,
-            projection.SmtDiagnostics,
-            AnalysisTruncation = truncation,
+            ProgramPoints = compactProgramPoints,
+            SmtDiagnostics = compactSmtDiagnostics,
+            AnalysisTruncation = analysisTruncation,
             AnalysisSummary = analysisSummary,
-            projection.Truncation
+            Truncation = outputTruncation
         }, SymbolicCliProjectionJson.Options);
         return new SymbolicCompactQueryProjection(
             scope,
             lineCount,
             linesWithProgramPoints,
             programPointCount,
-            projection,
+            compactObservedInvariant,
+            compactConservativeInvariant,
+            compactInvariantQuery,
+            reachability,
+            programPointSummary,
+            compactConditionProofs,
+            compactProgramPoints,
+            compactSmtDiagnostics,
+            outputTruncation,
             lines,
-            truncation,
+            analysisTruncation,
             analysisSummary,
             queryDescriptor,
             json);
     }
 
-    private static (int? LineCount, int LinesWithProgramPoints, int ProgramPointCount,
-        SymbolicCompactScopeProjection Projection, IReadOnlyList<SymbolicCompactLineResult> Lines,
-        SymbolicAnalysisTruncationInfo AnalysisTruncation) CreatePoint(
-        SymbolicProgramPointResult result,
-        SymbolicCompactQueryOptions options)
+    private static SymbolicCompactLineResult CreateLineResult(
+        SymbolicQueryResult result,
+        SymbolicCompactQueryOptions options,
+        int maxProgramPoints)
     {
-        var sourcePoints = new[] { result };
-        var projection = SymbolicCompactScopeProjection.Create(
-            SymbolicInvariantResult.FromFacts(result.Facts),
-            result.Facts,
-            result.Invariant,
-            null,
+        var (observedInvariant, conservativeInvariant, invariantQuery,
+            conditionProofs, programPoints, smtDiagnostics, truncation) = CreateScopeData(
+            result.ObservedInvariant, result.Facts, result.MergedInvariant, result.MergedPathFacts,
             result.InvariantQuery,
-            SymbolicReachabilitySummary.FromProgramPoints(sourcePoints),
-            SymbolicProgramPointSummary.FromProgramPoints(sourcePoints),
-            SymbolicConditionProofSummary.FromProgramPoints(sourcePoints),
-            sourcePoints,
+            SymbolicConditionProofSummary.FromProgramPoints(result.ProgramPoints),
+            result.ProgramPoints,
             result.SmtDiagnostics,
             options,
-            options.MaxProgramPoints);
-        return (null, 1, 1, projection, Array.Empty<SymbolicCompactLineResult>(), result.AnalysisTruncation);
+            maxProgramPoints);
+        return new SymbolicCompactLineResult(
+            SymbolicOrderedJson.Object(
+                ("filePath", result.FilePath), ("line", result.Line),
+                ("programPointCount", result.ProgramPoints.Count),
+                ("observedInvariant", observedInvariant),
+                ("conservativeInvariant", conservativeInvariant),
+                ("invariantQuery", invariantQuery),
+                ("mergedInvariantText", conservativeInvariant.Text),
+                ("reachability", result.ProgramPointSummary.Reachability),
+                ("programPointSummary", result.ProgramPointSummary),
+                ("proofOutcomes", result.ProgramPointSummary.ProofOutcomes),
+                ("conditionProofs", conditionProofs),
+                ("programPoints", programPoints),
+                ("smtDiagnostics", smtDiagnostics),
+                ("truncation", truncation)),
+            programPoints,
+            truncation);
     }
 
-    private static (int? LineCount, int LinesWithProgramPoints, int ProgramPointCount,
-        SymbolicCompactScopeProjection Projection, IReadOnlyList<SymbolicCompactLineResult> Lines,
-        SymbolicAnalysisTruncationInfo AnalysisTruncation) CreateAggregate(
-        SymbolicQueryResult result,
-        SymbolicCompactQueryOptions options)
+    private static (
+        SymbolicCompactInvariantSummary ObservedInvariant,
+        SymbolicCompactInvariantSummary ConservativeInvariant,
+        SymbolicCompactInvariantQueryView InvariantQuery,
+        IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs,
+        IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints,
+        SymbolicCompactSmtDiagnostics SmtDiagnostics,
+        SymbolicCompactOutputTruncation Truncation) CreateScopeData(
+        SymbolicInvariantResult observedInvariant,
+        IReadOnlyList<string> observedFacts,
+        SymbolicInvariantResult conservativeInvariant,
+        SymbolicMergedPathFacts? mergedPathFacts,
+        SymbolicInvariantQueryView invariantQuery,
+        IReadOnlyList<SymbolicConditionProofSummary> conditionProofSummaries,
+        IReadOnlyList<SymbolicProgramPointResult> sourceProgramPoints,
+        SymbolicSmtDiagnostics smtDiagnostics,
+        SymbolicCompactQueryOptions options,
+        int maxProgramPoints)
     {
-        var sourceLines = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.Lines : null;
-        var lines = new List<SymbolicCompactLineResult>();
-        var remainingProgramPoints = options.MaxProgramPoints;
-        foreach (var line in sourceLines ?? Array.Empty<SymbolicQueryResult>())
-        {
-            if (lines.Count >= options.MaxLines) break;
-            var pointLimit = remainingProgramPoints;
-            lines.Add(SymbolicCompactLineResult.FromResult(line, options, pointLimit));
-            if (remainingProgramPoints > 0) remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
-        }
-
-        var isFile = sourceLines != null;
-        var projection = SymbolicCompactScopeProjection.Create(
-            result.ObservedInvariant,
-            result.ObservedInvariant.Conditions.Select(static condition => condition.Text).ToArray(),
-            result.MergedInvariant,
-            result.MergedPathFacts,
-            result.InvariantQuery,
-            result.Reachability,
-            result.ProgramPointSummary,
-            result.ConditionProofs,
-            isFile ? Array.Empty<SymbolicProgramPointResult>() : result.ProgramPoints,
-            result.SmtDiagnostics,
-            options,
-            isFile ? 0 : options.MaxProgramPoints);
-        if (isFile)
-        {
-            var selectedProgramPointCount = lines.Sum(static line => line.ProgramPoints.Count);
-            projection = projection with
-            {
-                Truncation = SymbolicCompactOutputTruncation.Combine(
-                    new SymbolicCompactOutputTruncation(
-                        sourceLines!.Count > lines.Count,
-                        result.ProgramPointCount > selectedProgramPointCount,
-                        false, false, false),
-                    projection.Truncation,
-                    SymbolicCompactOutputTruncation.Combine(lines.Select(static line => line.Truncation)))
-            };
-        }
-
-        var lineCount = result.Scope.Kind == SymbolicQueryScopeKind.File ? result.LineCount : null;
-        var linesWithProgramPoints = result.Scope.Kind switch
-        {
-            SymbolicQueryScopeKind.File => sourceLines!.Count,
-            SymbolicQueryScopeKind.Span => result.ProgramPoints.Select(static point => point.Line).Distinct().Count(),
-            _ => result.ProgramPointCount == 0 ? 0 : 1
-        };
-        return (lineCount, linesWithProgramPoints, result.ProgramPointCount, projection, lines,
-            result.AnalysisTruncation);
+        var compactObservedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+            observedInvariant, observedFacts, options);
+        var compactConservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+            conservativeInvariant, mergedPathFacts, options);
+        var programPoints = SymbolicCompactProjection.Take(sourceProgramPoints, maxProgramPoints)
+            .Select(point => SymbolicCompactProgramPointResult.FromResult(point, options))
+            .ToArray();
+        var filteredProofs = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
+            conditionProofSummaries, options.InvariantTargets);
+        var conditionProofs = SymbolicCompactProjection.Take(filteredProofs, options.MaxProofs);
+        var truncation = SymbolicCompactOutputTruncation.Combine(
+            new SymbolicCompactOutputTruncation(
+                false, sourceProgramPoints.Count > programPoints.Length, false, false,
+                filteredProofs.Count > options.MaxProofs),
+            SymbolicCompactOutputTruncation.FromInvariant(compactObservedInvariant),
+            SymbolicCompactOutputTruncation.FromInvariant(compactConservativeInvariant),
+            SymbolicCompactOutputTruncation.Combine(programPoints.Select(static value => value.Truncation)));
+        return (
+            compactObservedInvariant,
+            compactConservativeInvariant,
+            SymbolicCompactInvariantQueryView.FromQueryView(invariantQuery, options),
+            conditionProofs,
+            programPoints,
+            SymbolicCompactSmtDiagnostics.FromDiagnostics(smtDiagnostics),
+            truncation);
     }
 }
 

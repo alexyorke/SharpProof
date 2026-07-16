@@ -1457,6 +1457,10 @@
                              "path":  "SharpProof.Test/SymbolicCfgProgramPointStateCollectorTests.cs"
                          },
                          {
+                             "name":  "SymbolicCliCompactProjectionByteTests",
+                             "path":  "SharpProof.ToolingTest/SymbolicCliCompactProjectionByteTests.cs"
+                         },
+                         {
                              "name":  "SymbolicCliDiagnosticSelectorTests",
                              "path":  "SharpProof.ToolingTest/SymbolicCliDiagnosticSelectorTests.cs"
                          },
@@ -4624,6 +4628,7 @@
                             "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.Transfer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
+                                                  "CfgBlockSlice",
                                                   "CfgFinallyContinuation",
                                                   "CfgFinallyLocalTargetPlan",
                                                   "CfgProgramPointTargetKind",
@@ -5319,7 +5324,7 @@
                             "declaredTypes":  [
                                                   "SharpProofEvidenceSchema"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "SharpProofEvidenceSchema"
                                                  ]
@@ -6999,11 +7004,15 @@
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonProjectionExtensions.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "SymbolicCliJsonProjectionExtensions"
+                                                  "Converter",
+                                                  "ISymbolicRawJsonProjection",
+                                                  "SymbolicCliJsonProjectionExtensions",
+                                                  "SymbolicCliProjectionJson",
+                                                  "SymbolicRawJsonProjectionConverter"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
-
+                                                     "Converter"
                                                  ]
                         },
                         {
@@ -7087,21 +7096,14 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SymbolicCliCounts",
-                                                  "SymbolicCompactCapabilityResult",
-                                                  "SymbolicCompactComplexityResult",
-                                                  "SymbolicCompactMethodResult",
-                                                  "SymbolicCompactRuntimeHazard",
-                                                  "SymbolicCompactRuntimeHazardItemTruncation",
-                                                  "SymbolicCompactRuntimeHazardOutputTruncation",
+                                                  "SymbolicCompactRuntimeHazardProjection",
                                                   "SymbolicCompactRuntimeHazardQueryOptions",
-                                                  "SymbolicCompactRuntimeHazardQueryResult",
-                                                  "SymbolicCompactRuntimeHazardStatusSummary",
                                                   "SymbolicSchemaResultBase"
                                               ],
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
+                                                     "SymbolicCompactRuntimeHazardProjection",
                                                      "SymbolicCompactRuntimeHazardQueryOptions",
-                                                     "SymbolicCompactRuntimeHazardQueryResult",
                                                      "SymbolicSchemaResultBase"
                                                  ]
                         },
@@ -7110,12 +7112,8 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SymbolicCompactAnalysisSummary",
-                                                  "SymbolicCompactInvariantQueryDiagnostic",
-                                                  "SymbolicCompactInvariantTargetPathSummary",
-                                                  "SymbolicCompactInvariantTargetSummary",
                                                   "SymbolicCompactOutputTruncation",
-                                                  "SymbolicCompactSmtDiagnostics",
-                                                  "SymbolicSmtDiagnosticsProjectionBase"
+                                                  "SymbolicCompactSmtDiagnostics"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
@@ -7143,28 +7141,19 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SymbolicCompactQueryOptions",
-                                                  "SymbolicCompactQueryResult",
+                                                  "SymbolicCompactQueryProjection",
                                                   "SymbolicCompactQueryScope",
                                                   "SymbolicCompactSourceQueryDescriptor",
                                                   "SymbolicInvariantQueryFocus",
-                                                  "SymbolicInvariantQueryResult",
-                                                  "SymbolicInvariantQuerySummary"
+                                                  "SymbolicInvariantQueryProjection",
+                                                  "SymbolicInvariantQuerySummary",
+                                                  "SymbolicOrderedJson"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicCompactQueryOptions",
-                                                     "SymbolicCompactQueryResult"
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactScopeProjection.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCompactScopeProjection"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
+                                                     "SymbolicCompactQueryProjection",
+                                                     "SymbolicInvariantQueryProjection"
                                                  ]
                         },
                         {
@@ -9104,14 +9093,13 @@
                                     "selectedTestFixtures":  [
                                                                  "BaselineSuppressionTests",
                                                                  "BaselineWorkflowTests",
-                                                                 "CompactDomainProjectionTests",
                                                                  "DiagnosticExplainPropertyTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SharpProofEvidenceSchema"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs",
@@ -10017,6 +10005,18 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonProjectionExtensions.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "DiagnosticEvidenceTests",
+                                                                 "EffectSummaryToolTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "Converter"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonRequest.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
@@ -10047,8 +10047,8 @@
                                                                  "CompactDomainProjectionTests"
                                                              ],
                                     "tokens":  [
+                                                   "SymbolicCompactRuntimeHazardProjection",
                                                    "SymbolicCompactRuntimeHazardQueryOptions",
-                                                   "SymbolicCompactRuntimeHazardQueryResult",
                                                    "SymbolicSchemaResultBase"
                                                ],
                                     "fixtureCount":  2
@@ -10068,14 +10068,14 @@
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
-                                                                 "AnalyzerPackagingTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicCompactQueryOptions",
-                                                   "SymbolicCompactQueryResult"
+                                                   "SymbolicCompactQueryProjection",
+                                                   "SymbolicInvariantQueryProjection"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "Tools/VsixHarness/Program.cs",

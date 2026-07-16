@@ -4,47 +4,8 @@ namespace SharpProof.Symbolic;
 
 internal sealed record SymbolicCompactLineResult(
     JsonElement Json,
-    SymbolicCompactScopeProjection Projection) : ISymbolicRawJsonProjection
-{
-    internal IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints => Projection.ProgramPoints;
-    internal SymbolicCompactOutputTruncation Truncation => Projection.Truncation;
-
-    internal static SymbolicCompactLineResult FromResult(
-        SymbolicQueryResult result,
-        SymbolicCompactQueryOptions options,
-        int maxProgramPoints)
-    {
-        var projection = SymbolicCompactScopeProjection.Create(
-            result.ObservedInvariant,
-            result.Facts,
-            result.MergedInvariant,
-            result.MergedPathFacts,
-            result.InvariantQuery,
-            result.ProgramPointSummary.Reachability,
-            result.ProgramPointSummary,
-            SymbolicConditionProofSummary.FromProgramPoints(result.ProgramPoints),
-            result.ProgramPoints,
-            result.SmtDiagnostics,
-            options,
-            maxProgramPoints);
-        return new SymbolicCompactLineResult(
-            SymbolicOrderedJson.Object(
-                ("filePath", result.FilePath), ("line", result.Line),
-                ("programPointCount", result.ProgramPoints.Count),
-                ("observedInvariant", projection.ObservedInvariant),
-                ("conservativeInvariant", projection.ConservativeInvariant),
-                ("invariantQuery", projection.InvariantQuery),
-                ("mergedInvariantText", projection.ConservativeInvariant.Text),
-                ("reachability", projection.Reachability),
-                ("programPointSummary", projection.ProgramPointSummary),
-                ("proofOutcomes", projection.ProgramPointSummary.ProofOutcomes),
-                ("conditionProofs", projection.ConditionProofs),
-                ("programPoints", projection.ProgramPoints),
-                ("smtDiagnostics", projection.SmtDiagnostics),
-                ("truncation", projection.Truncation)),
-            projection);
-    }
-}
+    IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints,
+    SymbolicCompactOutputTruncation Truncation) : ISymbolicRawJsonProjection;
 
 internal sealed record SymbolicCompactProgramPointResult(
     JsonElement Json,

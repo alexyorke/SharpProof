@@ -12,14 +12,6 @@
     },
     {
       "paths": [
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
-      ],
-      "category": "cli-schema-projection",
-      "reason": "Two retained compact JSON shapes expose the same nested program-point metadata at different schema locations; construction and truncation are shared."
-    },
-    {
-      "paths": [
         "SharpProof.Symbolic/SymbolicNormalCompletionStateTransfer.cs",
         "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs"
       ],
