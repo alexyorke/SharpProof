@@ -1645,7 +1645,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 - Next cheapest step: replace the next complete Symbolic execution or ProofCore
   semantic owner that can repay at least 350 production lines, then delete the
   superseded path in the same slice.
-- Blockers: the 20,000-line production target still requires 16,262 lines. The
+- Blockers: the 20,000-line production target still requires 15,389 lines. The
   structural fallback and remaining Analyzer CFG/transfer adapters remain
   reachable for typed CFG `Unsupported` cases. The user has authorized the
   required major rearchitecture; its remaining blocker is differential parity,
@@ -1659,3 +1659,12 @@ the unused preview .NET API may break when it obstructs the canonical design.
   scenarios, the generated documentation check, the 605-case Tooling lane, and
   the Release warning-as-error solution build are green. Production LOC is now
   100,043 across 429 files, leaving 15,794 lines to the fixed 84,249 target.
+- Text output now projects the canonical query graph through one 261-line
+  renderer, and explain text reuses the composed report used by JSON, SARIF,
+  and Markdown instead of executing four analysis queries a second time. The
+  obsolete verbose snapshots and implementation-shape assertions were migrated
+  to the concise surface. Focused text/explain tests pass 103/103, generated
+  examples are current, Tooling passes 606/606, and the Release warning-as-error
+  solution build is clean. Production LOC is 99,638 across 429 files, down 405
+  in this slice and 4,611 from the fixed continuation baseline; 15,389 lines
+  remain to the 84,249 target.

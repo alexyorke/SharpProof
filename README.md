@@ -312,7 +312,6 @@ CLI output:
 
 ```text
 docs/readme-examples/runtime-hazard-divide-by-zero/input.cs
-Line: 7
 Runtime hazards: 1
 Hazard status summary: Proven=1
 Hazard exception summary: System.DivideByZeroException=1
@@ -322,7 +321,6 @@ docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Pr
 Exception: System.DivideByZeroException
 Category: definite_divide_by_zero
 Reason: ir_state_contains_condition
-Node: DivideExpression <offset-range>
 Operation: 10 / divisor
 Trigger: divisor == 0
 Invariant: divisor == 0
@@ -336,14 +334,8 @@ SMT:
   Executed queries: 1
   Cache entries: 1
   Health: Ready
-  Permanently unavailable: False
   Transient retries: 0
-  Recovered transient failures: 0
   Context recycles: 0
-  Context generation: 0
-  Max transient retries: 1
-  Recycle context on transient failure: True
-  Dispose context with service: True
 ```
 
 ### Direct allocation sites under [ZeroAllocations]
@@ -438,31 +430,20 @@ CLI output:
 docs/readme-examples/invariants-positive/input.cs:7:13
 Node: ReturnStatement
 Program point kind: Statement
-Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
 Method: UseValue
 Merged invariant: value > 0
-Invariant merge: Conjunction
-Path conditions: 1
-Conservative unknown conditions: 0
-Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoints=0
+Reachability: Reachable
+Reachability reason: branch_reachable
+Invariant query: Must=1, Maybe=0, Unknown=0
 Invariant query text: value > 0
 Invariant query status: Exact
 Invariant query status reason: all_candidate_program_points_exact
-Invariant query summary: Invariant analysis is exact.
-Invariant query must facts: value > 0
-Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
+Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT
 Invariant query target summary: All selected reachable program points agree on the facts for this target.
 Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
 Invariant query target path summary: This target has source-location path conditions available for invariant queries.
 Invariant query target path conditions: value > 0
-Invariant conditions:
-  [0] value > 0 target=value kind=SmtBinary
-Reachability: Reachable
-Reachability reason: branch_reachable
 Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
-Implication formula: value > 0
-Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> node=ReturnStatement programPointKind=Statement span=<offset-range>
-Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
 Implication reason: ir_state_contains_condition
 Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
 SMT:
@@ -475,14 +456,8 @@ SMT:
   Executed queries: 1
   Cache entries: 1
   Health: Ready
-  Permanently unavailable: False
   Transient retries: 0
-  Recovered transient failures: 0
   Context recycles: 0
-  Context generation: 0
-  Max transient retries: 1
-  Recycle context on transient failure: True
-  Dispose context with service: True
 Facts:
   value > 0
 ```
@@ -518,12 +493,9 @@ CLI output:
 ```text
 docs/readme-examples/capabilities-console/input.cs
 Method: Example.Log()
-Declaration kind: MethodDeclarationSyntax
-Span: 5:5-8:6
 Capabilities: IO, Console
 Conservative: False
-Sites:
-  - [invocation] IO, Console via System.Console.WriteLine(System.String? value) @ 7:9
+IO, Console: invocation at 7:9 - System.Console.WriteLine(System.String? value)
 ```
 
 ### Conservative method complexity query
@@ -561,13 +533,10 @@ CLI output:
 ```text
 docs/readme-examples/complexity-linear/input.cs
 Method: int Example.Sum(int n)
-Declaration kind: method
-Span: 3:5-12:6
 Complexity: O(n)
 Kind: Linear
 Conservative: False
-Drivers:
-  - [ForLoop] for-loop bound O(n) from n @ 6:9
+Driver: ForLoop at 6:9 - for-loop bound O(n) from n
 ```
 
 ### Symbolic postconditions at method exits

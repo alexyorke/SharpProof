@@ -1,10 +1,6 @@
 docs/readme-examples/symbolic-unknown-dynamic/input.cs
 Method: TestClass.Render(dynamic)
-Declaration kind: MethodDeclarationSyntax
-Span: 3:5-6:6
 Capabilities: None
 Conservative: True
-Unknown reasons:
-  - DynamicDispatch
-Sites:
-  - [dynamic] Unknown via DynamicInvocation @ 5:16
+Unknown reasons: DynamicDispatch
+Unknown: dynamic at 5:16 - value.ToString()

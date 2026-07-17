@@ -193,6 +193,60 @@ internal sealed record SymbolicCliExplainReport(
         return builder.ToString();
     }
 
+    internal string ToText()
+    {
+        var point = Invariant.ProgramPoints.Single();
+        var builder = new StringBuilder()
+            .AppendLine("SharpProof explanation")
+            .AppendLine($"File: {Source.FilePath}")
+            .AppendLine($"Source input: {Source.Kind}");
+        if (Source.SourceMap is { } sourceMap)
+            builder.AppendLine($"Source map URI: {sourceMap.SourceUri}")
+                .AppendLine($"Source map origin: line {sourceMap.OriginalStartLine}, column {sourceMap.OriginalStartColumn}");
+        builder.AppendLine($"Target: {Target.DisplayText}");
+        AppendProject(builder, Project);
+        builder.AppendLine()
+            .AppendLine("Invariant proof")
+            .AppendLine($"Node: {point.NodeKind}")
+            .AppendLine($"Method: {point.MethodName ?? "<unknown>"}")
+            .AppendLine($"Merged invariant: {point.MergedInvariantText}")
+            .AppendLine($"Reachability: {point.Reachability}")
+            .AppendLine($"Proof outcomes: {point.ConditionProofs.Count}")
+            .AppendLine()
+            .AppendLine("Runtime hazards");
+        foreach (var hazard in RuntimeHazards)
+            builder.AppendLine($"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: {hazard.OperationText}");
+        builder.AppendLine()
+            .AppendLine("Capabilities")
+            .AppendLine($"Capabilities: {Capabilities.CapabilityText}")
+            .AppendLine()
+            .AppendLine("Complexity")
+            .AppendLine($"Complexity: {Complexity.Complexity.Text}")
+            .AppendLine()
+            .AppendLine("Build diagnostics")
+            .AppendLine($"File/project diagnostics: {Diagnostics.TotalCount}")
+            .AppendLine($"Target diagnostics: {Diagnostics.TargetCount}");
+        foreach (var diagnostic in Diagnostics.Items)
+            builder.AppendLine($"  - {diagnostic.Id} {diagnostic.Severity}: {diagnostic.Message}");
+        if (Invariant.SmtDiagnostics.IsConfigured)
+            builder.AppendLine($"Query timeout ms: {Invariant.SmtDiagnostics.QueryTimeoutMs}");
+        return builder.ToString();
+    }
+
+    private static void AppendProject(StringBuilder builder, SymbolicCliExplainProject? project)
+    {
+        if (project == null) return;
+        builder.AppendLine($"Project: {project.Name}")
+            .AppendLine($"Project file: {project.ProjectFilePath}");
+        if (project.SolutionFilePath != null)
+            builder.AppendLine($"Solution file: {project.SolutionFilePath}");
+        builder.AppendLine($"Analyzer config files: {project.AnalyzerConfigCount}")
+            .AppendLine($"Additional files: {project.AdditionalFileCount}")
+            .AppendLine($"Baseline loaded: {project.HasBaseline}")
+            .AppendLine($"Effect summaries: {project.EffectSummaryFileCount}")
+            .AppendLine($"Workspace diagnostics: {project.WorkspaceDiagnosticCount}");
+    }
+
     private static Dictionary<string, object?> CreateSarifResult(
         string ruleId,
         string level,
