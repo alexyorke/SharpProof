@@ -119,7 +119,7 @@ internal class ObjectCreationPurityRule : IPurityRule
         var constructorWasProvenPure = false;
         if (constructorSymbol != null)
         {
-            var cctorResult = CheckStaticConstructorPurity(constructorSymbol.ContainingType, context, currentState);
+            var cctorResult = CheckStaticConstructorPurity(constructorSymbol.ContainingType, context);
             if (!cctorResult.IsPure) return cctorResult;
 
             var policy = PurityPolicyResolver.Resolve(

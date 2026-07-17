@@ -19,10 +19,6 @@ internal sealed class SymbolicProofService
     private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
     private static readonly ProofResultCache s_fallbackCache = new(ProcessFallbackProofCacheEntryLimit);
     private static readonly ExpressionSyntax s_syntheticProofNode = SyntaxFactory.IdentifierName("__symbolic_proof__");
-    private static readonly SafeDivisorProofStrategy<FormulaSafeDivisorContext> FormulaSafeDivisorStrategy = new(
-        IsTermProvablyNonZero,
-        AssumeFormulaPathCondition,
-        false);
     private static readonly SafeDivisorProofStrategy<SymbolicState> StateSafeDivisorStrategy = new(
         IsTermProvablyNonZero,
         AssumeStatePathCondition,
@@ -78,48 +74,6 @@ internal sealed class SymbolicProofService
         return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
     }
 
-
-    private static bool IsTermProvablyNonZero(
-        SymbolicTerm term,
-        IReadOnlyCollection<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SymbolicProofPipeline proofPipeline)
-    {
-        if (term is SymbolicIntegerConstantTerm integerConstant) return integerConstant.Value != 0;
-
-        var nonZeroCondition = new SymbolicNotCondition(SymbolicIrLowerer.CreateIntegerZeroCondition(
-            term,
-            sourceNode,
-            "ir.safe-divisor.formula-path.non-zero"));
-        return SymbolicIrFormulaEncoder.TryEncode(nonZeroCondition, out var nonZeroFormula) &&
-               proofPipeline.ClassifyRawImplication(pathConditions, nonZeroFormula).Outcome ==
-               PurityProofOutcome.ProvablyPure;
-    }
-
-    private static bool IsTermProvablyNonZero(
-        SymbolicTerm term,
-        FormulaSafeDivisorContext context,
-        SyntaxNode sourceNode)
-    {
-        return IsTermProvablyNonZero(term, context.PathConditions, sourceNode, context.ProofPipeline);
-    }
-
-    private static SafeDivisorAssumption<FormulaSafeDivisorContext> AssumeFormulaPathCondition(
-        FormulaSafeDivisorContext context,
-        SymbolicCondition condition,
-        bool whenTrue)
-    {
-        var assumedCondition = whenTrue ? condition : new SymbolicNotCondition(condition);
-        if (!SymbolicIrFormulaEncoder.TryEncode(assumedCondition, out var formula))
-            return new SafeDivisorAssumption<FormulaSafeDivisorContext>(false, false, context);
-
-        return new SafeDivisorAssumption<FormulaSafeDivisorContext>(
-            true,
-            false,
-            new FormulaSafeDivisorContext(
-                context.PathConditions.Append(formula).ToArray(),
-                context.ProofPipeline));
-    }
 
     internal static bool TryEncodeConditionWithPathState(
         SymbolicCondition condition,
@@ -399,10 +353,6 @@ internal sealed class SymbolicProofService
             whenTrue ? condition : new SymbolicNotCondition(condition));
         return new SafeDivisorAssumption<SymbolicState>(true, assumedState.IsContradictory, assumedState);
     }
-
-    private readonly record struct FormulaSafeDivisorContext(
-        IReadOnlyCollection<SmtFormula> PathConditions,
-        SymbolicProofPipeline ProofPipeline);
 
     private readonly record struct SafeDivisorAssumption<TContext>(
         bool IsSupported,

@@ -308,7 +308,7 @@ internal static class PurityAssignmentTransition
         if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(value, valueState, compilation))
             state = ApplyLifetime(state, term, local, value, SymbolicLifetimeOperationKind.CreateOwnedValue,
                 "analyzer.array.acquire", "evidence.array.acquire");
-        if (PurityResourceStateFacts.IsOwnedDisposableObjectCreationValue(value, compilation) &&
+        if (PurityResourceStateFacts.IsOwnedDisposableObjectCreationValue(value) &&
             !PurityResourceStateFacts.HasReleasedResourceFact(term, state))
             state = ApplyLifetime(state, term, local, value, SymbolicLifetimeOperationKind.AcquireDisposable,
                 "analyzer.resource.acquire", "evidence.resource.acquire");

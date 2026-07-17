@@ -22,7 +22,6 @@ internal static class SummaryMethodIdentityMap
 {
     internal static ImmutableDictionary<string, ActualMethodIdentity> Load(
         string path,
-        bool normalizeSignatureTypeNames,
         bool includeMethodAttributes)
     {
         using var stream = File.OpenRead(path);
@@ -51,7 +50,6 @@ internal static class SummaryMethodIdentityMap
         ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>> cache,
         IEnumerable<string> methodKeys,
         string assemblyPath,
-        bool normalizeSignatureTypeNames,
         bool includeMethodAttributes,
         out ActualMethodIdentity identity)
     {
@@ -60,7 +58,7 @@ internal static class SummaryMethodIdentityMap
 
         var methodMap = cache.GetOrAdd(
             assemblyPath,
-            path => Load(path, normalizeSignatureTypeNames, includeMethodAttributes));
+            path => Load(path, includeMethodAttributes));
         foreach (var key in methodKeys)
             if (methodMap.TryGetValue(key, out var foundIdentity))
             {
@@ -207,7 +205,6 @@ internal sealed class EffectSummaryIdentityResolver
         _methodIdentityCache =
             new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly bool _normalizeSignatureTypeNames;
     private readonly bool _requireMetadataLocation;
 
     private readonly ConcurrentDictionary<string, string> _runtimeImplementationAssemblyPathByAssemblyNameCache =
@@ -217,12 +214,10 @@ internal sealed class EffectSummaryIdentityResolver
         new(StringComparer.Ordinal);
 
     internal EffectSummaryIdentityResolver(
-        bool normalizeSignatureTypeNames,
         bool includeMethodAttributes,
         bool requireMetadataLocation,
         Func<IMethodSymbol, string> methodCacheKeyFactory)
     {
-        _normalizeSignatureTypeNames = normalizeSignatureTypeNames;
         _includeMethodAttributes = includeMethodAttributes;
         _requireMetadataLocation = requireMetadataLocation;
         _methodCacheKeyFactory = methodCacheKeyFactory;
@@ -295,7 +290,6 @@ internal sealed class EffectSummaryIdentityResolver
             _methodIdentityCache,
             methodKeys,
             assemblyPath,
-            _normalizeSignatureTypeNames,
             _includeMethodAttributes,
             out identity);
     }

@@ -107,8 +107,7 @@ internal class UsingStatementPurityRule : IPurityRule
                 disposeMethod,
                 disposalSyntax,
                 context,
-                isAwaitUsing,
-                $"'{local.Name}'");
+                isAwaitUsing);
             if (!disposeResult.IsPure) return disposeResult;
         }
 
@@ -129,8 +128,7 @@ internal class UsingStatementPurityRule : IPurityRule
                     disposeMethod,
                     disposalSyntax,
                     context,
-                    isAwaitUsing,
-                    "expression resource");
+                    isAwaitUsing);
                 if (!disposeResult.IsPure) return disposeResult;
             }
         }
@@ -159,8 +157,7 @@ internal class UsingStatementPurityRule : IPurityRule
         IMethodSymbol disposeMethod,
         SyntaxNode syntaxNode,
         PurityAnalysisContext context,
-        bool isAwaitUsing,
-        string resourceDescription)
+        bool isAwaitUsing)
     {
         var disposeResult = PurityCalleeResolver.GetCalleePurityAtUse(disposeMethod, syntaxNode, context);
         if (!disposeResult.IsPure) return disposeResult;

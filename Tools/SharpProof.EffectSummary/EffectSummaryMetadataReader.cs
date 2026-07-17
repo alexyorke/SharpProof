@@ -138,7 +138,7 @@ internal static class EffectSummaryMetadataReader
         var definition = reader.GetFieldDefinition(handle);
         var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
         var fieldName = reader.GetString(definition.Name);
-        var fieldType = DecodeFieldDefinitionExactType(reader, definition);
+        var fieldType = DecodeFieldDefinitionExactType(definition);
         return $"{typeName}.{fieldName}:{fieldType}";
     }
 
@@ -147,7 +147,7 @@ internal static class EffectSummaryMetadataReader
         var memberReference = reader.GetMemberReference(handle);
         var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
         var fieldName = reader.GetString(memberReference.Name);
-        var fieldType = DecodeMemberReferenceFieldExactType(reader, memberReference);
+        var fieldType = DecodeMemberReferenceFieldExactType(memberReference);
         return $"{parentName}.{fieldName}:{fieldType}";
     }
 
@@ -164,7 +164,7 @@ internal static class EffectSummaryMetadataReader
         var parentName =
             NormalizeExactTypeName(GetMemberReferenceFieldLookupParentName(reader, memberReference.Parent));
         var fieldName = reader.GetString(memberReference.Name);
-        var fieldType = DecodeMemberReferenceFieldExactType(reader, memberReference);
+        var fieldType = DecodeMemberReferenceFieldExactType(memberReference);
         return $"{parentName}.{fieldName}:{fieldType}";
     }
 
@@ -173,7 +173,7 @@ internal static class EffectSummaryMetadataReader
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodSignature(reader, definition, includeReturnType: false);
+        var signature = DecodeMethodSignature(definition, includeReturnType: false);
         return $"{typeName}.{methodName}{signature}";
     }
 
@@ -182,7 +182,7 @@ internal static class EffectSummaryMetadataReader
         var definition = reader.GetMethodDefinition(handle);
         var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodSignature(reader, definition, includeReturnType: true);
+        var signature = DecodeMethodSignature(definition, includeReturnType: true);
         return $"{typeName}.{methodName}{signature}";
     }
 
@@ -193,11 +193,11 @@ internal static class EffectSummaryMetadataReader
         return $"{typeName}.{reader.GetString(definition.Name)}";
     }
 
-    internal static string DecodeFieldDefinitionExactType(MetadataReader reader, FieldDefinition definition)
+    internal static string DecodeFieldDefinitionExactType(FieldDefinition definition)
     {
         try
         {
-            return definition.DecodeSignature(new TypeNameProvider(reader), null);
+            return definition.DecodeSignature(new TypeNameProvider(), null);
         }
         catch (BadImageFormatException)
         {
@@ -209,11 +209,11 @@ internal static class EffectSummaryMetadataReader
         }
     }
 
-    internal static string DecodeMemberReferenceFieldExactType(MetadataReader reader, MemberReference memberReference)
+    internal static string DecodeMemberReferenceFieldExactType(MemberReference memberReference)
     {
         try
         {
-            return memberReference.DecodeFieldSignature(new TypeNameProvider(reader), null);
+            return memberReference.DecodeFieldSignature(new TypeNameProvider(), null);
         }
         catch (BadImageFormatException)
         {
@@ -268,7 +268,7 @@ internal static class EffectSummaryMetadataReader
 
         if (runtimeType.IsValueType || runtimeType.IsSealed) return false;
 
-        var parameterCount = TryGetMemberReferenceParameterCount(reader, memberReference);
+        var parameterCount = TryGetMemberReferenceParameterCount(memberReference);
         if (parameterCount == null) return true;
 
         var methodName = reader.GetString(memberReference.Name);
@@ -284,11 +284,11 @@ internal static class EffectSummaryMetadataReader
             method.IsVirtual && !method.IsFinal && method.DeclaringType?.IsSealed != true);
     }
 
-    internal static int? TryGetMemberReferenceParameterCount(MetadataReader reader, MemberReference memberReference)
+    internal static int? TryGetMemberReferenceParameterCount(MemberReference memberReference)
     {
         try
         {
-            return memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null).ParameterTypes.Length;
+            return memberReference.DecodeMethodSignature(new TypeNameProvider(), null).ParameterTypes.Length;
         }
         catch (BadImageFormatException)
         {
@@ -348,7 +348,7 @@ internal static class EffectSummaryMetadataReader
         var memberReference = reader.GetMemberReference(handle);
         var parentName = GetMemberReferenceParentName(reader, memberReference.Parent);
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: false);
+        var signature = DecodeMethodSignature(memberReference, includeReturnType: false);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -357,7 +357,7 @@ internal static class EffectSummaryMetadataReader
         var memberReference = reader.GetMemberReference(handle);
         var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: true);
+        var signature = DecodeMethodSignature(memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -367,7 +367,7 @@ internal static class EffectSummaryMetadataReader
         var parentName =
             NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: true);
+        var signature = DecodeMethodSignature(memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -427,13 +427,12 @@ internal static class EffectSummaryMetadataReader
     }
 
     internal static string DecodeMethodSignature(
-        MetadataReader reader,
         MethodDefinition definition,
         bool includeReturnType)
     {
         try
         {
-            var signature = definition.DecodeSignature(new TypeNameProvider(reader), null);
+            var signature = definition.DecodeSignature(new TypeNameProvider(), null);
             return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
         catch (BadImageFormatException)
@@ -443,13 +442,12 @@ internal static class EffectSummaryMetadataReader
     }
 
     internal static string DecodeMethodSignature(
-        MetadataReader reader,
         MemberReference memberReference,
         bool includeReturnType)
     {
         try
         {
-            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
+            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(), null);
             return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
         catch (BadImageFormatException)
@@ -501,7 +499,7 @@ internal static class EffectSummaryMetadataReader
     {
         try
         {
-            return reader.GetTypeSpecification(handle).DecodeSignature(new TypeNameProvider(reader), null);
+            return reader.GetTypeSpecification(handle).DecodeSignature(new TypeNameProvider(), null);
         }
         catch (BadImageFormatException)
         {
@@ -524,7 +522,7 @@ internal static class EffectSummaryMetadataReader
         try
         {
             return reader.GetTypeSpecification(handle).DecodeSignature(
-                new TypeNameProvider(reader, true),
+                new TypeNameProvider(true),
                 null);
         }
         catch (BadImageFormatException)

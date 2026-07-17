@@ -2849,12 +2849,6 @@ public class TestClass
 
 
 
-    private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source)
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        return diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
-    }
-
     private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
         string source,
         bool reportExceptions = true,

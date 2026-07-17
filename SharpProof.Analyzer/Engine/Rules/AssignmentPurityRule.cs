@@ -146,7 +146,7 @@ internal partial class AssignmentPurityRule : IPurityRule
                 operation.Syntax,
                 earlyBorrowConflictEvidence);
 
-        var isPureAssignment = IsAssignmentTargetPure(targetOperation, context, targetSymbol, currentState);
+        var isPureAssignment = IsAssignmentTargetPure(targetOperation, context, currentState);
 
         if (!isPureAssignment)
         {

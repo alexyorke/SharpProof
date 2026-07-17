@@ -7,6 +7,8 @@
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060</WarningsNotAsErrors>
     
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 

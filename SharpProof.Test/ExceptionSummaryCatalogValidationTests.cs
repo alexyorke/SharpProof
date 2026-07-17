@@ -16,8 +16,6 @@ namespace SharpProof.Test;
 [Explicit("Effect summary JSON ingestion is dormant during active analyzer development.")]
 public partial class ExceptionSummaryCatalogValidationTests
 {
-    private static readonly object EffectSummaryToolBuildLock = new();
-
     [Test]
     public async Task Sp0010_EffectSummary_WithMatchingAssemblyIdentity_IsTrusted()
     {

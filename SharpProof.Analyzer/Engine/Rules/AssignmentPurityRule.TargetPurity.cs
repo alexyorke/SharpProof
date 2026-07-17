@@ -9,7 +9,7 @@ namespace SharpProof.Analyzer.Engine.Rules;
 internal partial class AssignmentPurityRule : IPurityRule
 {
     private static bool IsAssignmentTargetPure(IOperation targetOperation, PurityAnalysisContext context,
-        ISymbol? targetSymbol, PurityAnalysisEngine.PurityAnalysisState currentState)
+        PurityAnalysisEngine.PurityAnalysisState currentState)
     {
         switch (targetOperation.Kind)
         {
@@ -81,7 +81,7 @@ internal partial class AssignmentPurityRule : IPurityRule
 
             case OperationKind.InlineArrayAccess:
                 if (targetOperation is IInlineArrayAccessOperation inlineArrayAccess &&
-                    IsPureInlineArrayTarget(inlineArrayAccess, context))
+                    IsPureInlineArrayTarget(inlineArrayAccess))
                     return true;
 
                 return false;
@@ -91,9 +91,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         }
     }
 
-    private static bool IsPureInlineArrayTarget(
-        IInlineArrayAccessOperation inlineArrayAccessOperation,
-        PurityAnalysisContext context)
+    private static bool IsPureInlineArrayTarget(IInlineArrayAccessOperation inlineArrayAccessOperation)
     {
         var instance = inlineArrayAccessOperation.Instance;
         if (instance == null) return false;

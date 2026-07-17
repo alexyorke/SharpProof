@@ -579,6 +579,7 @@ namespace SharpProof
         private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
             CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var host = GetHostForAttribute(attr);
             if (host == null)
                 return Task.FromResult(document);

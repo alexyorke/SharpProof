@@ -48,7 +48,6 @@ internal static partial class PurityResourceStateFacts
         IInvocationOperation invocationOperation,
         IMethodSymbol invokedMethodSymbol,
         PurityAnalysisState currentState,
-        SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string ruleName,
         out PurityEvidence evidence)

@@ -184,7 +184,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         if (propertySymbol.IsStatic)
         {
             var cctorResult =
-                PurityAnalysisEngine.CheckStaticConstructorPurity(propertySymbol.ContainingType, context, currentState);
+                PurityAnalysisEngine.CheckStaticConstructorPurity(propertySymbol.ContainingType, context);
             if (!cctorResult.IsPure)
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     cctorResult.ImpureSyntaxNode ?? propertyReferenceOperation.Syntax,
@@ -206,15 +206,12 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                     out var staticBclFallbackResult))
                 return staticBclFallbackResult;
 
-            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                $"static property '{propertySymbol.Name}'",
-                $"Static property '{propertySymbol.Name}' has no accessible getter to analyze and is not a known pure BCL member");
+            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
         }
 
         var instanceOperation = propertyReferenceOperation.Instance;
 
 
-        var instanceKind = instanceOperation?.Kind.ToString() ?? "null";
         if (instanceOperation == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
 
@@ -226,9 +223,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         {
             if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                $"property '{propertySymbol.Name}' on parameter '{paramRef.Parameter.Name}'",
-                $"Instance '{paramRef.Parameter.Name}' has no accessible getter to analyze");
+            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
         }
 
         if (instanceOperation is IInstanceReferenceOperation instanceRef &&
@@ -240,18 +235,13 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             { IsReadOnly: true, IsValueType: true };
 
             if (isReadonlyStruct)
-                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                    $"readonly struct property '{propertySymbol.Name}' on this",
-                    $"Instance is 'this' within a readonly struct, but property '{propertySymbol.Name}' has no accessible getter to analyze");
+                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
 
             if (propertySymbol.IsReadOnly)
-                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                    $"readonly property '{propertySymbol.Name}' on this",
-                    $"Instance is 'this', property '{propertySymbol.Name}' has no accessible getter to analyze");
+                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
 
             if (propertySymbol.GetMethod != null)
-                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                    $"property '{propertySymbol.Name}' on this");
+                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
 
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
         }
@@ -278,12 +268,10 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         if (propertySymbol.GetMethod != null &&
             context.AttributePolicy.HasAttribute(propertySymbol.GetMethod, "PureAttribute"))
-            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                $"[Pure] property '{propertySymbol.Name}'");
+            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
 
         if (propertySymbol.GetMethod != null)
-            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
-                $"complex instance ({instanceKind}) property '{propertySymbol.Name}'");
+            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
 
         if (propertySymbol.GetMethod != null &&
             context.PurityCache.TryGetValue(propertySymbol.GetMethod.OriginalDefinition, out var cachedGetterResult) &&

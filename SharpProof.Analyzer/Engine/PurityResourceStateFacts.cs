@@ -264,17 +264,15 @@ internal static partial class PurityResourceStateFacts
     internal static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
         => SymbolicStateMerger.HasExactResourceRelease(state.PathState, term);
 
-    internal static bool IsOwnedDisposableObjectCreationValue(
-        IOperation valueOperation,
-        Compilation compilation)
+    internal static bool IsOwnedDisposableObjectCreationValue(IOperation valueOperation)
     {
         var unwrappedValue = PurityAnalysisEngine.SkipImplicitConversions(valueOperation);
         return unwrappedValue is IObjectCreationOperation objectCreationOperation &&
                objectCreationOperation.Type is { } createdType &&
-               IsDisposableResourceType(createdType, compilation);
+               IsDisposableResourceType(createdType);
     }
 
-    private static bool IsDisposableResourceType(ITypeSymbol type, Compilation compilation)
+    private static bool IsDisposableResourceType(ITypeSymbol type)
     {
         if (type.SpecialType == SpecialType.System_IDisposable ||
             type.ToDisplayString() == "System.IAsyncDisposable")

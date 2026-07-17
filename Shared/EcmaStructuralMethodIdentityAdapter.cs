@@ -9,7 +9,7 @@ internal static class EcmaStructuralMethodIdentityAdapter
     internal static StructuralMethodIdentity Create(MetadataReader reader, MethodDefinitionHandle handle)
     {
         var definition = reader.GetMethodDefinition(handle);
-        var signature = definition.DecodeSignature(new StructuralTypeProvider(reader), null);
+        var signature = definition.DecodeSignature(new StructuralTypeProvider(), null);
         var parameterAttributes = GetParameterAttributes(reader, definition);
         var parameters = ImmutableArray.CreateBuilder<StructuralParameterIdentity>(signature.ParameterTypes.Length);
         for (var index = 0; index < signature.ParameterTypes.Length; index++)
@@ -36,7 +36,7 @@ internal static class EcmaStructuralMethodIdentityAdapter
     internal static StructuralMethodIdentity Create(MetadataReader reader, MemberReferenceHandle handle)
     {
         var reference = reader.GetMemberReference(handle);
-        var signature = reference.DecodeMethodSignature(new StructuralTypeProvider(reader), null);
+        var signature = reference.DecodeMethodSignature(new StructuralTypeProvider(), null);
         var metadataName = reader.GetString(reference.Name);
         return new StructuralMethodIdentity(
             GetMemberReferenceContainingMetadataType(reader, reference.Parent),
@@ -129,7 +129,7 @@ internal static class EcmaStructuralMethodIdentityAdapter
             HandleKind.TypeReference => GetTypeReferenceMetadataName(reader, (TypeReferenceHandle)parent),
             HandleKind.TypeSpecification => GetDefinitionNameFromTypeKey(
                 reader.GetTypeSpecification((TypeSpecificationHandle)parent)
-                    .DecodeSignature(new StructuralTypeProvider(reader), null).Key),
+                    .DecodeSignature(new StructuralTypeProvider(), null).Key),
             HandleKind.MethodDefinition => GetTypeDefinitionMetadataName(
                 reader,
                 reader.GetMethodDefinition((MethodDefinitionHandle)parent).GetDeclaringType()),
@@ -177,13 +177,6 @@ internal readonly record struct StructuralDecodedType(
 
 internal sealed class StructuralTypeProvider : ISignatureTypeProvider<StructuralDecodedType, object?>
 {
-    private readonly MetadataReader _reader;
-
-    internal StructuralTypeProvider(MetadataReader reader)
-    {
-        _reader = reader;
-    }
-
     public StructuralDecodedType GetArrayType(StructuralDecodedType elementType, ArrayShape shape)
     {
         return new StructuralDecodedType("array:" + shape.Rank + "[" + elementType.Key + "]");

@@ -96,8 +96,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static IEnumerable<MethodCallCandidate> GetForEachRuntimeMethodNodes(
         SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
+        SemanticModel semanticModel)
     {
         foreach (var forEachStatement in GetRelevantDescendants<CommonForEachStatementSyntax>(methodNode))
         {

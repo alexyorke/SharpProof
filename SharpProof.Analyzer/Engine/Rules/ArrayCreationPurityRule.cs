@@ -25,7 +25,7 @@ internal class ArrayCreationPurityRule : IPurityRule
             if (!paramsDimensionsResult.IsPure) return paramsDimensionsResult;
 
             var paramsInitializerResult =
-                CheckInitializerElements(arrayCreation, context, currentState, "'params' array");
+                CheckInitializerElements(arrayCreation, context, currentState);
             if (!paramsInitializerResult.IsPure) return paramsInitializerResult;
 
             return PurityAnalysisResult.Pure;
@@ -34,7 +34,7 @@ internal class ArrayCreationPurityRule : IPurityRule
         var dimensionsResult = CheckDimensionSizes(arrayCreation, context, currentState);
         if (!dimensionsResult.IsPure) return dimensionsResult;
 
-        var initializerResult = CheckInitializerElements(arrayCreation, context, currentState, "array");
+        var initializerResult = CheckInitializerElements(arrayCreation, context, currentState);
         if (!initializerResult.IsPure) return initializerResult;
 
         if (RuleAnalysisHelper.IsFreshLocalArrayInitialization(arrayCreation)) return PurityAnalysisResult.Pure;
@@ -85,8 +85,7 @@ internal class ArrayCreationPurityRule : IPurityRule
     private static PurityAnalysisResult CheckInitializerElements(
         IArrayCreationOperation arrayCreation,
         PurityAnalysisContext context,
-        PurityAnalysisState currentState,
-        string description)
+        PurityAnalysisState currentState)
     {
         if (arrayCreation.Initializer == null) return PurityAnalysisResult.Pure;
 

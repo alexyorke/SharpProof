@@ -163,7 +163,7 @@ internal sealed class SymbolicCapabilityService
                     _cancellationToken.ThrowIfCancellationRequested();
                     if (!IsVisibleOperation(operation, declaration)) continue;
 
-                    foreach (var site in AnalyzeOperation(operation, semanticModel))
+                    foreach (var site in AnalyzeOperation(operation))
                     {
                         sites.Add(site);
                         if (site.IsUnknown) unknownReasons.Add(site.UnknownReason);
@@ -185,7 +185,7 @@ internal sealed class SymbolicCapabilityService
             }
         }
 
-        private IEnumerable<CapabilitySiteData> AnalyzeOperation(IOperation operation, SemanticModel semanticModel)
+        private IEnumerable<CapabilitySiteData> AnalyzeOperation(IOperation operation)
         {
             switch (operation)
             {

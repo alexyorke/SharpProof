@@ -16,11 +16,10 @@ internal partial class MethodInvocationPurityRule
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
         if (!PurityResourceStateFacts.TryCreateDoubleDisposeEvidence(
-                invocationOperation,
-                invokedMethodSymbol,
-                currentState,
-                context.SemanticModel,
-                context.CancellationToken,
+            invocationOperation,
+            invokedMethodSymbol,
+            currentState,
+            context.CancellationToken,
                 nameof(MethodInvocationPurityRule),
                 out var evidence))
             return false;

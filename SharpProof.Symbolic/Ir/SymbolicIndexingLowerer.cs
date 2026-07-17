@@ -910,7 +910,6 @@ internal static class SymbolicIndexingLowerer
 
         return TryLowerViewLengthFromInvocationArguments(
             invocationExpression,
-            invocationOperation,
             sourceExpression,
             0,
             false,
@@ -934,7 +933,6 @@ internal static class SymbolicIndexingLowerer
 
         return TryLowerViewLengthFromInvocationArguments(
             invocationExpression,
-            invocationOperation,
             sourceExpression,
             firstArgumentIndex,
             true,
@@ -944,7 +942,6 @@ internal static class SymbolicIndexingLowerer
 
     private static bool TryLowerViewLengthFromInvocationArguments(
         InvocationExpressionSyntax invocationExpression,
-        IInvocationOperation invocationOperation,
         ExpressionSyntax sourceExpression,
         int firstArgumentIndex,
         bool allowDirectRangeArgument,

@@ -361,12 +361,6 @@ public sealed class SymbolicSemanticPipelineTests
         Assert.That(key, Does.Contain("length"));
     }
 
-    private static bool IsNegatedRuntimeTypeCondition(SmtFormula formula)
-    {
-        return formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not, Operand: var operand } &&
-               ContainsRuntimeTypeTest(operand);
-    }
-
     private static bool ContainsRuntimeTypeTest(SmtFormula formula)
     {
         return formula switch

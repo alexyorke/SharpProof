@@ -14,7 +14,6 @@ internal sealed class ExceptionSummaryCatalog
     private static readonly EffectSummaryIdentityResolver IdentityResolver =
         new(
             false,
-            false,
             true,
             RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
 

@@ -66,7 +66,7 @@ internal class FieldReferencePurityRule : IPurityRule
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var staticCtorResult =
-                PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context, currentState);
+                PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context);
             if (!staticCtorResult.IsPure)
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     staticCtorResult.ImpureSyntaxNode ?? fieldReferenceOperation.Syntax,

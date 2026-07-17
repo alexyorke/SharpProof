@@ -2,7 +2,7 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 {
     private readonly bool eraseGenericInstantiationsForLookup;
 
-    public TypeNameProvider(MetadataReader reader, bool eraseGenericInstantiationsForLookup = false)
+    public TypeNameProvider(bool eraseGenericInstantiationsForLookup = false)
     {
         this.eraseGenericInstantiationsForLookup = eraseGenericInstantiationsForLookup;
     }

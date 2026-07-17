@@ -311,8 +311,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                                              context.SemanticModel.Compilation))
         {
             var cctorResult =
-                PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context,
-                    currentState);
+                PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context);
             if (!cctorResult.IsPure)
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     cctorResult.ImpureSyntaxNode ?? invocationOperation.Syntax,

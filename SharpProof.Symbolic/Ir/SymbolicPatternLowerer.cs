@@ -113,7 +113,7 @@ internal static class SymbolicPatternLowerer
                TryLowerRelationalPatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerListPatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
                TryLowerRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
-               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
+               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, out condition) ||
                TryLowerTypePatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerUnaryPatternCondition(value, pattern, context, out condition);
     }
@@ -1059,7 +1059,7 @@ internal static class SymbolicPatternLowerer
     {
         condition = null!;
         return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
-               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition);
+               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, out condition);
     }
 
     internal static bool TryLowerEmptyRecursivePatternCondition(
@@ -1067,7 +1067,6 @@ internal static class SymbolicPatternLowerer
         ITypeSymbol? valueType,
         PatternSyntax pattern,
         SyntaxNode sourceNode,
-        SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
         condition = null!;

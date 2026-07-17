@@ -203,12 +203,11 @@ internal sealed class SymbolicComplexityService
 
         public MethodAnalysisSummary Analyze(ResolvedComplexityTarget target)
         {
-            return AnalyzeMethod(target.Symbol, target.Declaration, target.BodyNode, target.SemanticModel);
+            return AnalyzeMethod(target.Symbol, target.BodyNode, target.SemanticModel);
         }
 
         private MethodAnalysisSummary AnalyzeMethod(
             IMethodSymbol methodSymbol,
-            SyntaxNode declaration,
             SyntaxNode bodyNode,
             SemanticModel semanticModel)
         {
@@ -741,10 +740,9 @@ internal sealed class SymbolicComplexityService
                     SymbolicComplexityUnknownReason.UnknownCallee,
                     syntax);
 
-            var calleeSummary = AnalyzeMethod(methodSymbol, declaration, bodyNode, sourceModel);
+            var calleeSummary = AnalyzeMethod(methodSymbol, bodyNode, sourceModel);
             var substitutionResult = SubstituteCalleeCost(
                 calleeSummary.Cost,
-                methodSymbol,
                 argumentSyntaxes,
                 receiverSyntax,
                 semanticModel,
@@ -875,7 +873,6 @@ internal sealed class SymbolicComplexityService
 
         private SubstitutionResult SubstituteCalleeCost(
             SymbolicCostExpression cost,
-            IMethodSymbol callee,
             ImmutableArray<SyntaxNode> argumentSyntaxes,
             SyntaxNode? receiverSyntax,
             SemanticModel callerSemanticModel,
@@ -964,25 +961,25 @@ internal sealed class SymbolicComplexityService
 
         private static ComplexityArtifacts CombineSequence(IEnumerable<ComplexityArtifacts> parts)
         {
-            return CombineInternal(parts, false);
+            return CombineInternal(parts);
         }
 
         private static ComplexityArtifacts CombineSequence(params ComplexityArtifacts[] parts)
         {
-            return CombineInternal(parts, false);
+            return CombineInternal(parts);
         }
 
         private static ComplexityArtifacts CombineBranch(IEnumerable<ComplexityArtifacts> parts)
         {
-            return CombineInternal(parts, true);
+            return CombineInternal(parts);
         }
 
         private static ComplexityArtifacts CombineBranch(params ComplexityArtifacts[] parts)
         {
-            return CombineInternal(parts, true);
+            return CombineInternal(parts);
         }
 
-        private static ComplexityArtifacts CombineInternal(IEnumerable<ComplexityArtifacts> parts, bool useBranchMax)
+        private static ComplexityArtifacts CombineInternal(IEnumerable<ComplexityArtifacts> parts)
         {
             var costExpressions = new List<SymbolicCostExpression>();
             var drivers = new List<SymbolicComplexityDriverInfo>();

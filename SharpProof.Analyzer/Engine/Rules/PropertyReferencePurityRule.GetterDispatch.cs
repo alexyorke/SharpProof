@@ -121,9 +121,7 @@ internal partial class PropertyReferencePurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult GetterResultOrImpure(
         IPropertySymbol propertySymbol,
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context,
-        string getterDescription,
-        string? missingGetterMessage = null)
+        PurityAnalysisContext context)
     {
         if (propertySymbol.GetMethod is not { } getter)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);

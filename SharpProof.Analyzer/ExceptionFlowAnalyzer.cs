@@ -441,7 +441,7 @@ internal static partial class ExceptionFlowAnalyzer
             if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode)))
                 yield return usingDisposeNode;
 
-        foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel, cancellationToken))
+        foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel))
             if (seen.Add(CreateMethodCallSiteKey(forEachRuntimeNode.CallSite, forEachRuntimeNode.Method)))
                 yield return forEachRuntimeNode;
 

@@ -37,8 +37,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     spanToArrayMethod,
-                    "returned_span_to_array",
-                    currentState);
+                    "returned_span_to_array");
 
             if (IsAllowedTrustedArrayReturn(
                     sourceReturnedValue,
@@ -53,24 +52,21 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     factoryMethod,
-                    "returned_array_factory",
-                    currentState);
+                    "returned_array_factory");
 
             if (IsPureArrayReturningInvocationReturn(sourceReturnedValue, out var arrayReturningMethod))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     arrayReturningMethod,
-                    "returned_known_pure_array",
-                    currentState);
+                    "returned_known_pure_array");
 
             if (IsOwnedLocalArrayReturn(sourceReturnedValue, currentState, out var localSymbol))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     localSymbol,
-                    "owned_local_array_return",
-                    currentState);
+                    "owned_local_array_return");
 
             if (TryFindReturnedDelegateCapture(
                     sourceReturnedValue,
@@ -83,8 +79,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     delegateCaptureSyntax,
                     delegateCapturedArrayLocal,
-                    "escaping_closure_owned_array_capture",
-                    currentState);
+                    "escaping_closure_owned_array_capture");
 
             if (TryFindReturnedDelegateCapture(
                     sourceReturnedValue,
@@ -97,8 +92,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     objectDelegateCaptureSyntax,
                     objectDelegateCapturedLocal,
-                    "escaping_closure_fresh_mutable_object_capture",
-                    currentState);
+                    "escaping_closure_fresh_mutable_object_capture");
 
             if (TryGetCallerOwnedArrayViewReturn(
                     sourceReturnedValue,
@@ -111,16 +105,14 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     readOnlyCollectionMethod,
-                    "returned_array_read_only_view",
-                    currentState);
+                    "returned_array_read_only_view");
 
             if (IsListAsReadOnlyReturn(sourceReturnedValue, out var listAsReadOnlyMethod))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     listAsReadOnlyMethod,
-                    "returned_list_read_only_view",
-                    currentState);
+                    "returned_list_read_only_view");
 
             if (TryGetCallerOwnedArrayViewReturn(
                     sourceReturnedValue,
@@ -133,8 +125,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     spanMethod,
-                    "returned_array_span_view",
-                    currentState);
+                    "returned_array_span_view");
 
             if (TryGetCallerOwnedArrayViewReturn(
                     sourceReturnedValue,
@@ -147,8 +138,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
                     memoryConstructor,
-                    "returned_array_memory_view",
-                    currentState);
+                    "returned_array_memory_view");
 
             if (TryFindReturnedInitializerArrayEscape(
                     returnOperation.ReturnedValue,
@@ -162,8 +152,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     escapeSyntax,
                     escapeSymbol,
-                    catalogSource,
-                    currentState);
+                    catalogSource);
 
             if (TryFindReturnedInitializerMutableObjectEscape(
                     returnOperation.ReturnedValue,
@@ -176,8 +165,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     nestedObjectEscapeSyntax,
                     nestedObjectEscapeSymbol,
-                    nestedObjectCatalogSource,
-                    currentState);
+                    nestedObjectCatalogSource);
 
             if (TryFindMutableCollectionReturnEscape(
                     returnOperation.ReturnedValue,
@@ -190,8 +178,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     collectionEscapeSyntax,
                     collectionEscapeSymbol,
-                    collectionCatalogSource,
-                    currentState);
+                    collectionCatalogSource);
 
             if (TryFindFreshMutableObjectReturnEscape(
                     returnOperation.ReturnedValue,
@@ -205,8 +192,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     returnOperation,
                     objectEscapeSyntax,
                     objectEscapeSymbol,
-                    objectCatalogSource,
-                    currentState);
+                    objectCatalogSource);
 
             return valueResult;
         }
@@ -218,8 +204,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         IReturnOperation returnOperation,
         SyntaxNode escapeSyntax,
         ISymbol escapeSymbol,
-        string catalogSource,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+        string catalogSource)
     {
         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
             escapeSyntax,

@@ -16,7 +16,6 @@ internal sealed class GeneratedPurityCatalog
     private static readonly EffectSummaryIdentityResolver IdentityResolver =
         new(
             true,
-            true,
             false,
             RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
 

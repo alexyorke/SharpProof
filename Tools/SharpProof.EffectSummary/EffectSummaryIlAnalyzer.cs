@@ -658,7 +658,7 @@ internal static class EffectSummaryIlAnalyzer
         bool isObjectConstruction)
     {
         var definition = reader.GetMethodDefinition(handle);
-        var decodedSignature = definition.DecodeSignature(new TypeNameProvider(reader), null);
+        var decodedSignature = definition.DecodeSignature(new TypeNameProvider(), null);
         return new CallTargetSignature(
             !isObjectConstruction && (definition.Attributes & MethodAttributes.Static) == 0,
             decodedSignature.ParameterTypes.ToArray(),
@@ -671,7 +671,7 @@ internal static class EffectSummaryIlAnalyzer
         bool isObjectConstruction)
     {
         var memberReference = reader.GetMemberReference(handle);
-        var decodedSignature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
+        var decodedSignature = memberReference.DecodeMethodSignature(new TypeNameProvider(), null);
         return new CallTargetSignature(
             !isObjectConstruction && decodedSignature.Header.IsInstance,
             decodedSignature.ParameterTypes.ToArray(),

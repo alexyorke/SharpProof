@@ -118,7 +118,6 @@ public class EffectSummarySymbolKeyFactoryTests
 
         var identityResolver = new EffectSummaryIdentityResolver(
             true,
-            true,
             false,
             RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
         var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(

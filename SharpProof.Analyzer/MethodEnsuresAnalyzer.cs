@@ -729,6 +729,7 @@ internal static class MethodEnsuresAnalyzer
             SymbolicLoweringContext context,
             out SymbolicTerm term)
         {
+            _ = context;
             term = null!;
             if (!IsOldValueInvocation(invocation)) return false;
 

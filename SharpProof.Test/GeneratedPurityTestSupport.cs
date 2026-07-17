@@ -231,16 +231,7 @@ internal static class GeneratedPurityTestSupport
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodSignature(reader, definition);
-        return typeName + "." + methodName + signature;
-    }
-
-    private static string GetMethodExactSymbolKey(MetadataReader reader, MethodDefinitionHandle handle)
-    {
-        var definition = reader.GetMethodDefinition(handle);
-        var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
-        var methodName = reader.GetString(definition.Name);
-        var signature = DecodeExactMethodSignature(reader, definition);
+        var signature = DecodeMethodSignature(definition);
         return typeName + "." + methodName + signature;
     }
 
@@ -257,32 +248,16 @@ internal static class GeneratedPurityTestSupport
         return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
     }
 
-    private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
+    private static string DecodeMethodSignature(MethodDefinition definition)
     {
         try
         {
-            var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), null);
+            var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), null);
             return "(" + string.Join(", ", signature.ParameterTypes) + ")";
         }
         catch (BadImageFormatException)
         {
             return "(?)";
-        }
-    }
-
-    private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
-    {
-        try
-        {
-            var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), null);
-            return "(" +
-                   string.Join(", ", signature.ParameterTypes.Select(NormalizeExactSignatureTypeName)) +
-                   ")->" +
-                   NormalizeExactSignatureTypeName(signature.ReturnType);
-        }
-        catch (BadImageFormatException)
-        {
-            return "(?)->?";
         }
     }
 
@@ -401,10 +376,6 @@ internal static class GeneratedPurityTestSupport
 
     private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
     {
-        public EffectSummaryTypeNameProvider(MetadataReader reader)
-        {
-        }
-
         public string GetArrayType(string elementType, ArrayShape shape)
         {
             return elementType + "[]";

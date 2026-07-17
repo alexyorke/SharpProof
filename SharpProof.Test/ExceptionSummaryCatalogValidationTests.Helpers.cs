@@ -246,7 +246,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GeneratedPurityTestSupport.GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodSignature(reader, definition);
+        var signature = DecodeMethodSignature(definition);
         return typeName + "." + methodName + signature;
     }
 
@@ -257,7 +257,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             GeneratedPurityTestSupport.NormalizeExactTypeName(
                 GeneratedPurityTestSupport.GetTypeName(reader, definition.GetDeclaringType()));
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeExactMethodSignature(reader, definition);
+        var signature = DecodeExactMethodSignature(definition);
         return typeName + "." + methodName + signature;
     }
 
@@ -321,7 +321,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
     }
 
-    private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
+    private static string DecodeMethodSignature(MethodDefinition definition)
     {
         try
         {
@@ -334,7 +334,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         }
     }
 
-    private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+    private static string DecodeExactMethodSignature(MethodDefinition definition)
     {
         try
         {

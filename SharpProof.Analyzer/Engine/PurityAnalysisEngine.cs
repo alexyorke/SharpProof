@@ -938,8 +938,9 @@ internal partial class PurityAnalysisEngine
             : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(evidence);
     }
 
-    internal static PurityAnalysisResult CheckStaticConstructorPurity(ITypeSymbol? typeSymbol,
-        PurityAnalysisContext context, PurityAnalysisState currentState)
+    internal static PurityAnalysisResult CheckStaticConstructorPurity(
+        ITypeSymbol? typeSymbol,
+        PurityAnalysisContext context)
     {
         if (typeSymbol == null) return PurityAnalysisResult.Pure;
 
