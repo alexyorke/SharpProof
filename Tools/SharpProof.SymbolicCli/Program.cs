@@ -99,11 +99,7 @@ try
     else if (options.Json)
     {
         var jsonResult = result is SymbolicQueryResult queryResult
-            ? queryResult.Scope.Kind == SymbolicQueryScopeKind.Point
-                ? queryResult.ProgramPoints.Count != 0
-                    ? queryResult.ProgramPoints[0]
-                    : throw new InvalidOperationException("Symbolic query result has no value for its scope.")
-                : new SymbolicCliScopedQueryProjection(queryResult)
+            ? queryResult.ToCompactResult(options.CreateCompactOptions())
             : result;
         Console.WriteLine(JsonSerializer.Serialize(
             jsonResult,

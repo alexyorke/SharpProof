@@ -4090,11 +4090,11 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("Reachability").ValueKind, Is.EqualTo(JsonValueKind.String));
+            Assert.That(root.GetProperty("pointReachability").ValueKind, Is.EqualTo(JsonValueKind.String));
             Assert.That(
-                Enum.TryParse<SymbolicReachability>(root.GetProperty("Reachability").GetString(), out _),
+                Enum.TryParse<SymbolicReachability>(root.GetProperty("pointReachability").GetString(), out _),
                 Is.True);
-            Assert.That(root.GetProperty("Invariant").GetProperty("MergeKind").ValueKind,
+            Assert.That(root.GetProperty("observedInvariant").GetProperty("mergeKind").ValueKind,
                 Is.EqualTo(JsonValueKind.String));
         }
         finally

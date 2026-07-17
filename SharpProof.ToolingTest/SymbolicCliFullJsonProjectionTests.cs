@@ -12,10 +12,10 @@ public sealed class SymbolicCliFullJsonProjectionTests
 
     private static readonly TestCaseData[] ScopeCases =
     {
-        Case("Point", "E59A225A764916139B4E3FD728290906651B55AAA08EF39EB55C9937DEE6FF01", "--position", "0"),
-        Case("Line", "DEDABD873917551855A0210FEE2A22DCC201CE2B31CB655CB42AA5FF4745B501", "--line", "1", "--line-invariants"),
-        Case("Span", "DDC564D1C44225CA8665782EE84EF5D1014CFA7EA5A8924C3ECB70EEB3A9451A", "--span-start", "0", "--span-end", Source.Length.ToString()),
-        Case("File", "E0DC6BACCC1120699CF61FAA7E13FA9306F1A9FC83E2D4E01EB9FF746F5DB3CF", "--all-lines")
+        Case("Point", "3F46440200A6778C4FFDD0CACCD3D5F7B5D497B08381CD5A3573183913822835", "--position", "0"),
+        Case("Line", "4B18D0EEDB3C17E04B462ABF5CC3571DE98D9A12CE6F2BD76C2DFC9D61290C58", "--line", "1", "--line-invariants"),
+        Case("Span", "D46ABB4FD4A7A4B83CA55C87D644A072E949DF9AD7C51950535C7F7D5EC55BCC", "--span-start", "0", "--span-end", Source.Length.ToString()),
+        Case("File", "47D4BDE599DCDDE6CDF9FF6AC5106171AEA5C6DE7A3107F5F2969E9B23B431FD", "--all-lines")
     };
 
     [TestCaseSource(nameof(ScopeCases))]
