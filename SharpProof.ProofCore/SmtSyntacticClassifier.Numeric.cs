@@ -5,7 +5,7 @@ internal static partial class SmtSyntacticClassifier
 {
     internal sealed partial class SyntacticFactSet
     {
-        private bool TryGetKnownInteger(SmtFormula formula, out long value)
+        internal bool TryGetKnownInteger(SmtFormula formula, out long value)
         {
             formula = NormalizeAliases(formula);
             if (_integerIntervals.TryGetValue(formula, out var interval) &&

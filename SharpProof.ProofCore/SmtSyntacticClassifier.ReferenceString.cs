@@ -169,7 +169,7 @@ internal static partial class SmtSyntacticClassifier
             _integerIntervals[lengthFormula] = interval;
         }
 
-        private bool TryGetKnownString(SmtFormula formula, out string value)
+        internal bool TryGetKnownString(SmtFormula formula, out string value)
         {
             formula = NormalizeAliases(formula);
             if (_exactStrings.TryGetValue(formula, out var exactValue))

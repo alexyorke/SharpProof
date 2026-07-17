@@ -180,7 +180,7 @@ internal sealed class SmtConcreteFactPreprocessor
                 if (integerBinaryTerm.Operator is not (SmtIntegerBinaryOperator.Divide
                     or SmtIntegerBinaryOperator.Remainder)) return SmtConcreteFactPreparationStatus.Ready;
 
-                if (TryEvaluateInteger(integerBinaryTerm.Right, facts, out var denominator))
+                if (facts.TryGetKnownInteger(integerBinaryTerm.Right, out var denominator))
                     return denominator == 0
                         ? SmtConcreteFactPreparationStatus.Unknown
                         : SmtConcreteFactPreparationStatus.Ready;
@@ -260,7 +260,7 @@ internal sealed class SmtConcreteFactPreprocessor
         lower = null;
         upper = null;
 
-        if (TryEvaluateInteger(formula, facts, out var concrete))
+        if (facts.TryGetKnownInteger(formula, out var concrete))
         {
             lower = concrete;
             upper = concrete;
@@ -338,7 +338,7 @@ internal sealed class SmtConcreteFactPreprocessor
         lower = 0;
         upper = null;
 
-        if (TryGetConcreteString(value, facts, out var concrete))
+        if (facts.TryGetKnownString(value, out var concrete))
         {
             lower = concrete.Length;
             upper = concrete.Length;
@@ -379,10 +379,10 @@ internal sealed class SmtConcreteFactPreprocessor
                 return TryCombineBounds(leftLower, rightUpper, SmtIntegerArithmetic.TrySubtract, out lower) &&
                        TryCombineBounds(leftUpper, rightLower, SmtIntegerArithmetic.TrySubtract, out upper);
             case SmtIntegerBinaryOperator.Multiply:
-                if (TryEvaluateInteger(term.Left, facts, out var leftConstant))
+                if (facts.TryGetKnownInteger(term.Left, out var leftConstant))
                     return TryScaleBounds(rightLower, rightUpper, leftConstant, out lower, out upper);
 
-                if (TryEvaluateInteger(term.Right, facts, out var rightConstant))
+                if (facts.TryGetKnownInteger(term.Right, out var rightConstant))
                     return TryScaleBounds(leftLower, leftUpper, rightConstant, out lower, out upper);
 
                 return false;
@@ -462,57 +462,11 @@ internal sealed class SmtConcreteFactPreprocessor
         ConcreteFactContext facts,
         out bool value)
     {
-        switch (formula)
-        {
-            case SmtBooleanConstant booleanConstant:
-                value = booleanConstant.Value;
-                return true;
-            case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } unaryFormula
-                when TryEvaluateConcreteBoolean(unaryFormula.Operand, facts, out var operand):
-                value = !operand;
-                return true;
-            case SmtBinaryFormula binaryFormula:
-                return TryEvaluateConcreteBinaryBoolean(binaryFormula, facts, out value);
-            case SmtStringContainsFormula or SmtStringStartsWithFormula or SmtStringEndsWithFormula:
-                if (TryGetPositiveStringPredicateFact(formula, out var predicate) &&
-                    TryGetConcreteString(predicate.Value, facts, out var concreteValue) &&
-                    TryGetConcreteString(predicate.Argument, facts, out var concreteArgument))
-                {
-                    value = EvaluateStringPredicate(predicate.Kind, concreteValue, concreteArgument);
-                    return true;
-                }
-
-                break;
-            case SmtConditionalFormula { Kind: SmtValueKind.Bool } conditionalFormula:
-                if (TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
-                    return TryEvaluateConcreteBoolean(
-                        selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                        facts,
-                        out value);
-
-                break;
-        }
-
-        if (CanCacheBooleanFact(formula) && facts.BooleanEqualities.TryGetValue(formula, out value)) return true;
-        value = false;
-        return false;
+        return formula is SmtVariable { Kind: SmtValueKind.Bool } or SmtRuntimeTypeTestFormula
+            ? facts.TryEvaluateBoolean(formula, out value)
+            : facts.TryEvaluateDerivedBoolean(formula, out value);
     }
 
-    private static bool CanCacheBooleanFact(SmtFormula formula)
-    {
-        if (formula is SmtVariable { Kind: SmtValueKind.Bool } or SmtRuntimeTypeTestFormula) return true;
-        if (formula is not SmtBinaryFormula binary ||
-            binary.Operator is SmtBinaryOperator.And or SmtBinaryOperator.Or)
-            return false;
-        if (binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
-            binary.Left.Kind == SmtValueKind.Bool && binary.Right.Kind == SmtValueKind.Bool)
-            return false;
-
-        return !SmtFormulaTraversal.Contains(
-            binary,
-            static candidate => candidate is SmtRegexMatchFormula or SmtStringContainsFormula or
-                SmtStringStartsWithFormula or SmtStringEndsWithFormula);
-    }
 
     private static bool ShouldPreserveSourceFact(SmtFormula formula)
     {
@@ -534,312 +488,6 @@ internal sealed class SmtConcreteFactPreprocessor
             SmtNullConstant;
     }
 
-    private static bool TryEvaluateConcreteBinaryBoolean(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        out bool value)
-    {
-        if (formula.Operator == SmtBinaryOperator.And)
-        {
-            if (TryEvaluateConcreteBoolean(formula.Left, facts, out var left))
-            {
-                if (!left)
-                {
-                    value = false;
-                    return true;
-                }
-
-                if (TryEvaluateConcreteBoolean(formula.Right, facts, out var right))
-                {
-                    value = right;
-                    return true;
-                }
-            }
-
-            value = false;
-            return false;
-        }
-
-        if (formula.Operator == SmtBinaryOperator.Or)
-        {
-            if (TryEvaluateConcreteBoolean(formula.Left, facts, out var left))
-            {
-                if (left)
-                {
-                    value = true;
-                    return true;
-                }
-
-                if (TryEvaluateConcreteBoolean(formula.Right, facts, out var right))
-                {
-                    value = right;
-                    return true;
-                }
-            }
-
-            value = false;
-            return false;
-        }
-
-        if (TryEvaluateStringLengthComparison(formula, facts, out value)) return true;
-
-        if (formula.Left.Kind == SmtValueKind.Int &&
-            formula.Right.Kind == SmtValueKind.Int &&
-            TryEvaluateIntegerIntervalComparison(formula, facts, out value))
-            return true;
-
-        if (formula.Left.Kind == SmtValueKind.Int &&
-            formula.Right.Kind == SmtValueKind.Int &&
-            TryEvaluateInteger(formula.Left, facts, out var leftInteger) &&
-            TryEvaluateInteger(formula.Right, facts, out var rightInteger))
-            return SmtIntegerComparisonFacts.TryEvaluate(
-                formula.Operator,
-                leftInteger,
-                rightInteger,
-                out value);
-
-        if (formula.Left.Kind == SmtValueKind.String &&
-            formula.Right.Kind == SmtValueKind.String &&
-            TryGetConcreteString(formula.Left, facts, out var leftString) &&
-            TryGetConcreteString(formula.Right, facts, out var rightString))
-        {
-            value = CompareEquality(formula.Operator, string.Equals(leftString, rightString, StringComparison.Ordinal));
-            return formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
-        }
-
-        if (formula.Left.Kind == SmtValueKind.Reference &&
-            formula.Right.Kind == SmtValueKind.Reference &&
-            formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)
-        {
-            if (facts.TryGetKnownReferenceNullState(formula.Left, out var leftIsNull) &&
-                facts.TryGetKnownReferenceNullState(formula.Right, out var rightIsNull) &&
-                (leftIsNull || rightIsNull))
-            {
-                value = CompareEquality(formula.Operator, leftIsNull && rightIsNull);
-                return true;
-            }
-
-            if (EqualityComparer<SmtFormula>.Default.Equals(formula.Left, formula.Right))
-            {
-                value = formula.Operator == SmtBinaryOperator.Equal;
-                return true;
-            }
-        }
-
-        if (formula.Left.Kind == SmtValueKind.Bool &&
-            formula.Right.Kind == SmtValueKind.Bool &&
-            TryEvaluateConcreteBoolean(formula.Left, facts, out var leftBoolean) &&
-            TryEvaluateConcreteBoolean(formula.Right, facts, out var rightBoolean))
-        {
-            value = CompareEquality(formula.Operator, leftBoolean == rightBoolean);
-            return formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
-        }
-
-        if (formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
-            ((formula.Left is SmtNullConstant && formula.Right is SmtNullConstant) ||
-             EqualityComparer<SmtFormula>.Default.Equals(formula.Left, formula.Right)))
-        {
-            value = formula.Operator == SmtBinaryOperator.Equal;
-            return true;
-        }
-
-        value = false;
-        return false;
-    }
-
-    private static bool TryEvaluateStringLengthComparison(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        out bool value)
-    {
-        if (!TryNormalizeStringLengthComparison(formula, out var stringValue, out var op, out var constant))
-        {
-            value = false;
-            return false;
-        }
-
-        if (TryGetConcreteString(stringValue, facts, out var concreteString))
-            return SmtIntegerComparisonFacts.TryEvaluate(op, concreteString.Length, constant, out value);
-
-        bool? result = op switch
-        {
-            SmtBinaryOperator.Equal when constant < 0 => false,
-            SmtBinaryOperator.NotEqual when constant < 0 => true,
-            SmtBinaryOperator.LessThan when constant <= 0 => false,
-            SmtBinaryOperator.LessThanOrEqual when constant < 0 => false,
-            SmtBinaryOperator.GreaterThan when constant < 0 => true,
-            SmtBinaryOperator.GreaterThanOrEqual when constant <= 0 => true,
-            _ => null
-        };
-        value = result.GetValueOrDefault();
-        return result.HasValue;
-    }
-
-    private static bool TryEvaluateIntegerIntervalComparison(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        out bool value)
-    {
-        value = false;
-        if (!SmtComparisonOperatorFacts.IsComparison(formula.Operator)) return false;
-
-        if (TryEvaluateRemainderRangeComparison(formula, facts, out value)) return true;
-
-        if (!TryGetIntegerInterval(formula.Left, facts, out var leftLower, out var leftUpper) ||
-            !TryGetIntegerInterval(formula.Right, facts, out var rightLower, out var rightUpper))
-            return false;
-
-        return SmtIntegerComparisonFacts.TryEvaluateIntervals(
-            formula.Operator,
-            leftLower,
-            leftUpper,
-            rightLower,
-            rightUpper,
-            out value);
-    }
-
-    private static bool TryEvaluateRemainderRangeComparison(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        out bool value)
-    {
-        if (formula.Left is SmtIntegerBinaryTerm leftRemainder &&
-            TryEvaluateRemainderComparison(leftRemainder, formula.Operator, formula.Right, facts, out value))
-            return true;
-
-        if (formula.Right is SmtIntegerBinaryTerm rightRemainder &&
-            TryEvaluateRemainderComparison(
-                rightRemainder,
-                SmtComparisonOperatorFacts.Reverse(formula.Operator),
-                formula.Left,
-                facts,
-                out value))
-            return true;
-
-        value = false;
-        return false;
-    }
-
-    private static bool TryEvaluateRemainderComparison(
-        SmtIntegerBinaryTerm remainder,
-        SmtBinaryOperator op,
-        SmtFormula other,
-        ConcreteFactContext facts,
-        out bool value)
-    {
-        value = false;
-        if (remainder.Operator != SmtIntegerBinaryOperator.Remainder ||
-            !TryGetIntegerInterval(remainder.Left, facts, out var dividendLower, out _) ||
-            !TryGetIntegerInterval(remainder.Right, facts, out var divisorLower, out _) ||
-            !HasNonNegativeDividendAndPositiveDivisor(dividendLower, divisorLower) ||
-            !EqualityComparer<SmtFormula>.Default.Equals(other, remainder.Right))
-            return false;
-
-        switch (op)
-        {
-            case SmtBinaryOperator.LessThan:
-            case SmtBinaryOperator.LessThanOrEqual:
-            case SmtBinaryOperator.NotEqual:
-                value = true;
-                return true;
-            case SmtBinaryOperator.Equal:
-            case SmtBinaryOperator.GreaterThan:
-            case SmtBinaryOperator.GreaterThanOrEqual:
-                value = false;
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static bool TryNormalizeStringLengthComparison(
-        SmtBinaryFormula formula,
-        out SmtFormula stringValue,
-        out SmtBinaryOperator op,
-        out long constant)
-    {
-        if (formula.Left is SmtStringLengthTerm leftLength &&
-            formula.Right is SmtIntegerConstant rightConstant)
-        {
-            stringValue = leftLength.Value;
-            op = formula.Operator;
-            constant = rightConstant.Value;
-            return SmtComparisonOperatorFacts.IsComparison(op);
-        }
-
-        if (formula.Left is SmtIntegerConstant leftConstant &&
-            formula.Right is SmtStringLengthTerm rightLength)
-        {
-            stringValue = rightLength.Value;
-            op = SmtComparisonOperatorFacts.Reverse(formula.Operator);
-            constant = leftConstant.Value;
-            return SmtComparisonOperatorFacts.IsComparison(op);
-        }
-
-        stringValue = null!;
-        op = default;
-        constant = default;
-        return false;
-    }
-
-    private static bool TryEvaluateInteger(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        out long value)
-    {
-        if (formula is SmtIntegerConstant integerConstant)
-        {
-            value = integerConstant.Value;
-            return true;
-        }
-
-        if (facts.IntegerIntervals.TryGetValue(formula, out var interval) && interval.ExactValue.HasValue)
-        {
-            value = interval.ExactValue.Value;
-            return true;
-        }
-
-        switch (formula)
-        {
-            case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unaryTerm
-                when TryEvaluateInteger(unaryTerm.Operand, facts, out var operand):
-                return SmtIntegerArithmetic.TryNegate(operand, out value);
-            case SmtIntegerBinaryTerm binaryTerm:
-                return TryEvaluateIntegerBinary(binaryTerm, facts, out value);
-            case SmtConditionalFormula { Kind: SmtValueKind.Int } conditionalFormula
-                when TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch):
-                return TryEvaluateInteger(
-                    selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                    facts,
-                    out value);
-            default:
-                value = default;
-                return false;
-        }
-    }
-
-    private static bool TryEvaluateIntegerBinary(
-        SmtIntegerBinaryTerm term,
-        ConcreteFactContext facts,
-        out long value)
-    {
-        value = default;
-        if (!TryEvaluateInteger(term.Left, facts, out var left) ||
-            !TryEvaluateInteger(term.Right, facts, out var right))
-            return false;
-
-        return SmtIntegerArithmetic.TryEvaluateBinary(term.Operator, left, right, out value);
-    }
-
-    private static bool CompareEquality(SmtBinaryOperator op, bool equality)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.Equal => equality,
-            SmtBinaryOperator.NotEqual => !equality,
-            _ => false
-        };
-    }
 
     private static bool TryAddStringEquality(
         ConcreteFactContext facts,
@@ -931,7 +579,7 @@ internal sealed class SmtConcreteFactPreprocessor
 
         if (!TryGetPositiveStringPredicateFact(formula, out var predicate) ||
             !stringLengthEqualities.TryGetValue(predicate.Value, out var knownLength) ||
-            !TryGetConcreteString(predicate.Argument, facts, out var concreteArgument))
+            !facts.TryGetKnownString(predicate.Argument, out var concreteArgument))
             return SmtConcreteFactPreparationStatus.Ready;
 
         if (knownLength < concreteArgument.Length) return SmtConcreteFactPreparationStatus.Unsatisfiable;
@@ -962,7 +610,7 @@ internal sealed class SmtConcreteFactPreprocessor
             long? exactLength = null;
             if (stringLengthEqualities.TryGetValue(value, out var knownLength))
                 exactLength = knownLength;
-            else if (TryGetConcreteString(value, facts, out var concreteValue)) exactLength = concreteValue.Length;
+        else if (facts.TryGetKnownString(value, out var concreteValue)) exactLength = concreteValue.Length;
 
             if (exactLength.HasValue)
             {
@@ -990,7 +638,7 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         if (!TryGetPositiveStringPredicateFact(formula, out var predicate) ||
-            !TryGetConcreteString(predicate.Argument, facts, out var argument))
+                !facts.TryGetKnownString(predicate.Argument, out var argument))
             return SmtConcreteFactPreparationStatus.Ready;
 
         var shape = shapeFacts.TryGetValue(predicate.Value, out var existing)
@@ -1133,7 +781,7 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         if (TryGetRegexFact(formula, out var regexMatch, out var expectedMatch) &&
-            TryGetConcreteString(regexMatch.Value, facts, out var concreteInput))
+            facts.TryGetKnownString(regexMatch.Value, out var concreteInput))
         {
             if (!_regexValidator.TryValidate(
                     concreteInput,
@@ -1231,41 +879,6 @@ internal sealed class SmtConcreteFactPreprocessor
         }
     }
 
-    private static bool TryGetConcreteString(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        out string value)
-    {
-        if (formula is SmtStringConstant stringConstant)
-        {
-            value = stringConstant.Value;
-            return true;
-        }
-
-        if (facts.StringEqualities.TryGetValue(formula, out var found))
-        {
-            value = found;
-            return true;
-        }
-
-        if (formula is SmtStringConcatTerm stringConcatTerm &&
-            TryGetConcreteString(stringConcatTerm.Left, facts, out var left) &&
-            TryGetConcreteString(stringConcatTerm.Right, facts, out var right))
-        {
-            value = string.Concat(left, right);
-            return true;
-        }
-
-        if (formula is SmtConditionalFormula { Kind: SmtValueKind.String } conditionalFormula &&
-            TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
-            return TryGetConcreteString(
-                selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                facts,
-                out value);
-
-        value = string.Empty;
-        return false;
-    }
 
     private delegate bool CheckedLongBinaryOperation(long left, long right, out long value);
 

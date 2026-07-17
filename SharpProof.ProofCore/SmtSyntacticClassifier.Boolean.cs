@@ -9,6 +9,11 @@ internal static partial class SmtSyntacticClassifier
             return TryEvaluateBoolean(formula, out value, 0);
         }
 
+        internal bool TryEvaluateDerivedBoolean(SmtFormula formula, out bool value)
+        {
+            return TryEvaluateBoolean(formula, out value, 0, false);
+        }
+
         internal bool IsContradictoryForBothBooleanBranches(SmtFormula condition)
         {
             return IsContradictoryForBooleanBranch(condition, true) &&
@@ -26,6 +31,15 @@ internal static partial class SmtSyntacticClassifier
             out bool value,
             int conditionalBranchDepth)
         {
+            return TryEvaluateBoolean(formula, out value, conditionalBranchDepth, true);
+        }
+
+        private bool TryEvaluateBoolean(
+            SmtFormula formula,
+            out bool value,
+            int conditionalBranchDepth,
+            bool allowDirectFact)
+        {
             if (_booleanEvaluationDepth >= MaxBooleanEvaluationDepth ||
                 !_workBudget.TryConsume())
             {
@@ -40,7 +54,7 @@ internal static partial class SmtSyntacticClassifier
                 var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
                 if (!canonical.Equals(formula))
                 {
-                    if (_exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
+                    if (allowDirectFact && _exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
                     {
                         value = canonicalExactValue ^ isNegatedFromCanonical;
                         return true;
@@ -53,7 +67,7 @@ internal static partial class SmtSyntacticClassifier
                     }
                 }
 
-                if (_exactBooleans.TryGetValue(formula, out var exactValue))
+                if (allowDirectFact && _exactBooleans.TryGetValue(formula, out var exactValue))
                 {
                     value = exactValue;
                     return true;

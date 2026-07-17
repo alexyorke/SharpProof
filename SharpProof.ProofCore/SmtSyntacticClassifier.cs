@@ -201,10 +201,8 @@ internal static partial class SmtSyntacticClassifier
         private int _booleanFactInferenceDepth;
         private int _conditionalBranchEvaluationDepth;
 
-        internal Dictionary<SmtFormula, bool> BooleanEqualities => _exactBooleans;
         internal Dictionary<SmtFormula, string> StringEqualities => _exactStrings;
         internal Dictionary<SmtFormula, SmtIntegerInterval> IntegerIntervals => _integerIntervals;
-        internal Dictionary<SmtFormula, bool> ReferenceNullEqualities => _referenceNullStates;
 
         internal SyntacticFactSet()
         {
