@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
@@ -162,37 +163,27 @@ public sealed class SymbolicAnalysisLimitsTests
     [Test]
     public void PathConditionMerger_ReportsEveryStateMergeCap()
     {
-        static SmtFormula Equal(string name, int value)
+        var source = SyntaxFactory.ParseExpression("source");
+        IReadOnlyList<SymbolicCondition> first = new[]
         {
-            return new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtVariable(name, SmtValueKind.Int),
-                new SmtIntegerConstant(value));
-        }
+            Greater("x", 1), Greater("x", 2), Greater("x", 3),
+            Greater("y", 10), Greater("y", 11), Greater("y", 12),
+            Greater("z", 20), Greater("z", 21), Greater("z", 22)
+        };
+        IReadOnlyList<SymbolicCondition> second = new[]
+        {
+            Greater("x", 4), Greater("x", 5), Greater("x", 6),
+            Greater("y", 13), Greater("y", 14), Greater("y", 15),
+            Greater("z", 23), Greater("z", 24), Greater("z", 25)
+        };
 
-        var first = ImmutableArray.Create(
-            Equal("x", 1),
-            Equal("x", 2),
-            Equal("x", 3),
-            Equal("y", 10),
-            Equal("y", 11),
-            Equal("y", 12));
-        var second = ImmutableArray.Create(
-            Equal("x", 4),
-            Equal("x", 5),
-            Equal("x", 6),
-            Equal("y", 13),
-            Equal("y", 14),
-            Equal("y", 15));
-
-        using var scope = SymbolicAnalysisLimitContext.Push();
-        var merged = SmtPathConditionMerger.MergeAcrossAll(
-            new[] { first, second },
-            new SmtPathConditionMergeOptions(
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(
                 maxMergedPathConditions: 1,
-                maxFactsPerTargetPerState: 2,
+                maxMergeableFactsPerTargetPerState: 2,
                 maxFactChoiceCombinationsPerTarget: 1,
                 maxGuardFactsPerTargetPerState: 1));
+        var merged = SymbolicStateMerger.MergePathConditionsAcrossAll(new[] { first, second });
         var info = scope.Snapshot();
 
         Assert.That(merged, Has.Length.EqualTo(1));
@@ -205,37 +196,57 @@ public sealed class SymbolicAnalysisLimitsTests
                 SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget,
                 SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState
             }));
+
+        SymbolicCondition Greater(string name, int value) =>
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicVariableTerm(name, SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(value)),
+                source,
+                "test.equal"));
     }
 
     [Test]
     public void PathConditionMerger_GroupsNegatedBooleanAndComparisonTargets()
     {
-        var flag = new SmtVariable("flag", SmtValueKind.Bool);
-        var value = new SmtVariable("value", SmtValueKind.Int);
-        var first = ImmutableArray.Create<SmtFormula>(
-            flag,
-            new SmtUnaryFormula(
-                SmtUnaryOperator.Not,
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThan,
-                    value,
-                    new SmtIntegerConstant(0))));
-        var second = ImmutableArray.Create<SmtFormula>(
-            new SmtUnaryFormula(SmtUnaryOperator.Not, flag),
-            new SmtUnaryFormula(
-                SmtUnaryOperator.Not,
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThan,
-                    value,
-                    new SmtIntegerConstant(1))));
+        var source = SyntaxFactory.ParseExpression("source");
+        var flag = new SymbolicVariableTerm("flag", SmtValueKind.Bool);
+        var value = new SymbolicVariableTerm("value", SmtValueKind.Int);
+        var other = new SymbolicVariableTerm("other", SmtValueKind.Int);
+        IReadOnlyList<SymbolicCondition> first = new SymbolicCondition[]
+        {
+            Truth(flag),
+            new SymbolicNotCondition(Greater(value, 0)),
+            Greater(other, 10)
+        };
+        IReadOnlyList<SymbolicCondition> second = new SymbolicCondition[]
+        {
+            new SymbolicNotCondition(Truth(flag)),
+            new SymbolicNotCondition(Greater(value, 1)),
+            Greater(other, 11)
+        };
 
-        var merged = SmtPathConditionMerger.MergeAcrossAll(
-            new[] { first, second },
-            new SmtPathConditionMergeOptions(8, 8, 8, 8));
+        using var scope = SymbolicAnalysisLimitContext.Push(
+            SymbolicAnalysisLimits.Default.WithOverrides(maxGuardFactsPerTargetPerState: 1));
+        var merged = SymbolicStateMerger.MergePathConditionsAcrossAll(new[] { first, second });
 
         Assert.That(merged, Has.Length.EqualTo(2));
-        Assert.That(merged, Has.All.Matches<SmtFormula>(
-            static formula => formula is SmtBinaryFormula { Operator: SmtBinaryOperator.Or }));
+        Assert.That(merged, Has.All.Matches<SymbolicCondition>(
+            static condition => condition is SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or }));
+
+        SymbolicCondition Truth(SymbolicTerm term) =>
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(term), source, "test.truth"));
+
+        SymbolicCondition Greater(SymbolicTerm term, int constant) =>
+            new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    term,
+                    new SymbolicIntegerConstantTerm(constant)),
+                source,
+                "test.greater"));
     }
 
     [Test]

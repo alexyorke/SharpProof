@@ -16,9 +16,16 @@ internal static class SymbolicStateMerger
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
         IReadOnlyList<SymbolicState> states)
     {
+        return MergePathConditionsAcrossAll(
+            states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
+    }
+
+    internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets)
+    {
         var limits = SymbolicAnalysisLimitContext.Limits;
         return PathConditionMergeEngine.MergeAcrossAll(
-            states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray(),
+            conditionSets,
             Strategy,
             new PathConditionMergeLimits(
                 limits.MaxMergedPathConditions,
@@ -421,6 +428,8 @@ internal static class SymbolicStateMerger
 
     private static bool TryGetMergeTarget(SymbolicCondition condition, out SymbolicTerm target)
     {
+        if (condition is SymbolicNotCondition { Operand: { } operand }) condition = operand;
+
         if (condition is SymbolicFactCondition { Fact.Atom: SymbolicRelationAtom relation } &&
             (TryGetTargetTerm(relation.Left, out target) || TryGetTargetTerm(relation.Right, out target)))
             return true;
@@ -431,18 +440,6 @@ internal static class SymbolicStateMerger
             })
         {
             target = variable;
-            return true;
-        }
-
-        if (condition is SymbolicNotCondition
-            {
-                Operand: SymbolicFactCondition
-                {
-                    Fact.Atom: SymbolicTruthAtom { Condition: SymbolicVariableTerm negatedVariable }
-                }
-            })
-        {
-            target = negatedVariable;
             return true;
         }
 
