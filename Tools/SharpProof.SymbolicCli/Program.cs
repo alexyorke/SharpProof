@@ -68,17 +68,7 @@ try
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
 
-    if (options.InvariantJson)
-    {
-        if (result is not SymbolicQueryResult queryResult)
-            throw new InvalidOperationException("Unexpected invariant query result type.");
-
-        var invariantResult = queryResult.ToInvariantQueryResult(options.CreateCompactOptions());
-        Console.WriteLine(JsonSerializer.Serialize(
-            invariantResult,
-            SymbolicCliOutputPolicy.CompactJsonOptions));
-    }
-    else if (options.CompactJson)
+    if (options.CompactJson)
     {
         object compactResult;
         if (result is SymbolicQueryResult queryResult)

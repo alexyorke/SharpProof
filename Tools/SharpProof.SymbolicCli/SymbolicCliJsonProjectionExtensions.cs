@@ -47,19 +47,7 @@ public static class SymbolicCliJsonProjectionExtensions
         return SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
     }
 
-    public static JsonElement ToInvariantQueryResult(
-        this SymbolicProgramPointResult result,
-        SymbolicCompactQueryOptions? options = null)
-    {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-        return SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
-    }
-
     public static JsonElement ToCompactResult(
-        this SymbolicQueryResult result,
-        SymbolicCompactQueryOptions? options = null) => SymbolicCompactQueryProjection.Create(result, options).Json;
-
-    public static JsonElement ToInvariantQueryResult(
         this SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null) => SymbolicCompactQueryProjection.Create(result, options).Json;
 

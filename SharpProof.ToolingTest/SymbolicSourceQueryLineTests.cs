@@ -741,7 +741,7 @@ public class TestClass
         Assert.That(compactPoint.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
         Assert.That(compactPoint.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
 
-        var invariantResult = result.ToInvariantQueryResult();
+        var invariantResult = result.ToCompactResult();
         Assert.That(invariantResult.GetProperty("kind").GetString(), Is.EqualTo("point"));
         Assert.That(invariantResult.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
         Assert.That(invariantResult.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
@@ -3410,7 +3410,7 @@ public class TestClass
                 "copy > 0",
                 "--implies",
                 "other < 10",
-                "--invariant-json",
+                "--compact-json",
                 "--invariant-target",
                 "copy",
                 "--invariant-target",
@@ -3592,7 +3592,7 @@ public class TestClass
                 "copy <= 0",
                 "--condition-target",
                 "copy",
-                "--invariant-json",
+                "--compact-json",
                 "--max-conditions",
                 "1",
                 "--max-proofs",
@@ -4671,7 +4671,7 @@ public class TestClass
                 {
                     "--source-text", source, "--line", "1", "--fail-on-compact-truncation"
                 },
-                Error = "require --compact-json or --invariant-json"
+                Error = "require --compact-json"
             },
             new
             {

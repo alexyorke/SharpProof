@@ -51,7 +51,7 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 
 `--fail-on-compact-truncation` fails when `--max-lines`, `--max-points`,
 `--max-hazards`, `--max-facts`, `--max-conditions`, or `--max-proofs` truncates
-the selected `--compact-json` or `--invariant-json` projection.
+the selected `--compact-json` projection.
 
 Repeated `--fail-on-compact-threshold <metric=max>` gates raw aggregate counts.
 The process fails when `actual > max`; output truncation never lowers the

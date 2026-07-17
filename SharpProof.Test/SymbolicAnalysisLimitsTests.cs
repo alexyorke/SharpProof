@@ -272,7 +272,7 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(compact.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         Assert.That(compact.GetProperty("analysisSummary").GetProperty("analysisTruncated").GetBoolean(), Is.True);
         Assert.That(compact.GetProperty("analysisSummary").GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-        Assert.That(result.ToInvariantQueryResult()
+        Assert.That(result.ToCompactResult()
             .GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
     }
 

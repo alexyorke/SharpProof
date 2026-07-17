@@ -1,7 +1,7 @@
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-                                Usage: SharpProof.SymbolicCli [explain] (--file <path>|--stdin|--source-text <text>) [--source-file-name <path>] [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
+                                Usage: SharpProof.SymbolicCli [explain] (--file <path>|--stdin|--source-text <text>) [--source-file-name <path>] [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json]
 
                                 Options:
                                   --file <path>       C# source file to query.
@@ -142,7 +142,6 @@ internal sealed class SymbolicCliOptions
                                                       Override a positive bounded-analysis limit. Repeat for multiple limits.
                                   --json              Emit JSON instead of text.
                                   --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
-                                  --invariant-json    Emit only the compact invariant query answer, query/focus metadata, bounded reasons, proof summaries, and analysis summary.
                                   --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
                                   --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
                                   --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
@@ -182,7 +181,7 @@ internal sealed class SymbolicCliOptions
                                   SharpProof.SymbolicCli explain --project Example.csproj --file src/Example.cs --line 42
                                   SharpProof.SymbolicCli explain --solution Example.sln --project-name Example --file src/Example.cs --line 42
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
-                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --compact-json --invariant-target index
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --complexity
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --capabilities --compact-json
@@ -311,8 +310,6 @@ internal sealed class SymbolicCliOptions
     public bool Json { get; private set; }
 
     public bool CompactJson { get; private set; }
-
-    public bool InvariantJson { get; private set; }
 
     public bool CheckReachability { get; private set; }
 
@@ -582,7 +579,6 @@ internal sealed class SymbolicCliOptions
         Add(static (o, c, a) => o.ProofConditionContains.Add(c.String(a)), "--proof-condition-contains");
         Add(static (o, _, _) => o.Json = true, SymbolicCliOutputPolicy.Json);
         Add(static (o, _, _) => o.CompactJson = true, SymbolicCliOutputPolicy.CompactJson, SymbolicCliOutputPolicy.Compact);
-        Add(static (o, _, _) => o.InvariantJson = true, SymbolicCliOutputPolicy.InvariantJson, SymbolicCliOutputPolicy.InvariantQueryJson);
         Add(static (o, c, a) => { o.CompactMaxLines = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-lines");
         Add(static (o, c, a) => { o.CompactMaxProgramPoints = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-points");
         Add(static (o, c, a) => { o.CompactMaxHazards = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; o.HasCompactHazardOutputLimit = true; }, "--max-hazards");
@@ -650,19 +646,12 @@ internal sealed class SymbolicCliOptions
             if (options.Json && options.CompactJson)
                 throw new ArgumentException("--json cannot be combined with --compact-json.");
 
-            if (options.Json && options.InvariantJson)
-                throw new ArgumentException("--json cannot be combined with --invariant-json.");
-
-            if (options.CompactJson && options.InvariantJson)
-                throw new ArgumentException("--compact-json cannot be combined with --invariant-json.");
-
             if ((options.Sarif ? 1 : 0) +
                 (options.Markdown ? 1 : 0) +
                 (options.Json ? 1 : 0) +
-                (options.CompactJson ? 1 : 0) +
-                (options.InvariantJson ? 1 : 0) > 1)
+                (options.CompactJson ? 1 : 0) > 1)
                 throw new ArgumentException(
-                    "--json, --compact-json, --invariant-json, --sarif, and --markdown are mutually exclusive.");
+                    "--json, --compact-json, --sarif, and --markdown are mutually exclusive.");
 
             if ((options.Sarif || options.Markdown) && !options.Explain)
                 throw new ArgumentException("--sarif and --markdown require explain.");
@@ -673,17 +662,16 @@ internal sealed class SymbolicCliOptions
 
             if (options.Json && options.HasInvariantTargetFilter && !options.Explain)
                 throw new ArgumentException(
-                    "--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
+                    "--invariant-target cannot be combined with --json; use text or --compact-json.");
 
-            if (options.HasCompactOutputLimit && !options.CompactJson && !options.InvariantJson)
+            if (options.HasCompactOutputLimit && !options.CompactJson)
                 throw new ArgumentException(
-                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json or --invariant-json.");
+                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
 
             if ((options.FailOnCompactTruncation || options.CompactThresholds.Count != 0) &&
-                !options.CompactJson &&
-                !options.InvariantJson)
+                !options.CompactJson)
                 throw new ArgumentException(
-                    "--fail-on-compact-truncation and --fail-on-compact-threshold require --compact-json or --invariant-json.");
+                    "--fail-on-compact-truncation and --fail-on-compact-threshold require --compact-json.");
 
             if (options.FailOnUnprovenImplies && options.ImpliedConditions.Count == 0)
                 throw new ArgumentException("--fail-on-unproven-implies requires at least one --implies condition.");
@@ -851,9 +839,6 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException(
                     "--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
 
-            if (options.RuntimeHazards && options.InvariantJson)
-                throw new ArgumentException("--invariant-json cannot be combined with --runtime-hazards.");
-
             if (options.RuntimeHazards && options.HasInvariantTargetFilter)
                 throw new ArgumentException("--invariant-target cannot be combined with --runtime-hazards.");
 
@@ -895,7 +880,7 @@ internal sealed class SymbolicCliOptions
             if (options.Explain)
             {
                 options.CheckReachability = true;
-                if (options.CompactJson || options.InvariantJson)
+                if (options.CompactJson)
                     throw new ArgumentException(
                         "explain supports text, --json, --sarif, or --markdown, not compact query output formats.");
 
@@ -944,9 +929,6 @@ internal sealed class SymbolicCliOptions
 
     private void ValidateFocusedAnalysisCompatibility(string optionName)
     {
-        if (InvariantJson)
-            throw new ArgumentException($"--invariant-json cannot be combined with {optionName}.");
-
         if (HasInvariantTargetFilter)
             throw new ArgumentException($"--invariant-target cannot be combined with {optionName}.");
 
