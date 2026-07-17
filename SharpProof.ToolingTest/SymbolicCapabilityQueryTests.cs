@@ -63,7 +63,7 @@ public sealed class SymbolicCapabilityQueryTests
             "--line",
             FindLine(source, "value.ToString()").ToString(),
             "--capabilities",
-            "--compact-json");
+            "--json");
 
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
@@ -113,7 +113,7 @@ public sealed class SymbolicCapabilityQueryTests
             "--line",
             FindLine(source, "Console.WriteLine").ToString(),
             "--capabilities",
-            "--compact-json",
+            "--json",
             "--fail-on-capability-violation");
         Assert.That(violation.ExitCode, Is.EqualTo(1));
         Assert.That(violation.StandardError, Does.Contain("CI gate failed [capability-violation]"));
@@ -149,12 +149,12 @@ public sealed class SymbolicCapabilityQueryTests
             "--line",
             FindLine(source, "Console.WriteLine").ToString(),
             "--capabilities",
-            "--compact-json",
-            "--fail-on-compact-threshold",
+            "--json",
+            "--fail-on-threshold",
             "capability-sites=0");
         Assert.That(threshold.ExitCode, Is.EqualTo(1));
         Assert.That(threshold.StandardError,
-            Does.Contain("CI gate failed [compact-threshold.capability-sites]"));
+            Does.Contain("CI gate failed [threshold.capability-sites]"));
     }
 
 }

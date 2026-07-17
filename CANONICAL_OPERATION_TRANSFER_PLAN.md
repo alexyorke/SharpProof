@@ -759,8 +759,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 
 ## Final Gates
 
-- [ ] Net handwritten production reduction is at least 11,000 lines; continue
-  toward 16,000 while parity remains economical.
+- [ ] Tracked handwritten production LOC is at most 84,249, a 20,000-line
+  reduction from the fixed 104,249 continuation baseline.
 - [x] Release and warning-as-error builds succeed with zero warnings.
 - [x] All six test lanes meet or exceed the recorded baseline, apart from
   explicitly documented pre-existing failures/skips.
@@ -1634,11 +1634,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
   two documented MainGeneral skips. Production LOC is 104,249 across 441 files,
   down 3,427 from the rewrite start; tracked test LOC is 146,075. No handwritten
   file or partial type violates the architecture size limits.
-- Next cheapest step: fan out read-only audits over disparate unchecked Phase 7
-  items, then accept the next closed semantic family only if its measured rewrite
-  removes at least 350 net production lines or reaches a documented hard family
-  cap. Prefer complete owner replacement over another adapter extraction.
-- Blockers: the 11,000-line production target still requires 7,573 lines. The
+- The fixed 20k continuation baseline is `dbe1c747` at 104,249 production
+  lines. The canonical query/result migrations, unused-code cleanup, and final
+  compact/full CLI compatibility deletion reduce the current worktree to
+  100,511 lines across 429 files. The CLI now has one JSON policy and no compact
+  aliases, output-limit fields, summary facade, duplicate serializer settings,
+  or compact-named gates. Focused CLI/query tests pass 294/294, packaging and
+  documentation checks pass 8/8, Tooling passes 606/606, and Release builds
+  with zero warnings.
+- Next cheapest step: replace the next complete Symbolic execution or ProofCore
+  semantic owner that can repay at least 350 production lines, then delete the
+  superseded path in the same slice.
+- Blockers: the 20,000-line production target still requires 16,262 lines. The
   structural fallback and remaining Analyzer CFG/transfer adapters remain
   reachable for typed CFG `Unsupported` cases. The user has authorized the
   required major rearchitecture; its remaining blocker is differential parity,

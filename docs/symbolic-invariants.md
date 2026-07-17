@@ -32,13 +32,11 @@ The primary entrypoint is `SymbolicQueryService`:
 - A `SymbolicQueryResult` with `Scope.Kind=File` exposes all retained program points plus `ObservedInvariant`, `MergedPathFacts`, reachability summaries, and implication summaries. File observed invariants still use `MergeKind=DistinctFactUnion`.
 - `SymbolicQueryResult.ProgramPointSummary` exposes aggregate point count, total and maximum path-condition counts, reachability counts, and proof-outcome counts. These summaries are derived from retained program points and are recomputed after `SymbolicSourceQueryFilter` is applied.
 - `SymbolicSourceQueryFilter` can post-filter line or file results by exact node kind, program-point kind, exact source line, line range, containing method name, method-name substring, presence of facts, presence of path conditions, path-condition target, exact path-condition text, path-condition substring, reachability, presence of proofs, proof outcome, exact proof condition, or proof-condition substring; aggregate summaries are recomputed from the retained points.
-- The CLI adapter projects point, line, file, capability, complexity, and runtime-hazard results into stable `--compact-json` with `schemaVersion`, observed raw SMT facts, conservative source-like merged invariants, direct `mergedInvariantText`, condition targets, conservative-unknown counts, reachability counts, proof summaries, proof outcome counts, compact `analysisSummary` certainty metrics, SMT diagnostics, conservative-unknown diagnostics, output truncation flags, and bounded-analysis truncation events. These JSON-only DTOs are not part of `SharpProof.Symbolic.dll`.
+- The CLI serializes the canonical point, line, file, capability, complexity, and runtime-hazard results through one stable lower-camel `--json` policy.
 - `analysisSummary` is the smallest status surface for tools that do not want nested payloads: it includes program-point count, invariant condition count, conservative unknown count, total/max path-condition counts, checked/known/unknown reachability counts, resolved/unknown proof counts, SMT enablement, executed query count, and `hasUnresolvedAnalysis`.
-- `--compact-summary-only` requests aggregate-only compact output. It keeps invariant, reachability, proof, and truncation metadata while omitting nested line and program-point arrays.
-- Compact program points include file path, line, column, absolute position, node span start/end/length, node start/end line and column, containing method name, program-point kind, direct merged invariant text, reachability and reachability reason, proof outcomes, and bounded proof details. This metadata remains available at the top level for a single point result even when `--max-points 0` suppresses nested program point arrays.
 - `SymbolicQueryResult` is the unified public result for point, line, span, and all-lines queries. It exposes program points, observed and conservative merged invariants, reachability, proof summaries, and SMT diagnostics; JSON projection belongs to the CLI adapter.
-- `AnalysisTruncation` on full and compact query and runtime-hazard results reports stable `analysis_limit.*` events whenever a configured fact, branch, depth, or state-merge cap drops proof evidence. See [bounded analysis limits](analysis-limits.md).
-- Full and compact `SmtDiagnostics` include nested lifecycle options and an immutable health snapshot with transient retry/recovery counts, permanent-unavailability state, context recycle count, and generation. See [SMT lifecycle and health](smt-lifecycle.md).
+- `AnalysisTruncation` on query and runtime-hazard results reports stable `analysis_limit.*` events whenever a configured fact, branch, depth, or state-merge cap drops proof evidence. See [bounded analysis limits](analysis-limits.md).
+- `SmtDiagnostics` includes nested lifecycle options and an immutable health snapshot with transient retry/recovery counts, permanent-unavailability state, context recycle count, and generation. See [SMT lifecycle and health](smt-lifecycle.md).
 - Program points expose `ReachabilityWitness` and `InputDomainSummary`; line,
   span, file, and unified query results expose alternative
   `ReachabilityWitnesses` and a conservatively merged domain summary.
@@ -74,7 +72,7 @@ dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lin
 Use `--line-expressions` with `--line-invariants` or `--all-lines` when a caller needs expression-level points without computing absolute positions. This is useful for querying the invariant at a call, element access, member access, or arithmetic expression on a line:
 
 ```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --line-invariants --line-expressions --program-point-kind Expression --node-kind AddExpression --check-reachability --implies "index >= 0" --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --line-invariants --line-expressions --program-point-kind Expression --node-kind AddExpression --check-reachability --implies "index >= 0" --json
 ```
 
 Use `--node-kind`, `--program-point-kind`, `--filter-line`, `--line-start`, `--line-end`, `--method`, `--method-contains`, `--with-facts`, `--with-conditions`, `--condition-target`, `--condition`, `--condition-contains`, or `--reachability` with `--line-invariants` or `--all-lines` to narrow aggregate output without changing symbolic inference:
@@ -86,24 +84,15 @@ dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lin
 Use `--with-proofs`, `--proof-outcome`, `--proof-condition`, and `--proof-condition-contains` after `--implies` to keep only points with matching implication results:
 
 ```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --line-expressions --method-contains Parse --program-point-kind Expression --implies "index >= 0" --with-proofs --proof-outcome ProvenTrue --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --line-expressions --method-contains Parse --program-point-kind Expression --implies "index >= 0" --with-proofs --proof-outcome ProvenTrue --json
 ```
 
-Use `--compact-json` when a tool needs a smaller stable shape instead of the full public object graph:
-
-Compact results carry the shared proof/evidence version separately from their
-own structural schema. See the
+Use `--json` for the canonical lower-camel machine-readable result. See the
 [proof/evidence compatibility policy](evidence-schema.md) before persisting or
-strictly validating these fields.
+strictly validating evidence fields.
 
 ```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --compact-json --max-lines 25 --max-points 100 --max-facts 20 --max-conditions 20 --max-proofs 20
-```
-
-Use `--summary-only` to emit compact JSON with file or line aggregate metadata but no nested line or program-point arrays:
-
-```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --summary-only
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --json
 ```
 
 ## Runtime Hazard Queries
@@ -120,16 +109,16 @@ Query proven hazards on one line:
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards
 ```
 
-Query all proven null-dereference hazards with compact JSON output:
+Query all proven null-dereference hazards with JSON output:
 
 ```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --json
 ```
 
-Inspect unknown candidates as a bounded machine-readable summary:
+Inspect unknown candidates as a machine-readable result:
 
 ```powershell
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --json
 ```
 
 Fail the process when the final filtered hazard output is non-empty:
@@ -138,15 +127,15 @@ Fail the process when the final filtered hazard output is non-empty:
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind DivideByZero --fail-on-hazard
 ```
 
-Hazard filters include `--hazard-kind`, `--hazard-status`, `--hazard-exception-type`, and `--hazard-category`. `--compact-json` hazard output includes `kind = runtimeHazards`, `hazardCount`, status/kind/exception/category counts, `analysisSummary`, bounded hazard entries, truncation flags, and SMT diagnostics. Library callers consume the typed `SymbolicRuntimeHazardQueryResult`; the CLI adapter owns the serialized shape.
+Hazard filters include `--hazard-kind`, `--hazard-status`, `--hazard-exception-type`, and `--hazard-category`. JSON preserves typed hazard entries, counts, analysis truncation, and SMT diagnostics. Library callers consume the same `SymbolicRuntimeHazardQueryResult` graph serialized by the CLI.
 
-All-lines `--json` preserves the existing file-shaped object and string enum values. `--compact-json` emits lower-camel-case JSON with `schemaVersion`, `kind`, file/line/program-point counts, string enum values, `observedInvariant`, `conservativeInvariant`, direct `mergedInvariantText`, method names and program-point kinds on program points, invariant `targets`, conservative unknown counts, reachability counts, proof summaries, proof outcomes, compact `analysisSummary`, `smtDiagnostics`, bounded nested line/program-point arrays, conservative-unknown diagnostics, and `truncation` flags. `--max-lines`, `--max-points`, `--max-facts`, `--max-conditions`, and `--max-proofs` apply only to `--compact-json`; totals remain untruncated so callers can detect omitted details.
+All-lines `--json` emits the canonical lower-camel query graph with string enum values, program points, merged facts, summaries, diagnostics, and typed analysis-truncation events.
 
 Text output includes total line count, lines with program points, total program points, program-point kind on points, program-point summary, conservative merged invariant text, invariant condition details, conservative unknown counts, observed distinct fact count, observed invariant metadata, and aggregate reachability or implication counts when requested. File-level observed facts and summaries are an overview, not a single invariant that holds at every program point; use each point result with `MergeKind=Conjunction` for actual path invariants.
 
-For line and file aggregates, prefer `MergedInvariant` when a caller needs a conservative summary. Prefer `ObservedInvariant` or `Facts` when a caller needs every fact seen at any retained program point. `Facts` remains the raw SMT text from the symbolic engine; source-like condition text is exposed through typed path conditions and compact conservative invariant summaries. An `unknown(target)` entry means the query layer saw path facts about that target, but those facts were not common to every retained reachable-or-unknown point, so the aggregate cannot soundly claim one concrete fact.
+For line and file aggregates, prefer `MergedInvariant` when a caller needs a conservative summary. Prefer `ObservedInvariant` or `Facts` when a caller needs every fact seen at any retained program point. `Facts` remains the raw SMT text from the symbolic engine; source-like condition text is exposed through typed path conditions and conservative invariant summaries. An `unknown(target)` entry means the query layer saw path facts about that target, but those facts were not common to every retained reachable-or-unknown point, so the aggregate cannot soundly claim one concrete fact.
 
-Use `--json` or `--compact-json` for machine-readable output. The CLI does not hardcode BCL predicates; it only reports facts produced from the Roslyn syntax and semantic model.
+Use `--json` for machine-readable output. The CLI does not hardcode BCL predicates; it only reports facts produced from the Roslyn syntax and semantic model.
 
 Invalid source/target combinations are API misuse. The library currently throws
 `NotSupportedException` for unsupported combinations, and the CLI exits with an

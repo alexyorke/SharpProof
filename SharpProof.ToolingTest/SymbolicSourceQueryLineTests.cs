@@ -2088,15 +2088,7 @@ public class TestClass
                 "--check-reachability",
                 "--implies",
                 "value > 0",
-                "--compact-json",
-                "--max-points",
-                "1",
-                "--max-facts",
-                "0",
-                "--max-conditions",
-                "0",
-                "--max-proofs",
-                "0");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2233,7 +2225,7 @@ public class TestClass
             "virtual/InlineSample.cs",
             "--line",
             FindLine(source, "Identity").ToString(),
-            "--compact-json");
+            "--json");
 
         Assert.That(result.ExitCode, Is.Zero, result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2357,13 +2349,7 @@ public class TestClass
             "--check-reachability",
             "--line-expressions",
             "--post-line-invariants",
-            "--invariant-target", "value",
-            "--compact-json",
-            "--max-lines", "1",
-            "--max-points", "3",
-            "--max-facts", "3",
-            "--max-conditions", "3",
-            "--max-proofs", "3");
+            "--json");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2451,9 +2437,9 @@ public class TestClass
             "--source-file-name", "virtual/RequestGateSample.cs",
             "--line", FindLine(source, "if (value > 0)").ToString(),
             "--line-invariants",
-            "--compact-json",
+            "--json",
             "--max-conservative-unknowns", "0",
-            "--fail-on-compact-threshold", "program-points=10");
+            "--fail-on-threshold", "program-points=10");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2501,9 +2487,8 @@ public class TestClass
             "--source-file-name", "virtual/RequestModes.cs",
             "--line", FindLine(source, targetMarker).ToString(),
             "--smt-mode", "disabled",
-            "--compact-json"
+            "--json"
         };
-        if (mode == "runtimeHazards") requestArguments.AddRange(new[] { "--max-hazards", "5" });
         var requestJson = SymbolicCliTestHost.CreateJsonRequest(requestArguments.ToArray());
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
@@ -2636,7 +2621,7 @@ public class TestClass
             "--implies",
             "value < 0",
             "--fail-on-unproven-implies",
-            "--compact-json");
+            "--json");
         Assert.That(unproven.ExitCode, Is.EqualTo(1));
         Assert.That(unproven.StandardError, Does.Contain("CI gate failed [unproven-implies]"));
         using var document = JsonDocument.Parse(unproven.StandardOutput);
@@ -2662,7 +2647,7 @@ public class TestClass
             "--line",
             FindLine(source, "if (value > 0)").ToString(),
             "--line-invariants",
-            "--compact-json"
+            "--json"
         };
 
         var unknownFailure = await SymbolicCliTestHost.RunAsync(commonArguments
@@ -2677,14 +2662,14 @@ public class TestClass
         Assert.That(unknownPass.ExitCode, Is.Zero, unknownPass.StandardError);
 
         var thresholdFailure = await SymbolicCliTestHost.RunAsync(commonArguments
-            .Concat(new[] { "--fail-on-compact-threshold", "conservative-unknowns=0" })
+            .Concat(new[] { "--fail-on-threshold", "conservative-unknowns=0" })
             .ToArray());
         Assert.That(thresholdFailure.ExitCode, Is.EqualTo(1));
         Assert.That(thresholdFailure.StandardError,
-            Does.Contain("CI gate failed [compact-threshold.conservative-unknowns]"));
+            Does.Contain("CI gate failed [threshold.conservative-unknowns]"));
 
         var truncationFailure = await SymbolicCliTestHost.RunAsync(commonArguments
-            .Concat(new[] { "--max-points", "0", "--fail-on-compact-truncation" })
+            .Concat(new[] { "--fail-on-analysis-truncation" })
             .ToArray());
         Assert.That(truncationFailure.ExitCode, Is.Zero, truncationFailure.StandardError);
         using var document = JsonDocument.Parse(truncationFailure.StandardOutput);
@@ -2721,15 +2706,7 @@ public class TestClass
                 "--check-reachability",
                 "--implies",
                 "value == 7",
-                "--compact-json",
-                "--max-points",
-                "1",
-                "--max-facts",
-                "10",
-                "--max-conditions",
-                "10",
-                "--max-proofs",
-                "1");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2782,7 +2759,7 @@ public class TestClass
                 "--check-reachability",
                 "--implies",
                 "value > 0",
-                "--summary-only");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2856,11 +2833,7 @@ public class TestClass
                 "3",
                 "--smt-keep-context-on-transient-failure",
                 "--smt-dispose-context-on-exit",
-                "--compact-json",
-                "--max-points",
-                "2",
-                "--max-conditions",
-                "3");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2933,9 +2906,7 @@ public class TestClass
                 (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
                 "--implies",
                 "copy > 0",
-                "--compact-json",
-                "--max-points",
-                "3");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3114,11 +3085,7 @@ public class TestClass
                 "copy <= 0",
                 "--condition-target",
                 "copy",
-                "--compact-json",
-                "--max-conditions",
-                "1",
-                "--max-proofs",
-                "1");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3198,7 +3165,7 @@ public class TestClass
                 "--check-reachability",
                 "--implies",
                 "value > 0",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3282,7 +3249,7 @@ public class TestClass
                 "value",
                 "--implies",
                 "value > 0",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3359,7 +3326,7 @@ public class TestClass
                 "value > 0",
                 "--condition-contains",
                 "value",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3506,9 +3473,7 @@ public class TestClass
                 "--all-lines",
                 "--hazard-kind",
                 "DirectThrow",
-                "--compact-json",
-                "--max-hazards",
-                "1");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3576,7 +3541,7 @@ public class TestClass
                 "system.argumentexception",
                 "--hazard-category",
                 "DIRECT_THROW",
-                "--compact-json");
+                "--json");
 
             Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
             using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
@@ -3662,7 +3627,7 @@ public class TestClass
                 "--include-unproven-hazards",
                 "--hazard-status",
                 "Unknown",
-                "--compact-json");
+                "--json");
 
             Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
             using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
@@ -3723,7 +3688,7 @@ public class TestClass
                 "--runtime-hazards",
                 "--all-lines",
                 "--fail-on-hazard",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3764,7 +3729,7 @@ public class TestClass
                 "--fail-on-hazard",
                 "--hazard-exception-type",
                 "System.ArgumentException",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3802,7 +3767,7 @@ public class TestClass
                 "--runtime-hazards",
                 "--all-lines",
                 "--fail-on-hazard",
-                "--summary-only");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3915,7 +3880,7 @@ public class TestClass
                 "--all-lines",
                 "--analysis-limit",
                 "finite-foreach-element-facts=1",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3951,16 +3916,15 @@ public class TestClass
         File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
         try
         {
-            var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
+            var retiredCompactJson = await SymbolicCliTestHost.RunAsync(
                 "--file",
                 sourcePath,
                 "--position",
                 "0",
-                "--json",
                 "--compact-json");
-            Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
-            Assert.That(jsonAndCompact.StandardError + jsonAndCompact.StandardOutput,
-                Does.Contain("--json cannot be combined with --compact-json."));
+            Assert.That(retiredCompactJson.ExitCode, Is.EqualTo(64));
+            Assert.That(retiredCompactJson.StandardError + retiredCompactJson.StandardOutput,
+                Does.Contain("Unknown option '--compact-json'."));
 
             var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
                 "--file",
@@ -3971,19 +3935,18 @@ public class TestClass
                 "1");
             Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
             Assert.That(maxLinesWithoutCompact.StandardError + maxLinesWithoutCompact.StandardOutput,
-                Does.Contain("require --compact-json"));
+                Does.Contain("Unknown option '--max-lines'."));
 
-            var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
+            var negativeThreshold = await SymbolicCliTestHost.RunAsync(
                 "--file",
                 sourcePath,
                 "--position",
                 "0",
-                "--compact-json",
-                "--max-points",
-                "-1");
-            Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
-            Assert.That(negativeMaxPoints.StandardError + negativeMaxPoints.StandardOutput,
-                Does.Contain("non-negative integer"));
+                "--fail-on-threshold",
+                "program-points=-1");
+            Assert.That(negativeThreshold.ExitCode, Is.EqualTo(64));
+            Assert.That(negativeThreshold.StandardError + negativeThreshold.StandardOutput,
+                Does.Contain("non-negative-integer"));
 
             var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                 "--file",
@@ -4012,12 +3975,12 @@ public class TestClass
                 sourcePath,
                 "--position",
                 "0",
-                "--compact-json",
+                "--json",
                 "--max-hazards",
                 "1");
             Assert.That(maxHazardsWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
             Assert.That(maxHazardsWithoutRuntimeHazards.StandardError + maxHazardsWithoutRuntimeHazards.StandardOutput,
-                Does.Contain("--max-hazards requires --runtime-hazards."));
+                Does.Contain("--max-hazards"));
         }
         finally
         {
@@ -4092,16 +4055,16 @@ public class TestClass
             {
                 Arguments = new[]
                 {
-                    "--source-text", source, "--line", "1", "--fail-on-compact-truncation"
+                    "--source-text", source, "--line", "1", "--fail-on-threshold", "not-a-metric=0"
                 },
-                Error = "require --compact-json"
+                Error = "unknown metric"
             },
             new
             {
                 Arguments = new[]
                 {
-                    "--source-text", source, "--line", "1", "--capabilities", "--compact-json",
-                    "--fail-on-compact-threshold", "hazards=0"
+                    "--source-text", source, "--line", "1", "--capabilities", "--json",
+                    "--fail-on-threshold", "hazards=0"
                 },
                 Error = "not supported for this query mode"
             },

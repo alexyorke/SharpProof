@@ -13,7 +13,7 @@ internal static class SymbolicCliErrorWriter
         {
             Console.Out.WriteLine(JsonSerializer.Serialize(
                 new SymbolicErrorEnvelope(error),
-                SymbolicCliOutputPolicy.CompactJsonOptions));
+                SymbolicCliOutputPolicy.JsonOptions));
         }
         else
         {

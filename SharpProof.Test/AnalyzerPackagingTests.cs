@@ -1870,8 +1870,8 @@ namespace TestNamespace {
             ("SymbolicCliOptions.cs", "--fail-on-complexity-exceeded <bound>"),
             ("SymbolicCliOptions.cs", "--fail-on-complexity-unknown"),
             ("SymbolicCliOptions.cs", "--max-conservative-unknowns <n>"),
-            ("SymbolicCliOptions.cs", "--fail-on-compact-truncation"),
-            ("SymbolicCliOptions.cs", "--fail-on-compact-threshold <metric=max>"),
+            ("SymbolicCliOptions.cs", "--fail-on-analysis-truncation"),
+            ("SymbolicCliOptions.cs", "--fail-on-threshold <metric=max>"),
             ("SymbolicCliJsonRequest.cs", "return request.Arguments.ToArray()"),
             ("SymbolicCliExitGateEvaluator.cs", "SymbolicCliExitGateFailure"),
             ("SymbolicCliExitGateEvaluator.cs", "ComplexityComparison.Incomparable"));

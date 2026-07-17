@@ -28,10 +28,10 @@ The document contains:
 - `project`: project/solution identity, analyzer configs, AdditionalFiles,
   baseline/effect-summary counts, workspace diagnostics, and configuration
   issues when MSBuild context was loaded
-- `invariant`: the existing compact point-query projection, including
+- `invariant`: the canonical point-query view, including
   invariant status, reachability, proof outcomes, SMT diagnostics, and bounded
   facts and conditions
-- `runtimeHazards`: the existing compact runtime-hazard projection for the
+- `runtimeHazards`: a bounded runtime-hazard view for the
   resolved source line
 - `capabilities`: the containing method's capability summary plus bounded
   unknown reasons and sites
@@ -125,9 +125,8 @@ limits without a temporary source file:
 }
 ```
 
-For `mode: "explain"`, `output.maxHazards` maps to the explain-report hazard
-limit. In focused `runtimeHazards` mode it retains its compact-output meaning.
-`output.maxDiagnostics` and `output.maxItems` are explain-only.
+For explain reports, `maxHazards`, `maxDiagnostics`, and `maxItems` bound only
+the composed report sections. Focused query JSON is not output-truncated.
 
 Successful explain reports return exit code 0 even when they contain analyzer
 diagnostics or hazards. CI exit gates require a focused query mode and cannot

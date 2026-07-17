@@ -13,7 +13,7 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
   --source-text 'class C { static int M(int value) => value; }' `
   --source-file-name virtual/Buffer.cs `
   --line 1 `
-  --compact-json
+  --json
 ```
 
 Or read only the C# source from standard input:
@@ -74,9 +74,7 @@ grammars.
     "--smt-timeout-ms", "300",
     "--analysis-limit", "merged-if-else-facts=24",
     "--check-reachability",
-    "--invariant-target", "value",
-    "--compact-json",
-    "--max-points", "50",
+    "--json",
     "--fail-on-unproven-implies"
   ]
 }

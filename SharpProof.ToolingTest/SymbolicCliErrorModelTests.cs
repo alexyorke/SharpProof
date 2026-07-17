@@ -16,7 +16,7 @@ public sealed class SymbolicCliErrorModelTests
             "--line",
             "1",
             "--json",
-            "--compact-json");
+            "--json");
 
         AssertErrorEnvelope(
             result,
@@ -91,7 +91,7 @@ public sealed class SymbolicCliErrorModelTests
             "class C { }",
             "--line",
             "99",
-            "--compact-json");
+            "--json");
 
         AssertErrorEnvelope(
             result,

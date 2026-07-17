@@ -44,18 +44,17 @@ gates when CI must reject either outcome:
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Worker.cs --line 40 --complexity `
   --fail-on-complexity-exceeded Linear `
   --fail-on-complexity-unknown `
-  --compact-json
+  --json
 ```
 
-## Compact Output Gates
+## Aggregate And Truncation Gates
 
-`--fail-on-compact-truncation` fails when `--max-lines`, `--max-points`,
-`--max-hazards`, `--max-facts`, `--max-conditions`, or `--max-proofs` truncates
-the selected `--compact-json` projection.
+`--fail-on-analysis-truncation` fails when a configured bounded-analysis limit
+drops proof evidence. It responds to typed `AnalysisTruncation` events, not JSON
+rendering or output-size limits.
 
-Repeated `--fail-on-compact-threshold <metric=max>` gates raw aggregate counts.
-The process fails when `actual > max`; output truncation never lowers the
-value used by the gate.
+Repeated `--fail-on-threshold <metric=max>` gates aggregate counts. The process
+fails when `actual > max`.
 
 | Query mode | Supported metrics |
 | --- | --- |
@@ -64,49 +63,33 @@ value used by the gate.
 | Capabilities | `capability-sites`, `capability-unknowns` |
 | Complexity | `complexity-drivers`, `complexity-unknowns` |
 
-For example, this keeps the JSON payload bounded while independently requiring
-the full result to contain no conservative unknowns and no more than 100
+For example, this requires no conservative unknowns and no more than 100
 program points:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Worker.cs --all-lines --compact-json `
-  --max-points 20 `
-  --fail-on-compact-threshold conservative-unknowns=0 `
-  --fail-on-compact-threshold program-points=100
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Worker.cs --all-lines --json `
+  --fail-on-threshold conservative-unknowns=0 `
+  --fail-on-threshold program-points=100
 ```
-
-Add `--fail-on-compact-truncation` when exceeding the output limit itself must
-also fail.
 
 ## JSON Requests
 
-The schema-version 1 request envelope exposes the same settings under
-`gates`:
+The schema-version 2 request envelope carries the canonical CLI token vector:
 
 ```json
 {
-  "schemaVersion": 1,
-  "mode": "capabilities",
-  "source": {
-    "text": "using System; class C { void M() => Console.WriteLine(); }",
-    "filePath": "virtual/Capabilities.cs"
-  },
-  "target": { "kind": "line", "line": 1 },
-  "output": { "format": "compactJson" },
-  "gates": {
-    "allowedCapabilities": ["Console"],
-    "failOnCapabilityViolation": true,
-    "failOnCapabilityUnknown": true,
-    "failOnCompactTruncation": false,
-    "compactThresholds": {
-      "capability-sites": 10,
-      "capability-unknowns": 0
-    }
-  }
+  "schemaVersion": 2,
+  "arguments": [
+    "--source-text", "using System; class C { void M() => Console.WriteLine(); }",
+    "--source-file-name", "virtual/Capabilities.cs",
+    "--line", "1",
+    "--capabilities",
+    "--json",
+    "--allowed-capability", "Console",
+    "--fail-on-capability-violation",
+    "--fail-on-capability-unknown",
+    "--fail-on-threshold", "capability-sites=10",
+    "--fail-on-threshold", "capability-unknowns=0"
+  ]
 }
 ```
-
-Compact-threshold dictionary keys accept the same kebab-case metric names as
-the CLI. JSON property names remain lower camel case. Other gate properties are
-`failOnHazard`, `failOnUnprovenImplies`, `maximumComplexity`,
-`failOnComplexityUnknown`, and `maxConservativeUnknowns`.

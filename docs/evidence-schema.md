@@ -13,7 +13,7 @@ through `SharpProof.Symbolic.SharpProofEvidenceSchema`.
 
 | Surface | Structural version | Evidence fields |
 | --- | --- | --- |
-| CLI compact symbolic JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
+| CLI symbolic JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
 | Composed explain JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
 | Explain SARIF | SARIF `version` plus `properties.explainSchemaVersion` | run `properties.evidenceSchemaVersion`, `properties.evidenceSchemaCompatibility` |
 | Analyzer diagnostic properties | Roslyn diagnostic descriptor/version | `sharpproof.evidence.schema_version`, `sharpproof.evidence.schema_compatibility` |
@@ -64,11 +64,11 @@ generation semantics are described in [SMT lifecycle and health](smt-lifecycle.m
 
 Consumers should inspect the evidence version before interpreting proof fields.
 `SharpProofEvidenceSchema.IsReadCompatible(...)` accepts only the current
-version and rejects legacy, negative, and future versions. Compact JSON
-consumers outside .NET should implement the same check and reject an absent
+version and rejects legacy, negative, and future versions. JSON consumers
+outside .NET should implement the same check and reject an absent
 evidence version.
 
-Machine-readable explain output composes several compact and bounded evidence
+Machine-readable explain output composes several bounded evidence
 views without changing their meanings. Its cross-section pointers, truncation
 contract, and SARIF projection are documented in
 [machine-readable explain reports](explain-reports.md).

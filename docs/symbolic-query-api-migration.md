@@ -44,13 +44,13 @@ the `SymbolicCompact*`, `ISymbolicCompactResult`, `SymbolicInvariantQueryResult`
 and `ToCompactResult`/`ToInvariantQueryResult` preview surface. Library callers
 should consume `SymbolicQueryResult`, `SymbolicProgramPointResult`,
 `SymbolicCapabilityResult`, `SymbolicComplexityResult`, and
-`SymbolicRuntimeHazardQueryResult` directly. Processes that need the existing
-machine-readable schema should invoke the CLI with `--compact-json`; its JSON
-property names and shapes are unchanged.
+`SymbolicRuntimeHazardQueryResult` directly. Processes that need the
+machine-readable schema should invoke the CLI with `--json`, which serializes
+the canonical result graph directly.
 
-The compact query schema is now the sole invariant JSON result schema; the
-former invariant-only envelope and its duplicate focus/query-summary fields
-were removed.
+The canonical query schema is now the sole invariant JSON result schema; the
+former compact and invariant-only envelopes and duplicate focus/query-summary
+fields were removed.
 
 The standalone JSON request envelope now uses schema version 2 with a single
 `arguments` string array. The former nested source, target, query, output, and

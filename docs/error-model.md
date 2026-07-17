@@ -37,7 +37,7 @@ as malformed JSON request input, rather than every Roslyn syntax diagnostic.
 
 ## JSON Error Envelopes
 
-`--json`, `--compact-json`, `--sarif`, `--request-json`, and
+`--json`, `--sarif`, `--request-json`, and
 `--request-json-stdin` automatically emit failures as a lower-camel JSON
 envelope on stdout. Use `--error-json` to request the same behavior for a
 text-mode query.
@@ -68,7 +68,7 @@ stderr empty, so stdout contains exactly one machine-readable document. Text
 errors use stderr in this form:
 
 ```text
-SPQ1000 [Usage]: --json cannot be combined with --compact-json.
+SPQ1000 [Usage]: Unknown option '--compact-json'.
 ```
 
 Usage failures also print CLI help after that line.

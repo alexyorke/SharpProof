@@ -111,7 +111,6 @@ The symbolic CLI exposes complexity queries through `--complexity`:
 ```powershell
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --complexity
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --position 128 --complexity --json
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --complexity --compact-json
 ```
 
 Current CLI target support is intentionally narrow:

@@ -48,8 +48,8 @@ query outcomes. They do not mark the solver service permanently unavailable.
 - `IsAvailable` and `IsPermanentlyUnavailable` convenience flags
 
 The same snapshot and the active `SmtSolverLifecycleOptions` are included in
-`SymbolicSmtDiagnostics` and in the CLI adapter's compact invariant and
-runtime-hazard diagnostics. Full typed results and CLI JSON therefore expose
+`SymbolicSmtDiagnostics` and in canonical CLI invariant and runtime-hazard
+JSON. Typed results and CLI JSON therefore expose
 health without requiring direct access to the service instance.
 
 ## Explicit Recycling
@@ -108,7 +108,7 @@ The symbolic CLI exposes matching controls:
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability `
   --smt-transient-retries 2 `
   --smt-dispose-context-on-exit `
-  --compact-json
+  --json
 ```
 
 Use `--smt-keep-context-on-transient-failure` only for diagnostics or a host

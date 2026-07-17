@@ -32,7 +32,7 @@ public sealed class SymbolicComplexityQueryTests
             "--line",
             "3",
             "--complexity",
-            "--compact-json");
+            "--json");
 
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
@@ -105,7 +105,7 @@ public sealed class SymbolicComplexityQueryTests
             "--line",
             FindLine(source, "for (var left").ToString(),
             "--complexity",
-            "--compact-json",
+            "--json",
             "--fail-on-complexity-exceeded",
             "Linear");
         Assert.That(exceeded.ExitCode, Is.EqualTo(1));
@@ -164,12 +164,12 @@ public sealed class SymbolicComplexityQueryTests
             "--line",
             FindLine(source, "for (var left").ToString(),
             "--complexity",
-            "--compact-json",
-            "--fail-on-compact-threshold",
+            "--json",
+            "--fail-on-threshold",
             "complexity-drivers=0");
         Assert.That(threshold.ExitCode, Is.EqualTo(1));
         Assert.That(threshold.StandardError,
-            Does.Contain("CI gate failed [compact-threshold.complexity-drivers]"));
+            Does.Contain("CI gate failed [threshold.complexity-drivers]"));
     }
 
 }

@@ -1,7 +1,7 @@
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-                                Usage: SharpProof.SymbolicCli [explain] (--file <path>|--stdin|--source-text <text>) [--source-file-name <path>] [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json]
+                                Usage: SharpProof.SymbolicCli [explain] (--file <path>|--stdin|--source-text <text>) [--source-file-name <path>] [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json]
 
                                 Options:
                                   --file <path>       C# source file to query.
@@ -83,7 +83,7 @@ internal sealed class SymbolicCliOptions
                                   --condition-target <target>
                                                       Keep only program points with a path condition for the target. Can be repeated.
                                   --invariant-target <target>
-                                                      In compact, invariant, or text output, show per-target invariant summaries only for this target. Can be repeated.
+                                                      In text output, show per-target invariant summaries only for this target. Can be repeated.
                                   --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
                                   --condition-contains <text>
                                                       Keep only program points with a path condition containing text. Can be repeated.
@@ -141,19 +141,10 @@ internal sealed class SymbolicCliOptions
                                   --analysis-limit <name>=<n>
                                                       Override a positive bounded-analysis limit. Repeat for multiple limits.
                                   --json              Emit JSON instead of text.
-                                  --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
-                                  --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
-                                  --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
-                                  --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
-                                  --max-facts <n>     Maximum raw SMT facts included in --compact-json output. Default: 50.
-                                  --max-conditions <n>
-                                                      Maximum condition strings included in --compact-json output. Default: 50.
-                                  --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
-                                  --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
-                                  --fail-on-compact-truncation
-                                                      Exit with code 1 when a compact output limit truncates the result.
-                                  --fail-on-compact-threshold <metric=max>
-                                                      Exit with code 1 when a compact aggregate count exceeds max. Can be repeated.
+                                  --fail-on-analysis-truncation
+                                                      Exit with code 1 when a configured analysis limit truncates the result.
+                                  --fail-on-threshold <metric=max>
+                                                      Exit with code 1 when an aggregate count exceeds max. Can be repeated.
 
                                 Runtime hazard notes:
                                   --runtime-hazards accepts --line, --span-start/--span-end, or --all-lines.
@@ -181,12 +172,12 @@ internal sealed class SymbolicCliOptions
                                   SharpProof.SymbolicCli explain --project Example.csproj --file src/Example.cs --line 42
                                   SharpProof.SymbolicCli explain --solution Example.sln --project-name Example --file src/Example.cs --line 42
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
-                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --compact-json --invariant-target index
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-target index
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --complexity
-                                  SharpProof.SymbolicCli --file Example.cs --line 42 --capabilities --compact-json
-                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
-                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --capabilities --json
+                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --json
+                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --json
                                 """;
 
     public string? FilePath { get; private set; }
@@ -309,8 +300,6 @@ internal sealed class SymbolicCliOptions
 
     public bool Json { get; private set; }
 
-    public bool CompactJson { get; private set; }
-
     public bool CheckReachability { get; private set; }
 
     public List<string> ImpliedConditions { get; } = new();
@@ -339,9 +328,9 @@ internal sealed class SymbolicCliOptions
 
     public int? MaximumConservativeUnknowns { get; private set; }
 
-    public bool FailOnCompactTruncation { get; private set; }
+    public bool FailOnAnalysisTruncation { get; private set; }
 
-    public Dictionary<string, int> CompactThresholds { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, int> Thresholds { get; } = new(StringComparer.Ordinal);
 
     public bool IncludeUnprovenHazards { get; private set; }
 
@@ -401,24 +390,6 @@ internal sealed class SymbolicCliOptions
 
     private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
-    public int CompactMaxLines { get; private set; } = 100;
-
-    public int CompactMaxProgramPoints { get; private set; } = 250;
-
-    public int CompactMaxHazards { get; private set; } = 250;
-
-    public int CompactMaxFacts { get; private set; } = 50;
-
-    public int CompactMaxConditions { get; private set; } = 50;
-
-    public int CompactMaxProofs { get; private set; } = 50;
-
-    public bool HasCompactOutputLimit { get; private set; }
-
-    public bool HasCompactHazardOutputLimit { get; private set; }
-
-    public bool CompactSummaryOnly { get; private set; }
-
     public bool RequiresSmt => Explain || CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
 
     public bool HasExitGates =>
@@ -429,8 +400,8 @@ internal sealed class SymbolicCliOptions
         MaximumComplexity.HasValue ||
         FailOnComplexityUnknown ||
         MaximumConservativeUnknowns.HasValue ||
-        FailOnCompactTruncation ||
-        CompactThresholds.Count != 0;
+        FailOnAnalysisTruncation ||
+        Thresholds.Count != 0;
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
@@ -577,16 +548,8 @@ internal sealed class SymbolicCliOptions
         Add(static (o, c, a) => o.ProofConditions.Add(c.String(a)), "--proof-condition");
         Add(static (o, c, a) => o.ProofConditionContains.Add(c.String(a)), "--proof-condition-contains");
         Add(static (o, _, _) => o.Json = true, SymbolicCliOutputPolicy.Json);
-        Add(static (o, _, _) => o.CompactJson = true, SymbolicCliOutputPolicy.CompactJson, SymbolicCliOutputPolicy.Compact);
-        Add(static (o, c, a) => { o.CompactMaxLines = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-lines");
-        Add(static (o, c, a) => { o.CompactMaxProgramPoints = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-points");
-        Add(static (o, c, a) => { o.CompactMaxHazards = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; o.HasCompactHazardOutputLimit = true; }, "--max-hazards");
-        Add(static (o, c, a) => { o.CompactMaxFacts = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-facts");
-        Add(static (o, c, a) => { o.CompactMaxConditions = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-conditions");
-        Add(static (o, c, a) => { o.CompactMaxProofs = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-proofs");
-        Add(static (o, _, _) => { o.CompactSummaryOnly = true; o.CompactJson = true; }, "--summary-only");
-        Add(static (o, _, _) => o.FailOnCompactTruncation = true, "--fail-on-compact-truncation");
-        Add(static (o, c, a) => o.AddCompactThreshold(c.String(a), a), "--fail-on-compact-threshold");
+        Add(static (o, _, _) => o.FailOnAnalysisTruncation = true, "--fail-on-analysis-truncation");
+        Add(static (o, c, a) => o.AddThreshold(c.String(a), a), "--fail-on-threshold");
         Add(static (o, _, _) => o.CheckReachability = true, "--check-reachability");
         Add(static (o, c, a) => o.ImpliedConditions.Add(c.String(a)), "--implies");
         Add(static (o, _, _) => o.RuntimeHazards = true, "--runtime-hazards");
@@ -635,22 +598,11 @@ internal sealed class SymbolicCliOptions
             NormalizeStringList(options.PreprocessorSymbols);
             _ = options.CreateCompilationProfile();
 
-            if (options.CompactSummaryOnly)
-            {
-                options.CompactMaxLines = 0;
-                options.CompactMaxProgramPoints = 0;
-                options.CompactMaxHazards = 0;
-            }
-
-            if (options.Json && options.CompactJson)
-                throw new ArgumentException("--json cannot be combined with --compact-json.");
-
             if ((options.Sarif ? 1 : 0) +
                 (options.Markdown ? 1 : 0) +
-                (options.Json ? 1 : 0) +
-                (options.CompactJson ? 1 : 0) > 1)
+                (options.Json ? 1 : 0) > 1)
                 throw new ArgumentException(
-                    "--json, --compact-json, --sarif, and --markdown are mutually exclusive.");
+                    "--json, --sarif, and --markdown are mutually exclusive.");
 
             if ((options.Sarif || options.Markdown) && !options.Explain)
                 throw new ArgumentException("--sarif and --markdown require explain.");
@@ -661,16 +613,7 @@ internal sealed class SymbolicCliOptions
 
             if (options.Json && options.HasInvariantTargetFilter && !options.Explain)
                 throw new ArgumentException(
-                    "--invariant-target cannot be combined with --json; use text or --compact-json.");
-
-            if (options.HasCompactOutputLimit && !options.CompactJson)
-                throw new ArgumentException(
-                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
-
-            if ((options.FailOnCompactTruncation || options.CompactThresholds.Count != 0) &&
-                !options.CompactJson)
-                throw new ArgumentException(
-                    "--fail-on-compact-truncation and --fail-on-compact-threshold require --compact-json.");
+                    "--invariant-target cannot be combined with --json; use text output.");
 
             if (options.FailOnUnprovenImplies && options.ImpliedConditions.Count == 0)
                 throw new ArgumentException("--fail-on-unproven-implies requires at least one --implies condition.");
@@ -695,9 +638,6 @@ internal sealed class SymbolicCliOptions
                 (options.RuntimeHazards || options.Complexity || options.Capabilities))
                 throw new ArgumentException(
                     "--max-conservative-unknowns is supported only for invariant query results.");
-
-            if (options.HasCompactHazardOutputLimit && !options.RuntimeHazards)
-                throw new ArgumentException("--max-hazards requires --runtime-hazards.");
 
             if (!options.RuntimeHazards &&
                 (options.IncludeUnprovenHazards ||
@@ -879,10 +819,6 @@ internal sealed class SymbolicCliOptions
             if (options.Explain)
             {
                 options.CheckReachability = true;
-                if (options.CompactJson)
-                    throw new ArgumentException(
-                        "explain supports text, --json, --sarif, or --markdown, not compact query output formats.");
-
                 if (options.RuntimeHazards || options.Complexity || options.Capabilities)
                     throw new ArgumentException(
                         "explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
@@ -910,7 +846,7 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException(
                     "Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
 
-            options.ValidateCompactThresholds();
+            options.ValidateThresholds();
 
             foreach (var referencePath in options.ReferencePaths)
                 if (!File.Exists(CliHost.GetFullPath(referencePath)))
@@ -930,10 +866,6 @@ internal sealed class SymbolicCliOptions
     {
         if (HasInvariantTargetFilter)
             throw new ArgumentException($"--invariant-target cannot be combined with {optionName}.");
-
-        if (HasCompactOutputLimit)
-            throw new ArgumentException(
-                $"--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with {optionName}.");
 
         if (AllLines || IsAnySpanQuery || LineInvariants)
             throw new ArgumentException($"{optionName} supports --line, --line with --column, or --position only.");
@@ -1153,9 +1085,9 @@ internal sealed class SymbolicCliOptions
             result.SmtDiagnostics);
     }
 
-    private void ValidateCompactThresholds()
+    private void ValidateThresholds()
     {
-        if (CompactThresholds.Count == 0) return;
+        if (Thresholds.Count == 0) return;
 
         string[] allowedMetrics;
         if (RuntimeHazards)
@@ -1173,14 +1105,14 @@ internal sealed class SymbolicCliOptions
                 "reachability-unknowns"
             };
 
-        var unsupported = CompactThresholds.Keys
+        var unsupported = Thresholds.Keys
             .Where(metric => !allowedMetrics.Contains(metric, StringComparer.Ordinal))
             .OrderBy(static metric => metric, StringComparer.Ordinal)
             .ToArray();
         if (unsupported.Length == 0) return;
 
         throw new ArgumentException(
-            "--fail-on-compact-threshold metric(s) " +
+            "--fail-on-threshold metric(s) " +
             string.Join(", ", unsupported) +
             " are not supported for this query mode. Supported metrics: " +
             string.Join(", ", allowedMetrics) + ".");
@@ -1232,10 +1164,10 @@ internal sealed class SymbolicCliOptions
             "<name>=<positive-integer>", "limit name", 1);
     }
 
-    private void AddCompactThreshold(string value, string optionName)
+    private void AddThreshold(string value, string optionName)
     {
         AddNamedInteger(
-            value, optionName, CompactThresholds, IsCompactThresholdName,
+            value, optionName, Thresholds, IsThresholdName,
             "<metric>=<non-negative-integer>", "metric", 0);
     }
 
@@ -1301,7 +1233,7 @@ internal sealed class SymbolicCliOptions
             "guard-facts-per-target-per-state";
     }
 
-    private static bool IsCompactThresholdName(string name)
+    private static bool IsThresholdName(string name)
     {
         return name is "program-points" or
             "conservative-unknowns" or

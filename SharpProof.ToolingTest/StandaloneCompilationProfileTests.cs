@@ -44,7 +44,7 @@ public sealed class StandaloneCompilationProfileTests
             "release",
             "--assembly-name",
             "Profiled.Query",
-            "--compact-json");
+            "--json");
 
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);

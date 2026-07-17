@@ -74,8 +74,8 @@ if (result.AnalysisTruncation.IsTruncated)
 }
 ```
 
-`AnalysisTruncation` is exposed on unified, point, line, span, file, condition
-proof, runtime-hazard, and compact result objects. Each event includes its
+`AnalysisTruncation` is exposed on query, condition-proof, and runtime-hazard
+results. Each event includes its
 stable `Code`, typed `Kind`, retained `Limit`, attempted or observed count,
 proof `Provenance`, and source span start when available. Aggregate results
 deduplicate the same event while preserving the largest observed count.
@@ -89,10 +89,10 @@ limits:
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines `
   --analysis-limit finite-foreach-element-facts=16 `
   --analysis-limit structural-null-state-depth=6 `
-  --compact-json
+  --json
 ```
 
-Text output prints an `Analysis limits hit` section. Full and compact JSON
-include `analysisTruncation.isTruncated` and the complete event array. Runtime
+Text output prints an `Analysis limits hit` section. JSON includes
+`analysisTruncation.isTruncated` and the complete event array. Runtime
 hazard entries also retain the truncation evidence for the individual
 candidate analysis.

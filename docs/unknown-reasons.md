@@ -28,7 +28,7 @@ The descriptor is exposed through:
 - `SymbolicComplexityCalleeInfo.UnknownReasonInfo` and
   `SymbolicComplexityResult.UnknownReasonDetails`
 - `SymbolicRuntimeHazard.UnknownReasonInfo`
-- the public compact capability, complexity, and runtime-hazard projections
+- capability, complexity, runtime-hazard, and canonical CLI JSON results
 
 Condition/implication results expose the proof descriptor through their
 `Proof`. Purity and `[Ensures]` analyzer results carry the same taxonomy in

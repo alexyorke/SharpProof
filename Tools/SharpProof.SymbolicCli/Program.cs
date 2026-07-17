@@ -23,13 +23,13 @@ try
             if (options.Sarif)
                 Console.WriteLine(JsonSerializer.Serialize(
                     report.ToSarif(),
-                    SymbolicCliOutputPolicy.CompactJsonOptions));
+                    SymbolicCliOutputPolicy.JsonOptions));
             else if (options.Markdown)
                 Console.WriteLine(report.ToMarkdown());
             else
                 Console.WriteLine(JsonSerializer.Serialize(
                     report,
-                    SymbolicCliOutputPolicy.CompactJsonOptions));
+                    SymbolicCliOutputPolicy.JsonOptions));
         }
         else
         {
@@ -68,12 +68,12 @@ try
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
 
-    if (options.Json || options.CompactJson)
+    if (options.Json)
     {
         Console.WriteLine(JsonSerializer.Serialize(
             result,
             result.GetType(),
-            SymbolicCliOutputPolicy.CompactJsonOptions));
+            SymbolicCliOutputPolicy.JsonOptions));
     }
     else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
     {

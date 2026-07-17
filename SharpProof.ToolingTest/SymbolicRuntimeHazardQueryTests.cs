@@ -2784,7 +2784,7 @@ public class TestClass
                 "--line",
                 FindLine(source, "return 10 / divisor;").ToString(),
                 "--runtime-hazards",
-                "--compact-json");
+                "--json");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
@@ -3136,12 +3136,12 @@ public class TestClass
                 "--line",
                 FindLine(source, "throw new").ToString(),
                 "--runtime-hazards",
-                "--compact-json",
-                "--fail-on-compact-threshold",
+                "--json",
+                "--fail-on-threshold",
                 "hazards=0");
             Assert.That(threshold.ExitCode, Is.EqualTo(1));
             Assert.That(threshold.StandardError,
-                Does.Contain("CI gate failed [compact-threshold.hazards]"));
+                Does.Contain("CI gate failed [threshold.hazards]"));
             using (JsonDocument.Parse(threshold.StandardOutput))
             {
             }
@@ -3152,10 +3152,8 @@ public class TestClass
                 "--line",
                 FindLine(source, "throw new").ToString(),
                 "--runtime-hazards",
-                "--compact-json",
-                "--max-hazards",
-                "0",
-                "--fail-on-compact-truncation");
+                "--json",
+                "--fail-on-analysis-truncation");
             Assert.That(truncation.ExitCode, Is.Zero, truncation.StandardError);
             using var document = JsonDocument.Parse(truncation.StandardOutput);
             Assert.That(document.RootElement.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));

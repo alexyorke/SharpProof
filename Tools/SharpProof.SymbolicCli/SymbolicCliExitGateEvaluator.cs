@@ -30,8 +30,8 @@ internal static class SymbolicCliExitGateEvaluator
         EvaluateCapabilities(options, result, failures);
         EvaluateComplexity(options, result, failures);
         EvaluateConservativeUnknowns(options, result, failures);
-        EvaluateCompactTruncation(options, result, failures);
-        EvaluateCompactThresholds(options, result, failures);
+        EvaluateAnalysisTruncation(options, result, failures);
+        EvaluateThresholds(options, result, failures);
         return failures;
     }
 
@@ -143,12 +143,12 @@ internal static class SymbolicCliExitGateEvaluator
             "; maximum=" + options.MaximumConservativeUnknowns.Value.ToString(CultureInfo.InvariantCulture) + "."));
     }
 
-    private static void EvaluateCompactTruncation(
+    private static void EvaluateAnalysisTruncation(
         SymbolicCliOptions options,
         object result,
         ICollection<SymbolicCliExitGateFailure> failures)
     {
-        if (!options.FailOnCompactTruncation) return;
+        if (!options.FailOnAnalysisTruncation) return;
 
         var isTruncated = result switch
         {
@@ -159,28 +159,28 @@ internal static class SymbolicCliExitGateEvaluator
         if (!isTruncated) return;
 
         failures.Add(new SymbolicCliExitGateFailure(
-            "compact-truncation",
-            "one or more configured compact output limits were exceeded."));
+            "analysis-truncation",
+            "one or more configured analysis limits were exceeded."));
     }
 
-    private static void EvaluateCompactThresholds(
+    private static void EvaluateThresholds(
         SymbolicCliOptions options,
         object result,
         ICollection<SymbolicCliExitGateFailure> failures)
     {
-        foreach (var threshold in options.CompactThresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        foreach (var threshold in options.Thresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
-            var actual = GetCompactMetric(result, threshold.Key);
+            var actual = GetMetric(result, threshold.Key);
             if (actual <= threshold.Value) continue;
 
             failures.Add(new SymbolicCliExitGateFailure(
-                "compact-threshold." + threshold.Key,
+                "threshold." + threshold.Key,
                 "actual=" + actual.ToString(CultureInfo.InvariantCulture) +
                 "; maximum=" + threshold.Value.ToString(CultureInfo.InvariantCulture) + "."));
         }
     }
 
-    private static int GetCompactMetric(object result, string metric)
+    private static int GetMetric(object result, string metric)
     {
         if (result is SymbolicQueryResult queryResult)
             return metric switch
@@ -189,7 +189,7 @@ internal static class SymbolicCliExitGateEvaluator
                 "conservative-unknowns" => queryResult.MergedPathFacts.ConservativeUnknownCount,
                 "proof-unknowns" => queryResult.ProgramPointSummary.ProofOutcomes.UnknownCount,
                 "reachability-unknowns" => queryResult.Reachability.UnknownCount,
-                _ => throw new InvalidOperationException("Unsupported invariant compact threshold metric: " + metric)
+                _ => throw new InvalidOperationException("Unsupported invariant threshold metric: " + metric)
             };
 
         return result switch
@@ -203,7 +203,7 @@ internal static class SymbolicCliExitGateEvaluator
                 Math.Max(
                     complexity.UnknownReasons.Count,
                     complexity.Complexity.IsUnknown || complexity.Complexity.IsRecursiveUnknown ? 1 : 0),
-            _ => throw new InvalidOperationException("Unsupported compact threshold metric: " + metric)
+            _ => throw new InvalidOperationException("Unsupported threshold metric: " + metric)
         };
     }
 

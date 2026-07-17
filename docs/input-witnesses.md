@@ -29,9 +29,8 @@ The full public result graph exposes witnesses at every requested scope:
   `SymbolicRuntimeHazardQueryResult` exposes all trigger witnesses and their
   merged domain summary.
 
-The CLI's full `--json` output serializes these same public DTOs. Compact JSON
-intentionally omits high-cardinality model data; use `--json` when assignments
-or input domains are required.
+The CLI's `--json` output serializes these same public DTOs, including model
+assignments and input domains when available.
 
 ## Status And Precision
 

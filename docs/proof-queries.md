@@ -32,7 +32,7 @@ Use focused modes when you need a specific machine-readable answer:
 ```powershell
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --runtime-hazards
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --capabilities --json
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --complexity --compact-json
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --complexity --json
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability --implies "value > 0"
 ```
 
@@ -56,7 +56,7 @@ preserved. See [standalone query inputs](standalone-query-inputs.md).
 
 Successful queries normally exit 0 regardless of findings. CI can opt into
 typed exit-code gates for unproven implications, hazards, capability policy,
-complexity bounds, conservative unknowns, and compact aggregate/output limits.
+complexity bounds, conservative unknowns, analysis truncation, and aggregate thresholds.
 See [CI exit-code gates](ci-exit-gates.md).
 
 Request, input, unsupported-target, parse, project, solver, timeout, and
@@ -116,12 +116,10 @@ contracts across condition, reachability, runtime-hazard, purity, and
 for precedence, mutation invalidation, and trust boundaries.
 
 The public library returns typed query, proof, capability, complexity, and
-runtime-hazard results. Compact and invariant JSON projection DTOs are owned by
-the CLI adapter rather than the preview NuGet API. Use `--compact-json` for the
-stable lower-camel-case schema, bounded nested results, and evidence schema
-fields. The CLI's machine-readable explain report composes the same adapter
-projections with bounded capability, complexity, project, and diagnostic views
-under its `kind: "explain"`, schema-versioned envelope.
+runtime-hazard results. The CLI serializes those canonical result graphs with
+one lower-camel `--json` policy. Its machine-readable explain report composes
+the same domains with bounded capability, complexity, project, and diagnostic
+views under its `kind: "explain"`, schema-versioned envelope.
 
 The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
 XML documentation, nullable annotations, and portable PDBs containing Source
@@ -165,7 +163,7 @@ host can translate them with `input.SourceMap`.
 The CLI exposes the same settings:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines --language-version 12 --define FEATURE_X --nullable enable --allow-unsafe --documentation-mode diagnose --platform x64 --optimization release --assembly-name Example.Analysis --compact-json
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines --language-version 12 --define FEATURE_X --nullable enable --allow-unsafe --documentation-mode diagnose --platform x64 --optimization release --assembly-name Example.Analysis --json
 ```
 
 | Profile setting | CLI option | Default |

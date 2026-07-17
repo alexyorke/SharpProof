@@ -92,7 +92,6 @@ The symbolic CLI exposes the same classification through `--capabilities`:
 ```powershell
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --capabilities
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --capabilities --json
-dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --position 128 --capabilities --compact-json
 ```
 
 Current CLI target support is intentionally narrow:
