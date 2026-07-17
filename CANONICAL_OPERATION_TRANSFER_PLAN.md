@@ -671,6 +671,16 @@ the unused preview .NET API may break when it obstructs the canonical design.
       yield but still centralizes correctness-sensitive topology. Collector tests
       pass 244/244, focused loop/switch/reachability tests pass 138/138,
       MainSmtFlow passes 257/257, and Release warning-as-error is clean.
+  - [x] Replace Analyzer assignment branch fan-out with one ordered
+    `PurityAssignmentEnvelope` and transition owner. The envelope now owns
+    assignment targets, RHS-based local versions, fixed pre-target alias and
+    lifetime snapshots, delegate updates, concrete types, acquisitions, borrows,
+    and caller-visible mutation sidecars. Delete the 275-line symbolic-assignment
+    partial and the superseded assignment/resource adapters while retaining the
+    50-line operation router for return, using, flow-capture, and typed envelope
+    dispatch. Unsupported canonical RHS lowering retains the conservatively
+    invalidated state, and declaration-only delegate recovery never replaces a
+    known target when resolution returns no result.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -899,7 +909,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 internal compact query projection graph | This commit | 105,643 | -2,033 |
 | Phase 7 direct compact query leaves | `ddfb64c4` | 105,531 | -2,145 |
 | Phase 7 direct invariant-query view | `74873c92` | 105,458 | -2,218 |
-| Phase 7 direct compact scope construction | This commit | 105,425 | -2,251 |
+| Phase 7 direct compact scope construction | `7727f3e0` | 105,425 | -2,251 |
+| Phase 7 canonical mutation inventory | `215d840e` | 105,315 | -2,361 |
+| Phase 7 canonical purity assignment envelope | `db309060` | 105,077 | -2,599 |
 
 ## Validation Ledger
 
@@ -1128,6 +1140,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 direct compact query leaves | Ordered raw JSON leaves now replace the remaining descriptor, focus, analysis-summary, line, point, invariant-summary, diagnostic, and truncation serialization boilerplate. The retained metric fields are only those consumed by explain, exit gates, and aggregate construction; query scope metadata is read from its single canonical scope record instead of 29 forwarding properties. All 13 compact/invariant hashes and both explain hashes remain byte-identical; the complete Tooling lane passes 606/606, the focused main analysis/source-shape gate passes 10/10, and the Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 112 to 105,531, or -2,145 from the rewrite start; tracked test LOC is 145,250. A parallel hosted CI/CD audit found PR #79 and both push/PR package-consumer workflows green, so no workflow edit was warranted. |
 | Phase 7 direct invariant-query view | One ordered raw JSON document now owns the compact invariant-query shape; the three target, target-path, and diagnostic forwarding carriers are deleted. Explain and exit-gate callers retain only their typed counts, status, target names, and preformatted reason details. All 13 compact/invariant and both explain byte hashes pass 15/15; `SymbolicSourceQueryLineTests` pass 96/96. The Release package rebuild is clean and restores the package-byte test, after which the canonical Tooling lane passes 606/606. The Release warning-as-error solution build has zero warnings and errors. Production LOC falls by 73 to 105,458, or -2,218 from the rewrite start; tracked test LOC is 145,267 because compact-view assertions now verify the canonical JSON document directly. |
 | Phase 7 direct compact scope construction | The compact scope forwarding record is deleted. One private builder now materializes only the invariant, proof, program-point, SMT, and truncation data consumed immediately by canonical root and line JSON construction; line results retain only JSON, visible program points, and truncation while the root owns its existing metrics directly. The file-wide shared program-point budget and serialized order remain byte-identical. The obsolete linked compile items and clone adjudication are removed, and the test-impact inventory is regenerated and schema-validated. Compact/explain bytes pass 15/15, source-query tests pass 96/96, impacted-test inventory coverage passes 39/39, the package-preconditioned Tooling lane passes 606/606, and Release warning-as-error builds have zero warnings and errors. Production LOC falls by 33 to 105,425 across 443 files, or -2,251 from the rewrite start; tracked test LOC remains 145,267. |
+| Phase 7 canonical mutation inventory | One execution-scoped ordered `SymbolicMutationInventory` now owns direct targets, reference exposure, strict source windows, invalidation plans, and loop back-edge collection. Parallel loop, program-point, and invalidator walkers are deleted. Inventory/loop invariants pass 8/8, CFG/state/loop parity passes 278/278, source-query tooling passes 96/96, MainSmtFlow passes 257/257, the affected exception-flow batch passes 63/63, and the full main lane passes 5,548 with the same two skips. Release warning-as-error is clean. Production LOC is 105,315 across 444 files, or -2,361 from the rewrite start; tracked test LOC is 145,395. |
+| Phase 7 canonical purity assignment envelope | Commit `db309060` replaces the Analyzer assignment branch fan-out with one ordered target envelope and transition. Three direct invariants lock RHS-span local versions, fixed ref-closure ownership/disposal alias snapshots, and declaration delegate null-resolution recovery. `SymbolicOperationTransferModelTests` pass 47/47; the combined affected Purity/alias/resource/delegate/oracle/exception batch passes 679/679; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,551 plus the same two MainGeneral skips. The Release solution warning-as-error build has zero warnings and errors. Architecture metrics report no oversized files/partials, overparted partials, unassigned or ambiguous files, or dependency violations. Production LOC falls by 238 to 105,077 across 444 files, or -2,599 from the rewrite start; tracked test LOC is 145,542. |
 
 ## Current Checkpoint
 
@@ -1502,12 +1516,22 @@ the unused preview .NET API may break when it obstructs the canonical design.
   with the same two documented skips, and the Release warning-as-error solution
   build is clean. Production LOC is 105,315 across 444 files, down 110 in this
   tranche and 2,361 from the rewrite start; tracked test LOC is 145,395.
-- Next cheapest step: use the mutation inventory as the prerequisite for one
-  bounded state-transfer migration whose deleted legacy path clears a 100-line
-  net gate; first inventory exact callers and reject another low-yield wrapper
-  extraction before implementation.
-- Blockers: the 11,000-line production target still requires 8,639 lines. The
-  structural fallback and Analyzer assignment/merge wrappers remain reachable
-  for typed CFG `Unsupported` cases. The user has authorized the required major
+  Analyzer assignment transfer now has one ordered `PurityAssignmentEnvelope`
+  owning version, alias/lifetime snapshot, delegate, concrete-type, acquisition,
+  borrow, and mutation-sidecar policy. The 275-line symbolic-assignment partial
+  and superseded adapters are deleted. Three direct invariants pass, the final
+  affected batch passes 679/679, MainSmtAnalyzer passes 487/487, and the full
+  main gate passes 5,551 plus the same two documented skips. Release
+  warning-as-error is clean. Production LOC is 105,077 across 444 files, down
+  238 in this tranche and 2,599 from the rewrite start; tracked test LOC is
+  145,542. Architecture violation counts remain zero.
+- Next cheapest step: inventory the now-adjacent Purity CFG/state-merge closure
+  against the assignment envelope and canonical `SymbolicStateMerger`; accept
+  the next vertical slice only when deleting its superseded path clears the
+  100-line net gate with normalized state, evidence, version, ownership, and
+  conservative fallback parity.
+- Blockers: the 11,000-line production target still requires 8,401 lines. The
+  structural fallback and Analyzer CFG/state-merge wrappers remain reachable for
+  typed CFG `Unsupported` cases. The user has authorized the required major
   rearchitecture; its remaining blocker is differential parity, not permission.
   MainSmtFlow passes 257/257; the prior SP0010 baseline is no longer a blocker.
