@@ -261,65 +261,7 @@ internal static partial class PurityResourceStateFacts
         }
     }
 
-    internal static PurityAnalysisState AddOwnedLocalArrayFacts(
-        PurityAnalysisState nextState,
-        ISymbol localSymbol,
-        IOperation valueOperation)
-    {
-        var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        return PurityOperationTransferAdapter.ApplyLifetime(
-            nextState,
-            term,
-            SymbolicLifetimeOperationKind.CreateOwnedValue,
-            valueOperation.Syntax,
-            "analyzer.array.acquire",
-            localSymbol,
-            "evidence.array.acquire");
-    }
-
-    internal static PurityAnalysisState AddFreshMutableObjectFacts(
-        PurityAnalysisState nextState,
-        ISymbol localSymbol,
-        IOperation valueOperation)
-    {
-        var unwrappedValue = PurityAnalysisEngine.SkipImplicitConversions(valueOperation);
-        if (unwrappedValue is not IObjectCreationOperation objectCreationOperation ||
-            !RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
-            return nextState;
-
-        var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        return PurityOperationTransferAdapter.ApplyLifetime(
-            nextState,
-            term,
-            SymbolicLifetimeOperationKind.CreateOwnedValue,
-            valueOperation.Syntax,
-            "analyzer.object.acquire",
-            localSymbol,
-            "evidence.object.acquire");
-    }
-
-    internal static PurityAnalysisState AddOwnedDisposableLocalFacts(
-        PurityAnalysisState nextState,
-        ISymbol localSymbol,
-        IOperation valueOperation,
-        Compilation compilation)
-    {
-        if (!IsOwnedDisposableObjectCreationValue(valueOperation, compilation)) return nextState;
-
-        var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, nextState);
-        if (HasReleasedResourceFact(term, nextState)) return nextState;
-
-        return PurityOperationTransferAdapter.ApplyLifetime(
-            nextState,
-            term,
-            SymbolicLifetimeOperationKind.AcquireDisposable,
-            valueOperation.Syntax,
-            "analyzer.resource.acquire",
-            localSymbol,
-            "evidence.resource.acquire");
-    }
-
-    private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
+    internal static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
     {
         return IsResourceReleased(
             term,
@@ -328,7 +270,7 @@ internal static partial class PurityResourceStateFacts
             new HashSet<SymbolicTerm>());
     }
 
-    private static bool IsOwnedDisposableObjectCreationValue(
+    internal static bool IsOwnedDisposableObjectCreationValue(
         IOperation valueOperation,
         Compilation compilation)
     {

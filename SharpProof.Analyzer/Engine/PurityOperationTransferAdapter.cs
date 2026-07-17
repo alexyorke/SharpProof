@@ -8,67 +8,6 @@ namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityOperationTransferAdapter
 {
-    internal static PurityAnalysisState ApplyAssignment(
-        PurityAnalysisState state,
-        ISymbol targetSymbol,
-        IOperation valueOperation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        PurityAnalysisState valueState,
-        out SymbolicOperationTransitionResult transition)
-    {
-        transition = SymbolicOperationTransferAdapter.ApplyAssignment(
-            state.PathState,
-            targetSymbol,
-            valueOperation.Syntax,
-            semanticModel,
-            cancellationToken,
-            state.GetSmtSymbolVersion,
-            valueState.GetSmtSymbolVersion,
-            provenance: "analyzer.assignment",
-            bindingProvenance: "analyzer.assignment",
-            evidenceKey: "analyzer.assignment.value");
-        return transition.IsUnsupported
-            ? state
-            : state.WithPathState(transition.State);
-    }
-
-    internal static PurityAnalysisState ApplyAssignmentFacts(
-        PurityAnalysisState state,
-        ISymbol targetSymbol,
-        IOperation? valueOperation,
-        PurityAnalysisState valueState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var nextState = valueOperation?.Syntax is ExpressionSyntax
-            ? ApplyAssignment(
-                state,
-                targetSymbol,
-                valueOperation,
-                semanticModel,
-                cancellationToken,
-                valueState,
-                out _)
-            : state;
-        var sourceSymbol = PurityAnalysisEngine.TryResolveTrackedSymbol(valueOperation, valueState);
-        return sourceSymbol == null ||
-               SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
-               SymbolicFactFactory.GetTrackedSymbolType(sourceSymbol)?.IsReferenceType != true ||
-               SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.IsReferenceType != true
-            ? nextState
-            : ApplyReferenceRelationship(
-                nextState,
-                sourceSymbol,
-                valueState,
-                targetSymbol,
-                SymbolicLifetimeOperationKind.Alias,
-                valueOperation!.Syntax,
-                "analyzer.assignment.alias",
-                "evidence.assignment.alias");
-    }
-
     internal static PurityAnalysisState ApplyDeclaredBorrow(
         PurityAnalysisState state,
         ILocalSymbol declaredSymbol,
@@ -104,7 +43,7 @@ internal static class PurityOperationTransferAdapter
             "evidence.declaration.borrow");
     }
 
-    private static PurityAnalysisState ApplyReferenceRelationship(
+    internal static PurityAnalysisState ApplyReferenceRelationship(
         PurityAnalysisState state,
         ISymbol sourceSymbol,
         PurityAnalysisState sourceState,

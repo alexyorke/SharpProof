@@ -6,8 +6,10 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -669,24 +671,162 @@ public sealed class SymbolicOperationTransferModelTests
         var operation = (Microsoft.CodeAnalysis.Operations.IAssignmentOperation)
             fixture.SemanticModel.GetOperation(assignment)!;
         var target = ((Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation)operation.Target).Local;
+        var initialState = PurityAnalysisEngine.PurityAnalysisState.Pure;
+        var versionedState = initialState.WithSmtSymbolDefinitionVersion(target, operation.Value.Syntax);
         var symbolic = SymbolicOperationTransferAdapter.ApplyAssignment(
-            new SymbolicState(),
+            versionedState.PathState,
             target,
             operation.Value.Syntax,
             fixture.SemanticModel,
-            CancellationToken.None);
-        var purity = PurityOperationTransferAdapter.ApplyAssignment(
-            PurityAnalysisEngine.PurityAnalysisState.Pure,
+            CancellationToken.None,
+            versionedState.GetSmtSymbolVersion,
+            initialState.GetSmtSymbolVersion);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var containingMethod = (IMethodSymbol)target.ContainingSymbol;
+        var context = new PurityAnalysisContext(
+            fixture.SemanticModel,
+            fixture.SemanticModel.Compilation.GetSpecialType(SpecialType.System_Object),
+            pureAttributeSymbol: null,
+            allowSynchronizationAttributeSymbol: null,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+            new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
+            containingMethod,
+            ImmutableList<IPurityRule>.Empty,
+            CancellationToken.None,
+            purityService: null,
+            smtAnalysis);
+        var created = PurityAssignmentEnvelope.TryCreate(operation, initialState, context, out var envelope);
+        var purity = PurityAssignmentTransition.Apply(envelope, initialState, context);
+        var purityTransition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            versionedState.PathState,
             target,
-            operation.Value,
+            operation.Value.Syntax,
             fixture.SemanticModel,
             CancellationToken.None,
-            PurityAnalysisEngine.PurityAnalysisState.Pure,
-            out var purityTransition);
+            versionedState.GetSmtSymbolVersion,
+            initialState.GetSmtSymbolVersion,
+            provenance: "analyzer.assignment",
+            bindingProvenance: "analyzer.assignment",
+            evidenceKey: "analyzer.assignment.value");
 
+        Assert.That(created, Is.True);
         Assert.That(symbolic.IsExact, Is.True);
         Assert.That(purityTransition.IsExact, Is.True);
         Assert.That(purity.PathState.NormalizedProofKey, Is.EqualTo(symbolic.State.NormalizedProofKey));
+    }
+
+    [Test]
+    public void PurityAssignmentEnvelope_LocalVersionUsesRhsSyntax()
+    {
+        const string source = "static class C { static void M(int input) { int value = 0; value = input + 1; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(PurityAssignmentEnvelope_LocalVersionUsesRhsSyntax));
+        var syntax = fixture.Root.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
+        var operation = (Microsoft.CodeAnalysis.Operations.IAssignmentOperation)fixture.SemanticModel.GetOperation(syntax)!;
+        var local = ((Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation)operation.Target).Local;
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var context = CreatePurityContext(fixture, (IMethodSymbol)local.ContainingSymbol, smtAnalysis);
+
+        Assert.That(PurityAssignmentEnvelope.TryCreate(operation, PurityAnalysisEngine.PurityAnalysisState.Pure,
+            context, out var envelope), Is.True);
+        var actual = PurityAssignmentTransition.Apply(
+            envelope, PurityAnalysisEngine.PurityAnalysisState.Pure, context);
+
+        Assert.That(actual.GetSmtSymbolVersion(local),
+            Is.EqualTo(SymbolicOperationTransferKernel.GetDefinitionVersion(operation.Value.Syntax.Span)));
+    }
+
+    [Test]
+    public void PurityAssignmentEnvelope_RefClosureCapturesLifetimeAliasesFromOneSnapshot()
+    {
+        const string source = """
+            using System;
+            sealed class D : IDisposable { public void Dispose() { } }
+            static class C
+            {
+                static void M()
+                {
+                    D owner = new D();
+                    D ownedAlias = owner;
+                    D disposedAlias = owner;
+                    ref D first = ref owner;
+                    ref D second = ref first;
+                    second = new D();
+                }
+            }
+            """;
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source, nameof(PurityAssignmentEnvelope_RefClosureCapturesLifetimeAliasesFromOneSnapshot));
+        var syntax = fixture.Root.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
+        var operation = (Microsoft.CodeAnalysis.Operations.IAssignmentOperation)fixture.SemanticModel.GetOperation(syntax)!;
+        var locals = fixture.Root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .ToDictionary(node => node.Identifier.ValueText,
+                node => (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(node)!);
+        var initial = PurityAnalysisEngine.PurityAnalysisState.Pure;
+        var secondTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["second"], initial);
+        var firstTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["first"], initial);
+        var ownedAliasTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["ownedAlias"], initial);
+        var disposedAliasTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["disposedAlias"], initial);
+        var disposedResource = new SymbolicVariableTerm("disposed-resource", SmtValueKind.Reference);
+        initial = initial.WithPathState(new SymbolicState(new[]
+        {
+            SymbolicFact.Exact(new SymbolicResourceLifetimeAtom(
+                secondTerm, SymbolicResourceLifetimeState.Owned), syntax, "test.owned", locals["second"]),
+            SymbolicFact.Exact(new SymbolicAliasAtom(secondTerm, ownedAliasTerm, true),
+                syntax, "test.owned.alias", locals["ownedAlias"]),
+            SymbolicFact.Exact(new SymbolicDisposalAtom(
+                disposedResource, SymbolicDisposalState.Disposed), syntax, "test.disposed"),
+            SymbolicFact.Exact(new SymbolicAliasAtom(firstTerm, disposedResource, true),
+                syntax, "test.disposed.bridge", locals["second"]),
+            SymbolicFact.Exact(new SymbolicAliasAtom(firstTerm, disposedAliasTerm, true),
+                syntax, "test.disposed.alias", locals["disposedAlias"])
+        }));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var context = CreatePurityContext(fixture, (IMethodSymbol)locals["second"].ContainingSymbol, smtAnalysis);
+
+        Assert.That(PurityAssignmentEnvelope.TryCreate(operation, initial, context, out var envelope), Is.True);
+        var actual = PurityAssignmentTransition.Apply(envelope, initial, context);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(locals["ownedAlias"], actual), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(
+                PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["disposedAlias"], actual),
+                actual, new HashSet<SymbolicTerm>()), Is.True);
+        });
+    }
+
+    [Test]
+    public void PurityAssignmentEnvelope_DeclarationKeepsRecoveredDelegateTargetWhenResolutionIsNull()
+    {
+        const string source = """
+            using System;
+            static class C
+            {
+                static readonly Action Callback = GetCallback();
+                static Action GetCallback() => () => { };
+                static void PureTarget() { }
+                static void M() { Action action = Callback; }
+            }
+            """;
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source, nameof(PurityAssignmentEnvelope_DeclarationKeepsRecoveredDelegateTargetWhenResolutionIsNull));
+        var declaration = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
+        var operation = (Microsoft.CodeAnalysis.Operations.IVariableDeclarationGroupOperation)
+            fixture.SemanticModel.GetOperation(declaration)!;
+        var local = operation.Declarations.Single().Declarators.Single().Symbol;
+        var knownTarget = (IMethodSymbol)fixture.SemanticModel.GetDeclaredSymbol(
+            fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                .Single(method => method.Identifier.ValueText == "PureTarget"))!;
+        var initial = PurityAnalysisEngine.PurityAnalysisState.Pure.WithDelegateTarget(
+            local, PurityAnalysisEngine.PotentialTargets.FromSingle(knownTarget));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var context = CreatePurityContext(fixture, (IMethodSymbol)local.ContainingSymbol, smtAnalysis);
+
+        Assert.That(PurityAssignmentEnvelope.TryCreate(operation, initial, context, out var envelope), Is.True);
+        var actual = PurityAssignmentTransition.Apply(envelope, initial, context);
+
+        Assert.That(actual.DelegateTargetMap[local],
+            Is.EqualTo(PurityAnalysisEngine.PotentialTargets.FromSingle(knownTarget)));
     }
 
     [Test]
@@ -993,6 +1133,23 @@ public sealed class SymbolicOperationTransferModelTests
             cancellationToken,
             provenance,
             out _);
+
+    private static PurityAnalysisContext CreatePurityContext(
+        RoslynTestFixture.CompilationFixture fixture,
+        IMethodSymbol containingMethod,
+        SmtAnalysisService smtAnalysis) =>
+        new(
+            fixture.SemanticModel,
+            fixture.Compilation.GetSpecialType(SpecialType.System_Object),
+            pureAttributeSymbol: null,
+            allowSynchronizationAttributeSymbol: null,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+            new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
+            containingMethod,
+            ImmutableList<IPurityRule>.Empty,
+            CancellationToken.None,
+            purityService: null,
+            smtAnalysis);
 
     private static ImmutableArray<SymbolicFact> OwnedFacts(
         SymbolicTerm term,
