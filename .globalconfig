@@ -2,3 +2,9 @@ is_global = true
 
 sharpproof_enable_effect_summary_json = false
 dotnet_diagnostic.IDE0005.severity = warning
+
+# Build-visible dead-code inventory. This remains a warning because reflection,
+# MEF, analyzer registration, and serialization can be invisible to static
+# reachability analysis.
+dotnet_diagnostic.CA1811.severity = warning
+dotnet_code_quality.CA1811.api_surface = private, internal

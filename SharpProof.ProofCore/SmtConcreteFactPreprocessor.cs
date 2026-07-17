@@ -799,20 +799,6 @@ internal sealed class SmtConcreteFactPreprocessor
         return SmtConcreteFactPreparationStatus.Ready;
     }
 
-    private static bool EvaluateStringPredicate(
-        StringPredicateKind kind,
-        string value,
-        string argument)
-    {
-        return kind switch
-        {
-            StringPredicateKind.Contains => value.Contains(argument),
-            StringPredicateKind.StartsWith => value.StartsWith(argument, StringComparison.Ordinal),
-            StringPredicateKind.EndsWith => value.EndsWith(argument, StringComparison.Ordinal),
-            _ => false
-        };
-    }
-
     private static bool TryGetRegexFact(
         SmtFormula formula,
         out SmtRegexMatchFormula regexMatch,

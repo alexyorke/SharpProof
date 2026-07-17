@@ -5,6 +5,8 @@
     <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
     
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
