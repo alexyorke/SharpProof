@@ -7,7 +7,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
     private static bool IsCaughtWithinMethod(
         SyntaxNode throwNode,

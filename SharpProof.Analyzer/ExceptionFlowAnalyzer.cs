@@ -63,7 +63,7 @@ internal static partial class ExceptionFlowAnalyzer
             exceptionContracts.Length == 0)
             return;
 
-        ExceptionFlowQuery.MethodExceptionQueryResult? queryResult = null;
+        ExceptionFlowEngine.ExceptionFlowResult? queryResult = null;
         var unknownRuntimeHazards = ImmutableArray<SymbolicRuntimeHazard>.Empty;
         if (reportMethodSummaries ||
             reportCheckedExceptionSites ||
@@ -74,7 +74,7 @@ internal static partial class ExceptionFlowAnalyzer
                 if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
                     queryResult = context.State.GetOrCreateSymbolicQueryResult(
                         "exception-flow",
-                        () => ExceptionFlowQuery.AnalyzeMethod(
+                        () => ExceptionFlowEngine.AnalyzeMethod(
                             context.Node,
                             context.SemanticModel,
                             context.CancellationToken,
@@ -84,7 +84,7 @@ internal static partial class ExceptionFlowAnalyzer
                             attributePolicy));
 
                 if (reportUnknownRuntimeHazards)
-                    unknownRuntimeHazards = queryResult?.RuntimeHazards
+                    unknownRuntimeHazards = queryResult?.RawHazards
                         .Where(static hazard =>
                             hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
                                 SymbolicRuntimeHazardStatus.Unsupported)
@@ -92,7 +92,7 @@ internal static partial class ExceptionFlowAnalyzer
                         context.State.GetOrCreateSymbolicQueryResult(
                             "unknown-runtime-hazards",
                             () => new CachedUnknownRuntimeHazards(
-                                ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
+                                ExceptionFlowEngine.CollectUnknownRuntimeHazardCandidates(
                                     context.Node,
                                     context.SemanticModel,
                                     context.CancellationToken,
@@ -111,22 +111,22 @@ internal static partial class ExceptionFlowAnalyzer
         if (queryResult == null) return;
 
         if (reportCheckedExceptionSites)
-            AnalyzeUncaughtExceptionSites(context, methodSymbol, queryResult.SiteEntries, baseline);
+            AnalyzeUncaughtExceptionSites(context, methodSymbol, queryResult.Sites, baseline);
 
-        if (!reportMethodSummaries || queryResult.ExceptionEvidence.Count == 0) return;
+        if (!reportMethodSummaries || queryResult.Evidence.Count == 0) return;
 
         var diagnosticLocation = GetIdentifierLocation(context.Node);
         if (diagnosticLocation == null) return;
 
-        var sortedTypes = queryResult.ExceptionEvidence.Types;
+        var sortedTypes = queryResult.Evidence.Types;
         var exceptionList = string.Join(", ", sortedTypes);
         var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-            CreateExceptionProperties(queryResult.ExceptionEvidence),
+            CreateExceptionProperties(queryResult.Evidence),
             methodSymbol,
             context.Node.SyntaxTree,
             "ExceptionSummary",
             null,
-            CreateExceptionEvidenceKey("summary", queryResult.ExceptionEvidence),
+            CreateExceptionEvidenceKey("summary", queryResult.Evidence),
             diagnosticLocation,
             "runtime hazards",
             "may_throw");
@@ -221,20 +221,16 @@ internal static partial class ExceptionFlowAnalyzer
     private static void AnalyzeUncaughtExceptionSites(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
-        ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries,
+        ImmutableArray<ExceptionFlowEngine.ExceptionFlowSite> siteEntries,
         DiagnosticBaseline baseline)
     {
         foreach (var siteGroup in siteEntries.GroupBy(entry => CreateExceptionSiteKey(entry.Site),
                      StringComparer.Ordinal))
         {
             var firstEntry = siteGroup.First();
-            var siteEvidence = new ExceptionFlowQuery.ExceptionEvidenceSet();
-            string? exceptionSymbol = null;
-            foreach (var siteEntry in siteGroup)
-            {
-                siteEvidence.Add(siteEntry.Exception);
-                exceptionSymbol ??= siteEntry.ExceptionSymbol;
-            }
+            var siteEvidence = new ExceptionFlowEngine.ExceptionEvidenceProjection(siteGroup);
+            var exceptionSymbol = siteGroup.Select(static site => site.ExceptionSymbol)
+                .FirstOrDefault(static symbol => !string.IsNullOrWhiteSpace(symbol));
 
             if (siteEvidence.Count == 0) continue;
 
@@ -270,7 +266,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static ImmutableDictionary<string, string?> CreateExceptionProperties(
-        ExceptionFlowQuery.ExceptionEvidenceSet exceptionEvidence)
+        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.ExceptionTypesProperty, string.Join(";", exceptionEvidence.Types))
@@ -285,7 +281,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static string CreateExceptionEvidenceKey(
         string scope,
-        ExceptionFlowQuery.ExceptionEvidenceSet exceptionEvidence)
+        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence)
     {
         return scope +
                "|" +

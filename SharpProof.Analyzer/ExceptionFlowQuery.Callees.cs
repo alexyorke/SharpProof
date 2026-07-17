@@ -7,10 +7,10 @@ using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excepti
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
-    private static IEnumerable<ExceptionCandidate> CollectSourceCalleeExceptions(
-        IMethodSymbol invokedMethod,
+    private static IEnumerable<ExceptionFlowSite> CollectSourceCalleeExceptionSites(
+        ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
@@ -18,14 +18,15 @@ internal static partial class ExceptionFlowQuery
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
+        var invokedMethod = call.Method;
         var originalDefinition = invokedMethod.OriginalDefinition;
-        if (!visitedMethods.Add(originalDefinition)) return Enumerable.Empty<ExceptionCandidate>();
+        if (!visitedMethods.Add(originalDefinition)) return Enumerable.Empty<ExceptionFlowSite>();
 
         try
         {
             var syntaxReference = invokedMethod.DeclaringSyntaxReferences.FirstOrDefault()
                                   ?? originalDefinition.DeclaringSyntaxReferences.FirstOrDefault();
-            if (syntaxReference == null) return Enumerable.Empty<ExceptionCandidate>();
+            if (syntaxReference == null) return Enumerable.Empty<ExceptionFlowSite>();
 
             var syntax = syntaxReference.GetSyntax(cancellationToken);
             var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
@@ -40,23 +41,30 @@ internal static partial class ExceptionFlowQuery
                 attributePolicy);
 
             var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
-            return result.ExceptionEvidence.EnumerateEntries()
-                .SelectMany(entry =>
+            var symbol = invokedMethod.OriginalDefinition.ToDisplayString();
+            return result.Sites
+                .GroupBy(static site => site.ExceptionType, StringComparer.Ordinal)
+                .SelectMany(group => group
+                    .Select(static site => site.Category + ":" + site.Source)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(static source => source, StringComparer.Ordinal)
+                    .Select(source =>
                 {
-                    var chainedSources = entry.Sources.Length == 0
-                        ? new[] { invokedMethodDisplay }
-                        : entry.Sources.Select(source => invokedMethodDisplay + " -> " + source);
-                    return chainedSources.Select(source => new ExceptionCandidate(
-                        TryResolveExceptionType(compilation, entry.ExceptionType),
-                        entry.ExceptionType,
+                    var chainedSource = invokedMethodDisplay + " -> " + source;
+                    return new ExceptionFlowSite(
+                        call.CallSite,
+                        invokedMethod,
+                        TryResolveExceptionType(compilation, group.Key),
+                        group.Key,
                         ExceptionCategories.SourceCallee,
-                        source,
+                        chainedSource,
+                        symbol,
                         CreateDerivedDiagnosticEdges(
-                            entry.ExceptionType,
+                            group.Key,
                             ExceptionCategories.SourceCallee,
-                            source,
-                            CreatePrefixedCalleeChain(invokedMethodDisplay, source))));
-                })
+                            chainedSource,
+                            CreatePrefixedCalleeChain(invokedMethodDisplay, chainedSource)));
+                }))
                 .ToArray();
         }
         finally
@@ -65,8 +73,8 @@ internal static partial class ExceptionFlowQuery
         }
     }
 
-    private static IEnumerable<ExceptionCandidate> CollectCalleeExceptions(
-        IMethodSymbol invokedMethod,
+    private static IEnumerable<ExceptionFlowSite> CollectCalleeExceptionSites(
+        ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
@@ -74,7 +82,8 @@ internal static partial class ExceptionFlowQuery
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        foreach (var exception in CollectSourceCalleeExceptions(invokedMethod, compilation, cancellationToken,
+        var invokedMethod = call.Method;
+        foreach (var exception in CollectSourceCalleeExceptionSites(call, compilation, cancellationToken,
                      exceptionSummaryCatalog, visitedMethods, smtAnalysis, attributePolicy)) yield return exception;
 
         if (!exceptionSummaryCatalog.TryGetExceptionInfos(invokedMethod, compilation, out var summaryExceptions))
@@ -89,11 +98,11 @@ internal static partial class ExceptionFlowQuery
             foreach (var source in sources)
             {
                 var matchingEdges = summaryException.Edges.IsDefaultOrEmpty
-                    ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty
+                    ? ImmutableArray<ExceptionFlowEdge>.Empty
                     : summaryException.Edges
                         .Where(edge => edge.SourcePath == null ||
                                        string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
-                        .Select(edge => new ExceptionEdgeDiagnosticEntry(
+                        .Select(edge => new ExceptionFlowEdge(
                             summaryException.ExceptionType,
                             ExceptionCategories.EffectSummary,
                             edge.SourcePath,
@@ -102,11 +111,14 @@ internal static partial class ExceptionFlowQuery
                             edge.Depth ?? 0))
                         .ToImmutableArray();
 
-                yield return new ExceptionCandidate(
+                yield return new ExceptionFlowSite(
+                    call.CallSite,
+                    invokedMethod,
                     TryResolveExceptionType(compilation, summaryException.ExceptionType),
                     summaryException.ExceptionType,
                     ExceptionCategories.EffectSummary,
                     source,
+                    invokedMethod.OriginalDefinition.ToDisplayString(),
                     matchingEdges);
             }
         }
@@ -211,19 +223,19 @@ internal static partial class ExceptionFlowQuery
                segment.IndexOf("(", StringComparison.Ordinal) >= 0;
     }
 
-    private static ImmutableArray<ExceptionEdgeDiagnosticEntry> CreateDerivedDiagnosticEdges(
+    private static ImmutableArray<ExceptionFlowEdge> CreateDerivedDiagnosticEdges(
         string exceptionType,
         string category,
         string sourcePath,
         ImmutableArray<string> calleeChain)
     {
         if (calleeChain.IsDefaultOrEmpty || string.IsNullOrWhiteSpace(sourcePath))
-            return ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty;
+            return ImmutableArray<ExceptionFlowEdge>.Empty;
 
-        var builder = ImmutableArray.CreateBuilder<ExceptionEdgeDiagnosticEntry>();
+        var builder = ImmutableArray.CreateBuilder<ExceptionFlowEdge>();
         if (calleeChain.Length == 1)
         {
-            builder.Add(new ExceptionEdgeDiagnosticEntry(
+            builder.Add(new ExceptionFlowEdge(
                 exceptionType,
                 category,
                 null,
@@ -238,7 +250,7 @@ internal static partial class ExceptionFlowQuery
             var callee = calleeChain[index];
             if (string.IsNullOrWhiteSpace(callee)) continue;
 
-            builder.Add(new ExceptionEdgeDiagnosticEntry(
+            builder.Add(new ExceptionFlowEdge(
                 exceptionType,
                 category,
                 null,

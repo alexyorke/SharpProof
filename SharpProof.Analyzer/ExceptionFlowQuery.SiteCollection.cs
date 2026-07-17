@@ -7,7 +7,7 @@ using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excepti
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
     private readonly record struct ExceptionSiteCollectionContext(
         SyntaxNode MethodNode,
@@ -16,7 +16,7 @@ internal static partial class ExceptionFlowQuery
         IMethodSymbol MethodSymbol,
         SmtAnalysisService SmtAnalysis);
 
-    private static IEnumerable<UncaughtExceptionSiteEntry> CollectUncaughtExceptionSiteEntries(
+    private static IEnumerable<ExceptionFlowSite> CollectUncaughtExceptionSiteEntries(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -52,22 +52,20 @@ internal static partial class ExceptionFlowQuery
             var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
             if (calleeCallSite.IsDynamicDispatch)
             {
-                var dynamicDispatchException = new ExceptionCandidate(
-                    null,
-                    ExceptionTypes.Unknown,
-                    ExceptionCategories.DynamicDispatch,
-                    GetExceptionSourceMethodDisplay(calleeCallSite.Method.OriginalDefinition));
-                if (!IsCaughtWithinMethod(calleeCallSite.CallSite, dynamicDispatchException.Type, methodNode,
+                if (!IsCaughtWithinMethod(calleeCallSite.CallSite, null, methodNode,
                         semanticModel, cancellationToken, smtAnalysis))
-                    yield return new UncaughtExceptionSiteEntry(
+                    yield return new ExceptionFlowSite(
                         calleeCallSite.CallSite,
                         calleeCallSite.Method,
-                        dynamicDispatchException,
+                        null,
+                        ExceptionTypes.Unknown,
+                        ExceptionCategories.DynamicDispatch,
+                        GetExceptionSourceMethodDisplay(calleeCallSite.Method.OriginalDefinition),
                         calleeDisplay);
             }
 
-            foreach (var exception in CollectCalleeExceptions(
-                         calleeCallSite.Method,
+            foreach (var exception in CollectCalleeExceptionSites(
+                         calleeCallSite,
                          semanticModel.Compilation,
                          cancellationToken,
                          exceptionSummaryCatalog,
@@ -78,8 +76,7 @@ internal static partial class ExceptionFlowQuery
                 if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel,
                         cancellationToken, smtAnalysis)) continue;
 
-                yield return new UncaughtExceptionSiteEntry(calleeCallSite.CallSite, calleeCallSite.Method, exception,
-                    calleeDisplay);
+                yield return exception;
             }
         }
 
@@ -89,7 +86,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
     }
 
-    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries(
+    private static IEnumerable<ExceptionFlowSite> CreateProvenExceptionSiteEntries(
         IEnumerable<ProvenRuntimeHazardSite> sites,
         ExceptionSiteCollectionContext context)
     {
@@ -105,7 +102,7 @@ internal static partial class ExceptionFlowQuery
         }
     }
 
-    private static UncaughtExceptionSiteEntry? TryCreateProvenExceptionSiteEntry(
+    private static ExceptionFlowSite? TryCreateProvenExceptionSiteEntry(
         SyntaxNode site,
         ExceptionSiteCollectionContext context,
         string exceptionMetadataName,
@@ -136,13 +133,12 @@ internal static partial class ExceptionFlowQuery
                 context.SmtAnalysis))
             return null;
 
-        return new UncaughtExceptionSiteEntry(
+        return new ExceptionFlowSite(
             site,
             context.MethodSymbol,
-            new ExceptionCandidate(
-                exceptionType,
-                exceptionMetadataName,
-                category,
-                source));
+            exceptionType,
+            exceptionMetadataName,
+            category,
+            source);
     }
 }

@@ -8,7 +8,7 @@ using ExceptionSources = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excep
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
     private readonly record struct ProvenRuntimeHazardSite(
         SymbolicRuntimeHazard Hazard,

@@ -233,12 +233,12 @@ internal static class InferredContractSuggestionAnalyzer
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "AllowedExceptionsAttribute"))
             return;
 
-        ExceptionFlowQuery.MethodExceptionQueryResult result;
+        ExceptionFlowEngine.ExceptionFlowResult result;
         using (ExceptionFlowAnalyzer.UseAttributePolicy(session.AttributePolicy))
         {
             result = context.State.GetOrCreateSymbolicQueryResult(
                 "exception-flow",
-                () => ExceptionFlowQuery.AnalyzeMethod(
+                () => ExceptionFlowEngine.AnalyzeMethod(
                     context.Node,
                     context.SemanticModel,
                     context.CancellationToken,
@@ -248,7 +248,7 @@ internal static class InferredContractSuggestionAnalyzer
                     session.AttributePolicy));
         }
 
-        if (result.ExceptionEvidence.Count == 0)
+        if (result.Evidence.Count == 0)
         {
             const InferredContractConfidence confidence = InferredContractConfidence.High;
             if (!options.Includes(kind, confidence) || !IsTriviallyNonThrowingBody(context)) return;
@@ -434,12 +434,12 @@ internal static class InferredContractSuggestionAnalyzer
     }
 
     private static bool TryGetFiniteExceptionTypes(
-        ExceptionFlowQuery.MethodExceptionQueryResult result,
+        ExceptionFlowEngine.ExceptionFlowResult result,
         out string[] exceptionTypes,
         out string[] displayTypes)
     {
-        var symbols = result.SiteEntries
-            .Select(entry => entry.Exception.Type as INamedTypeSymbol)
+        var symbols = result.Sites
+            .Select(static entry => entry.Type as INamedTypeSymbol)
             .ToArray();
         if (symbols.Length == 0 || symbols.Any(static symbol => symbol == null))
         {

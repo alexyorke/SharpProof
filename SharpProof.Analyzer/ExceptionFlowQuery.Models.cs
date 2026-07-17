@@ -6,203 +6,96 @@ using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
-    internal sealed class MethodExceptionQueryResult(
-        ExceptionEvidenceSet exceptionEvidence,
-        ImmutableArray<UncaughtExceptionSiteEntry> siteEntries,
-        ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
+    internal sealed class ExceptionFlowResult(
+        ImmutableArray<ExceptionFlowSite> sites,
+        ImmutableArray<SymbolicRuntimeHazard> rawHazards)
     {
-        public ExceptionEvidenceSet ExceptionEvidence { get; } = exceptionEvidence;
-        public ImmutableArray<UncaughtExceptionSiteEntry> SiteEntries { get; } = siteEntries;
-
-        public ImmutableArray<SymbolicRuntimeHazard> RuntimeHazards { get; } = runtimeHazards;
+        public ImmutableArray<ExceptionFlowSite> Sites { get; } = sites;
+        public ImmutableArray<SymbolicRuntimeHazard> RawHazards { get; } = rawHazards;
+        public ExceptionEvidenceProjection Evidence { get; } = new(sites);
     }
 
-    internal sealed class ExceptionCandidate
-    {
-        public ExceptionCandidate(
-            ITypeSymbol? type,
-            string displayName,
-            string category,
-            string source,
-            ImmutableArray<ExceptionEdgeDiagnosticEntry> edges = default)
-        {
-            Type = type;
-            DisplayName = displayName;
-            Category = category;
-            Source = source;
-            Edges = edges.IsDefault ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty : edges;
-        }
-
-        public ITypeSymbol? Type { get; }
-
-        public string DisplayName { get; }
-
-        public string Category { get; }
-
-        public string Source { get; }
-
-        public ImmutableArray<ExceptionEdgeDiagnosticEntry> Edges { get; }
-    }
-
-    internal sealed class UncaughtExceptionSiteEntry(
+    internal sealed class ExceptionFlowSite(
         SyntaxNode site,
         IMethodSymbol method,
-        ExceptionCandidate exception,
-        string? exceptionSymbol = null)
+        ITypeSymbol? type,
+        string exceptionType,
+        string category,
+        string source,
+        string? exceptionSymbol = null,
+        ImmutableArray<ExceptionFlowEdge> edges = default)
     {
         public SyntaxNode Site { get; } = site;
         public IMethodSymbol Method { get; } = method;
-        public ExceptionCandidate Exception { get; } = exception;
-        public string? ExceptionSymbol { get; } = exceptionSymbol;
-    }
-
-    internal sealed class ExceptionEvidenceEntry(
-        string exceptionType,
-        string[] categories,
-        string[] sources,
-        ExceptionEdgeDiagnosticEntry[] edges)
-    {
+        public ITypeSymbol? Type { get; } = type;
         public string ExceptionType { get; } = exceptionType;
-        public string[] Categories { get; } = categories;
-        public string[] Sources { get; } = sources;
-        public ExceptionEdgeDiagnosticEntry[] Edges { get; } = edges;
+        public string Category { get; } = category;
+        public string Source { get; } = source;
+        public string? ExceptionSymbol { get; } = exceptionSymbol;
+        public ImmutableArray<ExceptionFlowEdge> Edges { get; } =
+            edges.IsDefault ? ImmutableArray<ExceptionFlowEdge>.Empty : edges;
     }
 
-    internal sealed class ExceptionEvidenceSet
+    internal sealed class ExceptionEvidenceProjection(IEnumerable<ExceptionFlowSite> sites)
     {
-        private readonly Dictionary<string, SortedSet<string>> _categoriesByType = new(StringComparer.Ordinal);
+        private readonly ImmutableArray<ExceptionFlowSite> _sites = sites.ToImmutableArray();
 
-        private readonly Dictionary<string, SortedDictionary<string, ExceptionEdgeDiagnosticEntry>> _edgesByType =
-            new(StringComparer.Ordinal);
+        public string[] Types => _sites.Select(static site => site.ExceptionType)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static type => type, StringComparer.Ordinal)
+            .ToArray();
 
-        private readonly Dictionary<string, SortedSet<string>> _sourcesByType = new(StringComparer.Ordinal);
+        public int Count => Types.Length;
 
-        public int Count => _categoriesByType.Count;
+        public string FormatCategories() => string.Join(
+            ";",
+            _sites.Select(static site => site.Category)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static category => category, StringComparer.Ordinal));
 
-        public string[] Types => _categoriesByType.Keys.OrderBy(type => type, StringComparer.Ordinal).ToArray();
-
-        public void Add(ExceptionCandidate candidate)
-        {
-            var exceptionType = candidate.DisplayName;
-            var category = candidate.Category;
-            var source = candidate.Source;
-            if (!_categoriesByType.TryGetValue(exceptionType, out var categories))
-            {
-                categories = new SortedSet<string>(StringComparer.Ordinal);
-                _categoriesByType.Add(exceptionType, categories);
-            }
-
-            categories.Add(category);
-
-            if (!_sourcesByType.TryGetValue(exceptionType, out var sources))
-            {
-                sources = new SortedSet<string>(StringComparer.Ordinal);
-                _sourcesByType.Add(exceptionType, sources);
-            }
-
-            sources.Add(category + ":" + source);
-
-            if (!candidate.Edges.IsDefaultOrEmpty)
-            {
-                if (!_edgesByType.TryGetValue(exceptionType, out var edges))
-                {
-                    edges = new SortedDictionary<string, ExceptionEdgeDiagnosticEntry>(StringComparer.Ordinal);
-                    _edgesByType.Add(exceptionType, edges);
-                }
-
-                foreach (var edge in candidate.Edges) edges[edge.CreateKey()] = edge;
-            }
-        }
-
-        public ExceptionEvidenceEntry[] EnumerateEntries()
-        {
-            return _categoriesByType.Keys
-                .OrderBy(type => type, StringComparer.Ordinal)
-                .Select(type => new ExceptionEvidenceEntry(
-                    type,
-                    _categoriesByType.TryGetValue(type, out var categories)
-                        ? categories.ToArray()
-                        : Array.Empty<string>(),
-                    _sourcesByType.TryGetValue(type, out var sources)
-                        ? sources.ToArray()
-                        : Array.Empty<string>(),
-                    _edgesByType.TryGetValue(type, out var edges)
-                        ? edges.Values.ToArray()
-                        : Array.Empty<ExceptionEdgeDiagnosticEntry>()))
-                .ToArray();
-        }
-
-        public string FormatCategories()
-        {
-            return string.Join(
-                ";",
-                _categoriesByType.Values
-                    .SelectMany(categories => categories)
+        public string FormatSources() => string.Join(
+            ";",
+            _sites.GroupBy(static site => site.ExceptionType, StringComparer.Ordinal)
+                .OrderBy(static group => group.Key, StringComparer.Ordinal)
+                .SelectMany(group => group
+                    .Select(static site => site.Category + ":" + site.Source)
                     .Distinct(StringComparer.Ordinal)
-                    .OrderBy(category => category, StringComparer.Ordinal));
-        }
-
-        public string FormatSources()
-        {
-            return string.Join(
-                ";",
-                _sourcesByType
-                    .OrderBy(item => item.Key, StringComparer.Ordinal)
-                    .SelectMany(item => item.Value.Select(source => item.Key + "=" + source)));
-        }
+                    .OrderBy(static source => source, StringComparer.Ordinal)
+                    .Select(source => group.Key + "=" + source)));
 
         public string? FormatEdges()
         {
-            var edges = _edgesByType
-                .OrderBy(item => item.Key, StringComparer.Ordinal)
-                .SelectMany(item => item.Value.Values)
+            var edges = _sites.SelectMany(static site => site.Edges)
+                .Select((edge, index) => (edge, index))
+                .GroupBy(static item => item.edge.CreateKey(), StringComparer.Ordinal)
+                .OrderBy(static group => group.Key, StringComparer.Ordinal)
+                .Select(static group => group.OrderByDescending(static item => item.index).First().edge)
                 .ToArray();
-            if (edges.Length == 0) return null;
-
-            return JsonSerializer.Serialize(edges);
+            return edges.Length == 0 ? null : JsonSerializer.Serialize(edges);
         }
     }
 
-    internal sealed class ExceptionEdgeDiagnosticEntry
+    internal sealed class ExceptionFlowEdge(
+        string exceptionType,
+        string category,
+        string? sourcePath,
+        IEnumerable<string> callChain,
+        string? calleeIdentity,
+        int depth)
     {
-        public ExceptionEdgeDiagnosticEntry(
-            string exceptionType,
-            string category,
-            string? sourcePath,
-            IEnumerable<string> callChain,
-            string? calleeIdentity,
-            int depth)
-        {
-            ExceptionType = exceptionType;
-            Category = category;
-            SourcePath = sourcePath;
-            CallChain = callChain.ToArray();
-            CalleeIdentity = calleeIdentity;
-            Depth = depth;
-        }
+        public string ExceptionType { get; } = exceptionType;
+        public string Category { get; } = category;
+        public string? SourcePath { get; } = sourcePath;
+        public string[] CallChain { get; } = callChain.ToArray();
+        public string? CalleeIdentity { get; } = calleeIdentity;
+        public int Depth { get; } = depth;
 
-        public string ExceptionType { get; }
-
-        public string Category { get; }
-
-        public string? SourcePath { get; }
-
-        public string[] CallChain { get; }
-
-        public string? CalleeIdentity { get; }
-
-        public int Depth { get; }
-
-        public string CreateKey()
-        {
-            return ExceptionType + "|" +
-                   Category + "|" +
-                   (SourcePath ?? string.Empty) + "|" +
-                   string.Join(">", CallChain) + "|" +
-                   (CalleeIdentity ?? string.Empty) + "|" +
-                   Depth.ToString(CultureInfo.InvariantCulture);
-        }
+        internal string CreateKey() => ExceptionType + "|" + Category + "|" +
+                                       (SourcePath ?? string.Empty) + "|" +
+                                       string.Join(">", CallChain) + "|" +
+                                       (CalleeIdentity ?? string.Empty) + "|" +
+                                       Depth.ToString(CultureInfo.InvariantCulture);
     }
 }

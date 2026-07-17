@@ -4,9 +4,9 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowQuery
+internal static partial class ExceptionFlowEngine
 {
-    internal static MethodExceptionQueryResult AnalyzeMethod(
+    internal static ExceptionFlowResult AnalyzeMethod(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -34,7 +34,7 @@ internal static partial class ExceptionFlowQuery
         }
     }
 
-    private static MethodExceptionQueryResult AnalyzeMethod(
+    private static ExceptionFlowResult AnalyzeMethod(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -61,9 +61,6 @@ internal static partial class ExceptionFlowQuery
                 runtimeHazards)
             .ToImmutableArray();
 
-        var exceptionEvidence = new ExceptionEvidenceSet();
-        foreach (var siteEntry in siteEntries) exceptionEvidence.Add(siteEntry.Exception);
-
-        return new MethodExceptionQueryResult(exceptionEvidence, siteEntries, runtimeHazards);
+        return new ExceptionFlowResult(siteEntries, runtimeHazards);
     }
 }

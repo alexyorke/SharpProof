@@ -53,7 +53,7 @@ internal static partial class ExceptionFlowAnalyzer
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionContract> contracts,
-        ExceptionFlowQuery.MethodExceptionQueryResult? queryResult,
+        ExceptionFlowEngine.ExceptionFlowResult? queryResult,
         DiagnosticBaseline baseline)
     {
         if (contracts.Length == 0) return;
@@ -67,24 +67,22 @@ internal static partial class ExceptionFlowAnalyzer
 
         var effectiveContracts = CreateEffectiveExceptionContracts(validContracts);
         foreach (var contract in effectiveContracts)
-            AnalyzeExceptionContract(context, methodSymbol, contract, queryResult.SiteEntries, baseline);
+            AnalyzeExceptionContract(context, methodSymbol, contract, queryResult.Sites, baseline);
     }
 
     private static void AnalyzeExceptionContract(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         EffectiveExceptionContract contract,
-        ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries,
+        ImmutableArray<ExceptionFlowEngine.ExceptionFlowSite> siteEntries,
         DiagnosticBaseline baseline)
     {
         foreach (var siteGroup in siteEntries.GroupBy(entry => CreateExceptionSiteKey(entry.Site),
                      StringComparer.Ordinal))
         {
             var firstEntry = siteGroup.First();
-            var disallowedEvidence = new ExceptionFlowQuery.ExceptionEvidenceSet();
-            foreach (var siteEntry in siteGroup)
-                if (!IsAllowedByExceptionContract(contract, siteEntry.Exception))
-                    disallowedEvidence.Add(siteEntry.Exception);
+            var disallowedSites = siteGroup.Where(site => !IsAllowedByExceptionContract(contract, site)).ToArray();
+            var disallowedEvidence = new ExceptionFlowEngine.ExceptionEvidenceProjection(disallowedSites);
 
             if (disallowedEvidence.Count == 0) continue;
 
@@ -288,7 +286,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool IsAllowedByExceptionContract(
         EffectiveExceptionContract contract,
-        ExceptionFlowQuery.ExceptionCandidate exception)
+        ExceptionFlowEngine.ExceptionFlowSite exception)
     {
         if (contract.Kind == ExceptionContractKind.DoesNotThrow) return false;
 
