@@ -27,14 +27,14 @@ public sealed class SmtSyntacticClassifierTests
             formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
         Assert.That(
-            SmtSyntacticFormulaOperations.TryGetComparison(formula, out var comparison, out var actualNegationCount),
+            SmtComparisonOperatorFacts.TryExtract(formula, out var comparison, out var actualNegationCount),
             Is.True);
         Assert.Multiple(() =>
         {
             Assert.That(comparison.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
             Assert.That(actualNegationCount, Is.EqualTo(negationCount));
             Assert.That(
-                SmtSyntacticFormulaOperations.ApplyNegations(comparison.Operator, actualNegationCount),
+                SmtComparisonOperatorFacts.ApplyNegations(comparison.Operator, actualNegationCount),
                 Is.EqualTo(expectedOperator));
         });
     }
@@ -69,8 +69,8 @@ public sealed class SmtSyntacticClassifierTests
     [Test]
     public void SyntacticFactSetCopy_PreservesDepthAndSharesWorkBudget()
     {
-        var factSetType = typeof(SmtAnalysisService).Assembly
-            .GetType("SharpProof.Symbolic.Smt.SmtSyntacticClassifier+SyntacticFactSet", true)!;
+        var factSetType = typeof(SmtFormula).Assembly
+            .GetType("SharpProof.ProofCore.Smt.SmtSyntacticClassifier+SyntacticFactSet", true)!;
         var defaultConstructor = factSetType.GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
             null,

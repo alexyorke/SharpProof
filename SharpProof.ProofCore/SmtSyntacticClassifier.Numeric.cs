@@ -1,7 +1,5 @@
 using System.Numerics;
-using SharpProof.ProofCore.Smt;
-
-namespace SharpProof.Symbolic.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
@@ -56,7 +54,7 @@ internal static partial class SmtSyntacticClassifier
             out bool hasContradiction)
         {
             hasContradiction = false;
-            if (!SmtSyntacticFormulaOperations.TryGetIntegerComparison(
+            if (!SmtComparisonOperatorFacts.TryGetIntegerComparison(
                     formula,
                     out var term,
                     out var op,

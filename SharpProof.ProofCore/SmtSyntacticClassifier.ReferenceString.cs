@@ -1,7 +1,4 @@
-using System.Collections.Immutable;
-using SharpProof.ProofCore.Smt;
-
-namespace SharpProof.Symbolic.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
@@ -19,9 +16,9 @@ internal static partial class SmtSyntacticClassifier
                     string.Equals(exactValue, value, StringComparison.Ordinal))
                     hasContradiction = true;
 
-                _excludedStrings[term] = _excludedStrings.TryGetValue(term, out var excluded)
-                    ? excluded.Add(value)
-                    : ImmutableHashSet.Create(StringComparer.Ordinal, value);
+                if (!_excludedStrings.TryGetValue(term, out var excluded))
+                    _excludedStrings[term] = excluded = new HashSet<string>(StringComparer.Ordinal);
+                excluded.Add(value);
                 return true;
             }
 
@@ -80,13 +77,13 @@ internal static partial class SmtSyntacticClassifier
             term = null!;
             isNull = false;
 
-            if (!SmtSyntacticFormulaOperations.TryGetComparison(
+            if (!SmtComparisonOperatorFacts.TryExtract(
                     formula,
                     out var binary,
                     out var negationCount))
                 return false;
 
-            var op = SmtSyntacticFormulaOperations.ApplyNegations(binary.Operator, negationCount);
+            var op = SmtComparisonOperatorFacts.ApplyNegations(binary.Operator, negationCount);
             if (op is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
             var comparisonIsNull = op == SmtBinaryOperator.Equal;
@@ -267,13 +264,13 @@ internal static partial class SmtSyntacticClassifier
             term = null!;
             op = default;
             value = string.Empty;
-            if (!SmtSyntacticFormulaOperations.TryGetComparison(
+            if (!SmtComparisonOperatorFacts.TryExtract(
                     formula,
                     out var binary,
                     out var negationCount))
                 return false;
 
-            var effectiveOperator = SmtSyntacticFormulaOperations.ApplyNegations(binary.Operator, negationCount);
+            var effectiveOperator = SmtComparisonOperatorFacts.ApplyNegations(binary.Operator, negationCount);
             if (effectiveOperator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
             if (binary.Left.Kind == SmtValueKind.String &&

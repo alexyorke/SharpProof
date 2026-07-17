@@ -1,6 +1,4 @@
-using SharpProof.ProofCore.Smt;
-
-namespace SharpProof.Symbolic.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
@@ -153,7 +151,7 @@ internal static partial class SmtSyntacticClassifier
         private bool TryEvaluateKnownComplement(SmtFormula formula, out bool value)
         {
             foreach (var exactBoolean in _exactBooleans)
-                if (SmtSyntacticFormulaOperations.AreSyntacticComplements(formula, exactBoolean.Key))
+                if (SmtComparisonOperatorFacts.AreComplements(formula, exactBoolean.Key))
                 {
                     value = !exactBoolean.Value;
                     return true;

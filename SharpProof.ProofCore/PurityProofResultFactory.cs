@@ -1,7 +1,6 @@
 using SharpProof.ProofCore.Purity;
-using SharpProof.ProofCore.Smt;
 
-namespace SharpProof.Symbolic.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 internal static class PurityProofResultFactory
 {

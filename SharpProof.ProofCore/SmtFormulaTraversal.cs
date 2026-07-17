@@ -2,6 +2,45 @@ namespace SharpProof.ProofCore.Smt;
 
 internal static class SmtFormulaTraversal
 {
+    internal static bool ExceedsNodeBudget(
+        SmtFormula trigger,
+        IEnumerable<SmtFormula> conditions,
+        int maximum,
+        out bool containsOpaqueIntegerOperation)
+    {
+        containsOpaqueIntegerOperation = false;
+        var remaining = maximum;
+        if (!TryConsumeNodes(trigger, ref remaining, ref containsOpaqueIntegerOperation)) return true;
+
+        foreach (var condition in conditions)
+            if (!TryConsumeNodes(condition, ref remaining, ref containsOpaqueIntegerOperation))
+                return true;
+
+        return false;
+    }
+
+    internal static IEnumerable<SmtFormula> EnumerateConjuncts(SmtFormula formula)
+    {
+        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction)
+        {
+            foreach (var item in EnumerateConjuncts(conjunction.Left)) yield return item;
+            foreach (var item in EnumerateConjuncts(conjunction.Right)) yield return item;
+        }
+        else
+        {
+            yield return formula;
+        }
+    }
+
+    internal static IEnumerable<SmtFormula> EnumerateConditionalConditions(IEnumerable<SmtFormula> formulas)
+    {
+        var seen = new HashSet<SmtFormula>();
+        foreach (var formula in formulas)
+            foreach (var conditional in Enumerate(formula).OfType<SmtConditionalFormula>())
+                if (seen.Add(conditional.Condition))
+                    yield return conditional.Condition;
+    }
+
     internal static IEnumerable<SmtFormula> Enumerate(SmtFormula root)
     {
         if (root == null) throw new ArgumentNullException(nameof(root));
@@ -192,6 +231,20 @@ internal static class SmtFormulaTraversal
     private static int GetChildCount(SmtFormula formula)
     {
         return GetChildren(formula).Count;
+    }
+
+    private static bool TryConsumeNodes(
+        SmtFormula root,
+        ref int remaining,
+        ref bool containsOpaqueIntegerOperation)
+    {
+        foreach (var formula in Enumerate(root))
+        {
+            if (remaining-- == 0) return false;
+            if (formula is SmtOpaqueIntegerBinaryTerm) containsOpaqueIntegerOperation = true;
+        }
+
+        return true;
     }
 
     private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack)
