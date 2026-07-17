@@ -150,12 +150,7 @@ internal static class SymbolicCliExitGateEvaluator
     {
         if (!options.FailOnCompactTruncation) return;
 
-        var isTruncated = options.InvariantJson
-            ? result is SymbolicQueryResult queryResult
-                ? SymbolicInvariantQueryProjection.Create(queryResult, options.CreateCompactOptions())
-                    .HasTruncatedOutput
-                : throw new InvalidOperationException("Unexpected invariant query result type.")
-            : IsCompactResultTruncated(result, options);
+        var isTruncated = IsCompactResultTruncated(result, options);
         if (!isTruncated) return;
 
         failures.Add(new SymbolicCliExitGateFailure(

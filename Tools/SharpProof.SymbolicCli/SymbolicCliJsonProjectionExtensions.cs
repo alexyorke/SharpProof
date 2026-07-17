@@ -52,7 +52,7 @@ public static class SymbolicCliJsonProjectionExtensions
         SymbolicCompactQueryOptions? options = null)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
-        return SymbolicInvariantQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
+        return SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), options).Json;
     }
 
     public static JsonElement ToCompactResult(
@@ -61,7 +61,7 @@ public static class SymbolicCliJsonProjectionExtensions
 
     public static JsonElement ToInvariantQueryResult(
         this SymbolicQueryResult result,
-        SymbolicCompactQueryOptions? options = null) => SymbolicInvariantQueryProjection.Create(result, options).Json;
+        SymbolicCompactQueryOptions? options = null) => SymbolicCompactQueryProjection.Create(result, options).Json;
 
     private static Dictionary<string, object?> CreateMethodProjection(SymbolicMethodResult result, string kind) =>
         new()

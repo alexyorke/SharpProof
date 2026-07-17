@@ -37,7 +37,7 @@ public sealed class CompactDomainProjectionTests
             Assert.Multiple(() =>
             {
                 Assert.That(result.ToCompactResult().GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
-                Assert.That(result.ToInvariantQueryResult().GetProperty("scopeKind").GetString(), Is.EqualTo(expectedKind));
+                Assert.That(result.ToInvariantQueryResult().GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
                 Assert.That(filtered.ScopeKind, Is.EqualTo(expectedKind));
             });
         }
