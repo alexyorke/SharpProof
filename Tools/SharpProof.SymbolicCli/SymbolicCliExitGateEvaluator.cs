@@ -150,7 +150,12 @@ internal static class SymbolicCliExitGateEvaluator
     {
         if (!options.FailOnCompactTruncation) return;
 
-        var isTruncated = IsCompactResultTruncated(result, options);
+        var isTruncated = result switch
+        {
+            SymbolicQueryResult query => query.AnalysisTruncation.IsTruncated,
+            SymbolicRuntimeHazardQueryResult hazards => hazards.AnalysisTruncation.IsTruncated,
+            _ => false
+        };
         if (!isTruncated) return;
 
         failures.Add(new SymbolicCliExitGateFailure(
@@ -200,27 +205,6 @@ internal static class SymbolicCliExitGateEvaluator
                     complexity.Complexity.IsUnknown || complexity.Complexity.IsRecursiveUnknown ? 1 : 0),
             _ => throw new InvalidOperationException("Unsupported compact threshold metric: " + metric)
         };
-    }
-
-    private static bool IsCompactResultTruncated(object result, SymbolicCliOptions options)
-    {
-        if (result is SymbolicQueryResult queryResult)
-            return SymbolicCompactQueryProjection.Create(queryResult, options.CreateCompactOptions())
-                .Truncation.IsTruncated;
-
-        return result switch
-        {
-            SymbolicRuntimeHazardQueryResult hazards => IsTruncated(
-                SymbolicCompactRuntimeHazardProjection.Create(hazards, options.CreateCompactHazardOptions())),
-            SymbolicCapabilityResult => false,
-            SymbolicComplexityResult => false,
-            _ => throw new InvalidOperationException("Unexpected query result type.")
-        };
-    }
-
-    private static bool IsTruncated(SymbolicCompactRuntimeHazardProjection projection)
-    {
-        return projection.HazardsTruncated || projection.PathConditionsTruncated;
     }
 
     private static ComplexityComparison CompareComplexity(

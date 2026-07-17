@@ -7,17 +7,31 @@ using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
+internal abstract class SymbolicSchemaResultBase
+{
+    public abstract string Kind { get; }
+
+    [JsonPropertyOrder(-3)]
+    public int SchemaVersion => 2;
+
+    [JsonPropertyOrder(-2)]
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    [JsonPropertyOrder(-1)]
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+}
+
 internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 {
-    private readonly SymbolicCompactQueryProjection _invariant;
-    private readonly SymbolicCompactRuntimeHazardProjection _runtimeHazards;
+    private readonly SymbolicInvariantQueryView _invariant;
+    private readonly IReadOnlyList<SymbolicRuntimeHazard> _runtimeHazards;
 
     private SymbolicCliExplainReport(
         SymbolicCliExplainSource source,
         SymbolicCliExplainTarget target,
         SymbolicCliExplainProject? project,
-        SymbolicCompactQueryProjection invariant,
-        SymbolicCompactRuntimeHazardProjection runtimeHazards,
+        SymbolicQueryResult invariant,
+        IReadOnlyList<SymbolicRuntimeHazard> runtimeHazards,
         SymbolicCliExplainCapabilityResult capabilities,
         SymbolicCliExplainComplexityResult complexity,
         SymbolicCliExplainDiagnosticResult diagnostics,
@@ -27,10 +41,10 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         Source = source;
         Target = target;
         Project = project;
-        _invariant = invariant;
-        Invariant = invariant.Json;
+        _invariant = SymbolicInvariantQueryView.From(invariant);
+        Invariant = invariant;
         _runtimeHazards = runtimeHazards;
-        RuntimeHazards = runtimeHazards.Json;
+        RuntimeHazards = runtimeHazards;
         Capabilities = capabilities;
         Complexity = complexity;
         Diagnostics = diagnostics;
@@ -47,9 +61,9 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
 
     public SymbolicCliExplainProject? Project { get; }
 
-    public JsonElement Invariant { get; }
+    public SymbolicQueryResult Invariant { get; }
 
-    public JsonElement RuntimeHazards { get; }
+    public IReadOnlyList<SymbolicRuntimeHazard> RuntimeHazards { get; }
 
     public SymbolicCliExplainCapabilityResult Capabilities { get; }
 
@@ -89,14 +103,6 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         var point = pointResult.ProgramPoints[0];
 
         var itemLimit = options.ReportMaxItems;
-        var compactOptions = new SymbolicCompactQueryOptions(
-            maxLines: 0,
-            maxProgramPoints: itemLimit == 0 ? 0 : 1,
-            maxFacts: itemLimit,
-            maxConditions: itemLimit,
-            maxProofs: itemLimit,
-            invariantTargets: options.InvariantTargets);
-        var invariant = SymbolicCompactQueryProjection.Create(pointResult, compactOptions);
 
         var runtimeHazards = service.QueryRuntimeHazards(
             new SymbolicQueryContext(
@@ -104,11 +110,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 SymbolicQueryTarget.Point(point.Line, point.Column),
                 queryOptions),
             options.CreateRuntimeHazardOptions());
-        var compactHazards = SymbolicCompactRuntimeHazardProjection.Create(
-            runtimeHazards,
-            new SymbolicCompactRuntimeHazardQueryOptions(
-                options.ReportMaxHazards,
-                itemLimit));
+        var selectedHazards = runtimeHazards.Hazards.Take(options.ReportMaxHazards).ToArray();
 
         var capabilityResult = service.QueryCapabilities(
             new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
@@ -130,20 +132,20 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         var target = SymbolicCliExplainTarget.FromPoint(options, point);
         var crossLinks = CreateCrossLinks(diagnostics.Items);
         var truncation = new SymbolicCliExplainTruncation(
-            invariant.Truncation.IsTruncated,
-            compactHazards.HazardsTruncated || compactHazards.PathConditionsTruncated,
+            pointResult.AnalysisTruncation.IsTruncated,
+            runtimeHazards.Hazards.Count > selectedHazards.Length,
             capabilities.Truncation.IsTruncated,
             complexity.Truncation.IsTruncated,
             diagnostics.Truncated,
             project?.Truncation.IsTruncated == true,
-            invariant.AnalysisTruncation.IsTruncated || compactHazards.AnalysisTruncation.IsTruncated);
+            pointResult.AnalysisTruncation.IsTruncated || runtimeHazards.AnalysisTruncation.IsTruncated);
 
         return new SymbolicCliExplainReport(
             source,
             target,
             project,
-            invariant,
-            compactHazards,
+            pointResult,
+            selectedHazards,
             capabilities,
             complexity,
             diagnostics,
@@ -173,7 +175,7 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 }));
         }
 
-        foreach (var hazard in _runtimeHazards.Hazards)
+        foreach (var hazard in _runtimeHazards)
         {
             results.Add(CreateSarifResult(
                 "SPQ-HZ-" + ToKebabCase(hazard.Kind.ToString()).ToUpperInvariant(),
@@ -200,12 +202,12 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 }));
         }
 
-        if (_invariant.InvariantQuery.HasUnresolvedAnalysis || _invariant.AnalysisTruncation.IsTruncated)
+        if (_invariant.HasUnresolvedAnalysis || Invariant.AnalysisTruncation.IsTruncated)
         {
             results.Add(CreateSarifResult(
                 "SPQ-INVARIANT-UNKNOWN",
                 "warning",
-                _invariant.InvariantQuery.Summary,
+                _invariant.Summary,
                 Source.FilePath,
                 Target.ResolvedLine,
                 Target.ResolvedColumn,
@@ -323,21 +325,22 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         builder.AppendLine();
         builder.AppendLine("## Invariant and reachability");
         builder.AppendLine();
-        builder.AppendLine($"- Invariant: `{EscapeInline(_invariant.MergedInvariantText)}`");
-        builder.AppendLine($"- Invariant status: `{_invariant.InvariantQuery.Status}` - {EscapeInline(_invariant.InvariantQuery.StatusReason)}");
-        builder.AppendLine($"- Reachability: `{_invariant.Scope.PointReachability}` - {EscapeInline(_invariant.Scope.ReachabilityReason ?? string.Empty)}");
+        var point = Invariant.ProgramPoints.Single();
+        builder.AppendLine($"- Invariant: `{EscapeInline(_invariant.Text)}`");
+        builder.AppendLine($"- Invariant status: `{_invariant.Status}` - {EscapeInline(_invariant.StatusReason)}");
+        builder.AppendLine($"- Reachability: `{point.Reachability}` - {EscapeInline(point.ReachabilityReason)}");
         builder.AppendLine($"- Proof outcomes: {_invariant.ProofOutcomes.TotalCount} total, {_invariant.ProofOutcomes.ProvenTrueCount} true, {_invariant.ProofOutcomes.ProvenFalseCount} false, {_invariant.ProofOutcomes.UnknownCount} unknown");
 
         builder.AppendLine();
         builder.AppendLine("## Runtime hazards");
         builder.AppendLine();
-        builder.AppendLine($"Total: {_runtimeHazards.HazardCount}");
-        if (_runtimeHazards.Hazards.Count != 0)
+        builder.AppendLine($"Total: {_runtimeHazards.Count}");
+        if (_runtimeHazards.Count != 0)
         {
             builder.AppendLine();
             builder.AppendLine("| Kind | Status | Location | Operation |");
             builder.AppendLine("| --- | --- | --- | --- |");
-            foreach (var hazard in _runtimeHazards.Hazards)
+            foreach (var hazard in _runtimeHazards)
                 builder.AppendLine($"| {EscapeCell(hazard.Kind.ToString())} | {EscapeCell(hazard.Status.ToString())} | {hazard.Line}:{hazard.Column} | {EscapeCell(hazard.OperationText)} |");
         }
 

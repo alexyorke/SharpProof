@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
@@ -11,6 +12,11 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicAnalysisLimitsTests
 {
+    private static readonly JsonSerializerOptions CanonicalJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     [Test]
     public void AnalysisLimits_DefaultsAndOverridesAreStable()
     {
@@ -279,12 +285,8 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(
             result.AnalysisTruncation.Events.Select(static item => item.Code),
             Does.Contain("analysis_limit.foreach_element_facts"));
-        var compact = result.ToCompactResult();
-        Assert.That(compact.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
-        Assert.That(compact.GetProperty("analysisSummary").GetProperty("analysisTruncated").GetBoolean(), Is.True);
-        Assert.That(compact.GetProperty("analysisSummary").GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-        Assert.That(result.ToCompactResult()
-            .GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        var json = JsonSerializer.SerializeToElement(result, CanonicalJsonOptions);
+        Assert.That(json.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
     }
 
     [Test]
@@ -320,10 +322,10 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(result.Hazards, Is.Not.Empty);
         Assert.That(result.AnalysisTruncation.IsTruncated, Is.True);
         Assert.That(result.Hazards.Any(static hazard => hazard.AnalysisTruncation.IsTruncated), Is.True);
-        var compact = result.ToCompactResult();
-        Assert.That(compact.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        var json = JsonSerializer.SerializeToElement(result, CanonicalJsonOptions);
+        Assert.That(json.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         Assert.That(
-            compact.GetProperty("hazards").EnumerateArray().Any(static hazard =>
+            json.GetProperty("hazards").EnumerateArray().Any(static hazard =>
                 hazard.GetProperty("analysisTruncation").GetProperty("isTruncated").GetBoolean()),
             Is.True);
     }

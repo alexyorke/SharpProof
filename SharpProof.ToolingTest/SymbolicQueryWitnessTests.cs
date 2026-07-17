@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
@@ -131,14 +133,15 @@ public sealed class SymbolicQueryWitnessTests
             .Single(assignment => assignment.SourceName == "divisor");
         var divisorDomain = hazard.TriggerWitness.DomainSummary.Domains
             .Single(domain => domain.Name == "divisor");
-        var compactHazard = result.ToCompactResult().GetProperty("hazards").EnumerateArray()
+        var serializedHazard = JsonSerializer.SerializeToElement(result, CanonicalJsonOptions)
+            .GetProperty("hazards").EnumerateArray()
             .Single(item => item.GetProperty("kind").GetString() == SymbolicRuntimeHazardKind.DivideByZero.ToString());
         Assert.Multiple(() =>
         {
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(hazard.UnknownReasonInfo.Source, Is.EqualTo(SymbolicUnknownReasonSource.RuntimeHazard));
             Assert.That(hazard.UnknownReasonInfo.Code, Is.EqualTo("runtime_hazard.unknown"));
-            Assert.That(compactHazard.GetProperty("unknownReasonInfo").GetProperty("code").GetString(),
+            Assert.That(serializedHazard.GetProperty("unknownReasonInfo").GetProperty("code").GetString(),
                 Is.EqualTo(hazard.UnknownReasonInfo.Code));
             Assert.That(hazard.TriggerWitness.IsAvailable, Is.True);
             Assert.That(divisorAssignment.IntegerValue, Is.EqualTo(0));
@@ -149,6 +152,13 @@ public sealed class SymbolicQueryWitnessTests
             Assert.That(result.InputDomainSummary.Domains, Has.Some.Property("Name").EqualTo("divisor"));
         });
     }
+
+    private static JsonSerializerOptions CanonicalJsonOptions { get; } = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private static int FindLine(string source, string text)
     {

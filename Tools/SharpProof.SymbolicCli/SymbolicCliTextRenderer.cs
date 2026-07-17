@@ -37,6 +37,16 @@ internal static class SymbolicCliTextRenderer
     if (result.SmtDiagnostics.IsConfigured && result.Lines.Count == 0) PrintSmtDiagnostics(result.SmtDiagnostics);
 }
 
+internal static class SymbolicCliCounts
+{
+    internal static IReadOnlyDictionary<string, int> By<T>(
+        IEnumerable<T> values,
+        Func<T, string> keySelector) => values
+        .GroupBy(keySelector, StringComparer.Ordinal)
+        .OrderBy(static group => group.Key, StringComparer.Ordinal)
+        .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+}
+
     internal static void PrintLineResult(SymbolicQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");

@@ -49,8 +49,9 @@ public sealed class StandaloneCompilationProfileTests
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
-        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("point"));
-        Assert.That(root.GetProperty("methodName").GetString(), Does.Contain("Read"));
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
+        Assert.That(root.GetProperty("programPoints")[0].GetProperty("methodName").GetString(),
+            Does.Contain("Read"));
     }
 
     [Test]

@@ -68,33 +68,12 @@ try
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
 
-    if (options.CompactJson)
+    if (options.Json || options.CompactJson)
     {
-        object compactResult;
-        if (result is SymbolicQueryResult queryResult)
-            compactResult = queryResult.ToCompactResult(options.CreateCompactOptions());
-        else
-            compactResult = result switch
-        {
-            SymbolicCapabilityResult capabilityResult => capabilityResult.ToCompactResult(),
-            SymbolicComplexityResult complexityResult => complexityResult.ToCompactResult(),
-            SymbolicRuntimeHazardQueryResult hazardResult => (object)hazardResult.ToCompactResult(
-                options.CreateCompactHazardOptions()),
-            _ => throw new InvalidOperationException("Unexpected query result type.")
-        };
         Console.WriteLine(JsonSerializer.Serialize(
-            compactResult,
+            result,
+            result.GetType(),
             SymbolicCliOutputPolicy.CompactJsonOptions));
-    }
-    else if (options.Json)
-    {
-        var jsonResult = result is SymbolicQueryResult queryResult
-            ? queryResult.ToCompactResult(options.CreateCompactOptions())
-            : result;
-        Console.WriteLine(JsonSerializer.Serialize(
-            jsonResult,
-            jsonResult.GetType(),
-            SymbolicCliOutputPolicy.FullJsonOptions));
     }
     else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
     {

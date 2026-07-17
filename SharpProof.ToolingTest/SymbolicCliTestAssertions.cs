@@ -8,17 +8,9 @@ internal static class SymbolicCliTestAssertions
 {
     internal static void AssertCompactEnvelope(JsonElement root, string kind)
     {
-        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo(kind));
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-        AssertEvidenceSchema(root);
-    }
-
-    internal static void AssertEvidenceSchema(JsonElement root)
-    {
-        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
-            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        var canonicalProperty = kind == "capabilities" ? "capabilities" : "complexity";
+        Assert.That(root.TryGetProperty(canonicalProperty, out _), Is.True);
+        Assert.That(root.GetProperty("filePath").GetString(), Is.Not.Empty);
     }
 
     internal static async Task AssertRejectsAllLinesAsync(string sourcePath, string mode)

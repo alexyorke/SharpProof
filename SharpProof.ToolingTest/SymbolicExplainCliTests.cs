@@ -117,7 +117,7 @@ public sealed class SymbolicExplainCliTests
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
         Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("explain"));
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(), Is.GreaterThan(0));
         Assert.That(root.GetProperty("source").GetProperty("filePath").GetString(),
             Is.EqualTo("virtual/ExplainReport.cs"));
@@ -129,24 +129,23 @@ public sealed class SymbolicExplainCliTests
             Is.EqualTo("ThrowStatement"));
 
         var invariant = root.GetProperty("invariant");
-        Assert.That(invariant.GetProperty("kind").GetString(), Is.EqualTo("point"));
-        Assert.That(invariant.GetProperty("pointReachability").GetString(), Is.EqualTo("Reachable"));
-        Assert.That(invariant.GetProperty("invariantQuery").GetProperty("status").GetString(), Is.Not.Empty);
+        Assert.That(invariant.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
+        Assert.That(invariant.GetProperty("programPoints")[0].GetProperty("reachability").GetString(),
+            Is.EqualTo("Reachable"));
+        Assert.That(invariant.GetProperty("mergedPathFacts").GetProperty("mergedInvariantText").GetString(),
+            Is.Not.Empty);
 
         var hazards = root.GetProperty("runtimeHazards");
-        Assert.That(hazards.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(hazards.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
-        Assert.That(hazards.GetProperty("hazards")[0].GetProperty("kind").GetString(),
+        Assert.That(hazards.GetArrayLength(), Is.EqualTo(1));
+        Assert.That(hazards[0].GetProperty("kind").GetString(),
             Is.EqualTo("DirectThrow"));
 
         var capabilities = root.GetProperty("capabilities");
-        Assert.That(capabilities.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
         Assert.That(capabilities.GetProperty("sites").GetArrayLength(), Is.LessThanOrEqualTo(1));
         Assert.That(capabilities.GetProperty("siteCount").GetInt32(),
             Is.GreaterThanOrEqualTo(capabilities.GetProperty("sites").GetArrayLength()));
 
         var complexity = root.GetProperty("complexity");
-        Assert.That(complexity.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
         Assert.That(complexity.GetProperty("drivers").GetArrayLength(), Is.LessThanOrEqualTo(1));
         Assert.That(complexity.GetProperty("calleeSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
 

@@ -12,19 +12,19 @@ public sealed class SymbolicCliCompactProjectionByteTests
 
     private static readonly TestCaseData[] ProjectionCases =
     {
-        Case("CompactPoint", "B687B3CFC9931A51CE8FE3C22F9DCBB2F526F1B36A51296B52787BA5DFF0B343", "--position", "0", "--compact-json"),
-        Case("CompactLine", "B19B887580836BE818A73CD935DBB64918F6FCE8BB1216B1BA576E1920914573", "--line", "1", "--line-invariants", "--compact-json"),
-        Case("CompactSpan", "BFD78184C00D8CBE4F297003319A890612167856BC0F9329FE185AB7D6A941B9", "--span-start", "0", "--span-end", Source.Length.ToString(), "--compact-json"),
-        Case("CompactFile", "F4031832C1BD136A7C0A18EE0C4F4455EBA21B1CBD3998F6F4F6CDCA6B31E477", "--all-lines", "--compact-json"),
-        Case("InvariantPoint", "B687B3CFC9931A51CE8FE3C22F9DCBB2F526F1B36A51296B52787BA5DFF0B343", "--position", "0", "--compact-json"),
-        Case("InvariantLine", "B19B887580836BE818A73CD935DBB64918F6FCE8BB1216B1BA576E1920914573", "--line", "1", "--line-invariants", "--compact-json"),
-        Case("InvariantSpan", "BFD78184C00D8CBE4F297003319A890612167856BC0F9329FE185AB7D6A941B9", "--span-start", "0", "--span-end", Source.Length.ToString(), "--compact-json"),
-        Case("InvariantFile", "F4031832C1BD136A7C0A18EE0C4F4455EBA21B1CBD3998F6F4F6CDCA6B31E477", "--all-lines", "--compact-json"),
-        Case("CompactFilteredTruncated", "86403C72342743AE867226D3B1B5A92E49CF39F516082A1D62223C7E031491EF", "--line", "1", "--line-invariants", "--compact-json", "--invariant-target", "value", "--max-facts", "0", "--max-conditions", "0", "--max-proofs", "0"),
-        Case("InvariantFilteredTruncated", "86403C72342743AE867226D3B1B5A92E49CF39F516082A1D62223C7E031491EF", "--line", "1", "--line-invariants", "--compact-json", "--invariant-target", "value", "--max-facts", "0", "--max-conditions", "0", "--max-proofs", "0"),
-        Case("RuntimeHazards", "DE93A095DD1144104C4946BE7D76FF84A7FDF96DDE9279DC1D095D0BC8D54ED7", "--line", "1", "--runtime-hazards", "--compact-json"),
-        Case("Capabilities", "939F7007DEC14F73F3309FECBECEE3F5A68A51D1278753F6225D89D2AB829117", "--line", "1", "--capabilities", "--compact-json"),
-        Case("Complexity", "68B4002D6B3F9DF85529332209996373981678AD6C5D7A24AD94B11CA1889E21", "--line", "1", "--complexity", "--compact-json")
+        Case("CompactPoint", "6AA93468986BDE40458A5BAC125AD071DFD76B99C09A8C06B801A616758DAD58", "--position", "0", "--compact-json"),
+        Case("CompactLine", "8B8436E3920E502FC61EDF2662D93937567874DE1D61011CCFEF197D55EDFF0E", "--line", "1", "--line-invariants", "--compact-json"),
+        Case("CompactSpan", "51EDFD8FEA52043174C013505C5ED37CEFBFAEDEE0F8950C4F716A6757303595", "--span-start", "0", "--span-end", Source.Length.ToString(), "--compact-json"),
+        Case("CompactFile", "A67D81D8A00DAEB32B23D4A5CD43B99C764F9F337F48931CE205F0DB21CE2871", "--all-lines", "--compact-json"),
+        Case("InvariantPoint", "6AA93468986BDE40458A5BAC125AD071DFD76B99C09A8C06B801A616758DAD58", "--position", "0", "--compact-json"),
+        Case("InvariantLine", "8B8436E3920E502FC61EDF2662D93937567874DE1D61011CCFEF197D55EDFF0E", "--line", "1", "--line-invariants", "--compact-json"),
+        Case("InvariantSpan", "51EDFD8FEA52043174C013505C5ED37CEFBFAEDEE0F8950C4F716A6757303595", "--span-start", "0", "--span-end", Source.Length.ToString(), "--compact-json"),
+        Case("InvariantFile", "A67D81D8A00DAEB32B23D4A5CD43B99C764F9F337F48931CE205F0DB21CE2871", "--all-lines", "--compact-json"),
+        Case("CompactFilteredTruncated", "8B8436E3920E502FC61EDF2662D93937567874DE1D61011CCFEF197D55EDFF0E", "--line", "1", "--line-invariants", "--compact-json", "--invariant-target", "value", "--max-facts", "0", "--max-conditions", "0", "--max-proofs", "0"),
+        Case("InvariantFilteredTruncated", "8B8436E3920E502FC61EDF2662D93937567874DE1D61011CCFEF197D55EDFF0E", "--line", "1", "--line-invariants", "--compact-json", "--invariant-target", "value", "--max-facts", "0", "--max-conditions", "0", "--max-proofs", "0"),
+        Case("RuntimeHazards", "D1E88AA9505155477C76B023E271A0A88373ABB11C355A5E931052DD08D52783", "--line", "1", "--runtime-hazards", "--compact-json"),
+        Case("Capabilities", "8BEC2EB69B5B8848788D812476B9B8766CDD3A0330F7A56E6423378D6CF9B261", "--line", "1", "--capabilities", "--compact-json"),
+        Case("Complexity", "7C3BA965BBB5ED08972DE8068A427D165B0F979B30E59EA3F570C0C32490BF03", "--line", "1", "--complexity", "--compact-json")
     };
 
     [TestCaseSource(nameof(ProjectionCases))]

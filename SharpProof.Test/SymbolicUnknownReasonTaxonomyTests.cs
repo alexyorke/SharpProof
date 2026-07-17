@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine;
@@ -9,6 +11,12 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicUnknownReasonTaxonomyTests
 {
+    private static readonly JsonSerializerOptions CanonicalJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     [TestCase(SymbolicUnknownReason.UnsupportedIrEncoding, SymbolicUnknownReasonCategory.UnsupportedSyntax,
         "proof.unsupported_ir_encoding")]
     [TestCase(SymbolicUnknownReason.MethodBudgetExceeded, SymbolicUnknownReasonCategory.SolverBudget,
@@ -140,13 +148,13 @@ public sealed class SymbolicUnknownReasonTaxonomyTests
         {
             Assert.That(capability.UnknownReasonDetails.Single().Code,
                 Is.EqualTo("capability.dynamic_dispatch"));
-            Assert.That(capability.ToCompactResult()
+            Assert.That(JsonSerializer.SerializeToElement(capability, CanonicalJsonOptions)
                     .GetProperty("unknownReasonDetails")[0]
                     .GetProperty("category").GetString(),
                 Is.EqualTo(SymbolicUnknownReasonCategory.DynamicDispatch.ToString()));
             Assert.That(complexity.UnknownReasonDetails.Single().Code,
                 Is.EqualTo("complexity.unknown_callee"));
-            Assert.That(complexity.ToCompactResult()
+            Assert.That(JsonSerializer.SerializeToElement(complexity, CanonicalJsonOptions)
                     .GetProperty("unknownReasonDetails")[0]
                     .GetProperty("category").GetString(),
                 Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedLibraryModel.ToString()));

@@ -35,11 +35,11 @@ public sealed class SymbolicCapabilityQueryTests
         Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
-        Assert.That(root.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
-        var site = root.GetProperty("Sites")[0];
-        Assert.That(site.GetProperty("CapabilityText").GetString(), Does.Contain("Console"));
-        Assert.That(site.GetProperty("SiteKind").GetString(), Is.EqualTo("invocation"));
-        Assert.That(site.GetProperty("OperationKind").GetString(), Is.EqualTo("Invocation"));
+        Assert.That(root.GetProperty("capabilityText").GetString(), Does.Contain("Console"));
+        var site = root.GetProperty("sites")[0];
+        Assert.That(site.GetProperty("capabilityText").GetString(), Does.Contain("Console"));
+        Assert.That(site.GetProperty("siteKind").GetString(), Is.EqualTo("invocation"));
+        Assert.That(site.GetProperty("operationKind").GetString(), Is.EqualTo("Invocation"));
     }
 
     [Test]

@@ -122,7 +122,7 @@ public class SmtAnalysisServiceTests
         var result = service.Classify(CreateSolverQuery("transient_recovery"));
         var health = service.Health;
         var diagnostics = SymbolicSmtDiagnostics.FromService(service);
-        var compactDiagnostics = SymbolicCompactSmtDiagnostics.FromDiagnostics(diagnostics);
+        var snapshot = diagnostics.Snapshot;
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(attempts, Is.EqualTo(2));
@@ -136,9 +136,9 @@ public class SmtAnalysisServiceTests
         Assert.That(health.ContextRecycleCount, Is.EqualTo(1));
         Assert.That(diagnostics.Health.State, Is.EqualTo(SmtAnalysisHealthState.Ready));
         Assert.That(diagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
-        Assert.That(compactDiagnostics.Health.TransientRetryCount, Is.EqualTo(1));
-        Assert.That(compactDiagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
-        Assert.That(compactDiagnostics.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
+        Assert.That(snapshot.Health.TransientRetryCount, Is.EqualTo(1));
+        Assert.That(snapshot.Lifecycle, Is.SameAs(options.Lifecycle));
+        Assert.That(snapshot.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
     }
 
     [Test]

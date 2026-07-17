@@ -401,18 +401,17 @@ internal sealed class SymbolicCliOptions
 
     private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
-    public int CompactMaxLines { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxLines;
+    public int CompactMaxLines { get; private set; } = 100;
 
-    public int CompactMaxProgramPoints { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProgramPoints;
+    public int CompactMaxProgramPoints { get; private set; } = 250;
 
-    public int CompactMaxHazards { get; private set; } =
-        SymbolicCompactRuntimeHazardQueryOptions.DefaultMaxHazards;
+    public int CompactMaxHazards { get; private set; } = 250;
 
-    public int CompactMaxFacts { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxFacts;
+    public int CompactMaxFacts { get; private set; } = 50;
 
-    public int CompactMaxConditions { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxConditions;
+    public int CompactMaxConditions { get; private set; } = 50;
 
-    public int CompactMaxProofs { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProofs;
+    public int CompactMaxProofs { get; private set; } = 50;
 
     public bool HasCompactOutputLimit { get; private set; }
 
@@ -638,8 +637,8 @@ internal sealed class SymbolicCliOptions
 
             if (options.CompactSummaryOnly)
             {
-                options.CompactMaxLines = SymbolicCompactQueryOptions.SummaryOnly.MaxLines;
-                options.CompactMaxProgramPoints = SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints;
+                options.CompactMaxLines = 0;
+                options.CompactMaxProgramPoints = 0;
                 options.CompactMaxHazards = 0;
             }
 
@@ -1122,24 +1121,6 @@ internal sealed class SymbolicCliOptions
             : HasColumn
                 ? SymbolicQueryTarget.Point(Line, Column)
                 : SymbolicQueryTarget.Line(Line);
-    }
-
-    public SymbolicCompactQueryOptions CreateCompactOptions()
-    {
-        return new SymbolicCompactQueryOptions(
-            CompactMaxLines,
-            CompactMaxProgramPoints,
-            CompactMaxFacts,
-            CompactMaxConditions,
-            CompactMaxProofs,
-            InvariantTargets);
-    }
-
-    public SymbolicCompactRuntimeHazardQueryOptions CreateCompactHazardOptions()
-    {
-        return new SymbolicCompactRuntimeHazardQueryOptions(
-            CompactMaxHazards,
-            CompactMaxConditions);
     }
 
     public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()

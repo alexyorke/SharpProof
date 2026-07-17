@@ -728,34 +728,23 @@ public class TestClass
         Assert.That(result.RequestedPositionDistance, Is.EqualTo(0));
         Assert.That(result.ContainsRequestedPosition, Is.True);
 
-        var compact = result.ToCompactResult();
-        Assert.That(compact.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
-        Assert.That(compact.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
-        Assert.That(compact.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
-        Assert.That(compact.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
-        Assert.That(compact.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
-        var compactPoint = compact.GetProperty("programPoints")[0];
-        Assert.That(compactPoint.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
-        Assert.That(compactPoint.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
-        Assert.That(compactPoint.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
-        Assert.That(compactPoint.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
-        Assert.That(compactPoint.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
-
-        var invariantResult = result.ToCompactResult();
-        Assert.That(invariantResult.GetProperty("kind").GetString(), Is.EqualTo("point"));
+        var invariantResult = CanonicalJson(SymbolicQueryResult.From(result));
+        Assert.That(invariantResult.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
         Assert.That(invariantResult.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
         Assert.That(invariantResult.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
         Assert.That(invariantResult.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
         Assert.That(invariantResult.GetProperty("position").GetInt32(), Is.EqualTo(result.Position));
-        Assert.That(invariantResult.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
-        Assert.That(invariantResult.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
-        Assert.That(invariantResult.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
-        Assert.That(invariantResult.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
-        Assert.That(invariantResult.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
-        Assert.That(invariantResult.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
-        Assert.That(invariantResult.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
-        Assert.That(invariantResult.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
-        Assert.That(invariantResult.GetProperty("reachabilityReason").GetString(), Is.EqualTo(result.ReachabilityReason));
+        var serializedPoint = invariantResult.GetProperty("programPoints")[0];
+        Assert.That(serializedPoint.GetProperty("requestedLine").GetInt32(), Is.EqualTo(line));
+        Assert.That(serializedPoint.GetProperty("requestedColumn").GetInt32(), Is.EqualTo(column));
+        Assert.That(serializedPoint.GetProperty("requestedPosition").GetInt32(), Is.EqualTo(requestedPosition));
+        Assert.That(serializedPoint.GetProperty("requestedPositionDistance").GetInt32(), Is.EqualTo(0));
+        Assert.That(serializedPoint.GetProperty("containsRequestedPosition").GetBoolean(), Is.True);
+        Assert.That(serializedPoint.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+        Assert.That(serializedPoint.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(serializedPoint.GetProperty("reachability").GetString(),
+            Is.EqualTo(result.Reachability.ToString()));
+        Assert.That(serializedPoint.GetProperty("reachabilityReason").GetString(), Is.EqualTo(result.ReachabilityReason));
         Assert.That(invariantResult.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
     }
 
@@ -1485,16 +1474,9 @@ public class TestClass
         Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
         Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
 
-        var compact = SymbolicCompactQueryProjection.Create(
-            filtered,
-            new SymbolicCompactQueryOptions(maxProgramPoints: 10));
-        var compactPoints = compact.Json.GetProperty("lines").EnumerateArray()
-            .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
-            .ToArray();
-        Assert.That(compactPoints, Is.Not.Empty);
-        Assert.That(compactPoints.All(static point => point.GetProperty("methodName").GetString() == "First"), Is.True);
-        Assert.That(compactPoints.All(static point => point.GetProperty("conservativeInvariant")
-            .GetProperty("targets").EnumerateArray().Any(target => target.GetString() == "value")), Is.True);
+        var serializedPoints = CanonicalJson(filtered).GetProperty("programPoints").EnumerateArray().ToArray();
+        Assert.That(serializedPoints, Is.Not.Empty);
+        Assert.That(serializedPoints.All(static point => point.GetProperty("methodName").GetString() == "First"), Is.True);
     }
 
     [Test]
@@ -1561,15 +1543,10 @@ public class TestClass
         Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
 
-        var compactPoint = SymbolicCompactQueryProjection.Create(
-                filtered,
-                new SymbolicCompactQueryOptions(maxProgramPoints: 10))
-            .Json.GetProperty("lines").EnumerateArray()
-            .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
-            .Single();
-        Assert.That(compactPoint.GetProperty("programPointKind").GetString(),
+        var serializedPoint = CanonicalJson(filtered).GetProperty("programPoints").EnumerateArray().Single();
+        Assert.That(serializedPoint.GetProperty("programPointKind").GetString(),
             Is.EqualTo(SymbolicProgramPointKinds.Expression));
-        Assert.That(compactPoint.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(),
+        Assert.That(serializedPoint.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(),
             Is.EqualTo(1));
     }
 
@@ -1619,118 +1596,38 @@ public class TestClass
             position,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), new SymbolicCompactQueryOptions(
-            maxProgramPoints: 0,
-            maxFacts: 0,
-            maxConditions: 0,
-            maxProofs: 0));
-        var compactWithFacts = SymbolicCompactQueryProjection.Create(SymbolicQueryResult.From(result), new SymbolicCompactQueryOptions(
-            maxProgramPoints: 1,
-            maxFacts: 1,
-            maxConditions: 1,
-            maxProofs: 1));
-        var descriptorJson = compact.QueryDescriptor.Json;
-        var analysisSummaryJson = compact.AnalysisSummary.Json;
-        var invariantQueryJson = compact.InvariantQuery.Json;
+        var query = SymbolicQueryResult.From(result);
+        var invariant = InvariantView(query);
+        var root = CanonicalJson(query);
+        var serializedPoint = root.GetProperty("programPoints").EnumerateArray().Single();
 
-        Assert.That(compact.Scope.Kind, Is.EqualTo("point"));
-        Assert.That(compact.SchemaVersion, Is.EqualTo(1));
-        Assert.That(compact.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(compact.EvidenceSchemaCompatibility,
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("point"));
-        Assert.That(descriptorJson.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
-        Assert.That(descriptorJson.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
-        Assert.That(descriptorJson.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
-        Assert.That(descriptorJson.GetProperty("position").GetInt32(), Is.EqualTo(position));
-        Assert.That(descriptorJson.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
-        Assert.That(descriptorJson.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
-        Assert.That(compact.Scope.Line, Is.EqualTo(result.Line));
-        Assert.That(compact.Scope.Column, Is.EqualTo(result.Column));
-        Assert.That(compact.Scope.Position, Is.EqualTo(position));
-        Assert.That(compact.Scope.NodeKind, Is.EqualTo("ReturnStatement"));
-        Assert.That(compact.Scope.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
-        Assert.That(compact.Scope.NodeSpanStart, Is.EqualTo(result.NodeSpanStart));
-        Assert.That(compact.Scope.NodeSpanEnd, Is.EqualTo(result.NodeSpanEnd));
-        Assert.That(compact.Scope.NodeSpanLength, Is.EqualTo(result.NodeSpanLength));
-        Assert.That(compact.Scope.NodeStartLine, Is.EqualTo(result.NodeStartLine));
-        Assert.That(compact.Scope.NodeStartColumn, Is.EqualTo(result.NodeStartColumn));
-        Assert.That(compact.Scope.NodeEndLine, Is.EqualTo(result.NodeEndLine));
-        Assert.That(compact.Scope.NodeEndColumn, Is.EqualTo(result.NodeEndColumn));
-        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(compact.Scope.PointReachability, Is.EqualTo(result.Reachability.ToString()));
-        Assert.That(compact.Scope.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
-        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
-        Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
-        Assert.That(analysisSummaryJson.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummaryJson.GetProperty("invariantConditionCount").GetInt32(), Is.EqualTo(result.Invariant.ConditionCount));
-        Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
-        Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
-        Assert.That(analysisSummaryJson.GetProperty("reachabilityCheckedCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummaryJson.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummaryJson.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummaryJson.GetProperty("smtEnabled").GetBoolean(), Is.True);
-        Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.False);
-        Assert.That(invariantQueryJson.GetProperty("statusReason").GetString(),
-            Is.EqualTo("all_candidate_program_points_exact"));
-        Assert.That(analysisSummaryJson.GetProperty("invariantStatusReason").GetString(),
-            Is.EqualTo(invariantQueryJson.GetProperty("statusReason").GetString()));
-        Assert.That(compact.ProgramPoints, Is.Empty);
-        Assert.That(compact.Truncation.ProgramPoints, Is.True);
-        Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
-        Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.PathConditionCount > 0));
-        Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
-        var observedJson = compact.ObservedInvariant.Json;
-        var conservativeJson = compact.ConservativeInvariant.Json;
-        Assert.That(observedJson.GetProperty("rawFactCount").GetInt32(), Is.EqualTo(result.Facts.Count));
-        Assert.That(observedJson.GetProperty("rawFacts").GetArrayLength(), Is.Zero);
-        Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
-        Assert.That(conservativeJson.GetProperty("conservativeUnknownCount").GetInt32(),
-            Is.EqualTo(result.Invariant.ConservativeUnknownCount));
-        Assert.That(conservativeJson.GetProperty("hasConservativeUnknowns").GetBoolean(), Is.False);
-        Assert.That(conservativeJson.GetProperty("conditions").GetArrayLength(), Is.Zero);
-        var symbolicFactsJson = compactWithFacts.ProgramPoints.Single().Json.GetProperty("symbolicFacts");
-        Assert.That(symbolicFactsJson.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(symbolicFactsJson[0].GetProperty("kind").GetString(), Is.EqualTo("SymbolicRelationAtom"));
-        Assert.That(symbolicFactsJson[0].GetProperty("provenance").GetString(), Does.StartWith("ir."));
-
-        var root = compact.Json;
-        Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
-        Assert.That(kind.GetString(), Is.EqualTo("point"));
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-        SymbolicCliTestAssertions.AssertEvidenceSchema(root);
-        Assert.That(root.TryGetProperty("Kind", out _), Is.False);
-        Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
-        var queryDescriptor = root.GetProperty("queryDescriptor");
-        Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("point"));
-        Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
-        Assert.That(queryDescriptor.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
-        Assert.That(queryDescriptor.GetProperty("position").GetInt32(), Is.EqualTo(position));
-        Assert.That(queryDescriptor.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
-        Assert.That(queryDescriptor.GetProperty("programPointKind").GetString(),
+        Assert.That(query.ScopeKind, Is.EqualTo("point"));
+        Assert.That(query.FilePath, Is.EqualTo(result.FilePath));
+        Assert.That(query.Line, Is.EqualTo(result.Line));
+        Assert.That(query.Column, Is.EqualTo(result.Column));
+        Assert.That(query.Position, Is.EqualTo(position));
+        Assert.That(query.ProgramPoints, Has.Count.EqualTo(1));
+        Assert.That(query.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(query.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
+        Assert.That(query.ProgramPointSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(query.ProgramPointSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(query.Reachability.ReachableCount + query.Reachability.UnreachableCount +
+            query.Reachability.UnknownCount, Is.EqualTo(1));
+        Assert.That(query.Reachability.ReachableCount + query.Reachability.UnreachableCount, Is.EqualTo(1));
+        Assert.That(invariant.StatusReason, Is.EqualTo("all_candidate_program_points_exact"));
+        Assert.That(invariant.HasUnresolvedAnalysis, Is.False);
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
+        Assert.That(root.TryGetProperty("ScopeKind", out _), Is.False);
+        Assert.That(serializedPoint.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
+        Assert.That(serializedPoint.GetProperty("programPointKind").GetString(),
             Is.EqualTo(SymbolicProgramPointKinds.Statement));
-        Assert.That(queryDescriptor.TryGetProperty("spanStart", out _), Is.False);
-        Assert.That(root.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
-        Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
-        Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
-        Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
-        Assert.That(root.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
-        Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
-            Is.EqualTo(result.ProofOutcomes.TotalCount));
-        var analysisSummary = root.GetProperty("analysisSummary");
-        Assert.That(analysisSummary.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummary.GetProperty("invariantConditionCount").GetInt32(),
-            Is.EqualTo(result.Invariant.ConditionCount));
-        Assert.That(analysisSummary.GetProperty("invariantStatusReason").GetString(),
-            Is.EqualTo("all_candidate_program_points_exact"));
-        Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
-        Assert.That(analysisSummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("invariantQuery").GetProperty("statusReason").GetString(),
-            Is.EqualTo("all_candidate_program_points_exact"));
-        Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
-        Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        Assert.That(serializedPoint.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
+        Assert.That(serializedPoint.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
+        Assert.That(serializedPoint.GetProperty("reachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
+        var symbolicFacts = serializedPoint.GetProperty("symbolicFacts");
+        Assert.That(symbolicFacts.GetArrayLength(), Is.EqualTo(result.SymbolicFacts.Count));
+        Assert.That(symbolicFacts[0].GetProperty("kind").GetString(), Is.EqualTo("SymbolicRelationAtom"));
+        Assert.That(symbolicFacts[0].GetProperty("provenance").GetString(), Does.StartWith("ir."));
     }
 
     [Test]
@@ -1748,75 +1645,28 @@ public class TestClass
         var result = session.AnalyzeLine(
             "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
-        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            maxProgramPoints: 1,
-            maxFacts: 1,
-            maxConditions: 1,
-            maxProofs: 1));
-        var descriptorJson = compact.QueryDescriptor.Json;
-
-        Assert.That(compact.Scope.Kind, Is.EqualTo("line"));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("line"));
-        Assert.That(descriptorJson.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
-        Assert.That(descriptorJson.TryGetProperty("column", out _), Is.False);
-        Assert.That(descriptorJson.TryGetProperty("position", out _), Is.False);
-        Assert.That(descriptorJson.TryGetProperty("spanStart", out _), Is.False);
-        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
-        Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
-        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
-        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        var observedJson = compact.ObservedInvariant.Json;
-        var conservativeJson = compact.ConservativeInvariant.Json;
-        Assert.That(observedJson.GetProperty("mergeKind").GetString(),
-            Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
-        Assert.That(observedJson.GetProperty("rawFactCount").GetInt32(), Is.EqualTo(result.Facts.Count));
-        Assert.That(observedJson.GetProperty("rawFacts").EnumerateArray().Select(static value => value.GetString()),
-            Is.EqualTo(result.Facts.Take(1)));
-        Assert.That(compact.ObservedInvariant.Text, Does.Contain("value > 0"));
-        Assert.That(conservativeJson.GetProperty("mergeKind").GetString(),
-            Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
-        Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(conservativeJson.GetProperty("conservativeUnknownCount").GetInt32(),
-            Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
-        Assert.That(conservativeJson.GetProperty("hasConservativeUnknowns").GetBoolean(), Is.True);
-        Assert.That(compact.ConservativeInvariant.Targets, Does.Contain("value"));
-        var mergedPathJson = conservativeJson.GetProperty("mergedPathFacts");
-        Assert.That(mergedPathJson.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(mergedPathJson.GetProperty("conservativeUnknowns").EnumerateArray()
-                .Select(static value => value.GetString()),
-            Does.Contain("unknown(value)"));
-        var diagnostic = mergedPathJson.GetProperty("conservativeUnknownDiagnostics").EnumerateArray().Single();
-        Assert.That(diagnostic.GetProperty("unknownText").GetString(), Is.EqualTo("unknown(value)"));
-        Assert.That(diagnostic.GetProperty("target").GetString(), Is.EqualTo("value"));
-        Assert.That(diagnostic.GetProperty("reason").GetString(),
-            Is.EqualTo("not_common_to_all_candidate_program_points"));
-        Assert.That(diagnostic.GetProperty("maybeFacts").GetArrayLength(), Is.GreaterThan(0));
-        Assert.That(compact.Reachability.ReachableCount,
-            Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
-        Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
-        Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
-
-        var compactPoint = compact.ProgramPoints.Single();
-        var compactPointJson = compactPoint.Json;
+        var root = CanonicalJson(result);
+        var serializedPoint = root.GetProperty("programPoints").EnumerateArray().First();
         var sourcePoint = result.ProgramPoints.First();
-        Assert.That(compactPointJson.GetProperty("filePath").GetString(), Is.EqualTo(sourcePoint.FilePath));
-        Assert.That(compactPointJson.GetProperty("line").GetInt32(), Is.EqualTo(sourcePoint.Line));
-        Assert.That(compactPointJson.GetProperty("column").GetInt32(), Is.EqualTo(sourcePoint.Column));
-        Assert.That(compactPointJson.GetProperty("position").GetInt32(), Is.EqualTo(sourcePoint.Position));
-        Assert.That(compactPointJson.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(sourcePoint.NodeSpanStart));
-        Assert.That(compactPointJson.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(sourcePoint.NodeSpanEnd));
-        Assert.That(compactPointJson.GetProperty("nodeSpanLength").GetInt32(), Is.EqualTo(sourcePoint.NodeSpanLength));
-        Assert.That(compactPointJson.GetProperty("nodeStartLine").GetInt32(), Is.EqualTo(sourcePoint.NodeStartLine));
-        Assert.That(compactPointJson.GetProperty("nodeStartColumn").GetInt32(), Is.EqualTo(sourcePoint.NodeStartColumn));
-        Assert.That(compactPointJson.GetProperty("nodeEndLine").GetInt32(), Is.EqualTo(sourcePoint.NodeEndLine));
-        Assert.That(compactPointJson.GetProperty("nodeEndColumn").GetInt32(), Is.EqualTo(sourcePoint.NodeEndColumn));
-        Assert.That(compactPointJson.GetProperty("methodName").GetString(), Is.EqualTo(sourcePoint.MethodName));
-        Assert.That(compactPointJson.GetProperty("programPointKind").GetString(), Is.EqualTo(sourcePoint.ProgramPointKind));
-        Assert.That(compactPointJson.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(sourcePoint.MergedInvariantText));
-        Assert.That(compactPointJson.GetProperty("reachability").GetString(), Is.EqualTo(sourcePoint.Reachability.ToString()));
-        Assert.That(compactPointJson.GetProperty("reachabilityReason").GetString(), Is.EqualTo(sourcePoint.ReachabilityReason));
-        Assert.That(compactPointJson.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(sourcePoint.ProofOutcomes.TotalCount));
+
+        Assert.That(result.ScopeKind, Is.EqualTo("line"));
+        Assert.That(result.ProgramPoints, Is.Not.Empty);
+        Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+        Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
+        Assert.That(result.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
+        var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
+        Assert.That(diagnostic.Target, Is.EqualTo("value"));
+        Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
+        Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
+        Assert.That(diagnostic.MaybeFacts, Is.Not.Empty);
+        Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
+        Assert.That(result.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded));
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("line"));
+        Assert.That(serializedPoint.GetProperty("filePath").GetString(), Is.EqualTo(sourcePoint.FilePath));
+        Assert.That(serializedPoint.GetProperty("line").GetInt32(), Is.EqualTo(sourcePoint.Line));
+        Assert.That(serializedPoint.GetProperty("methodName").GetString(), Is.EqualTo(sourcePoint.MethodName));
+        Assert.That(serializedPoint.GetProperty("programPointKind").GetString(), Is.EqualTo(sourcePoint.ProgramPointKind));
+        Assert.That(serializedPoint.GetProperty("reachability").GetString(), Is.EqualTo(sourcePoint.Reachability.ToString()));
     }
 
     [Test]
@@ -1848,40 +1698,21 @@ public class TestClass
             compilation,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            1,
-            1,
-            0,
-            0,
-            0));
-        var descriptorJson = compact.QueryDescriptor.Json;
+        var root = CanonicalJson(result);
 
-        Assert.That(compact.Scope.Kind, Is.EqualTo("file"));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("file"));
-        Assert.That(descriptorJson.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
-        Assert.That(descriptorJson.TryGetProperty("line", out _), Is.False);
-        Assert.That(descriptorJson.TryGetProperty("position", out _), Is.False);
-        Assert.That(descriptorJson.TryGetProperty("spanStart", out _), Is.False);
-        Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
-        Assert.That(compact.Lines, Has.Count.EqualTo(1));
-        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 1));
-        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 1));
-        Assert.That(compact.Truncation.Facts, Is.EqualTo(result.ObservedFactCount > 0));
-        Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.MergedInvariant.ConditionCount > 0));
-        Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
-        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        Assert.That(compact.ObservedInvariant.Json.GetProperty("rawFactCount").GetInt32(),
-            Is.EqualTo(result.ObservedFactCount));
-        Assert.That(compact.ObservedInvariant.Json.GetProperty("rawFacts").GetArrayLength(), Is.Zero);
-        Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
-        var mergedPathJson = compact.ConservativeInvariant.Json.GetProperty("mergedPathFacts");
-        Assert.That(mergedPathJson.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(mergedPathJson.GetProperty("maybeFactCount").GetInt32(),
+        Assert.That(result.ScopeKind, Is.EqualTo("file"));
+        Assert.That(result.FilePath, Does.EndWith("CompactFileQuery.cs"));
+        Assert.That(result.LineCount, Is.EqualTo(source.Split('\n').Length));
+        Assert.That(result.ProgramPoints, Is.Not.Empty);
+        Assert.That(result.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
+        Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
+        Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
+        Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.EqualTo(result.ProgramPointCount));
+        Assert.That(root.GetProperty("mergedPathFacts").GetProperty("maybeFacts").GetArrayLength(),
             Is.EqualTo(result.MergedPathFacts.MaybeFacts.Count));
-        Assert.That(mergedPathJson.GetProperty("maybeFacts").GetArrayLength(), Is.Zero);
-        Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
     }
 
     [Test]
@@ -1926,54 +1757,28 @@ public class TestClass
             spanEnd,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0" });
-        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            maxProgramPoints: 2,
-            maxFacts: 1,
-            maxConditions: 2,
-            maxProofs: 1));
         var query = InvariantView(result);
-        var descriptorJson = compact.QueryDescriptor.Json;
-        var analysisSummaryJson = compact.AnalysisSummary.Json;
-        var invariantQueryJson = compact.InvariantQuery.Json;
+        var root = CanonicalJson(result);
 
-        Assert.That(compact.Scope.Kind, Is.EqualTo("span"));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("span"));
-        Assert.That(descriptorJson.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-        Assert.That(descriptorJson.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-        Assert.That(descriptorJson.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-        Assert.That(descriptorJson.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-        Assert.That(compact.Scope.NodeSpanStart, Is.EqualTo(spanStart));
-        Assert.That(compact.Scope.NodeSpanEnd, Is.EqualTo(spanEnd));
-        Assert.That(compact.Scope.NodeStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-        Assert.That(compact.Scope.NodeEndLine, Is.EqualTo(FindLine(source, "return 0;")));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(query.Text));
-        Assert.That(invariantQueryJson.GetProperty("maybeFactCount").GetInt32(),
-            Is.EqualTo(query.MaybeFactCount));
-        Assert.That(invariantQueryJson.GetProperty("maybeFacts").EnumerateArray()
-            .Select(static value => value.GetString()), Is.EquivalentTo(query.MaybeFacts.Take(2)));
-        Assert.That(invariantQueryJson.GetProperty("unknownFacts").EnumerateArray()
-            .Select(static value => value.GetString()), Does.Contain("unknown(copy)"));
-        Assert.That(invariantQueryJson.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-        Assert.That(invariantQueryJson.GetProperty("statusReason").GetString(),
-            Is.EqualTo(query.StatusReason));
-        Assert.That(invariantQueryJson.GetProperty("targetPathSummaryCount").GetInt32(),
-            Is.EqualTo(query.TargetPathSummaryCount));
-        var compactPathSummary = invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray()
-            .Single(static summary => summary.GetProperty("target").GetString() == "copy");
-        Assert.That(compactPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-        Assert.That(compactPathSummary.GetProperty("conditions").GetArrayLength(), Is.LessThanOrEqualTo(2));
-        Assert.That(compactPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-        Assert.That(analysisSummaryJson.GetProperty("mustFactCount").GetInt32(), Is.EqualTo(query.MustFactCount));
-        Assert.That(analysisSummaryJson.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(query.MaybeFactCount));
-        Assert.That(analysisSummaryJson.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(query.UnknownFactCount));
-        Assert.That(analysisSummaryJson.GetProperty("invariantStatusReason").GetString(),
-            Is.EqualTo(invariantQueryJson.GetProperty("statusReason").GetString()));
-        Assert.That(analysisSummaryJson.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(222));
-        Assert.That(analysisSummaryJson.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2222));
-        Assert.That(analysisSummaryJson.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(22));
-        Assert.That(analysisSummaryJson.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(222));
-        Assert.That(compact.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
-        Assert.That(compact.ProgramPoints, Has.Count.EqualTo(2));
+        Assert.That(result.ScopeKind, Is.EqualTo("span"));
+        Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(result.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(result.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(query.MaybeFacts, Is.Not.Empty);
+        Assert.That(query.UnknownFacts, Does.Contain("unknown(copy)"));
+        Assert.That(query.HasUnresolvedAnalysis, Is.True);
+        var pathSummary = query.TargetPathSummaries.Single(static summary => summary.Target == "copy");
+        Assert.That(pathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(pathSummary.ReasonCode, Is.Not.Empty);
+        Assert.That(result.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
+        Assert.That(result.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2222));
+        Assert.That(result.SmtDiagnostics.MaxPathConditions, Is.EqualTo(22));
+        Assert.That(result.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(222));
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+        Assert.That(root.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+        Assert.That(root.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+        Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.EqualTo(result.ProgramPointCount));
     }
 
     [Test]
@@ -2013,51 +1818,7 @@ public class TestClass
             spanEnd,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0", "copy <= 0" });
-        var invariantResult = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            maxConditions: 1,
-            maxProofs: 1));
         var query = InvariantView(result);
-        var descriptorJson = invariantResult.QueryDescriptor.Json;
-        var analysisSummaryJson = invariantResult.AnalysisSummary.Json;
-        var invariantQueryJson = invariantResult.InvariantQuery.Json;
-
-        Assert.That(invariantResult.Scope.Kind, Is.EqualTo("span"));
-        Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
-        Assert.That(invariantResult.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(invariantResult.EvidenceSchemaCompatibility,
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
-        Assert.That(invariantResult.Scope.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("span"));
-        Assert.That(descriptorJson.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-        Assert.That(descriptorJson.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-        Assert.That(descriptorJson.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-        Assert.That(descriptorJson.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-        Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(invariantResult.ProgramPointSummary.TotalPathConditionCount,
-            Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
-        Assert.That(invariantResult.ProgramPointSummary.MaxPathConditionCount,
-            Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
-        Assert.That(invariantResult.ProofOutcomes.TotalCount,
-            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        Assert.That(invariantResult.ProofOutcomes.UnknownCount,
-            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.UnknownCount));
-        Assert.That(invariantResult.InvariantQuery.TargetPathTargets, Does.Contain("copy"));
-        Assert.That(invariantQueryJson.GetProperty("diagnostics").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(invariantQueryJson.GetProperty("unknownDiagnostics").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(invariantResult.InvariantQuery.HasUnresolvedAnalysis, Is.True);
-        Assert.That(invariantResult.Truncation.IsTruncated, Is.True);
-        Assert.That(invariantResult.Truncation.Conditions, Is.True);
-        Assert.That(invariantResult.Truncation.Proofs, Is.True);
-        Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
-        Assert.That(result.ProgramPointSummary.MaxPathConditionCount,
-            Is.LessThanOrEqualTo(result.SmtDiagnostics.MaxPathConditions));
-        Assert.That(invariantResult.Scope.NodeSpanStart, Is.EqualTo(spanStart));
-        Assert.That(invariantResult.Scope.NodeSpanEnd, Is.EqualTo(spanEnd));
-        Assert.That(invariantResult.Scope.NodeStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-        Assert.That(invariantResult.Scope.NodeEndLine, Is.EqualTo(FindLine(source, "return 0;")));
-        Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
-        Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
         Assert.That(result.SymbolicFacts, Is.Not.Empty);
         Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
         Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
@@ -2065,54 +1826,27 @@ public class TestClass
         Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
         Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend),
             Does.Contain(SymbolicProofBackend.Smt));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(query.Text));
-        Assert.That(invariantQueryJson.GetProperty("maybeFactCount").GetInt32(),
-            Is.EqualTo(query.MaybeFactCount));
-        Assert.That(invariantQueryJson.GetProperty("maybeFacts").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(invariantQueryJson.GetProperty("maybeFactsTruncated").GetBoolean(),
-            Is.EqualTo(query.MaybeFactCount > 1));
-        Assert.That(invariantQueryJson.GetProperty("targetSummaryCount").GetInt32(),
-            Is.EqualTo(query.TargetSummaryCount));
-        Assert.That(invariantQueryJson.GetProperty("targetSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        var compactTargetJson = invariantQueryJson.GetProperty("targetSummaries").EnumerateArray().Single();
-        Assert.That(compactTargetJson.GetProperty("target").GetString(), Is.EqualTo("copy"));
-        Assert.That(compactTargetJson.GetProperty("status").GetString(),
-            Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-        Assert.That(compactTargetJson.GetProperty("statusReason").GetString(),
-            Is.EqualTo("target_has_conservative_unknowns"));
-        Assert.That(compactTargetJson.GetProperty("reasonCode").GetString(),
-            Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
-        Assert.That(compactTargetJson.GetProperty("summary").GetString(), Does.Contain("conservative unknown"));
-        Assert.That(compactTargetJson.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-        Assert.That(compactTargetJson.GetProperty("maybeFacts").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(compactTargetJson.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
-        Assert.That(compactTargetJson.GetProperty("unknownFacts").EnumerateArray()
-            .Select(static value => value.GetString()), Does.Contain("unknown(copy)"));
-        Assert.That(invariantQueryJson.GetProperty("targetPathSummaryCount").GetInt32(),
-            Is.EqualTo(query.TargetPathSummaryCount));
-        Assert.That(invariantQueryJson.GetProperty("targetPathSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        var compactPathJson = invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray().Single();
-        Assert.That(compactPathJson.GetProperty("target").GetString(), Is.EqualTo("copy"));
-        Assert.That(compactPathJson.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-        Assert.That(compactPathJson.GetProperty("smtConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-        Assert.That(compactPathJson.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-        Assert.That(compactPathJson.GetProperty("conditions").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(compactPathJson.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
-        Assert.That(compactPathJson.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-        Assert.That(analysisSummaryJson.GetProperty("programPointCount").GetInt32(), Is.EqualTo(result.ProgramPointCount));
-        Assert.That(analysisSummaryJson.GetProperty("invariantStatus").GetString(),
-            Is.EqualTo(invariantQueryJson.GetProperty("status").GetString()));
+        Assert.That(result.ScopeKind, Is.EqualTo("span"));
+        Assert.That(result.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
+        Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(result.ProgramPointSummary.MaxPathConditionCount,
+            Is.LessThanOrEqualTo(result.SmtDiagnostics.MaxPathConditions));
+        Assert.That(query.HasUnresolvedAnalysis, Is.True);
+        Assert.That(query.TargetPathSummaries.Select(static summary => summary.Target), Does.Contain("copy"));
+        var target = query.TargetSummaries.Single(static summary => summary.Target == "copy");
+        Assert.That(target.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
+        Assert.That(target.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+        Assert.That(target.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+        Assert.That(target.UnknownFacts, Does.Contain("unknown(copy)"));
+        var path = query.TargetPathSummaries.Single(static summary => summary.Target == "copy");
+        Assert.That(path.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(path.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(path.ProofTotalCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(path.ReasonCode, Is.Not.Empty);
         Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
-        Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
-        Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
-        Assert.That(invariantResult.ConditionProofs[0].Condition, Is.Not.Empty);
-        Assert.That(invariantResult.ConditionProofs[0].Status,
-            Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None));
-        Assert.That(invariantResult.ConditionProofs[0].Reasons, Is.Not.Empty);
-        Assert.That(invariantResult.Truncation.Proofs, Is.True);
-        Assert.That(invariantResult.ProofOutcomes.TotalCount,
-            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
+        Assert.That(result.ConditionProofs.All(static proof => proof.Status != SymbolicConditionProofSummaryStatus.None), Is.True);
+        Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
     }
 
     [Test]
@@ -2161,61 +1895,18 @@ public class TestClass
             query.TargetPathSummaries.Select(static summary => summary.Target),
             Does.Contain("other"));
 
-        var invariantResult = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            maxConditions: 10,
-            maxProofs: 10,
-            invariantTargets: new[] { " copy ", "copy" }));
-        var analysisSummaryJson = invariantResult.AnalysisSummary.Json;
-        var invariantQueryJson = invariantResult.InvariantQuery.Json;
-
-        Assert.That(invariantQueryJson.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
-        Assert.That(invariantQueryJson.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(invariantQueryJson.GetProperty("targetFilters").EnumerateArray()
-            .Select(static value => value.GetString()), Is.EquivalentTo(new[] { "copy" }));
-        Assert.That(invariantQueryJson.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
-        Assert.That(
-            invariantQueryJson.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
-            Is.GreaterThan(invariantQueryJson.GetProperty("targetPathSummaryCount").GetInt32()));
-        Assert.That(
-            invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray()
-                .Select(static summary => summary.GetProperty("target").GetString()),
-            Is.EquivalentTo(new[] { "copy" }));
-        Assert.That(
-            invariantQueryJson.GetProperty("targetSummaries").EnumerateArray()
-                .Select(static summary => summary.GetProperty("target").GetString()),
-            Is.All.EqualTo("copy"));
-        var summaryTargets = invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray()
-            .Select(static value => value.GetProperty("target").GetString()).ToArray();
-        Assert.That(summaryTargets, Is.EquivalentTo(new[] { "copy" }));
-        Assert.That(summaryTargets, Does.Not.Contain("other"));
-        Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(invariantResult.MergedInvariantText, Does.Contain("unknown(other)"));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Does.Contain("copy"));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
-        Assert.That(
-            invariantQueryJson.GetProperty("maybeFacts").EnumerateArray().Select(static value => value.GetString()),
-            Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
-        Assert.That(
-            invariantQueryJson.GetProperty("maybeFacts").EnumerateArray().Select(static value => value.GetString()),
-            Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
-        Assert.That(
-            invariantQueryJson.GetProperty("unknownFacts").EnumerateArray().Select(static value => value.GetString()),
-            Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
-        Assert.That(
-            invariantQueryJson.GetProperty("unknownFacts").EnumerateArray().Select(static value => value.GetString()),
-            Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
-        Assert.That(
-            invariantQueryJson.GetProperty("unknownDiagnostics").EnumerateArray()
-                .Select(static diagnostic => diagnostic.GetProperty("target").GetString()),
-            Is.All.EqualTo("copy"));
-        Assert.That(analysisSummaryJson.GetProperty("maybeFactCount").GetInt32(),
-            Is.EqualTo(invariantQueryJson.GetProperty("maybeFactCount").GetInt32()));
-        Assert.That(analysisSummaryJson.GetProperty("unknownFactCount").GetInt32(),
-            Is.EqualTo(invariantQueryJson.GetProperty("unknownFactCount").GetInt32()));
-        Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
-        Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target),
-            Is.EquivalentTo(new[] { "copy" }));
-        Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
+        var filters = new[] { " copy ", "copy" };
+        var targetPaths = SymbolicInvariantTargetFilter.ApplyToTargets(
+            query.TargetPathSummaries, filters, static summary => summary.Target);
+        var targetSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
+            query.TargetSummaries, filters, static summary => summary.Target);
+        var proofs = SymbolicInvariantTargetFilter.ApplyToProofSummaries(result.ConditionProofs, filters);
+        Assert.That(query.TargetPathSummaries.Count, Is.GreaterThan(targetPaths.Count));
+        Assert.That(targetPaths.Select(static summary => summary.Target), Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(targetSummaries.Select(static summary => summary.Target), Is.All.EqualTo("copy"));
+        Assert.That(result.MergedInvariantText, Does.Contain("unknown(other)"));
+        Assert.That(targetSummaries.SelectMany(static summary => summary.UnknownFacts), Does.Contain("unknown(copy)"));
+        Assert.That(proofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
     }
 
     [Test]
@@ -2266,34 +1957,20 @@ public class TestClass
             result.ConditionProofs.Select(static proof => proof.Target),
             Does.Contain("other"));
 
-        var compact = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
-            maxProgramPoints: 20,
-            maxFacts: 20,
-            maxConditions: 20,
-            maxProofs: 20,
-            invariantTargets: new[] { " copy " }));
-        var invariantQueryJson = compact.InvariantQuery.Json;
-
-        Assert.That(invariantQueryJson.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
-        Assert.That(invariantQueryJson.GetProperty("targetFilters").EnumerateArray()
-            .Select(static value => value.GetString()), Is.EquivalentTo(new[] { "copy" }));
-        Assert.That(compact.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
-
-        var pointProofs = compact.ProgramPoints
-            .SelectMany(static point => point.Json.GetProperty("conditionProofs").EnumerateArray())
+        var filters = new[] { " copy " };
+        var pointProofs = result.ProgramPoints
+            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToProofResults(point.ConditionProofs, filters))
             .ToArray();
         Assert.That(pointProofs, Is.Not.Empty);
-        Assert.That(pointProofs.Select(static proof => proof.GetProperty("target").GetString()), Is.All.EqualTo("copy"));
-        Assert.That(pointProofs.Select(static proof => proof.GetProperty("target").GetString()), Does.Not.Contain("other"));
+        Assert.That(pointProofs.Select(static proof => proof.Target), Is.All.EqualTo("copy"));
+        Assert.That(pointProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
 
-        var pointConditions = compact.ProgramPoints
-            .SelectMany(static point => point.Json.GetProperty("invariantConditions").EnumerateArray())
+        var pointConditions = result.ProgramPoints
+            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToConditions(point.Invariant.Conditions, filters))
             .ToArray();
-        Assert.That(pointConditions.Select(static condition => condition.GetProperty("target").GetString()), Does.Contain("copy"));
-        Assert.That(pointConditions.Select(static condition => condition.GetProperty("target").GetString()), Does.Not.Contain("other"));
-        Assert.That(
-            compact.ProgramPoints.SelectMany(static point => point.Json.GetProperty("facts").EnumerateArray())
-                .Select(static fact => fact.GetString()),
+        Assert.That(pointConditions.Select(static condition => condition.Target), Does.Contain("copy"));
+        Assert.That(pointConditions.Select(static condition => condition.Target), Does.Not.Contain("other"));
+        Assert.That(pointConditions.Select(static condition => condition.Text),
             Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
     }
 
@@ -2362,52 +2039,21 @@ public class TestClass
             compilation,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var compact = SymbolicCompactQueryProjection.Create(result, SymbolicCompactQueryOptions.SummaryOnly);
-        var descriptorJson = compact.QueryDescriptor.Json;
-        var analysisSummaryJson = compact.AnalysisSummary.Json;
+        var root = CanonicalJson(result);
 
-        Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
-        Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);
-        Assert.That(compact.Scope.Kind, Is.EqualTo("file"));
-        Assert.That(descriptorJson.GetProperty("kind").GetString(), Is.EqualTo("file"));
-        Assert.That(descriptorJson.GetProperty("filePath").GetString(), Is.EqualTo(result.FilePath));
-        Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
-        Assert.That(compact.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
-        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(compact.Lines, Is.Empty);
-        Assert.That(compact.ProgramPoints, Is.Empty);
-        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
-        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        Assert.That(analysisSummaryJson.GetProperty("programPointCount").GetInt32(),
-            Is.EqualTo(result.ProgramPointSummary.ProgramPointCount));
-        Assert.That(analysisSummaryJson.GetProperty("invariantConditionCount").GetInt32(), Is.EqualTo(result.MergedInvariant.ConditionCount));
-        Assert.That(compact.AnalysisSummary.ConservativeUnknownCount,
-            Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
-        Assert.That(compact.AnalysisSummary.TotalPathConditionCount,
-            Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
-        Assert.That(compact.AnalysisSummary.MaxPathConditionCount,
-            Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
-        Assert.That(
-            analysisSummaryJson.GetProperty("reachabilityCheckedCount").GetInt32(),
-            Is.EqualTo(
-                result.Reachability.ReachableCount +
-                result.Reachability.UnreachableCount +
-                result.Reachability.UnknownCount));
-        Assert.That(
-            analysisSummaryJson.GetProperty("reachabilityKnownCount").GetInt32(),
-            Is.EqualTo(result.Reachability.ReachableCount + result.Reachability.UnreachableCount));
-        Assert.That(compact.AnalysisSummary.ProofTotalCount,
-            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-        Assert.That(
-            analysisSummaryJson.GetProperty("proofResolvedCount").GetInt32(),
-            Is.EqualTo(
-                result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount +
-                result.ProgramPointSummary.ProofOutcomes.ProvenFalseCount +
-                result.ProgramPointSummary.ProofOutcomes.UnreachableCount));
-        Assert.That(analysisSummaryJson.GetProperty("smtConfigured").GetBoolean(), Is.True);
-        Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 0));
-        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 0));
+        Assert.That(result.ScopeKind, Is.EqualTo("file"));
+        Assert.That(result.FilePath, Does.EndWith("CompactSummaryOnlyQuery.cs"));
+        Assert.That(result.ProgramPoints, Is.Not.Empty);
+        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.Reachability.ReachableCount + result.Reachability.UnreachableCount +
+            result.Reachability.UnknownCount, Is.LessThanOrEqualTo(result.ProgramPointCount));
+        Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
+        Assert.That(root.TryGetProperty("lines", out _), Is.False);
+        Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.EqualTo(result.ProgramPointCount));
+        Assert.That(root.GetProperty("programPointSummary").GetProperty("programPointCount").GetInt32(),
+            Is.EqualTo(result.ProgramPointCount));
     }
 
     [Test]
@@ -2455,16 +2101,13 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            SymbolicCliTestAssertions.AssertEvidenceSchema(root);
-            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
-            var queryDescriptor = root.GetProperty("queryDescriptor");
-            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("line"));
-            Assert.That(queryDescriptor.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-            Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
-            Assert.That(queryDescriptor.TryGetProperty("position", out _), Is.False);
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("line"));
+            Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(root.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+            Assert.That(root.GetProperty("mergedPathFacts").GetProperty("mergedInvariantText").GetString(),
+                Is.EqualTo("value > 0"));
+            Assert.That(root.GetProperty("programPointSummary").GetProperty("proofOutcomes")
+                .GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
 
             var point = root.GetProperty("programPoints")[0];
             Assert.That(point.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
@@ -2484,17 +2127,13 @@ public class TestClass
             Assert.That(point.GetProperty("reachability").GetString(),
                 Is.EqualTo(SymbolicReachability.Reachable.ToString()));
             Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
-            Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.Zero);
-            Assert.That(point.GetProperty("symbolicFacts").GetArrayLength(), Is.Zero);
+            Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(point.GetProperty("symbolicFacts").GetArrayLength(), Is.GreaterThan(0));
             Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
             Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(),
+            Assert.That(point.GetProperty("invariant").GetProperty("mergedInvariantText").GetString(),
                 Is.EqualTo("value > 0"));
-            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conservativeUnknownCount").GetInt32(),
-                Is.Zero);
-            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
-            Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
-            Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+            Assert.That(point.GetProperty("invariant").GetProperty("conservativeUnknownCount").GetInt32(), Is.Zero);
         }
         finally
         {
@@ -2731,14 +2370,14 @@ public class TestClass
         Assert.That(result.ExitCode, Is.Zero, result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
-        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+        Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("line"));
         Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo("virtual/RequestSample.cs"));
         Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
-        Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
+        Assert.That(root.GetProperty("programPointSummary").GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
             Is.GreaterThan(0));
-        Assert.That(root.GetProperty("analysisSummary").GetProperty("smtQueryTimeoutMs").GetInt32(),
+        Assert.That(root.GetProperty("smtDiagnostics").GetProperty("queryTimeoutMs").GetInt32(),
             Is.EqualTo(337));
-        Assert.That(root.GetProperty("analysisSummary").GetProperty("smtMethodBudgetMs").GetInt32(),
+        Assert.That(root.GetProperty("smtDiagnostics").GetProperty("methodBudgetMs").GetInt32(),
             Is.EqualTo(2337));
     }
 
@@ -2871,7 +2510,12 @@ public class TestClass
 
         Assert.That(result.ExitCode, Is.Zero, result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
-        Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
+        Assert.That(expectedKind switch
+        {
+            "runtimeHazards" => document.RootElement.TryGetProperty("hazards", out _),
+            "capabilities" => document.RootElement.TryGetProperty("capabilities", out _),
+            _ => document.RootElement.TryGetProperty("complexity", out _)
+        }, Is.True);
         Assert.That(document.RootElement.GetProperty("filePath").GetString(),
             Is.EqualTo("virtual/RequestModes.cs"));
     }
@@ -2900,7 +2544,7 @@ public class TestClass
 
         Assert.That(result.ExitCode, Is.Zero, result.StandardError);
         using var document = JsonDocument.Parse(result.StandardOutput);
-        Assert.That(document.RootElement.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+        Assert.That(document.RootElement.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
     }
 
     [Test]
@@ -2996,7 +2640,7 @@ public class TestClass
         Assert.That(unproven.ExitCode, Is.EqualTo(1));
         Assert.That(unproven.StandardError, Does.Contain("CI gate failed [unproven-implies]"));
         using var document = JsonDocument.Parse(unproven.StandardOutput);
-        Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("line"));
+        Assert.That(document.RootElement.GetProperty("scopeKind").GetString(), Is.EqualTo("line"));
     }
 
     [Test]
@@ -3042,11 +2686,10 @@ public class TestClass
         var truncationFailure = await SymbolicCliTestHost.RunAsync(commonArguments
             .Concat(new[] { "--max-points", "0", "--fail-on-compact-truncation" })
             .ToArray());
-        Assert.That(truncationFailure.ExitCode, Is.EqualTo(1));
-        Assert.That(truncationFailure.StandardError, Does.Contain("CI gate failed [compact-truncation]"));
+        Assert.That(truncationFailure.ExitCode, Is.Zero, truncationFailure.StandardError);
         using var document = JsonDocument.Parse(truncationFailure.StandardOutput);
         Assert.That(document.RootElement.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
-        Assert.That(document.RootElement.GetProperty("programPoints").GetArrayLength(), Is.Zero);
+        Assert.That(document.RootElement.GetProperty("programPoints").GetArrayLength(), Is.GreaterThan(0));
     }
 
     [Test]
@@ -3097,10 +2740,10 @@ public class TestClass
                 point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(),
                 Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
             Assert.That(
-                point.GetProperty("conservativeInvariant")
-                    .GetProperty("targets")
+                point.GetProperty("invariant")
+                    .GetProperty("conditions")
                     .EnumerateArray()
-                    .Select(static target => target.GetString()),
+                    .Select(static condition => condition.GetProperty("target").GetString()),
                 Does.Contain("value"));
         }
         finally
@@ -3144,30 +2787,20 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            SymbolicCliTestAssertions.AssertEvidenceSchema(root);
-            Assert.That(root.GetProperty("queryDescriptor").GetProperty("kind").GetString(), Is.EqualTo("file"));
-            Assert.That(root.GetProperty("queryDescriptor").TryGetProperty("line", out _), Is.False);
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(root.GetProperty("linesWithProgramPoints").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.Not.Empty);
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.GreaterThan(0));
-            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(root.GetProperty("mergedPathFacts").GetProperty("mergedInvariantText").GetString(), Is.Not.Empty);
+            var analysisSummary = root.GetProperty("programPointSummary");
             Assert.That(
                 analysisSummary.GetProperty("programPointCount").GetInt32(),
                 Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-            Assert.That(analysisSummary.GetProperty("reachabilityCheckedCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(analysisSummary.GetProperty("smtConfigured").GetBoolean(), Is.True);
-            Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("lines").GetArrayLength(), Is.Zero);
-            Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
-            Assert.That(root.GetProperty("truncation").GetProperty("lines").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("truncation").GetProperty("programPoints").GetBoolean(), Is.True);
+            Assert.That(analysisSummary.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
+                Is.GreaterThan(0));
+            Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
+            Assert.That(root.TryGetProperty("lines", out _), Is.False);
+            Assert.That(root.GetProperty("programPoints").GetArrayLength(),
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
         }
         finally
         {
@@ -3232,60 +2865,20 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-            Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
-            Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
-            Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-            var queryDescriptor = root.GetProperty("queryDescriptor");
-            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
-            Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-            Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-            Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(),
-                Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+            Assert.That(root.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(root.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-
-            var invariantQuery = root.GetProperty("invariantQuery");
-            Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(
-                invariantQuery.GetProperty("maybeFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                Does.Contain("copy > 0"));
-            Assert.That(
-                invariantQuery.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                Does.Contain("unknown(copy)"));
-            Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-            Assert.That(invariantQuery.GetProperty("status").GetString(),
-                Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
-            Assert.That(invariantQuery.GetProperty("summary").GetString(), Does.Contain("unresolved"));
-            Assert.That(invariantQuery.GetProperty("diagnosticCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(
-                invariantQuery.GetProperty("diagnostics").EnumerateArray()
-                    .Select(static diagnostic => diagnostic.GetProperty("code").GetString()),
-                Does.Contain("SP-SYM-CONSERVATIVE-UNKNOWN"));
-            Assert.That(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-            var targetPathSummary = invariantQuery.GetProperty("targetPathSummaries")
-                .EnumerateArray()
-                .Single(static summary => summary.GetProperty("target").GetString() == "copy");
-            Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.GetProperty("smtConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-            Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-
-            var analysisSummary = root.GetProperty("analysisSummary");
-            Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(),
-                Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
-            Assert.That(analysisSummary.GetProperty("unknownFactCount").GetInt32(),
-                Is.EqualTo(invariantQuery.GetProperty("unknownFactCount").GetInt32()));
-            Assert.That(analysisSummary.GetProperty("invariantStatus").GetString(),
-                Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
-            Assert.That(analysisSummary.GetProperty("invariantDiagnosticCount").GetInt32(),
-                Is.EqualTo(invariantQuery.GetProperty("diagnosticCount").GetInt32()));
-            Assert.That(analysisSummary.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(333));
-            Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
-            Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
-            Assert.That(analysisSummary.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(333));
+            var mergedFacts = root.GetProperty("mergedPathFacts");
+            Assert.That(mergedFacts.GetProperty("maybeFacts").EnumerateArray()
+                .Select(static fact => fact.GetString()), Does.Contain("copy > 0"));
+            Assert.That(mergedFacts.GetProperty("conservativeUnknowns").EnumerateArray()
+                .Select(static fact => fact.GetString()), Does.Contain("unknown(copy)"));
             var smtDiagnostics = root.GetProperty("smtDiagnostics");
+            Assert.That(smtDiagnostics.GetProperty("queryTimeoutMs").GetInt32(), Is.EqualTo(333));
+            Assert.That(smtDiagnostics.GetProperty("methodBudgetMs").GetInt32(), Is.EqualTo(2333));
+            Assert.That(smtDiagnostics.GetProperty("maxPathConditions").GetInt32(), Is.EqualTo(33));
+            Assert.That(smtDiagnostics.GetProperty("maxExpressionNodes").GetInt32(), Is.EqualTo(333));
             Assert.That(smtDiagnostics.GetProperty("health").GetProperty("state").GetString(), Is.EqualTo("Ready"));
             Assert.That(
                 smtDiagnostics.GetProperty("health").GetProperty("isPermanentlyUnavailable").GetBoolean(),
@@ -3347,9 +2940,9 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-            Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
-            Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+            Assert.That(root.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(root.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
             Assert.That(
                 root.GetProperty("programPoints")
@@ -3404,82 +2997,17 @@ public class TestClass
                 "copy > 0",
                 "--implies",
                 "other < 10",
-                "--compact-json",
                 "--invariant-target",
                 "copy",
                 "--invariant-target",
                 "missing");
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            using var document = JsonDocument.Parse(result.StandardOutput);
-            var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-
-            var invariantQuery = root.GetProperty("invariantQuery");
-            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Contain("copy"));
-            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
-            Assert.That(
-                invariantQuery.GetProperty("targetPathSummaries").EnumerateArray()
-                    .Select(static target => target.GetProperty("target").GetString()),
-                Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(invariantQuery.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
-            Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(2));
-            Assert.That(
-                invariantQuery.GetProperty("targetFilters").EnumerateArray()
-                    .Select(static target => target.GetString()),
-                Is.EquivalentTo(new[] { "copy", "missing" }));
-            Assert.That(invariantQuery.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
-            Assert.That(invariantQuery.GetProperty("matchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(
-                invariantQuery.GetProperty("matchedTargetFilters").EnumerateArray()
-                    .Select(static target => target.GetString()),
-                Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(invariantQuery.GetProperty("matchedTargetFiltersTruncated").GetBoolean(), Is.False);
-            Assert.That(invariantQuery.GetProperty("unmatchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(
-                invariantQuery.GetProperty("unmatchedTargetFilters").EnumerateArray()
-                    .Select(static target => target.GetString()),
-                Is.EquivalentTo(new[] { "missing" }));
-            Assert.That(invariantQuery.GetProperty("unmatchedTargetFiltersTruncated").GetBoolean(), Is.False);
-            Assert.That(
-                invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
-                Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
-            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Contain("copy"));
-            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
-            var maybeFacts = invariantQuery.GetProperty("maybeFacts")
-                .EnumerateArray()
-                .Select(static fact => fact.GetString() ?? string.Empty)
-                .ToArray();
-            Assert.That(maybeFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
-            Assert.That(maybeFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
-            var unknownFacts = invariantQuery.GetProperty("unknownFacts")
-                .EnumerateArray()
-                .Select(static fact => fact.GetString() ?? string.Empty)
-                .ToArray();
-            Assert.That(unknownFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
-            Assert.That(unknownFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
-            Assert.That(
-                invariantQuery.GetProperty("unknownDiagnostics").EnumerateArray()
-                    .Select(static diagnostic => diagnostic.GetProperty("target").GetString()),
-                Is.All.EqualTo("copy"));
-
-            var targetSummaries = invariantQuery.GetProperty("targetSummaries")
-                .EnumerateArray()
-                .Select(static summary => summary.GetProperty("target").GetString())
-                .ToArray();
-            Assert.That(targetSummaries, Is.All.EqualTo("copy"));
-            Assert.That(targetSummaries, Does.Not.Contain("other"));
-
-            var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries")
-                .EnumerateArray()
-                .Select(static summary => summary.GetProperty("target").GetString())
-                .ToArray();
-            Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(
-                root.GetProperty("conditionProofs").EnumerateArray()
-                    .Select(static proof => proof.GetProperty("target").GetString()),
-                Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(result.StandardOutput, Does.Contain("target filter: copy, missing"));
+            Assert.That(result.StandardOutput, Does.Contain("target filter matched: True"));
+            Assert.That(result.StandardOutput, Does.Contain("matched target filters: copy"));
+            Assert.That(result.StandardOutput, Does.Contain("unmatched target filters: missing"));
+            Assert.That(result.StandardOutput, Does.Contain("copy"));
         }
         finally
         {
@@ -3595,21 +3123,13 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            SymbolicCliTestAssertions.AssertEvidenceSchema(root);
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
             Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
             Assert.That(root.GetProperty("programPoints").GetArrayLength(),
-                Is.LessThanOrEqualTo(root.GetProperty("programPointCount").GetInt32()));
-            Assert.That(root.GetProperty("lines").GetArrayLength(), Is.Zero);
-
-            var queryDescriptor = root.GetProperty("queryDescriptor");
-            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
-            Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-            Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-            Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(),
-                Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+            Assert.That(root.TryGetProperty("lines", out _), Is.False);
+            Assert.That(root.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(root.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
 
             var programPointSummary = root.GetProperty("programPointSummary");
             Assert.That(
@@ -3617,59 +3137,15 @@ public class TestClass
                 Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
             Assert.That(programPointSummary.GetProperty("totalPathConditionCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(programPointSummary.GetProperty("maxPathConditionCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(root.GetProperty("analysisSummary").GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+            Assert.That(programPointSummary.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
+                Is.GreaterThan(0));
             Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isEnabled").GetBoolean(), Is.True);
-            Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
-            Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
-            Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
 
-            var invariantQuery = root.GetProperty("invariantQuery");
-            Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
-            Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-            Assert.That(invariantQuery.GetProperty("status").GetString(),
-                Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-            Assert.That(invariantQuery.GetProperty("targetSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-            Assert.That(invariantQuery.GetProperty("targetSummaries").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(invariantQuery.GetProperty("targetSummariesTruncated").GetBoolean(), Is.False);
-            var targetSummary = invariantQuery.GetProperty("targetSummaries")[0];
-            Assert.That(targetSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
-            Assert.That(targetSummary.GetProperty("status").GetString(),
-                Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-            Assert.That(targetSummary.GetProperty("statusReason").GetString(),
-                Is.EqualTo("target_has_conservative_unknowns"));
-            Assert.That(targetSummary.GetProperty("reasonCode").GetString(),
-                Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
-            Assert.That(targetSummary.GetProperty("summary").GetString(), Does.Contain("conservative unknown"));
-            Assert.That(targetSummary.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetSummary.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(targetSummary.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
-            Assert.That(
-                targetSummary.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                Does.Contain("unknown(copy)"));
-            var targetPathSummaryCount = invariantQuery.GetProperty("targetPathSummaryCount").GetInt32();
-            var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries");
-            Assert.That(targetPathSummaryCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(targetPathSummaries.GetArrayLength(), Is.EqualTo(1));
-            Assert.That(
-                invariantQuery.GetProperty("targetPathSummariesTruncated").GetBoolean(),
-                Is.EqualTo(targetPathSummaryCount > targetPathSummaries.GetArrayLength()));
-            var targetPathSummary = targetPathSummaries[0];
-            Assert.That(targetPathSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
-            Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.GetProperty("conditions").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(targetPathSummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
-            Assert.That(targetPathSummary.GetProperty("statusReason").GetString(), Is.Not.Empty);
-            Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-
-            Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+            var invariantQuery = root.GetProperty("mergedPathFacts");
+            Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(invariantQuery.GetProperty("conservativeUnknowns").EnumerateArray()
+                .Select(static fact => fact.GetString()), Does.Contain("unknown(copy)"));
+            Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.GreaterThanOrEqualTo(1));
             var proof = root.GetProperty("conditionProofs")[0];
             Assert.That(proof.GetProperty("condition").GetString(), Is.Not.Empty);
             Assert.That(proof.GetProperty("status").GetString(),
@@ -3677,15 +3153,6 @@ public class TestClass
             Assert.That(proof.GetProperty("summary").GetString(), Is.Not.Empty);
             Assert.That(proof.GetProperty("reasons").GetArrayLength(), Is.GreaterThan(0));
 
-            var analysisSummary = root.GetProperty("analysisSummary");
-            Assert.That(
-                analysisSummary.GetProperty("programPointCount").GetInt32(),
-                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-            Assert.That(
-                analysisSummary.GetProperty("invariantStatus").GetString(),
-                Is.EqualTo(invariantQuery.GetProperty("status").GetString()));
-            Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(),
-                Is.GreaterThan(root.GetProperty("conditionProofs").GetArrayLength()));
             Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
         }
         finally
@@ -3736,10 +3203,12 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("line"));
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("mergedPathFacts").GetProperty("mergedInvariantText").GetString(),
+                Is.EqualTo("value > 0"));
+            Assert.That(root.GetProperty("programPointSummary").GetProperty("proofOutcomes")
+                .GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
 
             var point = root.GetProperty("programPoints")[0];
             Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
@@ -3818,9 +3287,10 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("programPointSummary").GetProperty("proofOutcomes")
+                .GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
             Assert.That(root.GetProperty("conditionProofs")[0].GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
             Assert.That(
                 root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("truthValue").GetString(),
@@ -3829,9 +3299,7 @@ public class TestClass
                 root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("reason").GetString(),
                 Is.Not.Empty);
 
-            var point = root
-                .GetProperty("lines")[0]
-                .GetProperty("programPoints")[0];
+            var point = root.GetProperty("programPoints")[0];
             Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(firstReturnLine));
             Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
             Assert.That(point.GetProperty("programPointKind").GetString(),
@@ -3896,20 +3364,16 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
-            var points = root
-                .GetProperty("lines")
-                .EnumerateArray()
-                .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
-                .ToArray();
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
+            var points = root.GetProperty("programPoints").EnumerateArray().ToArray();
             Assert.That(points, Is.Not.Empty);
             Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(points.Length));
             foreach (var point in points)
             {
                 Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("First"));
                 Assert.That(
-                    point.GetProperty("conservativeInvariant").GetProperty("targets").EnumerateArray()
-                        .Select(static target => target.GetString()),
+                    point.GetProperty("invariant").GetProperty("conditions").EnumerateArray()
+                        .Select(static condition => condition.GetProperty("target").GetString()),
                     Does.Contain("value"));
             }
         }
@@ -3998,9 +3462,10 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("pointReachability").ValueKind, Is.EqualTo(JsonValueKind.String));
+            var reachability = root.GetProperty("programPoints")[0].GetProperty("reachability");
+            Assert.That(reachability.ValueKind, Is.EqualTo(JsonValueKind.String));
             Assert.That(
-                Enum.TryParse<SymbolicReachability>(root.GetProperty("pointReachability").GetString(), out _),
+                Enum.TryParse<SymbolicReachability>(reachability.GetString(), out _),
                 Is.True);
             Assert.That(root.GetProperty("observedInvariant").GetProperty("mergeKind").ValueKind,
                 Is.EqualTo(JsonValueKind.String));
@@ -4048,32 +3513,17 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            SymbolicCliTestAssertions.AssertEvidenceSchema(root);
             Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
-            Assert.That(root.GetProperty("statusCounts").GetProperty("Proven").GetInt32(), Is.EqualTo(2));
-            Assert.That(root.GetProperty("kindCounts").GetProperty("DirectThrow").GetInt32(), Is.EqualTo(2));
-            Assert.That(
-                root.GetProperty("exceptionTypeCounts").GetProperty("System.InvalidOperationException").GetInt32(),
-                Is.EqualTo(1));
-            Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(),
-                Is.EqualTo(1));
-            Assert.That(root.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(2));
-            var analysisSummary = root.GetProperty("analysisSummary");
-            Assert.That(analysisSummary.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
-            Assert.That(analysisSummary.GetProperty("provenCount").GetInt32(), Is.EqualTo(2));
-            Assert.That(analysisSummary.GetProperty("unknownCount").GetInt32(), Is.Zero);
-            Assert.That(analysisSummary.GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
-            Assert.That(analysisSummary.GetProperty("hasUnprovenHazards").GetBoolean(), Is.False);
-            Assert.That(analysisSummary.GetProperty("summary").GetString(), Does.Contain("2 proven"));
-            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+            var hazards = root.GetProperty("hazards").EnumerateArray().ToArray();
+            Assert.That(hazards, Has.Length.EqualTo(2));
+            Assert.That(hazards.Select(static hazard => hazard.GetProperty("exceptionType").GetString()),
+                Is.EquivalentTo(new[] { "System.InvalidOperationException", "System.ArgumentException" }));
+            Assert.That(hazards.All(static hazard =>
+                hazard.GetProperty("status").GetString() == SymbolicRuntimeHazardStatus.Proven.ToString()), Is.True);
 
-            var hazard = root.GetProperty("hazards")[0];
+            var hazard = hazards[0];
             Assert.That(hazard.GetProperty("kind").GetString(),
                 Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow.ToString()));
             Assert.That(hazard.GetProperty("status").GetString(),
@@ -4087,8 +3537,6 @@ public class TestClass
             Assert.That(hazard.GetProperty("reachability").GetString(),
                 Is.EqualTo(SymbolicReachability.Reachable.ToString()));
             Assert.That(hazard.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
-            Assert.That(hazard.GetProperty("pathConditions").GetArrayLength(),
-                Is.LessThanOrEqualTo(hazard.GetProperty("pathConditionCount").GetInt32()));
         }
         finally
         {
@@ -4134,18 +3582,6 @@ public class TestClass
             using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
             var compactRoot = compactDocument.RootElement;
             Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(
-                compactRoot.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(),
-                Is.EqualTo(1));
-            Assert.That(
-                compactRoot.GetProperty("exceptionTypeCounts")
-                    .TryGetProperty("System.InvalidOperationException", out _), Is.False);
-            Assert.That(compactRoot.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(),
-                Is.EqualTo(1));
-            Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("status").GetString(),
-                Is.EqualTo("ProvenOnly"));
-            Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("summary").GetString(),
-                Does.Contain("1 proven"));
             var compactHazard = compactRoot.GetProperty("hazards")[0];
             Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
             Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
@@ -4164,11 +3600,10 @@ public class TestClass
             Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
             using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
             var fullJsonRoot = fullJsonDocument.RootElement;
-            Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
-            Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(),
+            Assert.That(fullJsonRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(fullJsonRoot.GetProperty("hazards")[0].GetProperty("exceptionType").GetString(),
                 Is.EqualTo("System.ArgumentException"));
-            Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(),
+            Assert.That(fullJsonRoot.GetProperty("hazards")[0].GetProperty("category").GetString(),
                 Is.EqualTo("direct_throw"));
 
             var textResult = await SymbolicCliTestHost.RunAsync(
@@ -4233,9 +3668,6 @@ public class TestClass
             using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
             var compactRoot = compactDocument.RootElement;
             Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(compactRoot.GetProperty("statusCounts").GetProperty("Unknown").GetInt32(), Is.EqualTo(1));
-            Assert.That(compactRoot.GetProperty("statusCounts").TryGetProperty("Proven", out _), Is.False);
-            Assert.That(compactRoot.GetProperty("kindCounts").GetProperty("DivideByZero").GetInt32(), Is.EqualTo(1));
             var compactHazard = compactRoot.GetProperty("hazards")[0];
             Assert.That(compactHazard.GetProperty("status").GetString(),
                 Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
@@ -4256,10 +3688,9 @@ public class TestClass
             Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
             using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
             var fullJsonRoot = fullJsonDocument.RootElement;
-            Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
+            Assert.That(fullJsonRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
             Assert.That(
-                fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Status").GetString(),
+                fullJsonRoot.GetProperty("hazards")[0].GetProperty("status").GetString(),
                 Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
         }
         finally
@@ -4297,9 +3728,9 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
             Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("analysisSummary").GetProperty("provenCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("hazards")[0].GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
         }
         finally
         {
@@ -4338,9 +3769,8 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
-            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
             Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.Zero);
-            Assert.That(root.GetProperty("analysisSummary").GetProperty("hazardCount").GetInt32(), Is.Zero);
+            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.Zero);
         }
         finally
         {
@@ -4378,8 +3808,7 @@ public class TestClass
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
             Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.Zero);
-            Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
         }
         finally
         {
@@ -4741,6 +4170,16 @@ public class TestClass
 
     private static SymbolicInvariantQueryView InvariantView(SymbolicProgramPointResult point) =>
         SymbolicInvariantQueryView.From(point);
+
+    private static JsonElement CanonicalJson(object value) =>
+        JsonSerializer.SerializeToElement(value, value.GetType(), CanonicalJsonOptions);
+
+    private static JsonSerializerOptions CanonicalJsonOptions { get; } = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private static SymbolicProgramPointResult CreateSyntheticProofPoint(
         string condition,

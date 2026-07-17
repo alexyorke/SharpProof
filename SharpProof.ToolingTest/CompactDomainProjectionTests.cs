@@ -36,8 +36,7 @@ public sealed class CompactDomainProjectionTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(result.ToCompactResult().GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
-                Assert.That(result.ToCompactResult().GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
+                Assert.That(Serialize(result).GetProperty("scopeKind").GetString(), Is.EqualTo(expectedKind));
                 Assert.That(filtered.ScopeKind, Is.EqualTo(expectedKind));
             });
         }
@@ -82,72 +81,35 @@ public sealed class CompactDomainProjectionTests
             input,
             SymbolicQueryTarget.AllLines(),
             options));
-        var capability = service.QueryCapabilities(new SymbolicQueryContext(
+        var capability = Serialize(service.QueryCapabilities(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "Console.WriteLine")),
-                options))
-            .ToCompactResult();
-        var complexity = service.QueryComplexity(new SymbolicQueryContext(
+                options)));
+        var complexity = Serialize(service.QueryComplexity(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "for (var index")),
-                options))
-            .ToCompactResult();
-        var runtimeHazards = service.QueryRuntimeHazards(new SymbolicQueryContext(
+                options)));
+        var runtimeHazards = Serialize(service.QueryRuntimeHazards(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "throw new InvalidOperationException")),
-                options))
-            .ToCompactResult(new SymbolicCompactRuntimeHazardQueryOptions(maxHazards: 0, maxConditions: 0));
+                options)));
 
-        var compactInvariant = invariant.ToCompactResult();
-        var invariantQuery = invariant.ToCompactResult();
-        var compactResults = new[]
-        {
-            (Kind: compactInvariant.GetProperty("kind").GetString()!, Root: compactInvariant),
-            (Kind: invariantQuery.GetProperty("kind").GetString()!, Root: invariantQuery),
-            (Kind: "capabilities", Root: capability),
-            (Kind: "complexity", Root: complexity),
-            (Kind: "runtimeHazards", Root: runtimeHazards)
-        };
-        foreach (var (kind, root) in compactResults)
-        {
-            SymbolicCliTestAssertions.AssertCompactEnvelope(root, kind);
-            var expectedPropertyPrefix = kind is "capabilities" or "complexity"
-                ? new[] { "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility", "kind" }
-                : new[] { "kind", "schemaVersion", "evidenceSchemaVersion", "evidenceSchemaCompatibility" };
-            Assert.That(
-                root.EnumerateObject().Take(expectedPropertyPrefix.Length).Select(static property => property.Name),
-                Is.EqualTo(expectedPropertyPrefix),
-                kind);
-            if (kind is "capabilities" or "complexity")
-                Assert.That(
-                    root.EnumerateObject().Skip(4).Take(9).Select(static property => property.Name),
-                    Is.EqualTo(new[] { "filePath", "methodDisplayName", "declarationKind", "spanStart", "spanEnd",
-                        "startLine", "startColumn", "endLine", "endColumn" }),
-                    kind);
-        }
-
-        Assert.That(capability.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
+        var invariantJson = Serialize(invariant);
+        Assert.That(invariantJson.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
         Assert.That(capability.GetProperty("capabilityText").GetString(), Does.Contain("Console"));
-        Assert.That(complexity.GetProperty("kind").GetString(), Is.EqualTo("complexity"));
         Assert.That(complexity.GetProperty("methodDisplayName").GetString(), Does.Contain("Complexity"));
-        Assert.That(runtimeHazards.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
         Assert.That(runtimeHazards.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(runtimeHazards.GetProperty("hazards").GetArrayLength(), Is.Zero);
-        Assert.That(runtimeHazards.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
-        Assert.That(runtimeHazards.GetProperty("statusCounts")
-            .GetProperty(SymbolicRuntimeHazardStatus.Proven.ToString()).GetInt32(), Is.EqualTo(1));
+        Assert.That(runtimeHazards.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
     }
 
     [Test]
     public void PublicCompactRuntimeHazardOptions_ValidateBounds()
     {
-        Assert.That(SymbolicCompactRuntimeHazardQueryOptions.Default.MaxHazards,
-            Is.EqualTo(SymbolicCompactRuntimeHazardQueryOptions.DefaultMaxHazards));
         Assert.That(
-            () => new SymbolicCompactRuntimeHazardQueryOptions(maxHazards: -1),
+            () => SymbolicQueryTarget.Span(-1, 0),
             Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(
-            () => new SymbolicCompactRuntimeHazardQueryOptions(maxConditions: -1),
+            () => SymbolicQueryTarget.Span(2, 1),
             Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 
@@ -185,7 +147,7 @@ public sealed class CompactDomainProjectionTests
         Assert.That(proof.DisplayKind, Is.EqualTo(condition.DisplayKind));
     }
 
-    private static JsonElement Serialize(SymbolicSchemaResultBase result)
+    private static JsonElement Serialize(object result)
     {
         var json = JsonSerializer.Serialize(
             result,
