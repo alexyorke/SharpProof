@@ -797,6 +797,10 @@
                              "path":  "SharpProof.Test/ExceptionFlowPropagationRegressionTests.cs"
                          },
                          {
+                             "name":  "ExceptionFlowResultGraphTests",
+                             "path":  "SharpProof.Test/ExceptionFlowResultGraphTests.cs"
+                         },
+                         {
                              "name":  "ExceptionHandlingTests",
                              "path":  "SharpProof.Test/ExceptionHandlingTests.cs"
                          },
@@ -3576,7 +3580,6 @@
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AttributePolicyScope",
-                                                  "CachedUnknownRuntimeHazards",
                                                   "ExceptionFlowAnalyzer",
                                                   "MethodCallCandidate",
                                                   "UsingDisposeGuard"
@@ -3624,108 +3627,75 @@
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Callees.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionFlowQuery"
+                                                  "ExceptionFlowEngine"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Catches.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionFlowQuery"
+                                                  "ExceptionFlowEngine",
+                                                  "ExceptionSiteAssessment",
+                                                  "ExceptionSiteDisposition"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionFlowQuery"
+                                                  "ExceptionFlowEngine"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Models.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionCandidate",
-                                                  "ExceptionEdgeDiagnosticEntry",
-                                                  "ExceptionEvidenceEntry",
-                                                  "ExceptionEvidenceSet",
-                                                  "ExceptionFlowQuery",
-                                                  "MethodExceptionQueryResult",
-                                                  "UncaughtExceptionSiteEntry"
+                                                  "ExceptionEvidenceProjection",
+                                                  "ExceptionFlowEdge",
+                                                  "ExceptionFlowEngine",
+                                                  "ExceptionFlowResult",
+                                                  "ExceptionFlowSite"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine",
+                                                     "ExceptionFlowResult"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.RuntimeHazards.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionFlowQuery",
-                                                  "HazardSiteProjectionRule",
+                                                  "ExceptionFlowEngine",
+                                                  "HazardProjection",
                                                   "ProvenRuntimeHazardSite"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/ExceptionFlowQuery.SiteCollection.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExceptionFlowQuery",
-                                                  "ExceptionSiteCollectionContext"
+                                                  "ExceptionFlowEngine"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionPathStateService.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionPathStateService"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionPathStateService.Finally.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionPathStateService"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionSiteClassifier"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
+                                                     "ExceptionFlowEngine"
                                                  ]
                         },
                         {
@@ -3754,7 +3724,7 @@
                                                   "SummaryExceptionInfo",
                                                   "SummaryExceptionOriginKind"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "ExceptionSummaryCatalog"
                                                  ]
@@ -3979,7 +3949,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAttributeIdentityPolicy"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SharpProofAttributeIdentityPolicy"
                                                  ]
@@ -5396,7 +5366,7 @@
                                                   "SmtAnalysisMode",
                                                   "SmtAnalysisOptions"
                                               ],
-                            "referencingFixtureCount":  22,
+                            "referencingFixtureCount":  23,
                             "referencedTokens":  [
                                                      "SmtAnalysisMode",
                                                      "SmtAnalysisOptions"
@@ -5408,7 +5378,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  21,
+                            "referencingFixtureCount":  22,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -8279,17 +8249,85 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Callees.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Catches.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Models.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine",
+                                                   "ExceptionFlowResult"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.RuntimeHazards.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionFlowQuery.SiteCollection.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionFlowEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
                                                                  "EffectSummarySchemaV5Tests",
+                                                                 "ExceptionFlowResultGraphTests",
                                                                  "ExceptionSummaryCatalogValidationTests"
                                                              ],
                                     "tokens":  [
                                                    "ExceptionSummaryCatalog"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/GeneratedPurityCatalog.cs",
@@ -8409,12 +8447,13 @@
                                     "path":  "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests",
                                                                  "ProvenDiagnosticSuppressorTests"
                                                              ],
                                     "tokens":  [
                                                    "SharpProofAttributeIdentityPolicy"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/SharpProofDiagnosticSuppressor.cs",
@@ -9257,6 +9296,7 @@
                                                                  "AnalyzerTestHostConfigurationTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "CompactDomainProjectionTests",
+                                                                 "ExceptionFlowResultGraphTests",
                                                                  "ForeachSmtInvariantTests",
                                                                  "OperationBlockPipelineTests",
                                                                  "PathFactExpressionReachabilityTests",
@@ -9280,7 +9320,7 @@
                                                    "SmtAnalysisMode",
                                                    "SmtAnalysisOptions"
                                                ],
-                                    "fixtureCount":  22
+                                    "fixtureCount":  23
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
@@ -9289,6 +9329,7 @@
                                                                  "AnalyzerPackagingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "CompactDomainProjectionTests",
+                                                                 "ExceptionFlowResultGraphTests",
                                                                  "ForeachSmtInvariantTests",
                                                                  "OperationBlockPipelineTests",
                                                                  "PathFactExpressionReachabilityTests",
@@ -9311,7 +9352,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  21
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaReferenceScanner.cs",

@@ -721,6 +721,22 @@ the unused preview .NET API may break when it obstructs the canonical design.
     alias replay and every lifetime mutation writer retain their existing timing,
     version, provenance, and ordering policy. The replacement adds exactly 60
     production lines, deletes 220, and removes 134 authoritative nonblank lines.
+  - [x] Adjudicate a unified Symbolic observation-trace worklist before extending
+    the execution-root trace. The prototype deleted both observation loops and
+    retained exact ordering, but reduced the 461-line family to 441 nonblank
+    lines: only 19 lines removed versus the hard 150-line net gate and 300-line
+    family cap. The remaining reduction required formatting-only compression,
+    relocation, or a wider semantic rewrite, so the prototype was fully reverted
+    without a commit or behavior change.
+  - [x] Replace the exception-flow candidate, path-state, hazard, evidence, edge,
+    and result adapters with one ordered `ExceptionFlowEngine`. One immutable
+    site graph now serves direct and recursive callees; one cached site assessment
+    owns Requires-seeded reachability, finally shadowing, runtime-type resolution,
+    and catch/filter policy; and one ordered hazard projection retains raw
+    unsupported/unknown outcomes. The three green stages are `ab905c07`,
+    `af8b3bec`, and `527681e6`. The closed family falls from 1,100 to 741
+    nonblank lines, removes 375 net production lines, and remains below its
+    750-line cap without weakening conservative `Unknown` behavior.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -956,6 +972,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 inline purity CFG scheduler | `2b418660` | 104,873 | -2,803 |
 | Phase 7 ordered purity operation compatibility | `897b2b8d` | 104,758 | -2,918 |
 | Phase 7 canonical exact alias-component queries | `04ec0b9a` | 104,624 | -3,052 |
+| Phase 7 canonical exception-flow engine | `527681e6` | 104,249 | -3,427 |
 
 ## Validation Ledger
 
@@ -1190,6 +1207,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 inline purity CFG scheduler | Commit `2b418660` replaces the Analyzer-local worklist class, traversal carrier, branch propagator, and recursive finally completion helper with one 119-line coordinator-local scheduler. It preserves conditional-before-fallthrough order, constant-edge selection, feasibility pruning, structural continuation identity, block-ordinal revisit merging, queue deduplication, the exact `blocks * 200` bound, return ownership before finally, nested finally order, insertion-ordered exit evidence, and all-at-once normal-exit merging. The focused branch/merge/operation/try/loop/using/disposal/recursion/evidence/exception-region batch passes 523/523; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic impact inventory drops only the two deleted private types and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, architecture violation buckets remain zero, and exact empty-evidence projection is retained. Production LOC falls by 102 to 104,873 across 444 files, or -2,803 from the rewrite start; tracked test LOC remains 145,672. |
 | Phase 7 ordered purity operation compatibility | Commit `897b2b8d` makes one typed check-and-track helper own flow-capture result recording and pure-only state sidecars across CFG and subtree analysis, while callers retain their distinct unreachable and recursive-placeholder policy. One coordinator materializes visible operations once and applies using, foreach, direct throw, catch/finally, invocation, and operator compatibility stages before the unchanged missing-resource-disposal check. The 37-line syntax-only direct-throw fallback and repeated `goto`/enumeration plumbing are deleted. The eight-shape direct-throw table plus nested-callable boundary passes 17/17; the requested focused parity batch passes 707/707; deterministic impact inventory coverage passes 39/39; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,571 plus the same two MainGeneral skips. Release solution warning-as-error is clean and every architecture violation bucket is zero. Production LOC falls by 115 to 104,758 across 444 files, or -2,918 from the rewrite start; tracked test LOC is 145,849. |
 | Phase 7 canonical exact alias-component queries | Commit `04ec0b9a` replaces four recursive Analyzer/Symbolic alias-query forests with one root-first, symmetric, cycle-safe exact-positive component traversal and typed fact predicate. Three direct cases cover roots, forward/reverse chains, cycles, approximate/negative/may-not aliases, ownership, borrow kind and direction, disposal versus return/release, all-path merged release, and one-path outstanding ownership. The direct gate passes 3/3, the core assignment/merge/using/disposal/evidence/ref-alias/release batch 501/501, and the additional owned array/object/delegate/borrow/ref-parameter batch 159/159. Deterministic impact inventory coverage passes 39/39. MainSmtAnalyzer passes 487/487 and all Main lanes pass 5,574 plus the same two MainGeneral skips. Release solution warning-as-error is clean and every architecture violation bucket is zero. Production LOC falls by 134 to 104,624 across 444 files, or -3,052 from the rewrite start; tracked test LOC is 145,969. |
+| Phase 7 Symbolic observation-trace adjudication | A shared worklist prototype removed both loops but reduced the 461-line family to only 441 nonblank lines: 19 lines removed versus the required 150 and a 300-line family cap. The remaining compression was formatting-only, relocation, or required broader semantics, so every change was reverted. No commit or test expectation changed. |
+| Phase 7 canonical exception-flow engine | Commits `ab905c07`, `af8b3bec`, and `527681e6` replace the result/candidate/evidence graph, path-state/classifier/finally adapters, runtime-hazard mapper, recursive callee reconstruction, and unknown-hazard cache carrier with one ordered engine and immutable site graph. One regression fixture locks deterministic graph bytes and direct-before-callee order. The focused graph gate passes 1/1, path/finally tests 163/163, the combined exception gate 791/791, MainSmtAnalyzer 487/487, MainSmtFlow 257/257, and all six lanes 6,181 plus the same two documented MainGeneral skips. Impact inventory validation and its linked Tooling fixture pass 39/39. Release warning-as-error is clean. Production LOC falls by 375 to 104,249 across 441 files, or -3,427 from the rewrite start; tracked test LOC is 146,075. The closed family is 741 nonblank lines, under its 750-line cap, with no file or partial-type size violation. |
 
 ## Current Checkpoint
 
@@ -1602,13 +1621,24 @@ the unused preview .NET API may break when it obstructs the canonical design.
   distinctions, all-path release provenance, and one-path ownership remain
   directly characterized. Production LOC is 104,624 across 444 files, down 134
   in this tranche and 3,052 from the rewrite start; tracked test LOC is 145,969.
-- Next cheapest step: inventory the remaining Purity final-result/resource
-  evidence and exception-path adapters against the canonical operation
-  coordinator and state merger. Keep return/dispose/using/acquire/borrow mutation
-  writers explicit unless an exact replacement preserves timing, versions,
-  provenance, evidence, and fallback; accept only a closed slice removing at
-  least 100 net production lines.
-- Blockers: the 11,000-line production target still requires 7,948 lines. The
+  A shared Symbolic observation-trace worklist was rejected and fully reverted
+  after removing only 19 of the required 150 lines and missing the 300-line
+  family cap. The accepted exception-flow rewrite instead replaces the
+  result/candidate/evidence graph, path assessment, finally shadowing, catch
+  classification, runtime-hazard projection, recursive-callee reconstruction,
+  and unknown-hazard cache carrier with one ordered `ExceptionFlowEngine`.
+  Its three green commits remove 375 net production lines and close the
+  1,100-line family at 741 nonblank lines. The graph, focused exception,
+  MainSmtAnalyzer, MainSmtFlow, impact-inventory, all-six-lane, and Release
+  warning-as-error gates are green. All six lanes pass 6,181 tests plus the same
+  two documented MainGeneral skips. Production LOC is 104,249 across 441 files,
+  down 3,427 from the rewrite start; tracked test LOC is 146,075. No handwritten
+  file or partial type violates the architecture size limits.
+- Next cheapest step: fan out read-only audits over disparate unchecked Phase 7
+  items, then accept the next closed semantic family only if its measured rewrite
+  removes at least 350 net production lines or reaches a documented hard family
+  cap. Prefer complete owner replacement over another adapter extraction.
+- Blockers: the 11,000-line production target still requires 7,573 lines. The
   structural fallback and remaining Analyzer CFG/transfer adapters remain
   reachable for typed CFG `Unsupported` cases. The user has authorized the
   required major rearchitecture; its remaining blocker is differential parity,
