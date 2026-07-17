@@ -9,11 +9,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowEngine
 {
-    private readonly record struct ExceptionSiteCollectionContext(
-        SemanticModel SemanticModel,
-        IMethodSymbol MethodSymbol,
-        ExceptionSiteAssessment Assessment);
-
     private static IEnumerable<ExceptionFlowSite> CollectUncaughtExceptionSiteEntries(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
@@ -25,21 +20,20 @@ internal static partial class ExceptionFlowEngine
         SharpProofAttributeIdentityPolicy attributePolicy,
         ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
     {
-        var siteContext = new ExceptionSiteCollectionContext(
-            semanticModel,
-            methodSymbol,
-            new ExceptionSiteAssessment(methodNode, semanticModel, cancellationToken, smtAnalysis));
+        var assessment = new ExceptionSiteAssessment(methodNode, semanticModel, cancellationToken, smtAnalysis);
         var provenRuntimeHazardSites = ProjectProvenRuntimeHazardSites(methodNode, runtimeHazards);
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazardSites.Where(static site => site.BeforeCallees),
-                     siteContext))
+                     assessment,
+                     semanticModel,
+                     methodSymbol))
             yield return entry;
 
         foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel,
                      cancellationToken))
         {
-            if (siteContext.Assessment.Assess(
+            if (assessment.Assess(
                     calleeCallSite.CallSite,
                     calleeCallSite.UsingDisposeGuard,
                     static () => null,
@@ -49,7 +43,7 @@ internal static partial class ExceptionFlowEngine
             var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
             if (calleeCallSite.IsDynamicDispatch)
             {
-                if (siteContext.Assessment.Assess(
+                if (assessment.Assess(
                         calleeCallSite.CallSite,
                         calleeCallSite.UsingDisposeGuard,
                         static () => null,
@@ -73,7 +67,7 @@ internal static partial class ExceptionFlowEngine
                          smtAnalysis,
                          attributePolicy))
             {
-                if (siteContext.Assessment.Assess(
+                if (assessment.Assess(
                         calleeCallSite.CallSite,
                         calleeCallSite.UsingDisposeGuard,
                         () => exception.Type,
@@ -86,46 +80,33 @@ internal static partial class ExceptionFlowEngine
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
                      provenRuntimeHazardSites.Where(static site => !site.BeforeCallees),
-                     siteContext))
+                     assessment,
+                     semanticModel,
+                     methodSymbol))
             yield return entry;
     }
 
     private static IEnumerable<ExceptionFlowSite> CreateProvenExceptionSiteEntries(
         IEnumerable<ProvenRuntimeHazardSite> sites,
-        ExceptionSiteCollectionContext context)
+        ExceptionSiteAssessment assessment,
+        SemanticModel semanticModel,
+        IMethodSymbol methodSymbol)
     {
         foreach (var site in sites)
         {
-            var entry = TryCreateProvenExceptionSiteEntry(
+            if (assessment.Assess(
+                    site.Site,
+                    null,
+                    () => semanticModel.Compilation.GetTypeByMetadataName(site.Hazard.ExceptionType),
+                    out var exceptionType) != ExceptionSiteDisposition.Escapes)
+                continue;
+            yield return new ExceptionFlowSite(
                 site.Site,
-                context,
+                methodSymbol,
+                exceptionType,
                 site.Hazard.ExceptionType,
                 site.Category,
                 site.Source);
-            if (entry != null) yield return entry;
         }
-    }
-
-    private static ExceptionFlowSite? TryCreateProvenExceptionSiteEntry(
-        SyntaxNode site,
-        ExceptionSiteCollectionContext context,
-        string exceptionMetadataName,
-        string category,
-        string source)
-    {
-        if (context.Assessment.Assess(
-                site,
-                null,
-                () => context.SemanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName),
-                out var exceptionType) != ExceptionSiteDisposition.Escapes)
-            return null;
-
-        return new ExceptionFlowSite(
-            site,
-            context.MethodSymbol,
-            exceptionType,
-            exceptionMetadataName,
-            category,
-            source);
     }
 }

@@ -85,6 +85,11 @@ internal static partial class ExceptionFlowEngine
                         catchClause.Block.Span.Contains(site.SpanStart) ||
                         catchClause.Filter?.Span.Contains(site.SpanStart) == true))
                     continue;
+                if (SymbolicControlFlowFacts.StatementDefinitelyExits(
+                        finallyBlock,
+                        semanticModel,
+                        cancellationToken))
+                    return true;
                 using var completionScope = SymbolicAnalysisLimitContext.PushIsolated(
                     SymbolicAnalysisLimitContext.Limits,
                     finallyBlock);

@@ -84,19 +84,20 @@ internal static partial class ExceptionFlowAnalyzer
                             attributePolicy));
 
                 if (reportUnknownRuntimeHazards)
-                    unknownRuntimeHazards = queryResult?.RawHazards
+                {
+                    var hazardResult = queryResult ?? context.State.GetOrCreateSymbolicQueryResult(
+                        "unknown-runtime-hazards",
+                        () => ExceptionFlowEngine.AnalyzeHazards(
+                            context.Node,
+                            context.SemanticModel,
+                            context.CancellationToken,
+                            purityService.SmtAnalysis));
+                    unknownRuntimeHazards = hazardResult.RawHazards
                         .Where(static hazard =>
                             hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
                                 SymbolicRuntimeHazardStatus.Unsupported)
-                        .ToImmutableArray() ??
-                        context.State.GetOrCreateSymbolicQueryResult(
-                            "unknown-runtime-hazards",
-                            () => new CachedUnknownRuntimeHazards(
-                                ExceptionFlowEngine.CollectUnknownRuntimeHazardCandidates(
-                                    context.Node,
-                                    context.SemanticModel,
-                                    context.CancellationToken,
-                                    purityService.SmtAnalysis))).Hazards;
+                        .ToImmutableArray();
+                }
             }
 
         AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
@@ -712,62 +713,26 @@ internal static partial class ExceptionFlowAnalyzer
             : display;
     }
 
-    private sealed class AttributePolicyScope : IDisposable
+    private sealed class AttributePolicyScope(SharpProofAttributeIdentityPolicy? previous) : IDisposable
     {
-        private readonly SharpProofAttributeIdentityPolicy? _previous;
-
-        public AttributePolicyScope(SharpProofAttributeIdentityPolicy? previous)
-        {
-            _previous = previous;
-        }
-
-        public void Dispose()
-        {
-            CurrentAttributePolicy.Value = _previous;
-        }
+        public void Dispose() => CurrentAttributePolicy.Value = previous;
     }
 
-    private sealed class CachedUnknownRuntimeHazards
+    internal sealed class MethodCallCandidate(
+        SyntaxNode callSite,
+        IMethodSymbol method,
+        UsingDisposeGuard? usingDisposeGuard = null,
+        bool isDynamicDispatch = false)
     {
-        public CachedUnknownRuntimeHazards(ImmutableArray<SymbolicRuntimeHazard> hazards)
-        {
-            Hazards = hazards;
-        }
-
-        public ImmutableArray<SymbolicRuntimeHazard> Hazards { get; }
+        public SyntaxNode CallSite { get; } = callSite;
+        public IMethodSymbol Method { get; } = method;
+        public UsingDisposeGuard? UsingDisposeGuard { get; } = usingDisposeGuard;
+        public bool IsDynamicDispatch { get; } = isDynamicDispatch;
     }
 
-    internal sealed class MethodCallCandidate
+    internal sealed class UsingDisposeGuard(ExpressionSyntax resourceExpression)
     {
-        public MethodCallCandidate(
-            SyntaxNode callSite,
-            IMethodSymbol method,
-            UsingDisposeGuard? usingDisposeGuard = null,
-            bool isDynamicDispatch = false)
-        {
-            CallSite = callSite;
-            Method = method;
-            UsingDisposeGuard = usingDisposeGuard;
-            IsDynamicDispatch = isDynamicDispatch;
-        }
-
-        public SyntaxNode CallSite { get; }
-
-        public IMethodSymbol Method { get; }
-
-        public UsingDisposeGuard? UsingDisposeGuard { get; }
-
-        public bool IsDynamicDispatch { get; }
-    }
-
-    internal sealed class UsingDisposeGuard
-    {
-        public UsingDisposeGuard(ExpressionSyntax resourceExpression)
-        {
-            ResourceExpression = resourceExpression;
-        }
-
-        public ExpressionSyntax ResourceExpression { get; }
+        public ExpressionSyntax ResourceExpression { get; } = resourceExpression;
     }
 
 }

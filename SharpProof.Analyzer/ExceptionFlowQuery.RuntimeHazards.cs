@@ -19,214 +19,131 @@ internal static partial class ExceptionFlowEngine
         int InputOrder,
         bool BeforeCallees);
 
-    private readonly record struct HazardSiteProjectionRule(
+    private sealed record HazardProjection(
         string Source,
         int FlowOrder,
         string? Category = null,
         bool BeforeCallees = false);
 
-    internal static ImmutableArray<SymbolicRuntimeHazard> CollectUnknownRuntimeHazardCandidates(
+    internal static ExceptionFlowResult AnalyzeHazards(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return QueryRuntimeHazards(methodNode, semanticModel, cancellationToken, smtAnalysis)
-            .Where(static hazard =>
-                hazard.Status is SymbolicRuntimeHazardStatus.Unknown or SymbolicRuntimeHazardStatus.Unsupported)
-            .ToImmutableArray();
-    }
+        SmtAnalysisService smtAnalysis) =>
+        new(ImmutableArray<ExceptionFlowSite>.Empty,
+            QueryRuntimeHazards(methodNode, semanticModel, cancellationToken, smtAnalysis));
 
     private static ImmutableArray<SymbolicRuntimeHazard> QueryRuntimeHazards(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
-            methodNode,
-            semanticModel,
-            smtAnalysis,
-            cancellationToken,
-            new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true))
+        SmtAnalysisService smtAnalysis) =>
+        new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                methodNode,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true))
             .Hazards
             .ToImmutableArray();
-    }
 
     private static ImmutableArray<ProvenRuntimeHazardSite> ProjectProvenRuntimeHazardSites(
         SyntaxNode methodNode,
-        IEnumerable<SymbolicRuntimeHazard> hazards)
-    {
-        var builder = ImmutableArray.CreateBuilder<ProvenRuntimeHazardSite>();
-        var inputOrder = 0;
-        foreach (var hazard in hazards)
-        {
-            if (hazard.Status == SymbolicRuntimeHazardStatus.Proven &&
-                TryProjectProvenRuntimeHazardSite(methodNode, hazard, inputOrder, out var site))
-                builder.Add(site);
-            inputOrder++;
-        }
-
-        return builder
+        IEnumerable<SymbolicRuntimeHazard> hazards) =>
+        hazards.Select((hazard, index) => TryProjectHazard(methodNode, hazard, index))
+            .Where(static site => site.HasValue)
+            .Select(static site => site!.Value)
             .OrderBy(static site => site.FlowOrder)
             .ThenBy(static site => site.InputOrder)
             .ToImmutableArray();
-    }
 
-    private static bool TryProjectProvenRuntimeHazardSite(
+    private static ProvenRuntimeHazardSite? TryProjectHazard(
         SyntaxNode methodNode,
         SymbolicRuntimeHazard hazard,
-        int inputOrder,
-        out ProvenRuntimeHazardSite projected)
+        int inputOrder)
     {
+        if (hazard.Status != SymbolicRuntimeHazardStatus.Proven) return null;
         var site = ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard);
-        var category = hazard.Category;
-        string source;
-        int flowOrder;
-        var beforeCallees = false;
-
-        if (GetSimpleHazardSiteProjectionRule(hazard.Kind) is { } simpleRule)
-        {
-            source = simpleRule.Source;
-            flowOrder = simpleRule.FlowOrder;
-            category = simpleRule.Category ?? category;
-            beforeCallees = simpleRule.BeforeCallees;
-        }
-        else
-        {
-            switch (hazard.Kind)
-            {
-                case SymbolicRuntimeHazardKind.CheckedIntegralOverflow:
-                    source = site is CastExpressionSyntax
-                        ? ExceptionSources.CheckedConversion
-                        : ExceptionSources.CheckedOperator;
-                    category = ExceptionCategories.DefiniteCheckedIntegralOverflow;
-                    flowOrder = 20;
-                    break;
-                case SymbolicRuntimeHazardKind.NullDereference when IsAnalyzerOnlySymbolicHazardCategory(category):
-                    source = GetAnalyzerOnlySymbolicHazardSource(category);
-                    flowOrder = 180;
-                    break;
-                case SymbolicRuntimeHazardKind.NullDereference when site is
-                MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or
-                InvocationExpressionSyntax or AwaitExpressionSyntax:
-                    source = site is AwaitExpressionSyntax
-                        ? ExceptionSources.AwaitExpression
-                        : ExceptionSources.NullReceiver;
-                    category = site is AwaitExpressionSyntax
-                        ? ExceptionCategories.DefiniteAwaitNull
-                        : ExceptionCategories.DefiniteNullDereference;
-                    flowOrder = 50;
-                    break;
-                case SymbolicRuntimeHazardKind.ArgumentNull
-                when string.Equals(category, ExceptionCategories.DefiniteLockNull, StringComparison.Ordinal):
-                    source = ExceptionSources.LockReceiver;
-                    flowOrder = 60;
-                    break;
-                case SymbolicRuntimeHazardKind.DynamicNullBinding:
-                    source = GetDynamicNullBindingHazardSource(category);
-                    flowOrder = 70;
-                    break;
-                case SymbolicRuntimeHazardKind.IndexOutOfRange
-                when string.Equals(
-                    category,
-                    ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                    StringComparison.Ordinal):
-                    source = ExceptionSources.ArrayGetValue;
-                    flowOrder = 130;
-                    break;
-                case SymbolicRuntimeHazardKind.IndexOutOfRange
-                when string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, StringComparison.Ordinal):
-                    source = ExceptionSources.ArrayIndex;
-                    flowOrder = 120;
-                    break;
-                case SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                when string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, StringComparison.Ordinal) ||
-                     string.Equals(category, ExceptionCategories.DefiniteSliceOutOfRange, StringComparison.Ordinal):
-                    source = site is InvocationExpressionSyntax
-                        ? ExceptionSources.SpanSlice
-                        : ExceptionSources.RangeSlice;
-                    category = ExceptionCategories.DefiniteRangeOutOfRange;
-                    flowOrder = 140;
-                    break;
-                case SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                when string.Equals(
-                    category,
-                    ExceptionCategories.DefiniteCountIndexOutOfRange,
-                    StringComparison.Ordinal):
-                    source = ExceptionSources.CountIndex;
-                    flowOrder = 150;
-                    break;
-                case SymbolicRuntimeHazardKind.IndexOutOfRange when IsAnalyzerOnlySymbolicHazardCategory(category):
-                    source = GetAnalyzerOnlySymbolicHazardSource(category);
-                    flowOrder = 180;
-                    break;
-                default:
-                    projected = default;
-                    return false;
-            }
-        }
-
-        projected = new ProvenRuntimeHazardSite(
-            hazard,
-            site,
-            category,
-            source,
-            flowOrder,
-            inputOrder,
-            beforeCallees);
-        return true;
+        var projection = MapHazard(hazard, site);
+        return projection == null
+            ? null
+            : new ProvenRuntimeHazardSite(
+                hazard,
+                site,
+                projection.Category ?? hazard.Category,
+                projection.Source,
+                projection.FlowOrder,
+                inputOrder,
+                projection.BeforeCallees);
     }
 
-    private static HazardSiteProjectionRule? GetSimpleHazardSiteProjectionRule(
-        SymbolicRuntimeHazardKind kind) =>
-        kind switch
-        {
-            SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow =>
-                new(ExceptionSources.Throw, 0, BeforeCallees: true),
-            SymbolicRuntimeHazardKind.DivideByZero =>
-                new(ExceptionSources.BinaryOperator, 10, ExceptionCategories.DefiniteDivideByZero),
-            SymbolicRuntimeHazardKind.NegativeArrayLength => new(ExceptionSources.ArrayLength, 30),
-            SymbolicRuntimeHazardKind.NegativeStackAllocLength => new(ExceptionSources.StackAllocLength, 40),
-            SymbolicRuntimeHazardKind.NullableValueWithoutValue => new(ExceptionSources.NullableValue, 80),
-            SymbolicRuntimeHazardKind.UnboxNull => new(ExceptionSources.Cast, 90),
-            SymbolicRuntimeHazardKind.InvalidCast => new(ExceptionSources.Cast, 100),
-            SymbolicRuntimeHazardKind.ArrayTypeMismatch => new(ExceptionSources.ArrayStore, 110),
-            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch => new(ExceptionSources.SwitchExpression, 160),
-            SymbolicRuntimeHazardKind.InvalidCollectionCardinality =>
-                new(ExceptionSources.CollectionOperation, 170),
-            _ => null
-        };
-
-    private static bool IsAnalyzerOnlySymbolicHazardCategory(string category)
+    private static HazardProjection? MapHazard(SymbolicRuntimeHazard hazard, SyntaxNode site) => hazard.Kind switch
     {
-        return string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteWithNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal);
-    }
+        SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow =>
+            new(ExceptionSources.Throw, 0, BeforeCallees: true),
+        SymbolicRuntimeHazardKind.DivideByZero =>
+            new(ExceptionSources.BinaryOperator, 10, ExceptionCategories.DefiniteDivideByZero),
+        SymbolicRuntimeHazardKind.CheckedIntegralOverflow => new(
+            site is CastExpressionSyntax ? ExceptionSources.CheckedConversion : ExceptionSources.CheckedOperator,
+            20,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow),
+        SymbolicRuntimeHazardKind.NegativeArrayLength => new(ExceptionSources.ArrayLength, 30),
+        SymbolicRuntimeHazardKind.NegativeStackAllocLength => new(ExceptionSources.StackAllocLength, 40),
+        SymbolicRuntimeHazardKind.NullDereference when IsAnalyzerCategory(hazard.Category) =>
+            new(AnalyzerSource(hazard.Category), 180),
+        SymbolicRuntimeHazardKind.NullDereference when site is
+            MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or
+            InvocationExpressionSyntax or AwaitExpressionSyntax => new(
+                site is AwaitExpressionSyntax ? ExceptionSources.AwaitExpression : ExceptionSources.NullReceiver,
+                50,
+                site is AwaitExpressionSyntax
+                    ? ExceptionCategories.DefiniteAwaitNull
+                    : ExceptionCategories.DefiniteNullDereference),
+        SymbolicRuntimeHazardKind.ArgumentNull
+            when hazard.Category == ExceptionCategories.DefiniteLockNull => new(ExceptionSources.LockReceiver, 60),
+        SymbolicRuntimeHazardKind.DynamicNullBinding => new(DynamicSource(hazard.Category), 70),
+        SymbolicRuntimeHazardKind.NullableValueWithoutValue => new(ExceptionSources.NullableValue, 80),
+        SymbolicRuntimeHazardKind.UnboxNull => new(ExceptionSources.Cast, 90),
+        SymbolicRuntimeHazardKind.InvalidCast => new(ExceptionSources.Cast, 100),
+        SymbolicRuntimeHazardKind.ArrayTypeMismatch => new(ExceptionSources.ArrayStore, 110),
+        SymbolicRuntimeHazardKind.IndexOutOfRange
+            when hazard.Category == ExceptionCategories.DefiniteIndexOutOfRange => new(ExceptionSources.ArrayIndex, 120),
+        SymbolicRuntimeHazardKind.IndexOutOfRange
+            when hazard.Category == ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange =>
+            new(ExceptionSources.ArrayGetValue, 130),
+        SymbolicRuntimeHazardKind.ArgumentOutOfRange when
+            hazard.Category == ExceptionCategories.DefiniteRangeOutOfRange ||
+            hazard.Category == ExceptionCategories.DefiniteSliceOutOfRange => new(
+                site is InvocationExpressionSyntax ? ExceptionSources.SpanSlice : ExceptionSources.RangeSlice,
+                140,
+                ExceptionCategories.DefiniteRangeOutOfRange),
+        SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            when hazard.Category == ExceptionCategories.DefiniteCountIndexOutOfRange => new(ExceptionSources.CountIndex, 150),
+        SymbolicRuntimeHazardKind.SwitchExpressionNoMatch => new(ExceptionSources.SwitchExpression, 160),
+        SymbolicRuntimeHazardKind.InvalidCollectionCardinality => new(ExceptionSources.CollectionOperation, 170),
+        SymbolicRuntimeHazardKind.IndexOutOfRange when IsAnalyzerCategory(hazard.Category) =>
+            new(AnalyzerSource(hazard.Category), 180),
+        _ => null
+    };
 
-    private static string GetDynamicNullBindingHazardSource(string category)
-    {
-        if (string.Equals(category, SymbolicDynamicNullBindingFacts.MemberCategory, StringComparison.Ordinal))
-            return SymbolicDynamicNullBindingFacts.MemberSource;
-        if (string.Equals(category, SymbolicDynamicNullBindingFacts.IndexCategory, StringComparison.Ordinal))
-            return SymbolicDynamicNullBindingFacts.IndexSource;
-        return SymbolicDynamicNullBindingFacts.InvocationSource;
-    }
+    private static bool IsAnalyzerCategory(string category) =>
+        category == ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange ||
+        category == ExceptionCategories.DefiniteWithNull ||
+        category == ExceptionCategories.DefiniteDeconstructionNull;
 
-    private static string GetAnalyzerOnlySymbolicHazardSource(string category)
-    {
-        if (string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, StringComparison.Ordinal))
-            return ExceptionSources.ArrayGetValue;
+    private static string DynamicSource(string category) =>
+        category == SymbolicDynamicNullBindingFacts.MemberCategory
+            ? SymbolicDynamicNullBindingFacts.MemberSource
+            : category == SymbolicDynamicNullBindingFacts.IndexCategory
+                ? SymbolicDynamicNullBindingFacts.IndexSource
+                : SymbolicDynamicNullBindingFacts.InvocationSource;
 
-        if (string.Equals(category, ExceptionCategories.DefiniteWithNull, StringComparison.Ordinal))
-            return ExceptionSources.WithExpression;
-
-        if (string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal))
-            return ExceptionSources.DeconstructionReceiver;
-
-        return ExceptionSources.NullReceiver;
-    }
-
+    private static string AnalyzerSource(string category) =>
+        category == ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange
+            ? ExceptionSources.ArrayGetValue
+            : category == ExceptionCategories.DefiniteWithNull
+                ? ExceptionSources.WithExpression
+                : category == ExceptionCategories.DefiniteDeconstructionNull
+                    ? ExceptionSources.DeconstructionReceiver
+                    : ExceptionSources.NullReceiver;
 }

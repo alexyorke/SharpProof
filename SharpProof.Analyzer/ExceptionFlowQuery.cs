@@ -13,43 +13,22 @@ internal static partial class ExceptionFlowEngine
         IMethodSymbol methodSymbol,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
         SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        HashSet<IMethodSymbol>? visitedMethods = null)
     {
-        var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+        var isRoot = visitedMethods == null;
+        visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
         {
             methodSymbol.OriginalDefinition
         };
-
-        using (ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy))
-        {
-            return AnalyzeMethod(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                exceptionSummaryCatalog,
-                visitedMethods,
-                smtAnalysis,
-                attributePolicy);
-        }
-    }
-
-    private static ExceptionFlowResult AnalyzeMethod(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        IMethodSymbol methodSymbol,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
-        HashSet<IMethodSymbol> visitedMethods,
-        SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        using var attributeScope = isRoot ? ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy) : null;
         var runtimeHazards = QueryRuntimeHazards(
             methodNode,
             semanticModel,
             cancellationToken,
             smtAnalysis);
-        var siteEntries = CollectUncaughtExceptionSiteEntries(
+        return new ExceptionFlowResult(
+            CollectUncaughtExceptionSiteEntries(
                 methodNode,
                 semanticModel,
                 cancellationToken,
@@ -59,8 +38,7 @@ internal static partial class ExceptionFlowEngine
                 smtAnalysis,
                 attributePolicy,
                 runtimeHazards)
-            .ToImmutableArray();
-
-        return new ExceptionFlowResult(siteEntries, runtimeHazards);
+            .ToImmutableArray(),
+            runtimeHazards);
     }
 }

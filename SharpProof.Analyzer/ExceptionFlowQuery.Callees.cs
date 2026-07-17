@@ -36,9 +36,9 @@ internal static partial class ExceptionFlowEngine
                 cancellationToken,
                 invokedMethod,
                 exceptionSummaryCatalog,
-                visitedMethods,
                 smtAnalysis,
-                attributePolicy);
+                attributePolicy,
+                visitedMethods);
 
             var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
             var symbol = invokedMethod.OriginalDefinition.ToDisplayString();
@@ -133,22 +133,11 @@ internal static partial class ExceptionFlowEngine
             invokedChain = ImmutableArray.Create(invokedMethodDisplay);
 
         if (nestedChain.IsDefaultOrEmpty) return invokedChain;
-
-        if (!invokedChain.IsDefaultOrEmpty &&
-            string.Equals(nestedChain[0], invokedChain[invokedChain.Length - 1], StringComparison.Ordinal))
-        {
-            var deduplicatedBuilder =
-                ImmutableArray.CreateBuilder<string>(invokedChain.Length + nestedChain.Length - 1);
-            deduplicatedBuilder.AddRange(invokedChain);
-            for (var index = 1; index < nestedChain.Length; index++) deduplicatedBuilder.Add(nestedChain[index]);
-
-            return deduplicatedBuilder.ToImmutable();
-        }
-
-        var builder = ImmutableArray.CreateBuilder<string>(invokedChain.Length + nestedChain.Length);
-        builder.AddRange(invokedChain);
-        builder.AddRange(nestedChain);
-        return builder.ToImmutable();
+        var skip = !invokedChain.IsDefaultOrEmpty &&
+                   nestedChain[0] == invokedChain[invokedChain.Length - 1]
+            ? 1
+            : 0;
+        return invokedChain.Concat(nestedChain.Skip(skip)).ToImmutableArray();
     }
 
     private static string GetExceptionSourceMethodDisplay(IMethodSymbol methodSymbol)
@@ -196,32 +185,20 @@ internal static partial class ExceptionFlowEngine
         return (category, qualifiedSource.Substring(separatorIndex + 1));
     }
 
-    private static ImmutableArray<string> ParseCalleeChainFromSource(string source)
-    {
-        if (string.IsNullOrWhiteSpace(source)) return ImmutableArray<string>.Empty;
-
-        var segments = source
+    private static ImmutableArray<string> ParseCalleeChainFromSource(string source) =>
+        string.IsNullOrWhiteSpace(source)
+            ? ImmutableArray<string>.Empty
+            : source
             .Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries)
             .Select(NormalizeCalleeSegment)
             .Where(segment => !string.IsNullOrWhiteSpace(segment) && LooksLikeSymbolSegment(segment))
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
-        return segments;
-    }
 
-    private static string NormalizeCalleeSegment(string segment)
-    {
-        var trimmed = segment.Trim();
-        var (_, source) = SplitQualifiedSource(trimmed);
-        return source.Trim();
-    }
+    private static string NormalizeCalleeSegment(string segment) => SplitQualifiedSource(segment.Trim()).Source.Trim();
 
-    private static bool LooksLikeSymbolSegment(string segment)
-    {
-        return string.Equals(segment, "lambda expression", StringComparison.Ordinal) ||
-               segment.IndexOf(".", StringComparison.Ordinal) >= 0 ||
-               segment.IndexOf("(", StringComparison.Ordinal) >= 0;
-    }
+    private static bool LooksLikeSymbolSegment(string segment) =>
+        segment == "lambda expression" || segment.Contains('.') || segment.Contains('(');
 
     private static ImmutableArray<ExceptionFlowEdge> CreateDerivedDiagnosticEdges(
         string exceptionType,
@@ -229,49 +206,24 @@ internal static partial class ExceptionFlowEngine
         string sourcePath,
         ImmutableArray<string> calleeChain)
     {
-        if (calleeChain.IsDefaultOrEmpty || string.IsNullOrWhiteSpace(sourcePath))
-            return ImmutableArray<ExceptionFlowEdge>.Empty;
-
-        var builder = ImmutableArray.CreateBuilder<ExceptionFlowEdge>();
-        if (calleeChain.Length == 1)
-        {
-            builder.Add(new ExceptionFlowEdge(
+        if (calleeChain.IsDefaultOrEmpty || string.IsNullOrWhiteSpace(sourcePath)) return [];
+        return Enumerable.Range(1, Math.Max(1, calleeChain.Length - 1))
+            .Select(depth => new ExceptionFlowEdge(
                 exceptionType,
                 category,
                 null,
                 calleeChain,
                 null,
-                1));
-            return builder.ToImmutable();
-        }
-
-        for (var index = 1; index < calleeChain.Length; index++)
-        {
-            var callee = calleeChain[index];
-            if (string.IsNullOrWhiteSpace(callee)) continue;
-
-            builder.Add(new ExceptionFlowEdge(
-                exceptionType,
-                category,
-                null,
-                calleeChain,
-                null,
-                index));
-        }
-
-        return builder.ToImmutable();
+                depth))
+            .ToImmutableArray();
     }
 
-    private static bool IsKnownExceptionCategory(string category)
-    {
-        return SymbolicRuntimeExceptionFacts.IsKnownEvidenceCategory(category) ||
-               SymbolicDynamicNullBindingFacts.IsDynamicNullBindingCategory(category);
-    }
+    private static bool IsKnownExceptionCategory(string category) =>
+        SymbolicRuntimeExceptionFacts.IsKnownEvidenceCategory(category) ||
+        SymbolicDynamicNullBindingFacts.IsDynamicNullBindingCategory(category);
 
-    private static ITypeSymbol? TryResolveExceptionType(Compilation compilation, string displayName)
-    {
-        return displayName == ExceptionTypes.Unknown
+    private static ITypeSymbol? TryResolveExceptionType(Compilation compilation, string displayName) =>
+        displayName == ExceptionTypes.Unknown
             ? null
             : compilation.GetTypeByMetadataName(displayName);
-    }
 }
