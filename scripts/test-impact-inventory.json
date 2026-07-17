@@ -2454,8 +2454,6 @@
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CfgFinallyContinuation",
-                                                  "CfgFixedPointWorklist",
-                                                  "CfgTraversalPoint",
                                                   "PurityAnalysisEngine"
                                               ],
                             "referencingFixtureCount":  4,

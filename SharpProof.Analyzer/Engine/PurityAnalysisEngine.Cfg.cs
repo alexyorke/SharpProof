@@ -18,12 +18,11 @@ internal partial class PurityAnalysisEngine
         var cancellationToken = context.CancellationToken;
         var semanticModel = context.SemanticModel;
         var smtAnalysis = context.SmtAnalysis;
-        var containingMethodSymbol = context.ContainingMethodSymbol;
         cancellationToken.ThrowIfCancellationRequested();
         mergedNormalExitState = PurityAnalysisState.Pure;
         // Roslyn 4.x: Create(BlockSyntax|ArrowClause, model) throws ("operation has a non-null parent").
         // Create(BaseMethodDeclarationSyntax|LocalFunctionStatement|ConstructorDeclaration|... , model) is the supported root.
-        ControlFlowGraph? cfg = null;
+        ControlFlowGraph? cfg;
         try
         {
             cfg = ControlFlowGraph.Create(bodyNode, semanticModel);
@@ -35,97 +34,106 @@ internal partial class PurityAnalysisEngine
 
         if (cfg == null || cfg.Blocks.IsEmpty) return PurityAnalysisResult.Pure;
 
+        var entry = (cfg.Blocks.First(), (CfgFinallyContinuation?)null);
+        var entryState = CreateInitialRequiresState(context.ContainingMethodSymbol, bodyNode, semanticModel,
+            context.AttributePolicy, cancellationToken);
+        var states = new Dictionary<(BasicBlock Block, CfgFinallyContinuation? Continuation), PurityAnalysisState> { [entry] = entryState };
+        var queue = new Queue<(BasicBlock Block, CfgFinallyContinuation? Continuation)>([entry]);
+        var queued = new HashSet<(BasicBlock Block, CfgFinallyContinuation? Continuation)> { entry };
+        var exitStates = new Dictionary<(BasicBlock Block, CfgFinallyContinuation? Continuation), PurityAnalysisState>();
 
-        var fixedPoint = new CfgFixedPointWorklist(cfg.Blocks.Length * 200);
-        fixedPoint.Seed(
-            new CfgTraversalPoint(cfg.Blocks.First(), null),
-            CreateInitialRequiresState(
-                containingMethodSymbol,
-                bodyNode,
-                semanticModel,
-                context.AttributePolicy,
-                cancellationToken));
-
-        while (fixedPoint.TryDequeue(out var currentPoint, out var stateBefore))
+        void SchedulePoint((BasicBlock Block, CfgFinallyContinuation? Continuation) point, PurityAnalysisState state)
         {
+            if (states.TryGetValue(point, out var previous))
+            {
+                state = PurityAnalysisStateMerger.MergeStates(previous, state, point.Block.Ordinal);
+                if (state.Equals(previous)) return;
+            }
+            states[point] = state;
+            if (queued.Add(point)) queue.Enqueue(point);
+        }
+
+        void ScheduleBranch(ControlFlowBranch? branch, CfgFinallyContinuation? continuation, IOperation? branchValue,
+            PurityAnalysisState state)
+        {
+            if (branch == null) return;
+            if (branch.Semantics == ControlFlowBranchSemantics.Return && branchValue != null)
+                state = PurityResourceStateFacts.AddReturnedOwnedResourceFacts(state, branchValue, state);
+            if (!branch.FinallyRegions.IsDefaultOrEmpty)
+            {
+                continuation = new CfgFinallyContinuation(branch.FinallyRegions, 0, branch.Destination, continuation);
+                SchedulePoint((cfg.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal], continuation), state);
+                return;
+            }
+            if (branch.Destination != null)
+            {
+                SchedulePoint((branch.Destination, continuation), state);
+                return;
+            }
+            while (continuation != null)
+            {
+                var nextRegion = continuation.RegionIndex + 1;
+                if (nextRegion < continuation.Regions.Length)
+                {
+                    continuation = continuation with { RegionIndex = nextRegion };
+                    SchedulePoint((cfg.Blocks[continuation.Regions[nextRegion].FirstBlockOrdinal], continuation), state);
+                    return;
+                }
+                var destination = continuation.Destination;
+                continuation = continuation.Parent;
+                if (destination != null)
+                {
+                    SchedulePoint((destination, continuation), state);
+                    return;
+                }
+            }
+        }
+
+        var iterations = 0;
+        while (queue.Count != 0 && iterations++ < cfg.Blocks.Length * 200)
+        {
+            var currentPoint = queue.Dequeue();
+            queued.Remove(currentPoint);
             var currentBlock = currentPoint.Block;
-
-            var stateAfter = ApplyTransferFunction(
-                currentBlock,
-                stateBefore,
-                context);
-
-            fixedPoint.RecordExit(currentPoint, stateAfter);
-
-
+            var stateAfter = ApplyTransferFunction(currentBlock, states[currentPoint], context);
+            exitStates[currentPoint] = stateAfter;
             if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken,
                     out var takeConditionalSuccessor))
             {
                 var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
-                var takenBranch = takeConditionalSuccessor
-                    ? trueUsesConditionalSuccessor
-                        ? currentBlock.ConditionalSuccessor
-                        : currentBlock.FallThroughSuccessor
-                    : trueUsesConditionalSuccessor
-                        ? currentBlock.FallThroughSuccessor
-                        : currentBlock.ConditionalSuccessor;
+                var takenBranch = takeConditionalSuccessor == trueUsesConditionalSuccessor
+                    ? currentBlock.ConditionalSuccessor
+                    : currentBlock.FallThroughSuccessor;
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         takeConditionalSuccessor, smtAnalysis, cancellationToken, out var takenState))
-                    PropagateControlFlowBranch(
-                        takenBranch,
-                        currentPoint.Continuation,
-                        currentBlock.BranchValue,
-                        takenState,
-                        cfg,
-                        fixedPoint);
+                    ScheduleBranch(takenBranch, currentPoint.Continuation, currentBlock.BranchValue, takenState);
             }
             else
             {
                 var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
-
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var conditionalState))
-                    PropagateControlFlowBranch(
-                        currentBlock.ConditionalSuccessor,
-                        currentPoint.Continuation,
-                        currentBlock.BranchValue,
-                        conditionalState,
-                        cfg,
-                        fixedPoint);
-
+                    ScheduleBranch(currentBlock.ConditionalSuccessor, currentPoint.Continuation,
+                        currentBlock.BranchValue, conditionalState);
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         !trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var fallThroughState))
-                    PropagateControlFlowBranch(
-                        currentBlock.FallThroughSuccessor,
-                        currentPoint.Continuation,
-                        currentBlock.BranchValue,
-                        fallThroughState,
-                        cfg,
-                        fixedPoint);
+                    ScheduleBranch(currentBlock.FallThroughSuccessor, currentPoint.Continuation,
+                        currentBlock.BranchValue, fallThroughState);
             }
         }
 
-        if (fixedPoint.HasPendingWork) return PurityAnalysisResult.Impure(bodyNode);
+        if (queue.Count != 0) return PurityAnalysisResult.Impure(bodyNode);
 
-        var normalExitStates = fixedPoint.ExitStates
+        mergedNormalExitState = PurityAnalysisState.Merge(exitStates
             .Where(pair => pair.Key.Block.Kind == BasicBlockKind.Exit)
-            .Select(static pair => pair.Value)
-            .ToArray();
-        if (normalExitStates.Length != 0)
-            mergedNormalExitState = PurityAnalysisState.Merge(normalExitStates);
+            .Select(static pair => pair.Value).ToArray());
 
-        var finalResult = PurityAnalysisResult.Pure;
-
-        foreach (var exitState in fixedPoint.ExitStates.Values)
+        foreach (var exitState in exitStates.Values)
             if (exitState.HasPotentialImpurity)
-            {
-                finalResult = exitState.FirstImpureSyntaxNode != null
+                return exitState.FirstImpureSyntaxNode != null
                     ? PurityAnalysisResult.Impure(exitState.FirstImpureSyntaxNode, exitState.FirstImpurityEvidence)
                     : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(exitState.FirstImpurityEvidence);
-                return finalResult;
-            }
-
-        return finalResult;
+        return PurityAnalysisResult.Pure;
     }
 
     private static PurityAnalysisState ApplyTransferFunction(
