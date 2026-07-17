@@ -690,6 +690,14 @@ the unused preview .NET API may break when it obstructs the canonical design.
     comparers, and canonical path/version/lifetime merging. The wrapper is 93
     nonblank lines, down 102, while the CFG scheduler and Analyzer-only metadata
     remain explicit.
+  - [x] Inline the Analyzer-local Purity CFG scheduler into its sole coordinator.
+    One ordered queue now owns destination-state merging, queued-point deduping,
+    conditional-before-fallthrough order, bounded revisits, return ownership,
+    structural finally continuations, normal-exit merging, and first-impurity
+    selection. Delete `CfgFixedPointWorklist`, `CfgTraversalPoint`, and the
+    propagation/finally helper forest while retaining `ApplyTransferFunction`
+    and post-CFG compatibility policy as explicit adjacent owners. The closed
+    replacement is 119 nonblank lines and removes 102 net production lines.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -922,6 +930,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical mutation inventory | `215d840e` | 105,315 | -2,361 |
 | Phase 7 canonical purity assignment envelope | `db309060` | 105,077 | -2,599 |
 | Phase 7 canonical purity metadata merge | `2459e840` | 104,975 | -2,701 |
+| Phase 7 inline purity CFG scheduler | `2b418660` | 104,873 | -2,803 |
 
 ## Validation Ledger
 
@@ -1153,6 +1162,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical mutation inventory | One execution-scoped ordered `SymbolicMutationInventory` now owns direct targets, reference exposure, strict source windows, invalidation plans, and loop back-edge collection. Parallel loop, program-point, and invalidator walkers are deleted. Inventory/loop invariants pass 8/8, CFG/state/loop parity passes 278/278, source-query tooling passes 96/96, MainSmtFlow passes 257/257, the affected exception-flow batch passes 63/63, and the full main lane passes 5,548 with the same two skips. Release warning-as-error is clean. Production LOC is 105,315 across 444 files, or -2,361 from the rewrite start; tracked test LOC is 145,395. |
 | Phase 7 canonical purity assignment envelope | Commit `db309060` replaces the Analyzer assignment branch fan-out with one ordered target envelope and transition. Three direct invariants lock RHS-span local versions, fixed ref-closure ownership/disposal alias snapshots, and declaration delegate null-resolution recovery. `SymbolicOperationTransferModelTests` pass 47/47; the combined affected Purity/alias/resource/delegate/oracle/exception batch passes 679/679; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,551 plus the same two MainGeneral skips. The Release solution warning-as-error build has zero warnings and errors. Architecture metrics report no oversized files/partials, overparted partials, unassigned or ambiguous files, or dependency violations. Production LOC falls by 238 to 105,077 across 444 files, or -2,599 from the rewrite start; tracked test LOC is 145,542. |
 | Phase 7 canonical purity metadata merge | Commit `2459e840` makes `PurityAnalysisStateMerger` perform one ordered impurity/capture pass and one generic common-key intersection around a single canonical all-path state merge. Three direct tests characterize empty/singleton, pair, and three-state metadata/path behavior; the affected CFG/operation/delegate/alias/evidence batch passes 492/492; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic test-impact inventory includes the new fixture and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, and architecture violation buckets remain zero. Production LOC falls by 102 to 104,975 across 444 files, or -2,701 from the rewrite start; tracked test LOC is 145,672. |
+| Phase 7 inline purity CFG scheduler | Commit `2b418660` replaces the Analyzer-local worklist class, traversal carrier, branch propagator, and recursive finally completion helper with one 119-line coordinator-local scheduler. It preserves conditional-before-fallthrough order, constant-edge selection, feasibility pruning, structural continuation identity, block-ordinal revisit merging, queue deduplication, the exact `blocks * 200` bound, return ownership before finally, nested finally order, insertion-ordered exit evidence, and all-at-once normal-exit merging. The focused branch/merge/operation/try/loop/using/disposal/recursion/evidence/exception-region batch passes 523/523; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic impact inventory drops only the two deleted private types and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, architecture violation buckets remain zero, and exact empty-evidence projection is retained. Production LOC falls by 102 to 104,873 across 444 files, or -2,803 from the rewrite start; tracked test LOC remains 145,672. |
 
 ## Current Checkpoint
 
@@ -1543,14 +1553,22 @@ the unused preview .NET API may break when it obstructs the canonical design.
   Release warning-as-error is clean. Production LOC is 104,975
   across 444 files, down 102 in this tranche and 2,701 from the rewrite start;
   tracked test LOC is 145,672. Architecture violation counts remain zero.
-- Next cheapest step: inventory the now-adjacent Purity CFG fixed-point and
-  final-result closure after the metadata merge. Accept the next vertical slice
-  only if deleting reachable worklist/finalization policy clears the 100-line
-  net gate while preserving successor order, finally continuations, exit
-  impurity selection, normalized state, evidence, versions, ownership, and
-  conservative fallback.
-- Blockers: the 11,000-line production target still requires 8,299 lines. The
-  structural fallback and Analyzer CFG/worklist adapters remain reachable for
-  typed CFG `Unsupported` cases. The user has authorized the required major
-  rearchitecture; its remaining blocker is differential parity, not permission.
+  Purity CFG scheduling now lives in the sole `AnalyzePurityUsingCFGInternal`
+  coordinator. The private worklist, traversal carrier, branch propagator, and
+  recursive finally helper are deleted; exact ordering, iteration bounds,
+  ownership, continuation identity, merging, evidence, and fallback behavior
+  remain green. Production LOC is 104,873 across 444 files, down 102 in this
+  tranche and 2,803 from the rewrite start; tracked test LOC remains 145,672.
+- Next cheapest step: inventory the now-adjacent Purity block-operation transfer
+  loop and post-CFG resource/final-result closure against the canonical
+  assignment envelope, metadata merger, and operation results. Accept the next
+  vertical slice only if one closed replacement removes at least 100 net lines
+  while preserving recursive-placeholder order, branch-value evidence,
+  ownership/disposal exit policy, normalized state, versions, and conservative
+  fallback.
+- Blockers: the 11,000-line production target still requires 8,197 lines. The
+  structural fallback and remaining Analyzer CFG/transfer adapters remain
+  reachable for typed CFG `Unsupported` cases. The user has authorized the
+  required major rearchitecture; its remaining blocker is differential parity,
+  not permission.
   MainSmtFlow passes 257/257; the prior SP0010 baseline is no longer a blocker.
