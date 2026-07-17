@@ -10,11 +10,9 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowEngine
 {
     private readonly record struct ExceptionSiteCollectionContext(
-        SyntaxNode MethodNode,
         SemanticModel SemanticModel,
-        CancellationToken CancellationToken,
         IMethodSymbol MethodSymbol,
-        SmtAnalysisService SmtAnalysis);
+        ExceptionSiteAssessment Assessment);
 
     private static IEnumerable<ExceptionFlowSite> CollectUncaughtExceptionSiteEntries(
         SyntaxNode methodNode,
@@ -28,11 +26,9 @@ internal static partial class ExceptionFlowEngine
         ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
     {
         var siteContext = new ExceptionSiteCollectionContext(
-            methodNode,
             semanticModel,
-            cancellationToken,
             methodSymbol,
-            smtAnalysis);
+            new ExceptionSiteAssessment(methodNode, semanticModel, cancellationToken, smtAnalysis));
         var provenRuntimeHazardSites = ProjectProvenRuntimeHazardSites(methodNode, runtimeHazards);
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
@@ -43,17 +39,21 @@ internal static partial class ExceptionFlowEngine
         foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel,
                      cancellationToken))
         {
-            if (!ExceptionPathStateService.IsMethodCallCandidatePathReachable(calleeCallSite, semanticModel,
-                    cancellationToken, smtAnalysis)) continue;
-
-            if (IsShadowedByThrowingFinally(calleeCallSite.CallSite, semanticModel, cancellationToken, smtAnalysis))
+            if (siteContext.Assessment.Assess(
+                    calleeCallSite.CallSite,
+                    calleeCallSite.UsingDisposeGuard,
+                    static () => null,
+                    out _) is not ExceptionSiteDisposition.Escapes)
                 continue;
 
             var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
             if (calleeCallSite.IsDynamicDispatch)
             {
-                if (!IsCaughtWithinMethod(calleeCallSite.CallSite, null, methodNode,
-                        semanticModel, cancellationToken, smtAnalysis))
+                if (siteContext.Assessment.Assess(
+                        calleeCallSite.CallSite,
+                        calleeCallSite.UsingDisposeGuard,
+                        static () => null,
+                        out _) == ExceptionSiteDisposition.Escapes)
                     yield return new ExceptionFlowSite(
                         calleeCallSite.CallSite,
                         calleeCallSite.Method,
@@ -73,8 +73,12 @@ internal static partial class ExceptionFlowEngine
                          smtAnalysis,
                          attributePolicy))
             {
-                if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel,
-                        cancellationToken, smtAnalysis)) continue;
+                if (siteContext.Assessment.Assess(
+                        calleeCallSite.CallSite,
+                        calleeCallSite.UsingDisposeGuard,
+                        () => exception.Type,
+                        out _) != ExceptionSiteDisposition.Escapes)
+                    continue;
 
                 yield return exception;
             }
@@ -109,28 +113,11 @@ internal static partial class ExceptionFlowEngine
         string category,
         string source)
     {
-        if (IsInStaticallyUnreachableBranch(
+        if (context.Assessment.Assess(
                 site,
-                context.SemanticModel,
-                context.CancellationToken,
-                context.SmtAnalysis))
-            return null;
-
-        if (IsShadowedByThrowingFinally(
-                site,
-                context.SemanticModel,
-                context.CancellationToken,
-                context.SmtAnalysis))
-            return null;
-
-        var exceptionType = context.SemanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName);
-        if (IsCaughtWithinMethod(
-                site,
-                exceptionType,
-                context.MethodNode,
-                context.SemanticModel,
-                context.CancellationToken,
-                context.SmtAnalysis))
+                null,
+                () => context.SemanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName),
+                out var exceptionType) != ExceptionSiteDisposition.Escapes)
             return null;
 
         return new ExceptionFlowSite(

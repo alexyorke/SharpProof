@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Analyzer.Engine;
 using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
@@ -9,113 +10,130 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowEngine
 {
-    private static bool IsCaughtWithinMethod(
-        SyntaxNode throwNode,
-        ITypeSymbol? exceptionType,
+    private enum ExceptionSiteDisposition
+    {
+        Escapes,
+        Caught,
+        Unreachable,
+        ShadowedByFinally
+    }
+
+    private sealed class ExceptionSiteAssessment(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        // The CLR treats an exception raised while evaluating a catch filter as a false filter
-        // result. The filter exception is swallowed and handler search continues for the original
-        // exception, so the filter's own exception never escapes the method.
-        if (throwNode.Ancestors().OfType<CatchFilterClauseSyntax>().Any()) return true;
+        private readonly Dictionary<SyntaxNode, SymbolicState> _pathStates = new();
 
-        foreach (var tryStatement in throwNode.Ancestors().OfType<TryStatementSyntax>())
+        internal ExceptionSiteDisposition Assess(
+            SyntaxNode site,
+            ExceptionFlowAnalyzer.UsingDisposeGuard? usingGuard,
+            Func<ITypeSymbol?> resolveType,
+            out ITypeSymbol? exceptionType)
         {
-            if (!tryStatement.Span.Contains(throwNode.SpanStart)) continue;
-
-            if (!tryStatement.Block.Span.Contains(throwNode.SpanStart)) continue;
-
-            if (tryStatement.Catches.Any(catchClause => CatchesException(catchClause, exceptionType, throwNode,
-                    semanticModel, cancellationToken, smtAnalysis))) return true;
-
-            if (ReferenceEquals(tryStatement, methodNode)) break;
+            exceptionType = null;
+            var pathState = GetPathState(site);
+            var reachabilityState = usingGuard?.ResourceExpression is { } receiver
+                ? SymbolicStateFactBuilder.AddReferenceNullCondition(
+                    pathState,
+                    receiver,
+                    false,
+                    semanticModel,
+                    cancellationToken,
+                    "analyzer.exception-flow.non-null")
+                : pathState;
+            if (!IsReachable(reachabilityState))
+                return ExceptionSiteDisposition.Unreachable;
+            if (IsShadowedByFinally(site, pathState))
+                return ExceptionSiteDisposition.ShadowedByFinally;
+            exceptionType = resolveType();
+            return IsCaught(site, exceptionType)
+                ? ExceptionSiteDisposition.Caught
+                : ExceptionSiteDisposition.Escapes;
         }
 
-        return false;
+        private SymbolicState GetPathState(SyntaxNode site)
+        {
+            if (_pathStates.TryGetValue(site, out var state)) return state;
+            var initialState = RequiresEntryStateBuilder.CreateForUse(
+                site,
+                semanticModel,
+                ExceptionFlowAnalyzer.ActiveAttributePolicy,
+                cancellationToken);
+            state = SymbolicReachabilityService.CollectPathStateAt(
+                site,
+                semanticModel,
+                cancellationToken,
+                initialState);
+            _pathStates.Add(site, state);
+            return state;
+        }
+
+        private bool IsReachable(SymbolicState state) =>
+            SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis).Info.Status !=
+            SymbolicProofStatus.Unreachable;
+
+        private bool IsShadowedByFinally(SyntaxNode site, SymbolicState pathState)
+        {
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
+            {
+                if (tryStatement.Finally?.Block is not { } finallyBlock ||
+                    finallyBlock.Span.Contains(site.SpanStart) ||
+                    !tryStatement.Block.Span.Contains(site.SpanStart) &&
+                    !tryStatement.Catches.Any(catchClause =>
+                        catchClause.Block.Span.Contains(site.SpanStart) ||
+                        catchClause.Filter?.Span.Contains(site.SpanStart) == true))
+                    continue;
+                using var completionScope = SymbolicAnalysisLimitContext.PushIsolated(
+                    SymbolicAnalysisLimitContext.Limits,
+                    finallyBlock);
+                var state = pathState;
+                SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
+                    ref state,
+                    finallyBlock,
+                    semanticModel,
+                    cancellationToken);
+                if (!completionScope.Snapshot().IsTruncated && !IsReachable(state))
+                    return true;
+            }
+            return false;
+        }
+
+        private bool IsCaught(SyntaxNode site, ITypeSymbol? exceptionType)
+        {
+            if (site.Ancestors().OfType<CatchFilterClauseSyntax>().Any()) return true;
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
+            {
+                if (!tryStatement.Block.Span.Contains(site.SpanStart)) continue;
+                if (tryStatement.Catches.Any(catchClause =>
+                        Catches(catchClause, exceptionType, site)))
+                    return true;
+                if (ReferenceEquals(tryStatement, methodNode)) break;
+            }
+            return false;
+        }
+
+        private bool Catches(CatchClauseSyntax clause, ITypeSymbol? exceptionType, SyntaxNode site)
+        {
+            if (clause.Declaration != null)
+            {
+                if (exceptionType == null) return false;
+                var catchType = semanticModel.GetTypeInfo(clause.Declaration.Type, cancellationToken).Type;
+                if (catchType == null || !TypeHierarchyEnumeration.IsSameOrDerivedFrom(exceptionType, catchType))
+                    return false;
+            }
+            if (clause.Filter?.FilterExpression is not { } filter) return true;
+            var constant = semanticModel.GetConstantValue(filter, cancellationToken);
+            if (constant.HasValue && constant.Value is bool value) return value;
+            var lowering = SymbolicSemanticPipeline.LowerCondition(
+                filter,
+                new SymbolicLoweringContext(semanticModel, cancellationToken));
+            return lowering is { IsExact: true, Value: { } condition } &&
+                   SymbolicReachabilityService.ClassifyStateConditionTruth(
+                       GetPathState(site),
+                       condition,
+                       smtAnalysis).Info.Status == SymbolicProofStatus.ProvenTrue;
+        }
     }
-
-    private static bool IsInStaticallyUnreachableBranch(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return !ExceptionPathStateService.IsExceptionPathReachable(
-            node,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis);
-    }
-
-    private static bool IsShadowedByThrowingFinally(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return ExceptionSiteClassifier.IsShadowedByDefinitelyThrowingFinally(
-                   node,
-                   semanticModel,
-                   cancellationToken) ||
-               ExceptionPathStateService.IsShadowedByPathSensitiveThrowingFinally(
-                   node,
-                   semanticModel,
-                   cancellationToken,
-                   smtAnalysis);
-    }
-
-    private static bool CatchesException(
-        CatchClauseSyntax catchClause,
-        ITypeSymbol? exceptionType,
-        SyntaxNode exceptionSite,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (!CatchDeclarationMatches(catchClause, exceptionType, semanticModel, cancellationToken)) return false;
-
-        return IsCatchFilterProvenTrueAtSite(catchClause, exceptionSite, semanticModel, cancellationToken, smtAnalysis);
-    }
-
-    private static bool CatchDeclarationMatches(
-        CatchClauseSyntax catchClause,
-        ITypeSymbol? exceptionType,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (catchClause.Declaration == null) return true;
-
-        if (exceptionType == null) return false;
-
-        var catchType = semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
-        return catchType != null && TypeHierarchyEnumeration.IsSameOrDerivedFrom(exceptionType, catchType);
-    }
-
-    private static bool IsCatchFilterProvenTrueAtSite(
-        CatchClauseSyntax catchClause,
-        SyntaxNode exceptionSite,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (catchClause.Filter?.FilterExpression is not { } filterExpression) return true;
-
-        var constantValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
-        if (constantValue.HasValue && constantValue.Value is bool booleanValue) return booleanValue;
-
-        var pathState = ExceptionPathStateService.CollectPathStateForUse(
-            exceptionSite,
-            semanticModel,
-            cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            filterExpression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        return lowering is { IsExact: true, Value: { } condition } &&
-               SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
-                   .Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
-
 }
