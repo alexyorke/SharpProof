@@ -18,7 +18,7 @@ internal static partial class ExecutionVisibility
         Func<ISymbol, int>? getSymbolVersion)
     {
         if (TryGetEvaluationBranch(ancestor, syntaxNode.SpanStart, out var condition, out var branchWhenTrue) &&
-            !IsLoopGuardInvalidatedBeforeUse(
+            !IsGuardConditionInvalidatedBeforeUse(
                 ancestor,
                 condition,
                 syntaxNode,
@@ -152,19 +152,20 @@ internal static partial class ExecutionVisibility
         }
     }
 
-    private static bool IsLoopGuardInvalidatedBeforeUse(
+    // A guard condition (from an if/conditional/logical-and-or/loop ancestor) must not be
+    // assumed at the use site if any symbol it references is reassigned between the guard's
+    // branch entry and the use. Otherwise a stale guard fact (e.g. x > 0) is applied at the
+    // reassigned symbol's current version, contradicting the new value (x = -1) and pruning a
+    // reachable path. This mirrors the reassignment guard already applied in
+    // SymbolicProgramPointFacts.CollectAncestorReachabilityState.
+    private static bool IsGuardConditionInvalidatedBeforeUse(
         SyntaxNode ancestor,
         ExpressionSyntax condition,
         SyntaxNode use,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var body = ancestor switch
-        {
-            WhileStatementSyntax whileStatement => whileStatement.Statement,
-            ForStatementSyntax forStatement => forStatement.Statement,
-            _ => null
-        };
+        var body = GetGuardBranchBody(ancestor, use.SpanStart);
         return body != null &&
                SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                    condition,
@@ -172,6 +173,32 @@ internal static partial class ExecutionVisibility
                    use.SpanStart,
                    semanticModel,
                    cancellationToken);
+    }
+
+    private static SyntaxNode? GetGuardBranchBody(SyntaxNode ancestor, int position)
+    {
+        switch (ancestor)
+        {
+            case IfStatementSyntax ifStatement when ifStatement.Statement.Span.Contains(position):
+                return ifStatement.Statement;
+            case IfStatementSyntax { Else.Statement: { } elseStatement }
+                when elseStatement.Span.Contains(position):
+                return elseStatement;
+            case ConditionalExpressionSyntax conditional when conditional.WhenTrue.Span.Contains(position):
+                return conditional.WhenTrue;
+            case ConditionalExpressionSyntax conditional when conditional.WhenFalse.Span.Contains(position):
+                return conditional.WhenFalse;
+            case BinaryExpressionSyntax binary when binary.Right.Span.Contains(position) &&
+                                                    (binary.IsKind(SyntaxKind.LogicalAndExpression) ||
+                                                     binary.IsKind(SyntaxKind.LogicalOrExpression)):
+                return binary.Right;
+            case WhileStatementSyntax whileStatement when whileStatement.Statement.Span.Contains(position):
+                return whileStatement.Statement;
+            case ForStatementSyntax forStatement when forStatement.Statement.Span.Contains(position):
+                return forStatement.Statement;
+            default:
+                return null;
+        }
     }
 
     private static SymbolicState AddSwitchEvaluationState(
