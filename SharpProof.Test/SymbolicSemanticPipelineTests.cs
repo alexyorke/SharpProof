@@ -163,14 +163,22 @@ public sealed class SymbolicSemanticPipelineTests
     [Test]
     public void VariablePrefixScanner_DoesNotConfuseNumericLocationPrefixes()
     {
+        static SymbolicFact Fact(string name) => SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                new SymbolicVariableTerm(name, SmtValueKind.Int),
+                new SymbolicIntegerConstantTerm(0)),
+            SyntaxFactory.IdentifierName(name),
+            "test.variable-prefix");
+
         Assert.That(
-            SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                new SmtVariable("x#12", SmtValueKind.Int),
+            SymbolicIrReferenceScanner.ContainsVariablePrefix(
+                Fact("x#12"),
                 "x#1"),
             Is.False);
         Assert.That(
-            SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                new SmtVariable("x#1@2", SmtValueKind.Int),
+            SymbolicIrReferenceScanner.ContainsVariablePrefix(
+                Fact("x#1@v2"),
                 "x#1"),
             Is.True);
     }

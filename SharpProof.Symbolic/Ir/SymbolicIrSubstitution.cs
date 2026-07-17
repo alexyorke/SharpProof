@@ -2,6 +2,14 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicIrSubstitution
 {
+    internal static SymbolicTerm ReplaceTerm(
+        SymbolicTerm term,
+        SymbolicTerm source,
+        SymbolicTerm replacement)
+    {
+        return new TermSubstitutionRewriter(source, replacement).Rewrite(term);
+    }
+
     internal static SymbolicFact ReplaceTerm(
         SymbolicFact fact,
         SymbolicTerm source,
