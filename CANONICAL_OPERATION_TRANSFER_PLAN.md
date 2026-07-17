@@ -710,6 +710,17 @@ the unused preview .NET API may break when it obstructs the canonical design.
     that visible `IThrowOperation` syntax and throw evidence subsume the deleted
     syntax-only fallback. The closed replacement removes 115 net production
     lines.
+  - [x] Make `SymbolicStateMerger` the sole exact-alias-component query owner.
+    Its root-first, symmetric, cycle-safe traversal follows only positive exact
+    `MayAlias` facts. Ownership, borrow direction and kind, disposal diagnostics,
+    release obligations, and all-path resource merging now use typed predicates
+    over that component; the Analyzer recursion/forwarder forest and unused
+    `SemanticModel` evidence overload are deleted. Return/release remains an
+    ownership-obligation discharge but not use-after-dispose evidence, while the
+    all-path merged-release provenance remains disposal evidence. Assignment
+    alias replay and every lifetime mutation writer retain their existing timing,
+    version, provenance, and ordering policy. The replacement adds exactly 60
+    production lines, deletes 220, and removes 134 authoritative nonblank lines.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -943,6 +954,8 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical purity assignment envelope | `db309060` | 105,077 | -2,599 |
 | Phase 7 canonical purity metadata merge | `2459e840` | 104,975 | -2,701 |
 | Phase 7 inline purity CFG scheduler | `2b418660` | 104,873 | -2,803 |
+| Phase 7 ordered purity operation compatibility | `897b2b8d` | 104,758 | -2,918 |
+| Phase 7 canonical exact alias-component queries | `04ec0b9a` | 104,624 | -3,052 |
 
 ## Validation Ledger
 
@@ -1176,6 +1189,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical purity metadata merge | Commit `2459e840` makes `PurityAnalysisStateMerger` perform one ordered impurity/capture pass and one generic common-key intersection around a single canonical all-path state merge. Three direct tests characterize empty/singleton, pair, and three-state metadata/path behavior; the affected CFG/operation/delegate/alias/evidence batch passes 492/492; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic test-impact inventory includes the new fixture and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, and architecture violation buckets remain zero. Production LOC falls by 102 to 104,975 across 444 files, or -2,701 from the rewrite start; tracked test LOC is 145,672. |
 | Phase 7 inline purity CFG scheduler | Commit `2b418660` replaces the Analyzer-local worklist class, traversal carrier, branch propagator, and recursive finally completion helper with one 119-line coordinator-local scheduler. It preserves conditional-before-fallthrough order, constant-edge selection, feasibility pruning, structural continuation identity, block-ordinal revisit merging, queue deduplication, the exact `blocks * 200` bound, return ownership before finally, nested finally order, insertion-ordered exit evidence, and all-at-once normal-exit merging. The focused branch/merge/operation/try/loop/using/disposal/recursion/evidence/exception-region batch passes 523/523; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic impact inventory drops only the two deleted private types and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, architecture violation buckets remain zero, and exact empty-evidence projection is retained. Production LOC falls by 102 to 104,873 across 444 files, or -2,803 from the rewrite start; tracked test LOC remains 145,672. |
 | Phase 7 ordered purity operation compatibility | Commit `897b2b8d` makes one typed check-and-track helper own flow-capture result recording and pure-only state sidecars across CFG and subtree analysis, while callers retain their distinct unreachable and recursive-placeholder policy. One coordinator materializes visible operations once and applies using, foreach, direct throw, catch/finally, invocation, and operator compatibility stages before the unchanged missing-resource-disposal check. The 37-line syntax-only direct-throw fallback and repeated `goto`/enumeration plumbing are deleted. The eight-shape direct-throw table plus nested-callable boundary passes 17/17; the requested focused parity batch passes 707/707; deterministic impact inventory coverage passes 39/39; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,571 plus the same two MainGeneral skips. Release solution warning-as-error is clean and every architecture violation bucket is zero. Production LOC falls by 115 to 104,758 across 444 files, or -2,918 from the rewrite start; tracked test LOC is 145,849. |
+| Phase 7 canonical exact alias-component queries | Commit `04ec0b9a` replaces four recursive Analyzer/Symbolic alias-query forests with one root-first, symmetric, cycle-safe exact-positive component traversal and typed fact predicate. Three direct cases cover roots, forward/reverse chains, cycles, approximate/negative/may-not aliases, ownership, borrow kind and direction, disposal versus return/release, all-path merged release, and one-path outstanding ownership. The direct gate passes 3/3, the core assignment/merge/using/disposal/evidence/ref-alias/release batch 501/501, and the additional owned array/object/delegate/borrow/ref-parameter batch 159/159. Deterministic impact inventory coverage passes 39/39. MainSmtAnalyzer passes 487/487 and all Main lanes pass 5,574 plus the same two MainGeneral skips. Release solution warning-as-error is clean and every architecture violation bucket is zero. Production LOC falls by 134 to 104,624 across 444 files, or -3,052 from the rewrite start; tracked test LOC is 145,969. |
 
 ## Current Checkpoint
 
@@ -1579,14 +1593,22 @@ the unused preview .NET API may break when it obstructs the canonical design.
   boundary; all requested focused and lane gates remain green. Production LOC
   is 104,758 across 444 files, down 115 in this tranche and 2,918 from the
   rewrite start; tracked test LOC is 145,849.
-- Next cheapest step: inventory the remaining Purity resource/lifetime
-  transition wrappers and final-result/exception-path adapters against the
-  canonical assignment envelope, operation coordinator, and state merger.
-  Accept the next closed vertical slice only if it removes at least 100 net
-  production lines while preserving alias-based ownership, reverse disposal,
-  return escape, using-declaration exit timing, evidence, and conservative
-  fallback.
-- Blockers: the 11,000-line production target still requires 8,082 lines. The
+  Exact alias-component queries now have one 60-line cross-layer replacement
+  around the Symbolic owner and typed predicates. Analyzer borrow, borrower,
+  ownership, disposal, missing-dispose,
+  assignment preservation, and merged-release queries no longer recurse or
+  forward independently. Root order, bidirectional chains, cycles, exact-positive
+  confidence, directional borrow semantics, Returned/Released/Disposed
+  distinctions, all-path release provenance, and one-path ownership remain
+  directly characterized. Production LOC is 104,624 across 444 files, down 134
+  in this tranche and 3,052 from the rewrite start; tracked test LOC is 145,969.
+- Next cheapest step: inventory the remaining Purity final-result/resource
+  evidence and exception-path adapters against the canonical operation
+  coordinator and state merger. Keep return/dispose/using/acquire/borrow mutation
+  writers explicit unless an exact replacement preserves timing, versions,
+  provenance, evidence, and fallback; accept only a closed slice removing at
+  least 100 net production lines.
+- Blockers: the 11,000-line production target still requires 7,948 lines. The
   structural fallback and remaining Analyzer CFG/transfer adapters remain
   reachable for typed CFG `Unsupported` cases. The user has authorized the
   required major rearchitecture; its remaining blocker is differential parity,
