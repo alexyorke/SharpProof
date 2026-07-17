@@ -3,7 +3,7 @@ namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
-    private sealed partial class SyntacticFactSet
+    internal sealed partial class SyntacticFactSet
     {
         private bool TryGetKnownInteger(SmtFormula formula, out long value)
         {

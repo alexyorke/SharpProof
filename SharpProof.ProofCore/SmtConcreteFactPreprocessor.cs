@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Text.RegularExpressions;
+using ConcreteFactContext = SharpProof.ProofCore.Smt.SmtSyntacticClassifier.SyntacticFactSet;
 
 namespace SharpProof.ProofCore.Smt;
 
@@ -29,20 +30,17 @@ internal sealed class SmtConcreteFactPreprocessor
             return SmtConcreteFactPreparationStatus.Unsatisfiable;
         }
 
-        var facts = new ConcreteFactContext();
-        if (!SmtBooleanReferenceFactCollector.TryCollectBooleanFacts(
-                normalizedConditions,
-                facts,
-                TryEvaluateConcreteBoolean))
+        var factConditions = normalizedConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts).ToArray();
+        var facts = SmtSyntacticClassifier.SyntacticFactSet.Create(factConditions, out var hasContradiction);
+        if (hasContradiction)
         {
             preparedConditions = Array.Empty<SmtFormula>();
-            return SmtConcreteFactPreparationStatus.Unsatisfiable;
+            return ValidateContradictoryConditions(normalizedConditions, facts);
         }
 
         var conditionalStatus = SmtConditionalFactSimplifier.Simplify(
             normalizedConditions,
             facts,
-            TryEvaluateConcreteBoolean,
             ref changed);
         if (conditionalStatus != SmtConcreteFactPreparationStatus.Ready)
         {
@@ -50,41 +48,17 @@ internal sealed class SmtConcreteFactPreprocessor
             return conditionalStatus;
         }
 
-        if (!SmtBooleanReferenceFactCollector.TryCollectBooleanFacts(
-                normalizedConditions,
-                facts,
-                TryEvaluateConcreteBoolean))
+        factConditions = normalizedConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts).ToArray();
+        facts = SmtSyntacticClassifier.SyntacticFactSet.Create(factConditions, out hasContradiction);
+        if (hasContradiction)
         {
             preparedConditions = Array.Empty<SmtFormula>();
-            return SmtConcreteFactPreparationStatus.Unsatisfiable;
-        }
-
-        var referenceStatus = SmtBooleanReferenceFactCollector.TryCollectReferenceFacts(
-            normalizedConditions,
-            facts,
-            TryEvaluateConcreteBoolean);
-        if (referenceStatus != SmtConcreteFactPreparationStatus.Ready)
-        {
-            preparedConditions = Array.Empty<SmtFormula>();
-            return referenceStatus;
-        }
-
-        if (!TryCollectStringEqualities(normalizedConditions, facts))
-        {
-            preparedConditions = Array.Empty<SmtFormula>();
-            return SmtConcreteFactPreparationStatus.Unsatisfiable;
-        }
-
-        var integerStatus = TryCollectIntegerFacts(normalizedConditions, facts);
-        if (integerStatus != SmtConcreteFactPreparationStatus.Ready)
-        {
-            preparedConditions = Array.Empty<SmtFormula>();
-            return integerStatus;
+            return ValidateContradictoryConditions(normalizedConditions, facts);
         }
 
         foreach (var condition in normalizedConditions)
         {
-            integerStatus = ValidateIntegerTermSafety(condition, facts);
+            var integerStatus = ValidateIntegerTermSafety(condition, facts);
             if (integerStatus != SmtConcreteFactPreparationStatus.Ready)
             {
                 preparedConditions = Array.Empty<SmtFormula>();
@@ -157,256 +131,28 @@ internal sealed class SmtConcreteFactPreprocessor
         return SmtConcreteFactPreparationStatus.Ready;
     }
 
-    private static SmtConcreteFactPreparationStatus TryCollectIntegerFacts(
-        IReadOnlyList<SmtFormula> conditions,
+    private static SmtConcreteFactPreparationStatus ValidateContradictoryConditions(
+        IEnumerable<SmtFormula> conditions,
         ConcreteFactContext facts)
     {
-        return SmtFactFixedPoint.Collect(
-            conditions,
-            SmtConcreteFactPreparationStatus.Ready,
-            (SmtFormula formula, ref bool changed) => TryCollectIntegerFacts(formula, facts, ref changed));
-    }
-
-    private static SmtConcreteFactPreparationStatus TryCollectIntegerFacts(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
+        var safeConditions = new List<SmtFormula>();
+        var unsafeStatus = SmtConcreteFactPreparationStatus.Ready;
+        foreach (var condition in conditions)
         {
-            var leftStatus = TryCollectIntegerFacts(
-                andFormula.Left,
-                facts,
-                ref changed);
-            if (leftStatus != SmtConcreteFactPreparationStatus.Ready) return leftStatus;
-
-            return TryCollectIntegerFacts(
-                andFormula.Right,
-                facts,
-                ref changed);
+            var status = ValidateIntegerTermSafety(condition, facts);
+            if (status == SmtConcreteFactPreparationStatus.Ready)
+                safeConditions.Add(condition);
+            else if (status == SmtConcreteFactPreparationStatus.Unsatisfiable)
+                return status;
+            else
+                unsafeStatus = status;
         }
 
-        if (formula is not SmtBinaryFormula binaryFormula) return SmtConcreteFactPreparationStatus.Ready;
-
-        var boundStatus = TryCollectIntegerBoundFact(binaryFormula, facts, ref changed);
-        if (boundStatus != SmtConcreteFactPreparationStatus.Ready) return boundStatus;
-
-        if (binaryFormula.Operator == SmtBinaryOperator.NotEqual &&
-            TryEvaluateInteger(binaryFormula.Left, facts, out var notEqualLeft) &&
-            TryEvaluateInteger(binaryFormula.Right, facts, out var notEqualRight) &&
-            notEqualLeft == notEqualRight)
-            return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (binaryFormula.Operator != SmtBinaryOperator.Equal) return SmtConcreteFactPreparationStatus.Ready;
-
-        var leftIsConcrete = TryEvaluateInteger(binaryFormula.Left, facts, out var leftValue);
-        var rightIsConcrete = TryEvaluateInteger(binaryFormula.Right, facts, out var rightValue);
-        if (leftIsConcrete && rightIsConcrete)
-            return leftValue == rightValue
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (TrySolveAffineIntegerEquality(binaryFormula, facts, ref changed, out var affineStatus)) return affineStatus;
-
-        if (leftIsConcrete)
-            return TryAddIntegerEquality(facts, binaryFormula.Right, leftValue, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (rightIsConcrete)
-            return TryAddIntegerEquality(facts, binaryFormula.Left, rightValue, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static bool TryAddIntegerEquality(
-        ConcreteFactContext facts,
-        SmtFormula formula,
-        long value,
-        ref bool changed)
-    {
-        if (formula.Kind != SmtValueKind.Int) return true;
-
-        if (facts.IntegerEqualities.TryGetValue(formula, out var existing)) return existing == value;
-
-        facts.IntegerEqualities.Add(formula, value);
-        if (!TryMergeIntegerInterval(
-                facts,
-                formula,
-                SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, value),
-                ref changed))
-            return false;
-
-        changed = true;
-        return true;
-    }
-
-    private static SmtConcreteFactPreparationStatus TryCollectIntegerBoundFact(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (!TryNormalizeIntegerComparisonToConstant(formula, out var expression, out var op, out var constant))
-            return SmtConcreteFactPreparationStatus.Ready;
-
-        var interval = SmtIntegerInterval.Unbounded.Apply(op, constant);
-        return TryMergeIntegerInterval(facts, expression, interval, ref changed)
-            ? SmtConcreteFactPreparationStatus.Ready
-            : SmtConcreteFactPreparationStatus.Unsatisfiable;
-    }
-
-    private static bool TryMergeIntegerInterval(
-        ConcreteFactContext facts,
-        SmtFormula expression,
-        SmtIntegerInterval interval,
-        ref bool changed)
-    {
-        if (expression.Kind != SmtValueKind.Int) return true;
-
-        var hadExisting = facts.IntegerIntervals.TryGetValue(expression, out var existing);
-        var merged = hadExisting ? existing.Intersect(interval) : interval;
-        if (merged.IsContradictory) return false;
-
-        if (!hadExisting || !merged.Equals(existing)) changed = true;
-        facts.IntegerIntervals[expression] = merged;
-        return true;
-    }
-
-    private static bool TrySolveAffineIntegerEquality(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed,
-        out SmtConcreteFactPreparationStatus status)
-    {
-        status = SmtConcreteFactPreparationStatus.Ready;
-        if (formula.Operator != SmtBinaryOperator.Equal) return false;
-
-        if (TryGetAffineTerm(formula.Left, facts, out var leftBase, out var leftCoefficient, out var leftConstant) &&
-            leftBase is not null &&
-            TryEvaluateInteger(formula.Right, facts, out var rightValue))
-            return TrySolveAffineEquality(
-                facts,
-                leftBase,
-                leftCoefficient,
-                leftConstant,
-                rightValue,
-                ref changed,
-                out status);
-
-        if (TryGetAffineTerm(formula.Right, facts, out var rightBase, out var rightCoefficient,
-                out var rightConstant) &&
-            rightBase is not null &&
-            TryEvaluateInteger(formula.Left, facts, out var leftValue))
-            return TrySolveAffineEquality(
-                facts,
-                rightBase,
-                rightCoefficient,
-                rightConstant,
-                leftValue,
-                ref changed,
-                out status);
-
-        return false;
-    }
-
-    private static bool TrySolveAffineEquality(
-        ConcreteFactContext facts,
-        SmtFormula variable,
-        long coefficient,
-        long constant,
-        long value,
-        ref bool changed,
-        out SmtConcreteFactPreparationStatus status)
-    {
-        if (coefficient == 0)
-        {
-            status = constant == value
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-            return true;
-        }
-
-        var adjusted = (BigInteger)value - constant;
-        var bigCoefficient = (BigInteger)coefficient;
-        if (adjusted % bigCoefficient != 0)
-        {
-            status = SmtConcreteFactPreparationStatus.Unsatisfiable;
-            return true;
-        }
-
-        var solved = adjusted / bigCoefficient;
-        if (solved < long.MinValue || solved > long.MaxValue)
-        {
-            status = SmtConcreteFactPreparationStatus.Ready;
-            return false;
-        }
-
-        var solvedValue = (long)solved;
-        status = TryAddIntegerEquality(facts, variable, solvedValue, ref changed)
-            ? SmtConcreteFactPreparationStatus.Ready
-            : SmtConcreteFactPreparationStatus.Unsatisfiable;
-        return true;
-    }
-
-    private static bool TryGetAffineTerm(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        out SmtFormula? variable,
-        out long coefficient,
-        out long constant)
-    {
-        bool ResolveConstant(SmtFormula candidate, out long value) =>
-            TryEvaluateInteger(candidate, facts, out value);
-
-        if (!SmtAffineIntegerTerm.TryCreate(
-                formula,
-                int.MaxValue,
-                static candidate => candidate,
-                ResolveConstant,
-                true,
-                static candidate => candidate is SmtVariable { Kind: SmtValueKind.Int },
-                out var affine))
-        {
-            variable = null;
-            coefficient = 0;
-            constant = 0;
-            return false;
-        }
-
-        variable = affine.BaseTerm;
-        coefficient = affine.Scale;
-        constant = affine.Offset;
-        return true;
-    }
-
-    private static bool TryNormalizeIntegerComparisonToConstant(
-        SmtBinaryFormula formula,
-        out SmtFormula expression,
-        out SmtBinaryOperator op,
-        out long constant)
-    {
-        if (formula.Left is SmtIntegerConstant leftConstant && formula.Right.Kind == SmtValueKind.Int)
-        {
-            expression = formula.Right;
-            op = SmtComparisonOperatorFacts.Reverse(formula.Operator);
-            constant = leftConstant.Value;
-            return SmtComparisonOperatorFacts.IsComparison(op);
-        }
-
-        if (formula.Right is SmtIntegerConstant rightConstant && formula.Left.Kind == SmtValueKind.Int)
-        {
-            expression = formula.Left;
-            op = formula.Operator;
-            constant = rightConstant.Value;
-            return SmtComparisonOperatorFacts.IsComparison(op);
-        }
-
-        expression = null!;
-        op = default;
-        constant = default;
-        return false;
+        var safeFacts = safeConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts);
+        SmtSyntacticClassifier.SyntacticFactSet.Create(safeFacts, out var safeContradiction);
+        return safeContradiction || unsafeStatus == SmtConcreteFactPreparationStatus.Ready
+            ? SmtConcreteFactPreparationStatus.Unsatisfiable
+            : unsafeStatus;
     }
 
     private static SmtConcreteFactPreparationStatus ValidateIntegerTermSafety(
@@ -747,7 +493,25 @@ internal sealed class SmtConcreteFactPreprocessor
                 break;
         }
 
-        return facts.BooleanEqualities.TryGetValue(formula, out value);
+        if (CanCacheBooleanFact(formula) && facts.BooleanEqualities.TryGetValue(formula, out value)) return true;
+        value = false;
+        return false;
+    }
+
+    private static bool CanCacheBooleanFact(SmtFormula formula)
+    {
+        if (formula is SmtVariable { Kind: SmtValueKind.Bool } or SmtRuntimeTypeTestFormula) return true;
+        if (formula is not SmtBinaryFormula binary ||
+            binary.Operator is SmtBinaryOperator.And or SmtBinaryOperator.Or)
+            return false;
+        if (binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
+            binary.Left.Kind == SmtValueKind.Bool && binary.Right.Kind == SmtValueKind.Bool)
+            return false;
+
+        return !SmtFormulaTraversal.Contains(
+            binary,
+            static candidate => candidate is SmtRegexMatchFormula or SmtStringContainsFormula or
+                SmtStringStartsWithFormula or SmtStringEndsWithFormula);
     }
 
     private static bool ShouldPreserveSourceFact(SmtFormula formula)
@@ -847,8 +611,8 @@ internal sealed class SmtConcreteFactPreprocessor
             formula.Right.Kind == SmtValueKind.Reference &&
             formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)
         {
-            if (SmtBooleanReferenceFactCollector.TryEvaluateReferenceNull(formula.Left, facts, TryEvaluateConcreteBoolean, out var leftIsNull) &&
-                SmtBooleanReferenceFactCollector.TryEvaluateReferenceNull(formula.Right, facts, TryEvaluateConcreteBoolean, out var rightIsNull) &&
+            if (facts.TryGetKnownReferenceNullState(formula.Left, out var leftIsNull) &&
+                facts.TryGetKnownReferenceNullState(formula.Right, out var rightIsNull) &&
                 (leftIsNull || rightIsNull))
             {
                 value = CompareEquality(formula.Operator, leftIsNull && rightIsNull);
@@ -1029,7 +793,11 @@ internal sealed class SmtConcreteFactPreprocessor
             return true;
         }
 
-        if (facts.IntegerEqualities.TryGetValue(formula, out value)) return true;
+        if (facts.IntegerIntervals.TryGetValue(formula, out var interval) && interval.ExactValue.HasValue)
+        {
+            value = interval.ExactValue.Value;
+            return true;
+        }
 
         switch (formula)
         {
@@ -1071,46 +839,6 @@ internal sealed class SmtConcreteFactPreprocessor
             SmtBinaryOperator.NotEqual => !equality,
             _ => false
         };
-    }
-
-    private static bool TryCollectStringEqualities(
-        IReadOnlyList<SmtFormula> conditions,
-        ConcreteFactContext facts)
-    {
-        return SmtFactFixedPoint.Collect(
-            conditions,
-            true,
-            (SmtFormula formula, ref bool changed) => TryCollectStringEqualities(formula, facts, ref changed));
-    }
-
-    private static bool TryCollectStringEqualities(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
-            return TryCollectStringEqualities(andFormula.Left, facts, ref changed) &&
-                   TryCollectStringEqualities(andFormula.Right, facts, ref changed);
-
-        if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equalFormula) return true;
-
-        if (TryGetConcreteString(equalFormula.Left, facts, out var leftValue) &&
-            TryGetConcreteString(equalFormula.Right, facts, out var rightValue))
-            return string.Equals(leftValue, rightValue, StringComparison.Ordinal);
-
-        if (equalFormula.Left is SmtStringConstant leftConstant)
-            return TryAddStringEquality(facts, equalFormula.Right, leftConstant.Value, ref changed);
-
-        if (equalFormula.Right is SmtStringConstant rightConstant)
-            return TryAddStringEquality(facts, equalFormula.Left, rightConstant.Value, ref changed);
-
-        if (TryGetConcreteString(equalFormula.Left, facts, out leftValue))
-            return TryAddStringEquality(facts, equalFormula.Right, leftValue, ref changed);
-
-        if (TryGetConcreteString(equalFormula.Right, facts, out rightValue))
-            return TryAddStringEquality(facts, equalFormula.Left, rightValue, ref changed);
-
-        return true;
     }
 
     private static bool TryAddStringEquality(

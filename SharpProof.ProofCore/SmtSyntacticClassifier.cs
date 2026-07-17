@@ -180,7 +180,7 @@ internal static partial class SmtSyntacticClassifier
         return reason.Length != 0;
     }
 
-    private sealed partial class SyntacticFactSet
+    internal sealed partial class SyntacticFactSet
     {
         private const int MaxAffineExpansionDepth = 8;
         private const int MaxBooleanEvaluationDepth = 64;
@@ -200,6 +200,11 @@ internal static partial class SmtSyntacticClassifier
         private int _booleanEvaluationDepth;
         private int _booleanFactInferenceDepth;
         private int _conditionalBranchEvaluationDepth;
+
+        internal Dictionary<SmtFormula, bool> BooleanEqualities => _exactBooleans;
+        internal Dictionary<SmtFormula, string> StringEqualities => _exactStrings;
+        internal Dictionary<SmtFormula, SmtIntegerInterval> IntegerIntervals => _integerIntervals;
+        internal Dictionary<SmtFormula, bool> ReferenceNullEqualities => _referenceNullStates;
 
         internal SyntacticFactSet()
         {
@@ -225,8 +230,15 @@ internal static partial class SmtSyntacticClassifier
 
         internal static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
         {
+            return Create(formulas, out _);
+        }
+
+        internal static SyntacticFactSet Create(
+            IEnumerable<SmtFormula> formulas,
+            out bool hasContradiction)
+        {
             var facts = new SyntacticFactSet();
-            facts.AddAll(formulas, out _);
+            facts.AddAll(formulas, out hasContradiction);
             return facts;
         }
 

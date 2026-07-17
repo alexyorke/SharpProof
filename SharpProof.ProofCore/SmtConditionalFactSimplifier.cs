@@ -4,8 +4,7 @@ internal static class SmtConditionalFactSimplifier
 {
     internal static SmtConcreteFactPreparationStatus Simplify(
         List<SmtFormula> conditions,
-        ConcreteFactContext facts,
-        SmtConcreteBooleanEvaluator evaluateBoolean,
+        SmtSyntacticClassifier.SyntacticFactSet facts,
         ref bool changed)
     {
         for (var index = 0; index < conditions.Count; index++)
@@ -13,7 +12,6 @@ internal static class SmtConditionalFactSimplifier
             var simplified = Simplify(
                 conditions[index],
                 facts,
-                evaluateBoolean,
                 out var conditionChanged);
             changed |= conditionChanged;
             if (simplified is SmtBooleanConstant { Value: false })
@@ -27,8 +25,7 @@ internal static class SmtConditionalFactSimplifier
 
     private static SmtFormula Simplify(
         SmtFormula formula,
-        ConcreteFactContext facts,
-        SmtConcreteBooleanEvaluator evaluateBoolean,
+        SmtSyntacticClassifier.SyntacticFactSet facts,
         out bool changed)
     {
         return SmtFormulaTraversal.RewriteBottomUp(
@@ -40,7 +37,7 @@ internal static class SmtConditionalFactSimplifier
                 if (SmtFormulaTraversal.AreStructurallyEqual(conditional.WhenTrue, conditional.WhenFalse))
                     return conditional.WhenTrue;
 
-                if (evaluateBoolean(conditional.Condition, facts, out var selectedBranch))
+                if (facts.TryEvaluateBoolean(conditional.Condition, out var selectedBranch))
                     return selectedBranch ? conditional.WhenTrue : conditional.WhenFalse;
 
                 return candidate;

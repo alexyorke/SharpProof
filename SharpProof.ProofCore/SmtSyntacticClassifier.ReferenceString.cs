@@ -2,7 +2,7 @@ namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier
 {
-    private sealed partial class SyntacticFactSet
+    internal sealed partial class SyntacticFactSet
     {
         private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction)
         {
@@ -133,7 +133,7 @@ internal static partial class SmtSyntacticClassifier
             return true;
         }
 
-        private bool TryGetKnownReferenceNullState(SmtFormula formula, out bool isNull)
+        internal bool TryGetKnownReferenceNullState(SmtFormula formula, out bool isNull)
         {
             formula = NormalizeAliases(formula);
             if (formula is SmtNullConstant)
