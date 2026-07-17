@@ -1,164 +1,100 @@
 using System.Globalization;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-internal abstract class SymbolicSchemaResultBase
+internal sealed record SymbolicCliExplainReport(
+    SymbolicCliExplainSource Source,
+    SymbolicCliExplainTarget Target,
+    SymbolicCliExplainProject? Project,
+    SymbolicQueryResult Invariant,
+    IReadOnlyList<SymbolicRuntimeHazard> RuntimeHazards,
+    SymbolicCapabilityResult Capabilities,
+    SymbolicComplexityResult Complexity,
+    SymbolicCliExplainDiagnostics Diagnostics,
+    SymbolicCliExplainTruncation Truncation)
 {
-    public abstract string Kind { get; }
+    [JsonPropertyOrder(-4)]
+    public string Kind => "explain";
 
     [JsonPropertyOrder(-3)]
-    public int SchemaVersion => 2;
+    public int SchemaVersion => 3;
 
     [JsonPropertyOrder(-2)]
     public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
 
     [JsonPropertyOrder(-1)]
     public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
-}
 
-internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
-{
-    private readonly SymbolicInvariantQueryView _invariant;
-    private readonly IReadOnlyList<SymbolicRuntimeHazard> _runtimeHazards;
-
-    private SymbolicCliExplainReport(
-        SymbolicCliExplainSource source,
-        SymbolicCliExplainTarget target,
-        SymbolicCliExplainProject? project,
-        SymbolicQueryResult invariant,
-        IReadOnlyList<SymbolicRuntimeHazard> runtimeHazards,
-        SymbolicCliExplainCapabilityResult capabilities,
-        SymbolicCliExplainComplexityResult complexity,
-        SymbolicCliExplainDiagnosticResult diagnostics,
-        IReadOnlyList<SymbolicCliExplainCrossLink> crossLinks,
-        SymbolicCliExplainTruncation truncation)
-    {
-        Source = source;
-        Target = target;
-        Project = project;
-        _invariant = SymbolicInvariantQueryView.From(invariant);
-        Invariant = invariant;
-        _runtimeHazards = runtimeHazards;
-        RuntimeHazards = runtimeHazards;
-        Capabilities = capabilities;
-        Complexity = complexity;
-        Diagnostics = diagnostics;
-        CrossLinks = crossLinks;
-        Truncation = truncation;
-    }
-
-    [JsonPropertyOrder(-4)]
-    public override string Kind => "explain";
-
-    public SymbolicCliExplainSource Source { get; }
-
-    public SymbolicCliExplainTarget Target { get; }
-
-    public SymbolicCliExplainProject? Project { get; }
-
-    public SymbolicQueryResult Invariant { get; }
-
-    public IReadOnlyList<SymbolicRuntimeHazard> RuntimeHazards { get; }
-
-    public SymbolicCliExplainCapabilityResult Capabilities { get; }
-
-    public SymbolicCliExplainComplexityResult Complexity { get; }
-
-    public SymbolicCliExplainDiagnosticResult Diagnostics { get; }
-
-    public IReadOnlyList<SymbolicCliExplainCrossLink> CrossLinks { get; }
-
-    public SymbolicCliExplainTruncation Truncation { get; }
-
-    public static async Task<SymbolicCliExplainReport> CreateAsync(
+    internal static async Task<SymbolicCliExplainReport> CreateAsync(
         SymbolicCliOptions options,
         SymbolicCliInputContext inputContext,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default)
     {
-        if (options == null) throw new ArgumentNullException(nameof(options));
-        if (inputContext == null) throw new ArgumentNullException(nameof(inputContext));
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(inputContext);
+        ArgumentNullException.ThrowIfNull(smtAnalysis);
 
         var service = new SymbolicQueryService();
-        var sourceInput = inputContext.SourceInput;
+        var source = inputContext.SourceInput;
         var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
-        var pointTarget = options.Position.HasValue
+        var requestedTarget = options.Position.HasValue
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
-        var pointResult = service.Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
-        if (pointResult.ProgramPoints.Count != 1)
+        var invariant = service.Query(new SymbolicQueryContext(source, requestedTarget, queryOptions));
+        if (invariant.ProgramPoints.Count != 1)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
                 SymbolicErrorCategory.Unsupported,
-                $"Explain requires a resolvable source program point, but the query returned {pointResult.ScopeKind}.",
+                $"Explain requires one source program point; the query returned {invariant.ScopeKind}.",
                 SymbolicErrorExitCodes.InvalidData,
                 "resultKind",
-                pointResult.ScopeKind);
-        var point = pointResult.ProgramPoints[0];
+                invariant.ScopeKind);
 
-        var itemLimit = options.ReportMaxItems;
-
-        var runtimeHazards = service.QueryRuntimeHazards(
+        var point = invariant.ProgramPoints[0];
+        var hazardResult = service.QueryRuntimeHazards(
             new SymbolicQueryContext(
-                sourceInput,
+                source,
                 SymbolicQueryTarget.Point(point.Line, point.Column),
                 queryOptions),
             options.CreateRuntimeHazardOptions());
-        var selectedHazards = runtimeHazards.Hazards.Take(options.ReportMaxHazards).ToArray();
-
-        var capabilityResult = service.QueryCapabilities(
-            new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
-        var capabilities = SymbolicCliExplainCapabilityResult.FromResult(capabilityResult, itemLimit);
-        var complexityResult = service.QueryComplexity(
-            new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
-        var complexity = SymbolicCliExplainComplexityResult.FromResult(complexityResult, itemLimit);
-
-        var diagnostics = await CreateDiagnosticsAsync(
+        var hazards = hazardResult.Hazards.Take(options.ReportMaxHazards).ToArray();
+        var capabilities = service.QueryCapabilities(
+            new SymbolicQueryContext(source, requestedTarget, queryOptions));
+        var complexity = service.QueryComplexity(
+            new SymbolicQueryContext(source, requestedTarget, queryOptions));
+        var diagnostics = await SymbolicCliExplainDiagnostics.CreateAsync(
             options,
             inputContext.ProjectContext,
             options.ReportMaxDiagnostics,
             cancellationToken).ConfigureAwait(false);
-        var project = SymbolicCliExplainProject.FromContext(inputContext, itemLimit);
-        var source = new SymbolicCliExplainSource(
-            sourceInput.FilePath ?? point.FilePath,
-            sourceInput.Kind.ToString(),
-            sourceInput.SourceMap);
-        var target = SymbolicCliExplainTarget.FromPoint(options, point);
-        var crossLinks = CreateCrossLinks(diagnostics.Items);
-        var truncation = new SymbolicCliExplainTruncation(
-            pointResult.AnalysisTruncation.IsTruncated,
-            runtimeHazards.Hazards.Count > selectedHazards.Length,
-            capabilities.Truncation.IsTruncated,
-            complexity.Truncation.IsTruncated,
-            diagnostics.Truncated,
-            project?.Truncation.IsTruncated == true,
-            pointResult.AnalysisTruncation.IsTruncated || runtimeHazards.AnalysisTruncation.IsTruncated);
+        var project = SymbolicCliExplainProject.Create(inputContext, options.ReportMaxItems);
 
         return new SymbolicCliExplainReport(
-            source,
-            target,
+            new SymbolicCliExplainSource(source.FilePath ?? point.FilePath, source.Kind.ToString(), source.SourceMap),
+            SymbolicCliExplainTarget.Create(options, point),
             project,
-            pointResult,
-            selectedHazards,
+            invariant,
+            hazards,
             capabilities,
             complexity,
             diagnostics,
-            crossLinks,
-            truncation);
+            new SymbolicCliExplainTruncation(
+                invariant.AnalysisTruncation.IsTruncated,
+                hazardResult.Hazards.Count > hazards.Length,
+                diagnostics.IsTruncated,
+                project?.IsTruncated == true,
+                invariant.AnalysisTruncation.IsTruncated || hazardResult.AnalysisTruncation.IsTruncated));
     }
 
-    public IReadOnlyDictionary<string, object?> ToSarif()
+    internal IReadOnlyDictionary<string, object?> ToSarif()
     {
-        var results = new List<Dictionary<string, object?>>();
-        foreach (var diagnostic in Diagnostics.Items)
-        {
-            results.Add(CreateSarifResult(
+        var results = Diagnostics.Items
+            .Select(static diagnostic => CreateSarifResult(
                 diagnostic.Id,
                 ToSarifLevel(diagnostic.Severity),
                 diagnostic.Message,
@@ -166,121 +102,27 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 diagnostic.StartLine,
                 diagnostic.StartColumn,
                 diagnostic.EndLine,
-                diagnostic.EndColumn,
-                diagnostic.CrossLinks,
-                new Dictionary<string, object?>
-                {
-                    ["isTarget"] = diagnostic.IsTarget,
-                    ["helpLinkUri"] = diagnostic.HelpLinkUri
-                }));
-        }
-
-        foreach (var hazard in _runtimeHazards)
-        {
-            results.Add(CreateSarifResult(
+                diagnostic.EndColumn))
+            .Concat(RuntimeHazards.Select(static hazard => CreateSarifResult(
                 "SPQ-HZ-" + ToKebabCase(hazard.Kind.ToString()).ToUpperInvariant(),
-                hazard.Status switch
-                {
-                    SymbolicRuntimeHazardStatus.Proven => "error",
-                    SymbolicRuntimeHazardStatus.Unknown => "warning",
-                    SymbolicRuntimeHazardStatus.Unsupported => "note",
-                    _ => "none"
-                },
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven ? "error" : "warning",
                 $"{hazard.Kind}: {hazard.OperationText} ({hazard.StatusReason})",
                 hazard.FilePath,
                 hazard.Line,
                 hazard.Column,
                 hazard.NodeEndLine,
-                hazard.NodeEndColumn,
-                new[] { "#/runtimeHazards" },
-                new Dictionary<string, object?>
-                {
-                    ["status"] = hazard.Status.ToString(),
-                    ["exceptionType"] = hazard.ExceptionType,
-                    ["category"] = hazard.Category,
-                    ["triggerCondition"] = hazard.TriggerCondition
-                }));
-        }
-
-        if (_invariant.HasUnresolvedAnalysis || Invariant.AnalysisTruncation.IsTruncated)
-        {
-            results.Add(CreateSarifResult(
-                "SPQ-INVARIANT-UNKNOWN",
-                "warning",
-                _invariant.Summary,
-                Source.FilePath,
-                Target.ResolvedLine,
-                Target.ResolvedColumn,
-                Target.ResolvedEndLine,
-                Target.ResolvedEndColumn,
-                new[] { "#/invariant" }));
-        }
-
-        if (Capabilities.HasUnknowns)
-        {
-            results.Add(CreateSarifResult(
-                "SPQ-CAPABILITY-UNKNOWN",
-                "warning",
-                "Capability analysis is conservative or contains unknown sites.",
-                Capabilities.FilePath,
-                Capabilities.StartLine,
-                Capabilities.StartColumn,
-                Capabilities.EndLine,
-                Capabilities.EndColumn,
-                new[] { "#/capabilities" }));
-        }
-
-        if (Complexity.Complexity.IsConservative || Complexity.Complexity.IsUnknown)
-        {
-            results.Add(CreateSarifResult(
-                "SPQ-COMPLEXITY-UNKNOWN",
-                "warning",
-                $"Complexity analysis is conservative: {Complexity.Complexity.Text}.",
-                Complexity.FilePath,
-                Complexity.StartLine,
-                Complexity.StartColumn,
-                Complexity.EndLine,
-                Complexity.EndColumn,
-                new[] { "#/complexity" }));
-        }
-
+                hazard.NodeEndColumn)))
+            .ToList();
         if (Truncation.IsTruncated)
-        {
             results.Add(CreateSarifResult(
                 "SPQ-REPORT-TRUNCATED",
                 "warning",
-                "The explain report was bounded or analysis reached a configured limit; inspect report.truncation.",
+                "The explain report or its analysis reached a configured bound.",
                 Source.FilePath,
                 Target.ResolvedLine,
                 Target.ResolvedColumn,
                 Target.ResolvedEndLine,
-                Target.ResolvedEndColumn,
-                new[] { "#/truncation" }));
-        }
-
-        var ruleIds = results
-            .Select(static result => (string)result["ruleId"]!)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static id => id, StringComparer.Ordinal)
-            .ToArray();
-        var rules = ruleIds
-            .Select(id => new Dictionary<string, object?>
-            {
-                ["id"] = id,
-                ["shortDescription"] = new Dictionary<string, object?>
-                {
-                    ["text"] = DescribeRule(id)
-                }
-            })
-            .ToArray();
-        var runProperties = new Dictionary<string, object?>
-        {
-            ["explainSchemaVersion"] = SchemaVersion,
-            ["evidenceSchemaVersion"] = EvidenceSchemaVersion,
-            ["evidenceSchemaCompatibility"] = EvidenceSchemaCompatibility,
-            ["reportTruncated"] = Truncation.IsTruncated,
-            ["crossLinks"] = CrossLinks
-        };
+                Target.ResolvedEndColumn));
 
         return new Dictionary<string, object?>
         {
@@ -292,176 +134,63 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
                 {
                     ["tool"] = new Dictionary<string, object?>
                     {
-                        ["driver"] = new Dictionary<string, object?>
-                        {
-                            ["name"] = "SharpProof",
-                            ["informationUri"] = "https://github.com/alexyorke/SharpProof",
-                            ["rules"] = rules
-                        }
+                        ["driver"] = new Dictionary<string, object?> { ["name"] = "SharpProof" }
                     },
                     ["results"] = results,
-                    ["properties"] = runProperties
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["explainSchemaVersion"] = SchemaVersion,
+                        ["evidenceSchemaVersion"] = EvidenceSchemaVersion,
+                        ["reportTruncated"] = Truncation.IsTruncated
+                    }
                 }
             }
         };
     }
 
-    public string ToMarkdown()
+    internal string ToMarkdown()
     {
-        var builder = new StringBuilder();
-        builder.AppendLine("# SharpProof explanation");
-        builder.AppendLine();
-        builder.AppendLine($"- File: `{EscapeInline(Source.FilePath)}`");
-        builder.AppendLine($"- Source input: `{Source.Kind}`");
-        builder.AppendLine($"- Target: {EscapeInline(Target.DisplayText)}");
-        builder.AppendLine($"- Resolved point: {Target.ResolvedLine}:{Target.ResolvedColumn} (`{Target.NodeKind}`)");
-        if (Project != null)
-        {
-            builder.AppendLine($"- Project: `{EscapeInline(Project.Name)}`");
-            builder.AppendLine($"- Baseline loaded: {Project.HasBaseline.ToString().ToLowerInvariant()}");
-            builder.AppendLine($"- Effect summaries: {Project.EffectSummaryFileCount}");
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("## Invariant and reachability");
-        builder.AppendLine();
         var point = Invariant.ProgramPoints.Single();
-        builder.AppendLine($"- Invariant: `{EscapeInline(_invariant.Text)}`");
-        builder.AppendLine($"- Invariant status: `{_invariant.Status}` - {EscapeInline(_invariant.StatusReason)}");
-        builder.AppendLine($"- Reachability: `{point.Reachability}` - {EscapeInline(point.ReachabilityReason)}");
-        builder.AppendLine($"- Proof outcomes: {_invariant.ProofOutcomes.TotalCount} total, {_invariant.ProofOutcomes.ProvenTrueCount} true, {_invariant.ProofOutcomes.ProvenFalseCount} false, {_invariant.ProofOutcomes.UnknownCount} unknown");
+        var builder = new StringBuilder()
+            .AppendLine("# SharpProof explanation")
+            .AppendLine()
+            .AppendLine($"- File: `{Escape(Source.FilePath)}`")
+            .AppendLine($"- Target: {Target.DisplayText}")
+            .AppendLine($"- Resolved point: {Target.ResolvedLine}:{Target.ResolvedColumn} (`{Target.NodeKind}`)")
+            .AppendLine()
+            .AppendLine("## Invariant and reachability")
+            .AppendLine()
+            .AppendLine($"- Invariant: `{Escape(point.MergedInvariantText)}`")
+            .AppendLine($"- Reachability: `{point.Reachability}` - {Escape(point.ReachabilityReason)}")
+            .AppendLine($"- Proof outcomes: {point.ConditionProofs.Count}")
+            .AppendLine()
+            .AppendLine("## Runtime hazards")
+            .AppendLine();
+        foreach (var hazard in RuntimeHazards)
+            builder.AppendLine($"- `{hazard.Kind}` at {hazard.Line}:{hazard.Column}: {Escape(hazard.OperationText)}");
 
-        builder.AppendLine();
-        builder.AppendLine("## Runtime hazards");
-        builder.AppendLine();
-        builder.AppendLine($"Total: {_runtimeHazards.Count}");
-        if (_runtimeHazards.Count != 0)
-        {
-            builder.AppendLine();
-            builder.AppendLine("| Kind | Status | Location | Operation |");
-            builder.AppendLine("| --- | --- | --- | --- |");
-            foreach (var hazard in _runtimeHazards)
-                builder.AppendLine($"| {EscapeCell(hazard.Kind.ToString())} | {EscapeCell(hazard.Status.ToString())} | {hazard.Line}:{hazard.Column} | {EscapeCell(hazard.OperationText)} |");
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("## Capabilities");
-        builder.AppendLine();
-        builder.AppendLine($"- Method: `{EscapeInline(Capabilities.MethodDisplayName)}`");
-        builder.AppendLine($"- Capability set: `{EscapeInline(Capabilities.CapabilityText)}`");
-        builder.AppendLine($"- Conservative: {Capabilities.HasUnknowns.ToString().ToLowerInvariant()}");
-        if (Capabilities.Sites.Count != 0)
-        {
-            builder.AppendLine();
-            builder.AppendLine("| Capability | Site | Location | Symbol or operation |");
-            builder.AppendLine("| --- | --- | --- | --- |");
-            foreach (var site in Capabilities.Sites)
-            {
-                var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
-                    ? site.OperationText
-                    : site.SymbolDisplayName;
-                builder.AppendLine($"| {EscapeCell(site.IsUnknown ? "Unknown" : site.CapabilityText)} | {EscapeCell(site.SiteKind)} | {site.SourceLine}:{site.SourceColumn} | {EscapeCell(detail)} |");
-            }
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("## Complexity");
-        builder.AppendLine();
-        builder.AppendLine($"- Method: `{EscapeInline(Complexity.MethodDisplayName)}`");
-        builder.AppendLine($"- Bound: `{EscapeInline(Complexity.Complexity.Text)}` (`{Complexity.Complexity.Kind}`)");
-        builder.AppendLine($"- Conservative: {Complexity.Complexity.IsConservative.ToString().ToLowerInvariant()}");
-        if (Complexity.Drivers.Count != 0)
-        {
-            builder.AppendLine();
-            builder.AppendLine("| Driver | Location | Description |");
-            builder.AppendLine("| --- | --- | --- |");
-            foreach (var driver in Complexity.Drivers)
-                builder.AppendLine($"| {EscapeCell(driver.Kind)} | {driver.SourceLine}:{driver.SourceColumn} | {EscapeCell(driver.Description)} |");
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("## Analyzer diagnostics");
-        builder.AppendLine();
-        builder.AppendLine($"Total: {Diagnostics.TotalCount}; target: {Diagnostics.TargetCount}");
-        if (Diagnostics.Items.Count != 0)
-        {
-            builder.AppendLine();
-            builder.AppendLine("| ID | Severity | Target | Location | Message | Related evidence |");
-            builder.AppendLine("| --- | --- | --- | --- | --- | --- |");
-            foreach (var diagnostic in Diagnostics.Items)
-            {
-                var location = diagnostic.StartLine.HasValue
-                    ? $"{diagnostic.StartLine}:{diagnostic.StartColumn}"
-                    : "project";
-                builder.AppendLine($"| {EscapeCell(diagnostic.Id)} | {EscapeCell(diagnostic.Severity)} | {(diagnostic.IsTarget ? "yes" : "no")} | {location} | {EscapeCell(diagnostic.Message)} | {EscapeCell(string.Join(", ", diagnostic.CrossLinks))} |");
-            }
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("## Cross-links");
-        builder.AppendLine();
-        foreach (var link in CrossLinks)
-            builder.AppendLine($"- `{EscapeInline(link.From)}` {EscapeInline(link.Relation)} `{EscapeInline(link.To)}`: {EscapeInline(link.Description)}");
+        builder.AppendLine()
+            .AppendLine("## Capabilities")
+            .AppendLine()
+            .AppendLine($"- Method: `{Escape(Capabilities.MethodDisplayName)}`")
+            .AppendLine($"- Capability set: `{Escape(Capabilities.CapabilityText)}`")
+            .AppendLine($"- Conservative: {Capabilities.HasUnknowns.ToString().ToLowerInvariant()}")
+            .AppendLine()
+            .AppendLine("## Complexity")
+            .AppendLine()
+            .AppendLine($"- Method: `{Escape(Complexity.MethodDisplayName)}`")
+            .AppendLine($"- Bound: `{Escape(Complexity.Complexity.Text)}`")
+            .AppendLine()
+            .AppendLine("## Analyzer diagnostics")
+            .AppendLine()
+            .AppendLine($"Total: {Diagnostics.TotalCount}; target: {Diagnostics.TargetCount}");
+        foreach (var diagnostic in Diagnostics.Items)
+            builder.AppendLine($"- `{diagnostic.Id}` {Escape(diagnostic.Message)}");
 
         if (Truncation.IsTruncated)
-        {
-            builder.AppendLine();
-            builder.AppendLine("## Truncation");
-            builder.AppendLine();
-            builder.AppendLine("This report is bounded. Inspect the machine-readable `truncation` object or increase the `--report-max-*` limits.");
-        }
-
+            builder.AppendLine().AppendLine("## Truncation").AppendLine()
+                .AppendLine("The report or its analysis reached a configured bound.");
         return builder.ToString();
-    }
-
-    private static async Task<SymbolicCliExplainDiagnosticResult> CreateDiagnosticsAsync(
-        SymbolicCliOptions options,
-        SharpProofProjectAnalysisContext? context,
-        int limit,
-        CancellationToken cancellationToken)
-    {
-        if (context == null) return SymbolicCliExplainDiagnosticResult.Empty;
-
-        var diagnostics = await context.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
-        var relevant = SymbolicCliDiagnosticSelector.SelectRelevant(
-            diagnostics,
-            context.SyntaxTree,
-            options.Position,
-            options.Line);
-        var projection = SymbolicCompactProjection.Project(relevant, limit);
-        var items = projection.Items
-            .Select(static item => SymbolicCliExplainDiagnostic.FromDiagnostic(
-                item.Diagnostic,
-                item.IsTarget))
-            .ToArray();
-        return new SymbolicCliExplainDiagnosticResult(
-            projection.TotalCount,
-            relevant.Count(static item => item.IsTarget),
-            items,
-            projection.IsTruncated);
-    }
-
-    private static IReadOnlyList<SymbolicCliExplainCrossLink> CreateCrossLinks(
-        IReadOnlyList<SymbolicCliExplainDiagnostic> diagnostics)
-    {
-        var links = new List<SymbolicCliExplainCrossLink>
-        {
-            new("#/target", "resolvesTo", "#/invariant/queryDescriptor", "The requested target resolves to the invariant program point."),
-            new("#/invariant", "corroborates", "#/runtimeHazards", "Reachability and facts supply context for runtime hazards."),
-            new("#/capabilities", "describes", "#/invariant/queryDescriptor/methodName", "Capabilities describe the containing method-like body."),
-            new("#/complexity", "describes", "#/invariant/queryDescriptor/methodName", "Complexity describes the containing method-like body.")
-        };
-        for (var index = 0; index < diagnostics.Count; index++)
-        {
-            foreach (var target in diagnostics[index].CrossLinks)
-                links.Add(new SymbolicCliExplainCrossLink(
-                    $"#/diagnostics/items/{index}",
-                    "explainedBy",
-                    target,
-                    $"{diagnostics[index].Id} maps to related symbolic evidence."));
-        }
-
-        return links;
     }
 
     private static Dictionary<string, object?> CreateSarifResult(
@@ -472,229 +201,113 @@ internal sealed class SymbolicCliExplainReport : SymbolicSchemaResultBase
         int? startLine,
         int? startColumn,
         int? endLine,
-        int? endColumn,
-        IReadOnlyList<string> crossLinks,
-        IReadOnlyDictionary<string, object?>? extraProperties = null)
+        int? endColumn)
     {
-        var properties = new Dictionary<string, object?>
-        {
-            ["crossLinks"] = crossLinks
-        };
-        if (extraProperties != null)
-        {
-            foreach (var property in extraProperties)
-                if (property.Value != null)
-                    properties[property.Key] = property.Value;
-        }
-
         var result = new Dictionary<string, object?>
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?> { ["text"] = message },
-            ["properties"] = properties
+            ["message"] = new Dictionary<string, object?> { ["text"] = message }
         };
-        if (!string.IsNullOrWhiteSpace(filePath) && startLine.HasValue && startColumn.HasValue)
+        if (string.IsNullOrWhiteSpace(filePath) || !startLine.HasValue || !startColumn.HasValue) return result;
+
+        result["locations"] = new object[]
         {
-            var region = new Dictionary<string, object?>
+            new Dictionary<string, object?>
             {
-                ["startLine"] = Math.Max(1, startLine.Value),
-                ["startColumn"] = Math.Max(1, startColumn.Value)
-            };
-            if (endLine.HasValue) region["endLine"] = Math.Max(1, endLine.Value);
-            if (endColumn.HasValue) region["endColumn"] = Math.Max(1, endColumn.Value);
-            result["locations"] = new object[]
-            {
-                new Dictionary<string, object?>
+                ["physicalLocation"] = new Dictionary<string, object?>
                 {
-                    ["physicalLocation"] = new Dictionary<string, object?>
+                    ["artifactLocation"] = new Dictionary<string, object?>
                     {
-                        ["artifactLocation"] = new Dictionary<string, object?>
-                        {
-                            ["uri"] = NormalizeArtifactUri(filePath)
-                        },
-                        ["region"] = region
+                        ["uri"] = Path.IsPathRooted(filePath)
+                            ? new Uri(CliHost.GetFullPath(filePath)).AbsoluteUri
+                            : filePath.Replace('\\', '/')
+                    },
+                    ["region"] = new Dictionary<string, object?>
+                    {
+                        ["startLine"] = Math.Max(1, startLine.Value),
+                        ["startColumn"] = Math.Max(1, startColumn.Value),
+                        ["endLine"] = endLine,
+                        ["endColumn"] = endColumn
                     }
                 }
-            };
-        }
-
+            }
+        };
         return result;
     }
 
-    private static string ToSarifLevel(string severity)
+    private static string ToSarifLevel(string severity) => severity.ToLowerInvariant() switch
     {
-        return severity.ToLowerInvariant() switch
-        {
-            "error" => "error",
-            "warning" => "warning",
-            "info" => "note",
-            _ => "none"
-        };
-    }
+        "error" => "error",
+        "warning" => "warning",
+        "info" => "note",
+        _ => "none"
+    };
 
-    private static string NormalizeArtifactUri(string path)
-    {
-        if (Path.IsPathRooted(path)) return new Uri(CliHost.GetFullPath(path)).AbsoluteUri;
+    private static string ToKebabCase(string value) => string.Concat(value.Select((c, index) =>
+        index != 0 && char.IsUpper(c) && !char.IsUpper(value[index - 1]) ? "-" + c : c.ToString()));
 
-        return path.Replace('\\', '/');
-    }
-
-    private static string ToKebabCase(string value)
-    {
-        if (value.Length == 0) return value;
-
-        var builder = new StringBuilder(value.Length + 8);
-        for (var index = 0; index < value.Length; index++)
-        {
-            var character = value[index];
-            if (index != 0 && char.IsUpper(character) && !char.IsUpper(value[index - 1])) builder.Append('-');
-            builder.Append(character);
-        }
-
-        return builder.ToString();
-    }
-
-    private static string DescribeRule(string ruleId)
-    {
-        if (ruleId.StartsWith("SPQ-HZ-", StringComparison.Ordinal)) return "SharpProof runtime hazard";
-        if (ruleId.StartsWith("SPQ-", StringComparison.Ordinal)) return "SharpProof explain report status";
-        return "SharpProof analyzer diagnostic";
-    }
-
-    private static string EscapeInline(string value)
-    {
-        return (value ?? string.Empty)
-            .Replace("`", "\\`", StringComparison.Ordinal)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal);
-    }
-
-    private static string EscapeCell(string value)
-    {
-        return EscapeInline(value).Replace("|", "\\|", StringComparison.Ordinal);
-    }
+    private static string Escape(string? value) => (value ?? string.Empty)
+        .Replace("`", "\\`", StringComparison.Ordinal)
+        .Replace("\r", " ", StringComparison.Ordinal)
+        .Replace("\n", " ", StringComparison.Ordinal);
 }
 
-internal sealed record SymbolicCliExplainSource(
-    string FilePath,
-    string Kind,
-    SymbolicSourceMap? SourceMap);
+internal sealed record SymbolicCliExplainSource(string FilePath, string Kind, SymbolicSourceMap? SourceMap);
 
 internal sealed record SymbolicCliExplainTarget(
-    string Kind,
     int? RequestedLine,
     int? RequestedColumn,
     int? RequestedPosition,
     int ResolvedLine,
     int ResolvedColumn,
-    int ResolvedPosition,
-    int ResolvedSpanStart,
-    int ResolvedSpanEnd,
     int ResolvedEndLine,
     int ResolvedEndColumn,
     string NodeKind,
     string? MethodName,
     string ProgramPointKind)
 {
-    public string DisplayText => RequestedPosition.HasValue
+    internal string DisplayText => RequestedPosition.HasValue
         ? $"position {RequestedPosition.Value}"
         : $"line {RequestedLine}, column {RequestedColumn}";
 
-    public static SymbolicCliExplainTarget FromPoint(
-        SymbolicCliOptions options,
-        SymbolicProgramPointResult point)
-    {
-        return new SymbolicCliExplainTarget(
-            options.Position.HasValue ? "position" : "point",
+    internal static SymbolicCliExplainTarget Create(SymbolicCliOptions options, SymbolicProgramPointResult point) =>
+        new(
             options.Position.HasValue ? null : options.Line,
             options.Position.HasValue ? null : options.Column,
             options.Position,
             point.Line,
             point.Column,
-            point.Position,
-            point.NodeSpanStart,
-            point.NodeSpanEnd,
             point.NodeEndLine,
             point.NodeEndColumn,
             point.NodeKind,
             point.MethodName,
             point.ProgramPointKind);
-    }
 }
 
-internal sealed class SymbolicCliExplainProject
+internal sealed record SymbolicCliExplainProject(
+    string Name,
+    string? ProjectFilePath,
+    string? SolutionFilePath,
+    bool HasBaseline,
+    int EffectSummaryFileCount,
+    int AnalyzerConfigCount,
+    IReadOnlyList<string> AnalyzerConfigPaths,
+    int AdditionalFileCount,
+    IReadOnlyList<string> AdditionalFilePaths,
+    int WorkspaceDiagnosticCount,
+    IReadOnlyList<string> WorkspaceDiagnostics,
+    int ConfigurationIssueCount,
+    IReadOnlyList<SharpProofProjectConfigurationIssue> ConfigurationIssues,
+    bool IsTruncated)
 {
-    private SymbolicCliExplainProject(
-        string name,
-        string? projectFilePath,
-        string? solutionFilePath,
-        bool hasBaseline,
-        int effectSummaryFileCount,
-        int analyzerConfigCount,
-        IReadOnlyList<string> analyzerConfigPaths,
-        int additionalFileCount,
-        IReadOnlyList<string> additionalFilePaths,
-        int workspaceDiagnosticCount,
-        IReadOnlyList<string> workspaceDiagnostics,
-        int configurationIssueCount,
-        IReadOnlyList<SharpProofProjectConfigurationIssue> configurationIssues,
-        SymbolicCliExplainProjectTruncation truncation)
+    internal static SymbolicCliExplainProject? Create(SymbolicCliInputContext input, int limit)
     {
-        Name = name;
-        ProjectFilePath = projectFilePath;
-        SolutionFilePath = solutionFilePath;
-        HasBaseline = hasBaseline;
-        EffectSummaryFileCount = effectSummaryFileCount;
-        AnalyzerConfigCount = analyzerConfigCount;
-        AnalyzerConfigPaths = analyzerConfigPaths;
-        AdditionalFileCount = additionalFileCount;
-        AdditionalFilePaths = additionalFilePaths;
-        WorkspaceDiagnosticCount = workspaceDiagnosticCount;
-        WorkspaceDiagnostics = workspaceDiagnostics;
-        ConfigurationIssueCount = configurationIssueCount;
-        ConfigurationIssues = configurationIssues;
-        Truncation = truncation;
-    }
-
-    public string Name { get; }
-
-    public string? ProjectFilePath { get; }
-
-    public string? SolutionFilePath { get; }
-
-    public bool HasBaseline { get; }
-
-    public int EffectSummaryFileCount { get; }
-
-    public int AnalyzerConfigCount { get; }
-
-    public IReadOnlyList<string> AnalyzerConfigPaths { get; }
-
-    public int AdditionalFileCount { get; }
-
-    public IReadOnlyList<string> AdditionalFilePaths { get; }
-
-    public int WorkspaceDiagnosticCount { get; }
-
-    public IReadOnlyList<string> WorkspaceDiagnostics { get; }
-
-    public int ConfigurationIssueCount { get; }
-
-    public IReadOnlyList<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; }
-
-    public SymbolicCliExplainProjectTruncation Truncation { get; }
-
-    public static SymbolicCliExplainProject? FromContext(
-        SymbolicCliInputContext inputContext,
-        int limit)
-    {
-        var context = inputContext.ProjectContext;
+        var context = input.ProjectContext;
         if (context == null) return null;
-
-        var analyzerConfigPaths = SymbolicCompactProjection.Project(context.AnalyzerConfigPaths, limit);
-        var additionalFilePaths = SymbolicCompactProjection.Project(context.AdditionalFilePaths, limit);
-        var workspaceDiagnostics = SymbolicCompactProjection.Project(inputContext.WorkspaceDiagnostics, limit);
+        var analyzerConfigs = SymbolicCompactProjection.Project(context.AnalyzerConfigPaths, limit);
+        var additionalFiles = SymbolicCompactProjection.Project(context.AdditionalFilePaths, limit);
+        var workspaceDiagnostics = SymbolicCompactProjection.Project(input.WorkspaceDiagnostics, limit);
         var configurationIssues = SymbolicCompactProjection.Project(context.ConfigurationIssues, limit);
         return new SymbolicCliExplainProject(
             context.ProjectName,
@@ -702,276 +315,82 @@ internal sealed class SymbolicCliExplainProject
             context.SolutionFilePath,
             context.HasBaseline,
             context.EffectSummaryFileCount,
-            analyzerConfigPaths.TotalCount,
-            analyzerConfigPaths.Items,
-            additionalFilePaths.TotalCount,
-            additionalFilePaths.Items,
+            analyzerConfigs.TotalCount,
+            analyzerConfigs.Items,
+            additionalFiles.TotalCount,
+            additionalFiles.Items,
             workspaceDiagnostics.TotalCount,
             workspaceDiagnostics.Items,
             configurationIssues.TotalCount,
             configurationIssues.Items,
-            new SymbolicCliExplainProjectTruncation(
-                analyzerConfigPaths.IsTruncated,
-                additionalFilePaths.IsTruncated,
-                workspaceDiagnostics.IsTruncated,
-                configurationIssues.IsTruncated));
+            analyzerConfigs.IsTruncated || additionalFiles.IsTruncated ||
+            workspaceDiagnostics.IsTruncated || configurationIssues.IsTruncated);
     }
 }
 
-internal sealed record SymbolicCliExplainProjectTruncation(
-    bool AnalyzerConfigPaths,
-    bool AdditionalFilePaths,
-    bool WorkspaceDiagnostics,
-    bool ConfigurationIssues)
-{
-    public bool IsTruncated =>
-        AnalyzerConfigPaths || AdditionalFilePaths || WorkspaceDiagnostics || ConfigurationIssues;
-}
-
-internal abstract class SymbolicCliExplainMethodTargetResult
-{
-    private readonly SymbolicMethodResult _target;
-
-    protected SymbolicCliExplainMethodTargetResult(SymbolicMethodResult target)
-    {
-        _target = target;
-    }
-
-    public string FilePath => _target.FilePath;
-
-    public string MethodDisplayName => _target.MethodDisplayName;
-
-    public string DeclarationKind => _target.DeclarationKind;
-
-    public int SpanStart => _target.SpanStart;
-
-    public int SpanEnd => _target.SpanEnd;
-
-    public int StartLine => _target.StartLine;
-
-    public int StartColumn => _target.StartColumn;
-
-    public int EndLine => _target.EndLine;
-
-    public int EndColumn => _target.EndColumn;
-}
-
-internal sealed class SymbolicCliExplainCapabilityResult : SymbolicCliExplainMethodTargetResult
-{
-    private SymbolicCliExplainCapabilityResult(
-        SymbolicCapabilityResult result,
-        IReadOnlyList<SymbolicCapabilityUnknownReason> unknownReasons,
-        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
-        IReadOnlyList<SymbolicCapabilitySite> sites,
-        SymbolicCliExplainCapabilityTruncation truncation)
-        : base(result)
-    {
-        Capabilities = result.Capabilities;
-        CapabilityText = result.CapabilityText;
-        HasUnknowns = result.HasUnknowns;
-        UnknownReasonCount = result.UnknownReasons.Count;
-        UnknownReasons = unknownReasons;
-        UnknownReasonDetails = unknownReasonDetails;
-        SiteCount = result.Sites.Count;
-        Sites = sites;
-        Truncation = truncation;
-    }
-
-    public string Kind => "capabilities";
-
-    public SymbolicCapability Capabilities { get; }
-
-    public string CapabilityText { get; }
-
-    public bool HasUnknowns { get; }
-
-    public int UnknownReasonCount { get; }
-
-    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
-
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
-
-    public int SiteCount { get; }
-
-    public IReadOnlyList<SymbolicCapabilitySite> Sites { get; }
-
-    public SymbolicCliExplainCapabilityTruncation Truncation { get; }
-
-    public static SymbolicCliExplainCapabilityResult FromResult(SymbolicCapabilityResult result, int limit)
-    {
-        var unknownReasons = SymbolicCompactProjection.Project(result.UnknownReasons, limit);
-        var unknownReasonDetails = SymbolicCompactProjection.Project(result.UnknownReasonDetails, limit);
-        var sites = SymbolicCompactProjection.Project(result.Sites, limit);
-        return new SymbolicCliExplainCapabilityResult(
-            result,
-            unknownReasons.Items,
-            unknownReasonDetails.Items,
-            sites.Items,
-            new SymbolicCliExplainCapabilityTruncation(
-                unknownReasons.IsTruncated,
-                sites.IsTruncated));
-    }
-}
-
-internal sealed record SymbolicCliExplainCapabilityTruncation(bool UnknownReasons, bool Sites)
-{
-    public bool IsTruncated => UnknownReasons || Sites;
-}
-
-internal sealed class SymbolicCliExplainComplexityResult : SymbolicCliExplainMethodTargetResult
-{
-    private SymbolicCliExplainComplexityResult(
-        SymbolicComplexityResult result,
-        IReadOnlyList<SymbolicComplexityDriverInfo> drivers,
-        IReadOnlyList<SymbolicComplexityUnknownReason> unknownReasons,
-        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
-        IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries,
-        SymbolicCliExplainComplexityTruncation truncation)
-        : base(result)
-    {
-        Complexity = result.Complexity;
-        DriverCount = result.Drivers.Count;
-        Drivers = drivers;
-        UnknownReasonCount = result.UnknownReasons.Count;
-        UnknownReasons = unknownReasons;
-        UnknownReasonDetails = unknownReasonDetails;
-        CalleeSummaryCount = result.CalleeSummaries.Count;
-        CalleeSummaries = calleeSummaries;
-        Truncation = truncation;
-    }
-
-    public string Kind => "complexity";
-
-    public SymbolicComplexityInfo Complexity { get; }
-
-    public int DriverCount { get; }
-
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
-
-    public int UnknownReasonCount { get; }
-
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
-
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
-
-    public int CalleeSummaryCount { get; }
-
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
-
-    public SymbolicCliExplainComplexityTruncation Truncation { get; }
-
-    public static SymbolicCliExplainComplexityResult FromResult(SymbolicComplexityResult result, int limit)
-    {
-        var drivers = SymbolicCompactProjection.Project(result.Drivers, limit);
-        var unknownReasons = SymbolicCompactProjection.Project(result.UnknownReasons, limit);
-        var unknownReasonDetails = SymbolicCompactProjection.Project(result.UnknownReasonDetails, limit);
-        var calleeSummaries = SymbolicCompactProjection.Project(result.CalleeSummaries, limit);
-        return new SymbolicCliExplainComplexityResult(
-            result,
-            drivers.Items,
-            unknownReasons.Items,
-            unknownReasonDetails.Items,
-            calleeSummaries.Items,
-            new SymbolicCliExplainComplexityTruncation(
-                drivers.IsTruncated,
-                unknownReasons.IsTruncated,
-                calleeSummaries.IsTruncated));
-    }
-}
-
-internal sealed record SymbolicCliExplainComplexityTruncation(
-    bool Drivers,
-    bool UnknownReasons,
-    bool CalleeSummaries)
-{
-    public bool IsTruncated => Drivers || UnknownReasons || CalleeSummaries;
-}
-
-internal sealed record SymbolicCliExplainDiagnosticResult(
+internal sealed record SymbolicCliExplainDiagnostics(
     int TotalCount,
     int TargetCount,
     IReadOnlyList<SymbolicCliExplainDiagnostic> Items,
-    bool Truncated)
+    bool IsTruncated)
 {
-    public static readonly SymbolicCliExplainDiagnosticResult Empty = new(
-        0,
-        0,
-        Array.Empty<SymbolicCliExplainDiagnostic>(),
-        false);
+    internal static async Task<SymbolicCliExplainDiagnostics> CreateAsync(
+        SymbolicCliOptions options,
+        SharpProofProjectAnalysisContext? context,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        if (context == null) return new SymbolicCliExplainDiagnostics(0, 0, Array.Empty<SymbolicCliExplainDiagnostic>(), false);
+        var diagnostics = await context.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+        var relevant = SymbolicCliDiagnosticSelector.SelectRelevant(
+            diagnostics,
+            context.SyntaxTree,
+            options.Position,
+            options.Line);
+        var projection = SymbolicCompactProjection.Project(relevant, limit);
+        return new SymbolicCliExplainDiagnostics(
+            projection.TotalCount,
+            relevant.Count(static item => item.IsTarget),
+            projection.Items.Select(static item => SymbolicCliExplainDiagnostic.Create(item.Diagnostic, item.IsTarget)).ToArray(),
+            projection.IsTruncated);
+    }
 }
 
 internal sealed record SymbolicCliExplainDiagnostic(
     string Id,
     string Severity,
     string Message,
-    string? HelpLinkUri,
     bool IsTarget,
     string? FilePath,
     int? StartLine,
     int? StartColumn,
     int? EndLine,
-    int? EndColumn,
-    int? SpanStart,
-    int? SpanLength,
-    IReadOnlyList<string> CrossLinks)
+    int? EndColumn)
 {
-    public static SymbolicCliExplainDiagnostic FromDiagnostic(Diagnostic diagnostic, bool isTarget)
+    internal static SymbolicCliExplainDiagnostic Create(Diagnostic diagnostic, bool isTarget)
     {
         var location = diagnostic.Location;
         var hasLocation = location != Location.None && location.IsInSource;
-        var lineSpan = hasLocation ? location.GetLineSpan() : default;
+        var span = hasLocation ? location.GetLineSpan() : default;
         return new SymbolicCliExplainDiagnostic(
             diagnostic.Id,
             diagnostic.Severity.ToString(),
             diagnostic.GetMessage(CultureInfo.InvariantCulture),
-            string.IsNullOrWhiteSpace(diagnostic.Descriptor.HelpLinkUri)
-                ? null
-                : diagnostic.Descriptor.HelpLinkUri,
             isTarget,
-            hasLocation ? lineSpan.Path : null,
-            hasLocation ? lineSpan.StartLinePosition.Line + 1 : null,
-            hasLocation ? lineSpan.StartLinePosition.Character + 1 : null,
-            hasLocation ? lineSpan.EndLinePosition.Line + 1 : null,
-            hasLocation ? lineSpan.EndLinePosition.Character + 1 : null,
-            hasLocation ? location.SourceSpan.Start : null,
-            hasLocation ? location.SourceSpan.Length : null,
-            MapDiagnosticCrossLinks(diagnostic.Id));
-    }
-
-    private static IReadOnlyList<string> MapDiagnosticCrossLinks(string diagnosticId)
-    {
-        return diagnosticId switch
-        {
-            "SP0015" or "SP0016" or "SP0017" => new[] { "#/capabilities" },
-            "SP0021" or "SP0022" or "SP0023" => new[] { "#/complexity" },
-            "SP0010" or "SP0030" or "SP0031" or "SP0033" => new[] { "#/runtimeHazards" },
-            "SP0002" => new[] { "#/invariant", "#/capabilities" },
-            _ => new[] { "#/invariant" }
-        };
+            hasLocation ? span.Path : null,
+            hasLocation ? span.StartLinePosition.Line + 1 : null,
+            hasLocation ? span.StartLinePosition.Character + 1 : null,
+            hasLocation ? span.EndLinePosition.Line + 1 : null,
+            hasLocation ? span.EndLinePosition.Character + 1 : null);
     }
 }
 
-internal sealed record SymbolicCliExplainCrossLink(
-    string From,
-    string Relation,
-    string To,
-    string Description);
-
 internal sealed record SymbolicCliExplainTruncation(
-    bool InvariantOutput,
-    bool RuntimeHazardOutput,
-    bool CapabilityOutput,
-    bool ComplexityOutput,
-    bool DiagnosticOutput,
-    bool ProjectOutput,
+    bool InvariantAnalysis,
+    bool RuntimeHazards,
+    bool Diagnostics,
+    bool Project,
     bool Analysis)
 {
-    public bool IsTruncated =>
-        InvariantOutput ||
-        RuntimeHazardOutput ||
-        CapabilityOutput ||
-        ComplexityOutput ||
-        DiagnosticOutput ||
-        ProjectOutput ||
-        Analysis;
+    public bool IsTruncated => InvariantAnalysis || RuntimeHazards || Diagnostics || Project || Analysis;
 }

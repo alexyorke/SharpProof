@@ -22,7 +22,7 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 - containing-method complexity summary
 
 Add `--json`, `--sarif`, or `--markdown` to compose the same domains, relevant
-project analyzer diagnostics, and evidence cross-links into one bounded report.
+project analyzer diagnostics, and canonical analysis results into one bounded report.
 Use `--report-max-diagnostics`, `--report-max-hazards`, and
 `--report-max-items` to control attachment size. See
 [machine-readable explain reports](explain-reports.md).

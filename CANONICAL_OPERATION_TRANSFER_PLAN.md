@@ -1651,3 +1651,11 @@ the unused preview .NET API may break when it obstructs the canonical design.
   required major rearchitecture; its remaining blocker is differential parity,
   not permission.
   MainSmtFlow passes 257/257; the prior SP0010 baseline is no longer a blocker.
+- The composed explain adapter no longer mirrors canonical invariant,
+  capability, complexity, hazard, diagnostic, project, cross-link, and
+  truncation graphs. Schema v3 stores the canonical analysis results directly
+  and has one small composition record with direct JSON, SARIF, and Markdown
+  projections. The migration removes 486 production lines; all nine explain
+  scenarios, the generated documentation check, the 605-case Tooling lane, and
+  the Release warning-as-error solution build are green. Production LOC is now
+  100,043 across 429 files, leaving 15,794 lines to the fixed 84,249 target.

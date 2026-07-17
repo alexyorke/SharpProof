@@ -16,7 +16,7 @@ keeps its concise text output.
 ## Composed JSON Schema
 
 `explain --json` emits one lower-camel JSON document with `kind: "explain"`
-and `schemaVersion: 1`. It also carries the shared
+and `schemaVersion: 3`. It also carries the shared
 `evidenceSchemaVersion` and `evidenceSchemaCompatibility` fields.
 
 The document contains:
@@ -24,30 +24,19 @@ The document contains:
 - `source`: virtual or physical file identity, source-input kind, and optional
   snippet source-map metadata
 - `target`: requested line/column or position plus the resolved program point,
-  node span, method, and program-point kind
+  method, and program-point kind
 - `project`: project/solution identity, analyzer configs, AdditionalFiles,
   baseline/effect-summary counts, workspace diagnostics, and configuration
   issues when MSBuild context was loaded
-- `invariant`: the canonical point-query view, including
-  invariant status, reachability, proof outcomes, SMT diagnostics, and bounded
-  facts and conditions
+- `invariant`: the canonical point-query result, including reachability, proof
+  outcomes, SMT diagnostics, facts, and conditions
 - `runtimeHazards`: a bounded runtime-hazard view for the
   resolved source line
-- `capabilities`: the containing method's capability summary plus bounded
-  unknown reasons and sites
-- `complexity`: the containing method's complexity summary plus bounded
-  reasons, drivers, and callee summaries
-- `diagnostics`: relevant project analyzer diagnostics, with target-first
-  ordering and evidence links
-- `crossLinks`: JSON-pointer relationships among the target, diagnostics, and
-  symbolic evidence sections
-- `truncation`: one aggregate view of output bounds and analysis-limit events
-
-Diagnostic cross-links are conservative mappings. Capability diagnostics such
-as `SP0015`-`SP0017` link to `#/capabilities`, complexity diagnostics such as
-`SP0021`-`SP0023` link to `#/complexity`, and runtime-hazard/exception
-diagnostics link to `#/runtimeHazards`. Other diagnostics link to the invariant
-section; `SP0002` links to both invariant and capability evidence.
+- `capabilities`: the canonical containing-method capability result
+- `complexity`: the canonical containing-method complexity result
+- `diagnostics`: relevant bounded project analyzer diagnostics, with
+  target-first ordering
+- `truncation`: one aggregate view of report bounds and analysis-limit events
 
 Standalone inputs do not run the analyzer, so their `diagnostics` section has
 zero counts. Add `--project` or `--solution` to include diagnostics after the
@@ -63,12 +52,12 @@ Machine-readable reports default to 50 items per bounded collection:
 | --- | --- |
 | `--report-max-diagnostics <n>` | Analyzer diagnostic items |
 | `--report-max-hazards <n>` | Runtime-hazard items |
-| `--report-max-items <n>` | Invariant facts/conditions/proofs, capability sites/reasons, complexity drivers/reasons/callees, and project metadata/messages |
+| `--report-max-items <n>` | Project metadata paths, workspace messages, and configuration issues |
 
-All limits accept zero. Untruncated totals remain in their owning sections.
-Each section reports its own truncation flags, while root `truncation` tells a
-consumer whether any report projection or underlying bounded analysis was
-truncated. Increase output limits only when the attachment or consumer can
+All limits accept zero. Canonical invariant, capability, and complexity results
+are no longer copied into separate bounded wrapper graphs. Root `truncation`
+tells a consumer whether a report projection or underlying bounded analysis was
+truncated. Increase report limits only when the attachment or consumer can
 accept the additional data. Analysis-limit truncation is separate and must be
 addressed through the bounded-analysis settings described in
 [bounded analysis limits](analysis-limits.md).
@@ -80,22 +69,17 @@ SharpProof run. Results include:
 
 - relevant Roslyn analyzer diagnostics with their original IDs and severities
 - bounded runtime hazards with stable `SPQ-HZ-*` rule IDs
-- synthetic warnings when invariant, capability, or complexity evidence is
-  unresolved
 - `SPQ-REPORT-TRUNCATED` when report or analysis bounds affected the result
 
-Locations use SARIF physical locations, and each result has
-`properties.crossLinks` pointing to the corresponding section in the composed
-JSON model. Run properties retain schema versions, report truncation, and the
-complete bounded cross-link list. This lets a CI bot upload SARIF while keeping
-enough identifiers to request or attach the richer JSON report.
+Locations use SARIF physical locations. Run properties retain the explain and
+evidence schema versions plus report truncation status.
 
 ## Markdown
 
 `explain --markdown` renders the same composed result as an issue-ready report.
-It includes summary metadata, invariant/reachability status, bounded hazard,
-capability, complexity, and diagnostic tables, cross-links, and an explicit
-truncation notice. Markdown is a presentation format; use JSON when a consumer
+It includes summary metadata, invariant/reachability status, hazards,
+capability, complexity, diagnostics, and an explicit truncation notice.
+Markdown is a presentation format; use JSON when a consumer
 needs stable field names or exact counts.
 
 ## JSON Request Envelope
@@ -105,23 +89,18 @@ limits without a temporary source file:
 
 ```json
 {
-  "schemaVersion": 1,
-  "mode": "explain",
-  "source": {
-    "text": "class C { static void M() { throw new System.Exception(); } }",
-    "filePath": "virtual/Buffer.cs"
-  },
-  "target": {
-    "kind": "point",
-    "line": 1,
-    "column": 35
-  },
-  "output": {
-    "format": "sarif",
-    "maxDiagnostics": 25,
-    "maxHazards": 25,
-    "maxItems": 25
-  }
+  "schemaVersion": 2,
+  "arguments": [
+    "explain",
+    "--source-text", "class C { static void M() { throw new System.Exception(); } }",
+    "--source-file-name", "virtual/Buffer.cs",
+    "--line", "1",
+    "--column", "35",
+    "--sarif",
+    "--report-max-diagnostics", "25",
+    "--report-max-hazards", "25",
+    "--report-max-items", "25"
+  ]
 }
 ```
 

@@ -117,7 +117,7 @@ public sealed class SymbolicExplainCliTests
         using var document = JsonDocument.Parse(result.StandardOutput);
         var root = document.RootElement;
         Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("explain"));
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
         Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(), Is.GreaterThan(0));
         Assert.That(root.GetProperty("source").GetProperty("filePath").GetString(),
             Is.EqualTo("virtual/ExplainReport.cs"));
@@ -141,17 +141,15 @@ public sealed class SymbolicExplainCliTests
             Is.EqualTo("DirectThrow"));
 
         var capabilities = root.GetProperty("capabilities");
-        Assert.That(capabilities.GetProperty("sites").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(capabilities.GetProperty("siteCount").GetInt32(),
-            Is.GreaterThanOrEqualTo(capabilities.GetProperty("sites").GetArrayLength()));
+        Assert.That(capabilities.GetProperty("capabilityText").GetString(), Is.Not.Empty);
+        Assert.That(capabilities.GetProperty("sites").ValueKind, Is.EqualTo(JsonValueKind.Array));
 
         var complexity = root.GetProperty("complexity");
-        Assert.That(complexity.GetProperty("drivers").GetArrayLength(), Is.LessThanOrEqualTo(1));
-        Assert.That(complexity.GetProperty("calleeSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
+        Assert.That(complexity.GetProperty("drivers").ValueKind, Is.EqualTo(JsonValueKind.Array));
+        Assert.That(complexity.GetProperty("calleeSummaries").ValueKind, Is.EqualTo(JsonValueKind.Array));
 
         Assert.That(root.GetProperty("diagnostics").GetProperty("items").GetArrayLength(), Is.Zero);
-        Assert.That(root.GetProperty("crossLinks").GetArrayLength(), Is.GreaterThanOrEqualTo(4));
-        Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.False);
     }
 
     [Test]
@@ -185,8 +183,7 @@ public sealed class SymbolicExplainCliTests
             run.GetProperty("results").EnumerateArray().Any(item =>
                 item.GetProperty("ruleId").GetString() == "SPQ-HZ-DIRECT-THROW"),
             Is.True);
-        Assert.That(run.GetProperty("properties").GetProperty("crossLinks").GetArrayLength(),
-            Is.GreaterThanOrEqualTo(4));
+        Assert.That(run.GetProperty("properties").GetProperty("explainSchemaVersion").GetInt32(), Is.EqualTo(3));
     }
 
     [Test]
@@ -215,7 +212,7 @@ public sealed class SymbolicExplainCliTests
         Assert.That(result.StandardOutput, Does.Contain("## Capabilities"));
         Assert.That(result.StandardOutput, Does.Contain("## Complexity"));
         Assert.That(result.StandardOutput, Does.Contain("## Analyzer diagnostics"));
-        Assert.That(result.StandardOutput, Does.Contain("## Cross-links"));
+        Assert.That(result.StandardOutput, Does.Not.Contain("## Cross-links"));
     }
 
     [Test]
@@ -253,10 +250,7 @@ public sealed class SymbolicExplainCliTests
         Assert.That(
             diagnostics.EnumerateArray().Any(item => item.GetProperty("id").GetString() == "SP0004"),
             Is.True);
-        Assert.That(
-            root.GetProperty("crossLinks").EnumerateArray().Any(link =>
-                link.GetProperty("from").GetString()!.StartsWith("#/diagnostics/items/", StringComparison.Ordinal)),
-            Is.True);
+        Assert.That(diagnostics.EnumerateArray().All(item => item.TryGetProperty("isTarget", out _)), Is.True);
     }
 
     [Test]
