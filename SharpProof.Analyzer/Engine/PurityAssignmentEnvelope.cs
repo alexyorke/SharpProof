@@ -370,7 +370,7 @@ internal static class PurityAssignmentTransition
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(reassigned, state);
         var preserve = owned
             ? HasUnreleasedOwnedResourceObligation(term, state)
-            : PurityResourceStateFacts.HasDisposedResourceFactForTerm(term, state, new HashSet<SymbolicTerm>());
+            : PurityResourceStateFacts.HasDisposedResourceFactForTerm(term, state);
         if (!preserve) return ImmutableArray<ISymbol>.Empty;
         var result = ImmutableArray.CreateBuilder<ISymbol>();
         var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
@@ -407,8 +407,6 @@ internal static class PurityAssignmentTransition
                 { State: SymbolicResourceLifetimeState.Owned } lifetime && Equals(lifetime.Resource, term) ||
              fact.Atom is SymbolicDisposalAtom
                 { State: SymbolicDisposalState.NotDisposed } disposal && Equals(disposal.Resource, term)));
-        return owned && !PurityResourceStateFacts.IsResourceReleased(
-            term, PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState),
-            state, new HashSet<SymbolicTerm>());
+        return owned && !SymbolicStateMerger.HasExactResourceRelease(state.PathState, term);
     }
 }

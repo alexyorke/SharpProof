@@ -23,26 +23,19 @@ internal static class PuritySymbolicStateFacts
     internal static bool HasSymbolicBorrowFactForLocal(
         ILocalSymbol localSymbol,
         PurityAnalysisState currentState,
-        SymbolicBorrowKind? borrowKind = null)
-    {
-        var localTerm = CreateSymbolicReferenceTerm(localSymbol, currentState);
-        return HasSymbolicBorrowFactForTerm(
-            localTerm,
-            currentState,
-            borrowKind,
-            new HashSet<SymbolicTerm>());
-    }
+        SymbolicBorrowKind? borrowKind = null) =>
+        SymbolicStateMerger.ExactAliasComponentFactAny(
+            CreateSymbolicReferenceTerm(localSymbol, currentState), currentState.PathState.Facts,
+            (fact, term) => fact.Atom is SymbolicBorrowAtom borrow &&
+                            Equals(borrow.Borrow, term) &&
+                            (!borrowKind.HasValue || borrow.Kind == borrowKind.Value));
 
     internal static bool HasSymbolicBorrowerFactForSymbol(
         ISymbol ownerSymbol,
-        PurityAnalysisState currentState)
-    {
-        var ownerTerm = CreateSymbolicReferenceTerm(ownerSymbol, currentState);
-        return HasSymbolicBorrowerFactForTerm(
-            ownerTerm,
-            currentState,
-            new HashSet<SymbolicTerm>());
-    }
+        PurityAnalysisState currentState) =>
+        SymbolicStateMerger.ExactAliasComponentFactAny(
+            CreateSymbolicReferenceTerm(ownerSymbol, currentState), currentState.PathState.Facts,
+            static (fact, term) => fact.Atom is SymbolicBorrowAtom borrow && Equals(borrow.Owner, term));
 
     internal static bool TryCreateMutableBorrowConflictEvidence(
         IOperation operation,
@@ -160,100 +153,16 @@ internal static class PuritySymbolicStateFacts
         return false;
     }
 
-    private static bool HasSymbolicBorrowerFactForTerm(
-        SymbolicTerm ownerTerm,
-        PurityAnalysisState currentState,
-        HashSet<SymbolicTerm> visitedTerms)
-    {
-        if (!visitedTerms.Add(ownerTerm)) return false;
-
-        foreach (var fact in currentState.PathState.Facts)
-            if (fact.Polarity &&
-                fact.Confidence == SymbolicFactConfidence.Exact &&
-                fact.Atom is SymbolicBorrowAtom borrow &&
-                Equals(borrow.Owner, ownerTerm))
-                return true;
-
-        foreach (var aliasTerm in EnumerateSymbolicAliasTerms(ownerTerm, currentState))
-            if (HasSymbolicBorrowerFactForTerm(aliasTerm, currentState, visitedTerms))
-                return true;
-
-        return false;
-    }
-
-    private static bool HasSymbolicBorrowFactForTerm(
-        SymbolicTerm localTerm,
-        PurityAnalysisState currentState,
-        SymbolicBorrowKind? borrowKind,
-        HashSet<SymbolicTerm> visitedTerms)
-    {
-        if (!visitedTerms.Add(localTerm)) return false;
-
-        foreach (var fact in currentState.PathState.Facts)
-        {
-            if (!fact.Polarity ||
-                fact.Confidence != SymbolicFactConfidence.Exact ||
-                fact.Atom is not SymbolicBorrowAtom borrow ||
-                !Equals(borrow.Borrow, localTerm) ||
-                (borrowKind.HasValue && borrow.Kind != borrowKind.Value))
-                continue;
-
-            return true;
-        }
-
-        foreach (var aliasTerm in EnumerateSymbolicAliasTerms(localTerm, currentState))
-            if (HasSymbolicBorrowFactForTerm(aliasTerm, currentState, borrowKind, visitedTerms))
-                return true;
-
-        return false;
-    }
-
     internal static bool HasSymbolicOwnedFactForSymbol(
         ISymbol symbol,
-        PurityAnalysisState currentState)
-    {
-        var symbolTerm = CreateSymbolicReferenceTerm(symbol, currentState);
-        return HasSymbolicOwnedFactForTerm(
-            symbolTerm,
-            currentState,
-            new HashSet<SymbolicTerm>());
-    }
-
-    private static bool HasSymbolicOwnedFactForTerm(
-        SymbolicTerm symbolTerm,
-        PurityAnalysisState currentState,
-        HashSet<SymbolicTerm> visitedTerms)
-    {
-        if (!visitedTerms.Add(symbolTerm)) return false;
-
-        foreach (var fact in currentState.PathState.Facts)
-        {
-            if (!fact.Polarity ||
-                fact.Confidence != SymbolicFactConfidence.Exact)
-                continue;
-
-            if (fact.Atom is SymbolicOwnershipAtom { Escaped: false } ownership &&
-                Equals(ownership.Value, symbolTerm))
-                return true;
-
-            if (fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime &&
-                Equals(lifetime.Resource, symbolTerm))
-                return true;
-        }
-
-        foreach (var aliasTerm in EnumerateSymbolicAliasTerms(symbolTerm, currentState))
-            if (HasSymbolicOwnedFactForTerm(aliasTerm, currentState, visitedTerms))
-                return true;
-
-        return false;
-    }
-
-    internal static IEnumerable<SymbolicTerm> EnumerateSymbolicAliasTerms(
-        SymbolicTerm symbolTerm,
         PurityAnalysisState currentState) =>
-        SymbolicStateMerger.EnumerateExactAliasNeighbors(symbolTerm, currentState.PathState.Facts);
-
-    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state) =>
-        SymbolicStateMerger.CollectExactReleasedResources(state);
+        SymbolicStateMerger.ExactAliasComponentFactAny(
+            CreateSymbolicReferenceTerm(symbol, currentState), currentState.PathState.Facts,
+            static (fact, term) =>
+                fact.Atom is SymbolicOwnershipAtom { Escaped: false } ownership &&
+                Equals(ownership.Value, term) ||
+                fact.Atom is SymbolicResourceLifetimeAtom
+                    { State: SymbolicResourceLifetimeState.Owned } lifetime &&
+                Equals(lifetime.Resource, term));
 
 }

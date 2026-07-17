@@ -48,7 +48,6 @@ internal partial class MethodInvocationPurityRule
                 invocationOperation.Instance,
                 invokedMethodSymbol,
                 currentState,
-                context.SemanticModel,
                 context.CancellationToken,
                 nameof(MethodInvocationPurityRule),
                 out var evidence))

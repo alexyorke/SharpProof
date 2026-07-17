@@ -5247,7 +5247,7 @@
                                                   "GuardedState",
                                                   "SymbolicStateMerger"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SymbolicStateMerger"
                                                  ]
@@ -9184,12 +9184,13 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "PurityAnalysisStateMergerTests",
+                                                                 "SymbolicOperationTransferModelTests",
                                                                  "SymbolicStateMergerTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicStateMerger"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/MethodBodyOperationResolver.cs",

@@ -791,7 +791,134 @@ public sealed class SymbolicOperationTransferModelTests
             Assert.That(PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(locals["ownedAlias"], actual), Is.True);
             Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(
                 PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals["disposedAlias"], actual),
-                actual, new HashSet<SymbolicTerm>()), Is.True);
+                actual), Is.True);
+        });
+    }
+
+    [Test]
+    public void ExactAliasComponent_IsRootFirstSymmetricCycleSafeAndExactPositiveOnly()
+    {
+        var source = SyntaxFactory.IdentifierName("alias");
+        var root = new SymbolicVariableTerm("root", SmtValueKind.Reference);
+        var reverse = new SymbolicVariableTerm("reverse", SmtValueKind.Reference);
+        var chained = new SymbolicVariableTerm("chained", SmtValueKind.Reference);
+        var mayNot = new SymbolicVariableTerm("may-not", SmtValueKind.Reference);
+        var approximate = new SymbolicVariableTerm("approximate", SmtValueKind.Reference);
+        var negative = new SymbolicVariableTerm("negative", SmtValueKind.Reference);
+        var facts = ImmutableArray.Create(
+            Exact(new SymbolicAliasAtom(reverse, root, true), source, "test.alias.reverse"),
+            Exact(new SymbolicAliasAtom(reverse, chained, true), source, "test.alias.forward"),
+            Exact(new SymbolicAliasAtom(chained, root, true), source, "test.alias.cycle"),
+            Exact(new SymbolicAliasAtom(chained, mayNot, false), source, "test.alias.may-not"),
+            Exact(new SymbolicAliasAtom(chained, approximate, true), source, "test.alias.approximate") with
+                { Confidence = SymbolicFactConfidence.Approximate },
+            Exact(new SymbolicAliasAtom(chained, negative, true), source, "test.alias.negative").Negate());
+
+        var actual = SymbolicStateMerger.EnumerateExactAliasComponent(root, facts).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.EqualTo(new[] { root, reverse, chained }));
+            Assert.That(SymbolicStateMerger.EnumerateExactAliasComponent(root, facts).Any(term => Equals(term, root)),
+                Is.True);
+            Assert.That(SymbolicStateMerger.EnumerateExactAliasComponent(root, facts).Any(
+                term => Equals(term, mayNot) || Equals(term, approximate) || Equals(term, negative)),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void ExactAliasComponent_AnalyzerQueriesPreserveDirectionalAndLifetimeSemantics()
+    {
+        const string source = "static class C { static void M() { object owner = null!, ownerAlias = null!, " +
+                              "borrow = null!, borrowAlias = null!, resource = null!, resourceAlias = null!; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ExactAliasComponent_AnalyzerQueriesPreserveDirectionalAndLifetimeSemantics));
+        var locals = fixture.Root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .ToDictionary(node => node.Identifier.ValueText,
+                node => (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(node)!);
+        var initial = PurityAnalysisEngine.PurityAnalysisState.Pure;
+        SymbolicTerm Term(string name) => PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(locals[name], initial);
+        var owner = Term("owner");
+        var ownerAlias = Term("ownerAlias");
+        var borrow = Term("borrow");
+        var borrowAlias = Term("borrowAlias");
+        var resource = Term("resource");
+        var resourceAlias = Term("resourceAlias");
+        var returned = new SymbolicVariableTerm("returned", SmtValueKind.Reference);
+        var released = new SymbolicVariableTerm("released", SmtValueKind.Reference);
+        var allPathReleased = new SymbolicVariableTerm("all-path", SmtValueKind.Reference);
+        var syntax = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var state = initial.WithPathState(new SymbolicState(new[]
+        {
+            Exact(new SymbolicAliasAtom(ownerAlias, owner, true), syntax, "test.owner.alias"),
+            Exact(new SymbolicOwnershipAtom(owner, false), syntax, "test.owner"),
+            Exact(new SymbolicAliasAtom(borrow, borrowAlias, true), syntax, "test.borrow.alias"),
+            Exact(new SymbolicBorrowAtom(owner, borrow, SymbolicBorrowKind.Shared), syntax, "test.borrow"),
+            Exact(new SymbolicAliasAtom(resourceAlias, resource, true), syntax, "test.resource.alias"),
+            Exact(new SymbolicDisposalAtom(resource, SymbolicDisposalState.Disposed), syntax, "test.disposed"),
+            Exact(new SymbolicResourceLifetimeAtom(returned, SymbolicResourceLifetimeState.Returned),
+                syntax, "test.returned"),
+            Exact(new SymbolicResourceLifetimeAtom(released, SymbolicResourceLifetimeState.Released),
+                syntax, "test.released"),
+            Exact(new SymbolicResourceLifetimeAtom(allPathReleased, SymbolicResourceLifetimeState.Released),
+                syntax, "analyzer.resource.merge.all-path-release")
+        }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(locals["ownerAlias"], state), Is.True);
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicBorrowFactForLocal(
+                locals["borrowAlias"], state, SymbolicBorrowKind.Shared), Is.True);
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicBorrowFactForLocal(
+                locals["borrowAlias"], state, SymbolicBorrowKind.Mutable), Is.False);
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicBorrowerFactForSymbol(locals["ownerAlias"], state), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(resourceAlias, state), Is.True);
+            Assert.That(PurityResourceStateFacts.HasReleasedResourceFact(resourceAlias, state), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(returned, state), Is.False);
+            Assert.That(PurityResourceStateFacts.HasReleasedResourceFact(returned, state), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(released, state), Is.False);
+            Assert.That(PurityResourceStateFacts.HasReleasedResourceFact(released, state), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(allPathReleased, state), Is.True);
+        });
+    }
+
+    [Test]
+    public void ExactAliasComponent_AllPathReleaseAndOnePathOutstandingRemainDistinct()
+    {
+        const string source = "static class C { static void M() { object resource = null!, alias = null!; } }";
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ExactAliasComponent_AllPathReleaseAndOnePathOutstandingRemainDistinct));
+        var declarations = fixture.Root.DescendantNodes().OfType<VariableDeclaratorSyntax>().ToArray();
+        var resourceSymbol = (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(declarations[0])!;
+        var aliasSymbol = (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(declarations[1])!;
+        var initial = PurityAnalysisEngine.PurityAnalysisState.Pure;
+        var resource = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, initial);
+        var alias = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(aliasSymbol, initial);
+        var syntax = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var owned = SymbolicFact.Exact(new SymbolicResourceLifetimeAtom(
+            resource, SymbolicResourceLifetimeState.Owned), syntax, "test.owned", resourceSymbol);
+        var aliasFact = SymbolicFact.Exact(new SymbolicAliasAtom(
+            resource, alias, true), syntax, "test.alias", aliasSymbol);
+        var disposedResource = SymbolicFact.Exact(new SymbolicDisposalAtom(
+            resource, SymbolicDisposalState.Disposed), syntax, "test.disposed.root", resourceSymbol);
+        var disposedAlias = SymbolicFact.Exact(new SymbolicDisposalAtom(
+            alias, SymbolicDisposalState.Disposed), syntax, "test.disposed.alias", aliasSymbol);
+        var first = new SymbolicState(new[] { owned, aliasFact, disposedResource });
+        var secondReleased = new SymbolicState(new[] { owned, aliasFact, disposedAlias });
+        var secondOutstanding = new SymbolicState(new[] { owned, aliasFact });
+        var allPath = SymbolicStateMerger.MergePathStatesAcrossAll(
+            new[] { first, secondReleased }, SymbolicStateMerger.AreEvidenceEquivalentFacts, 7);
+        var onePath = SymbolicStateMerger.MergePathStatesAcrossAll(
+            new[] { first, secondOutstanding }, SymbolicStateMerger.AreEvidenceEquivalentFacts, 7);
+        var allPathState = initial.WithPathState(allPath);
+        var onePathState = initial.WithPathState(onePath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(SymbolicStateMerger.HasExactResourceRelease(allPath, resource), Is.True);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(resource, allPathState), Is.True);
+            Assert.That(SymbolicStateMerger.HasExactResourceRelease(onePath, resource), Is.False);
+            Assert.That(PurityResourceStateFacts.HasDisposedResourceFactForTerm(resource, onePathState), Is.False);
+            Assert.That(PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(resourceSymbol, onePathState), Is.True);
         });
     }
 

@@ -17,7 +17,6 @@ internal static partial class PurityResourceStateFacts
         result = PurityAnalysisResult.Pure;
 
         var ownedResources = new Dictionary<SymbolicTerm, ISymbol?>();
-        var releasedResources = PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState);
         foreach (var fact in state.PathState.Facts)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -37,7 +36,7 @@ internal static partial class PurityResourceStateFacts
         foreach (var resource in ownedResources)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsResourceReleased(resource.Key, releasedResources, state, new HashSet<SymbolicTerm>())) continue;
+            if (SymbolicStateMerger.HasExactResourceRelease(state.PathState, resource.Key)) continue;
 
             var syntax = containingMethodSymbol.DeclaringSyntaxReferences
                 .Select(reference => reference.GetSyntax(cancellationToken))
@@ -56,22 +55,6 @@ internal static partial class PurityResourceStateFacts
                     catalogSource: "symbolic_resource_lifetime"));
             return true;
         }
-
-        return false;
-    }
-
-    internal static bool IsResourceReleased(
-        SymbolicTerm resource,
-        HashSet<SymbolicTerm> releasedResources,
-        PurityAnalysisState state,
-        HashSet<SymbolicTerm> visitedTerms)
-    {
-        if (releasedResources.Contains(resource)) return true;
-        if (!visitedTerms.Add(resource)) return false;
-
-        foreach (var aliasTerm in PuritySymbolicStateFacts.EnumerateSymbolicAliasTerms(resource, state))
-            if (IsResourceReleased(aliasTerm, releasedResources, state, visitedTerms))
-                return true;
 
         return false;
     }

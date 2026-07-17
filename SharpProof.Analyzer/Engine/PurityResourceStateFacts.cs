@@ -262,13 +262,7 @@ internal static partial class PurityResourceStateFacts
     }
 
     internal static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
-    {
-        return IsResourceReleased(
-            term,
-            PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState),
-            state,
-            new HashSet<SymbolicTerm>());
-    }
+        => SymbolicStateMerger.HasExactResourceRelease(state.PathState, term);
 
     internal static bool IsOwnedDisposableObjectCreationValue(
         IOperation valueOperation,

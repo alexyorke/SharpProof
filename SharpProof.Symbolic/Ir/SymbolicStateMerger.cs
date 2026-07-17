@@ -179,24 +179,39 @@ internal static class SymbolicStateMerger
         SymbolEqualityComparer.Default.Equals(first.Symbol, second.Symbol) &&
         string.Equals(first.EvidenceKey, second.EvidenceKey, StringComparison.Ordinal);
 
-    internal static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
-        SymbolicTerm term,
-        IEnumerable<SymbolicFact> facts)
+    internal static IEnumerable<SymbolicTerm> EnumerateExactAliasComponent(
+        SymbolicTerm root,
+        IReadOnlyList<SymbolicFact> facts)
     {
-        foreach (var fact in facts)
+        var pending = new Queue<SymbolicTerm>();
+        var visited = new HashSet<SymbolicTerm>();
+        pending.Enqueue(root);
+        while (pending.Count != 0)
         {
-            if (!fact.Polarity ||
-                fact.Confidence != SymbolicFactConfidence.Exact ||
-                fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
-                continue;
-
-            if (Equals(alias.Target, term)) yield return alias.Source;
-            if (Equals(alias.Source, term)) yield return alias.Target;
+            var term = pending.Dequeue();
+            if (!visited.Add(term)) continue;
+            yield return term;
+            foreach (var fact in facts)
+            {
+                if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact ||
+                    fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
+                    continue;
+                if (Equals(alias.Target, term)) pending.Enqueue(alias.Source);
+                if (Equals(alias.Source, term)) pending.Enqueue(alias.Target);
+            }
         }
     }
 
-    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state) =>
-        new(EnumerateExactResourceReleases(state).Select(static release => release.Resource));
+    internal static bool ExactAliasComponentFactAny(
+        SymbolicTerm root,
+        IReadOnlyList<SymbolicFact> facts,
+        Func<SymbolicFact, SymbolicTerm, bool> predicate) =>
+        EnumerateExactAliasComponent(root, facts).Any(term => facts.Any(fact =>
+            fact.Polarity && fact.Confidence == SymbolicFactConfidence.Exact && predicate(fact, term)));
+
+    internal static bool HasExactResourceRelease(SymbolicState state, SymbolicTerm resource) =>
+        ExactAliasComponentFactAny(resource, state.Facts, static (fact, term) =>
+            TryGetExactResourceRelease(fact, out var released, out _) && Equals(released, term));
 
     private static ImmutableArray<SymbolicFact> MergeResourceStateFacts(
         ImmutableArray<SymbolicFact> commonFacts,
@@ -221,11 +236,8 @@ internal static class SymbolicStateMerger
                     .First(pair =>
                         TryGetExactResourceRelease(pair.Fact, out var released, out var releasedSymbol) &&
                         (ResourceStateIdentityMatches(resource, symbol, released, releasedSymbol) ||
-                         IsResourceReleasedViaMergedAliases(
-                             resource,
-                             new HashSet<SymbolicTerm> { released },
-                             pair.State,
-                             new HashSet<SymbolicTerm>())))
+                         EnumerateExactAliasComponent(resource, pair.State.Facts)
+                             .Any(term => Equals(term, released))))
                     .Fact;
                 var mergedFact = representative with
                 {
@@ -255,24 +267,7 @@ internal static class SymbolicStateMerger
             releasedResources.Add(release.Resource);
         }
 
-        return IsResourceReleasedViaMergedAliases(
-            resource,
-            releasedResources,
-            state,
-            new HashSet<SymbolicTerm>());
-    }
-
-    private static bool IsResourceReleasedViaMergedAliases(
-        SymbolicTerm resource,
-        HashSet<SymbolicTerm> releasedResources,
-        SymbolicState state,
-        HashSet<SymbolicTerm> visited)
-    {
-        if (releasedResources.Contains(resource)) return true;
-        if (!visited.Add(resource)) return false;
-
-        return EnumerateExactAliasNeighbors(resource, state.Facts).Any(neighbor =>
-            IsResourceReleasedViaMergedAliases(neighbor, releasedResources, state, visited));
+        return EnumerateExactAliasComponent(resource, state.Facts).Any(releasedResources.Contains);
     }
 
     private static bool TryGetResourceStateIdentity(

@@ -16,21 +16,19 @@ internal static partial class PurityResourceStateFacts
     }
 
     internal static bool HasDisposedResourceFact(PurityAnalysisState currentState, ISymbol resourceSymbol)
-    {
-        return HasDisposedResourceFactForTerm(
-            PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, currentState),
-            currentState,
-            new HashSet<SymbolicTerm>());
-    }
+        => HasDisposedResourceFactForTerm(
+            PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, currentState), currentState);
 
     internal static bool TryCreateUseAfterDisposeEvidence(
         IOperation useOperation,
         IOperation? resourceOperation,
         ISymbol usedMemberSymbol,
         PurityAnalysisState currentState,
+        CancellationToken cancellationToken,
         string ruleName,
         out PurityEvidence evidence)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         evidence = PurityEvidence.None;
         if (TryResolveTrackedSymbol(resourceOperation, currentState) is not { } resourceSymbol ||
             !HasDisposedResourceFact(currentState, resourceSymbol))
@@ -44,26 +42,6 @@ internal static partial class PurityResourceStateFacts
             usedMemberSymbol,
             "symbolic_resource_lifetime");
         return true;
-    }
-
-    internal static bool TryCreateUseAfterDisposeEvidence(
-        IOperation useOperation,
-        IOperation? resourceOperation,
-        ISymbol usedMemberSymbol,
-        PurityAnalysisState currentState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string ruleName,
-        out PurityEvidence evidence)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return TryCreateUseAfterDisposeEvidence(
-            useOperation,
-            resourceOperation,
-            usedMemberSymbol,
-            currentState,
-            ruleName,
-            out evidence);
     }
 
     internal static bool TryCreateDoubleDisposeEvidence(
@@ -94,23 +72,9 @@ internal static partial class PurityResourceStateFacts
 
     internal static bool HasDisposedResourceFactForTerm(
         SymbolicTerm resourceTerm,
-        PurityAnalysisState currentState,
-        HashSet<SymbolicTerm> visitedTerms)
-    {
-        if (!visitedTerms.Add(resourceTerm)) return false;
-
-        foreach (var fact in currentState.PathState.Facts)
-            if (fact.Polarity &&
-                fact.Confidence == SymbolicFactConfidence.Exact &&
-                IsDisposedResourceFactForTerm(fact, resourceTerm))
-                return true;
-
-        foreach (var aliasTerm in PuritySymbolicStateFacts.EnumerateSymbolicAliasTerms(resourceTerm, currentState))
-            if (HasDisposedResourceFactForTerm(aliasTerm, currentState, visitedTerms))
-                return true;
-
-        return false;
-    }
+        PurityAnalysisState currentState) =>
+        SymbolicStateMerger.ExactAliasComponentFactAny(
+            resourceTerm, currentState.PathState.Facts, IsDisposedResourceFactForTerm);
 
     private static bool IsDisposedResourceFactForTerm(
         SymbolicFact fact,
