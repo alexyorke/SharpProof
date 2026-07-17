@@ -194,225 +194,20 @@ internal partial class PurityAnalysisEngine
 
 
             PurityAnalysisState? postCfgExitResourceState = null;
-            if (result.IsPure)
-                if (methodBodyIOperation != null)
-                {
-                    var postCfgReturnState = mergedNormalExitStateFromCfg;
-                    postCfgExitResourceState = postCfgReturnState;
-                    foreach (var usingDeclaration in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<IUsingDeclarationOperation>())
-                        postCfgExitResourceState = PurityResourceStateFacts.AddUsingDeclarationDisposeFacts(
-                            postCfgExitResourceState.Value,
-                            usingDeclaration);
-                    var postCfgProbeState = postCfgReturnState.WithPathState(
-                        SymbolicRuntimeTypeFacts.RetainExactRuntimeTypes(postCfgReturnState.PathState));
-
-                    foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op =>
-                                 op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))
-                    {
-                        var usingResult = CheckSingleOperation(usingOp, analysisContext, postCfgProbeState);
-                        if (!usingResult.IsPure)
-                        {
-                            result = usingResult;
-                            goto PostCfgChecksDone;
-                        }
-                    }
-
-                    foreach (var forEachOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<IForEachLoopOperation>())
-                    {
-                        if (ShouldSkipPostCfgDirectPurityProbe(forEachOp, semanticModel, activeSmtAnalysis,
-                                cancellationToken)) continue;
-
-                        var forEachResult = forEachOp.IsAsynchronous
-                            ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(
-                                forEachOp.Collection,
-                                analysisContext)
-                            : LoopPurityRule.CheckForEachEnumeratorPurity(
-                                forEachOp.Collection,
-                                analysisContext);
-                        if (!forEachResult.IsPure)
-                        {
-                            result = forEachResult;
-                            goto PostCfgChecksDone;
-                        }
-                    }
-
-
-                    foreach (var firstThrowOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<IThrowOperation>())
-                    {
-                        if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                                firstThrowOp.Syntax,
-                                semanticModel,
-                                cancellationToken,
-                                activeSmtAnalysis))
-                            continue;
-
-                        if (firstThrowOp.Exception != null)
-                        {
-                            var exResult = CheckSingleOperation(firstThrowOp.Exception, analysisContext,
-                                PurityAnalysisState.Pure);
-                            if (!exResult.IsPure)
-                            {
-                                result = PurityAnalysisResult.Impure(
-                                    exResult.ImpureSyntaxNode ?? firstThrowOp.Syntax,
-                                    exResult.Evidence);
-                                goto PostCfgChecksDone;
-                            }
-                        }
-
-                        result = PurityAnalysisResult.Impure(
-                            firstThrowOp.Syntax,
-                            PurityEvidence.Create(
-                                "throw",
-                                "ThrowOperationPurityRule",
-                                firstThrowOp));
-                        goto PostCfgChecksDone;
-                    }
-
-
-                    foreach (var tryOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<ITryOperation>())
-                    {
-                        foreach (var catchClause in tryOp.Catches)
-                        {
-                            var catchResult = AnalyzeOperationSubtreePurity(catchClause, analysisContext);
-                            if (!catchResult.IsPure)
-                            {
-                                result = catchResult;
-                                goto PostCfgChecksDone;
-                            }
-                        }
-
-                        if (tryOp.Finally != null)
-                        {
-                            var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, analysisContext);
-                            if (!finallyResult.IsPure)
-                            {
-                                result = finallyResult;
-                                goto PostCfgChecksDone;
-                            }
-                        }
-                    }
-
-
-                    foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<IInvocationOperation>())
-                    {
-                        if (ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis,
-                                cancellationToken)) continue;
-
-                        var hasSemanticKnownImpureCatalogSource = PurityKnownBclSemantics.TryGetSemanticKnownImpureCatalogSource(
-                            invocationOp,
-                            out var semanticKnownImpureCatalogSource);
-                        if (invocationOp.TargetMethod != null &&
-                            !PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocationOp) &&
-                            !PurityKnownBclSemantics.IsArrayInterfaceGetEnumeratorInvocation(
-                                invocationOp,
-                                semanticModel,
-                                cancellationToken) &&
-                            !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
-                        {
-                            var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
-                            if (hasSemanticKnownImpureCatalogSource)
-                            {
-                                result = ImpureResult(
-                                    invocationOp,
-                                    "catalog_hit",
-                                    "MethodInvocationPurityRule",
-                                    targetMethod,
-                                    semanticKnownImpureCatalogSource);
-                                goto PostCfgChecksDone;
-                            }
-
-                            if (PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation(invocationOp)) continue;
-
-                            var invocationMetadataPurity = GetTrustedMethodPurityMetadata(
-                                targetMethod,
-                                semanticModel.Compilation);
-                            var knownImpureSource = invocationMetadataPurity.KnownImpureMemberSource;
-                            var hasConfiguredKnownImpure = invocationMetadataPurity.HasConfiguredKnownImpureMember;
-                            var postCfgGeneratedPurity = invocationMetadataPurity.GeneratedPurity;
-                            var hasTrustedGeneratedPurityForInvocation =
-                                invocationMetadataPurity.HasTrustedGeneratedPurity;
-
-                            if (hasConfiguredKnownImpure)
-                            {
-                                result = ImpureResult(
-                                    invocationOp,
-                                    "catalog_hit",
-                                    "MethodInvocationPurityRule",
-                                    targetMethod,
-                                    knownImpureSource);
-                                goto PostCfgChecksDone;
-                            }
-
-                            if (hasTrustedGeneratedPurityForInvocation &&
-                                !MethodInvocationPurityRule.ShouldDeferToSpecializedDispatchPurity(targetMethod))
-                            {
-                                if (postCfgGeneratedPurity.IsPure) continue;
-
-                                if (!postCfgGeneratedPurity.IsPure)
-                                {
-                                    var invocationRuleResult = CheckSingleOperation(invocationOp, analysisContext,
-                                        postCfgReturnState);
-                                    if (invocationRuleResult.IsPure) continue;
-
-                                    result = invocationRuleResult;
-                                    goto PostCfgChecksDone;
-                                }
-                            }
-
-                            if (knownImpureSource != null)
-                            {
-                                result = ImpureResult(
-                                    invocationOp,
-                                    "catalog_hit",
-                                    "MethodInvocationPurityRule",
-                                    targetMethod,
-                                    knownImpureSource);
-                                goto PostCfgChecksDone;
-                            }
-                        }
-                    }
-
-                    var directThrowOnlySyntax = TryGetDirectThrowOnlySyntax(bodySyntaxNode);
-                    if (directThrowOnlySyntax != null)
-                    {
-                        result = PurityAnalysisResult.Impure(
-                            directThrowOnlySyntax,
-                            PurityEvidence.Create(
-                                "throw",
-                                "ThrowOperationPurityRule",
-                                syntaxNode: directThrowOnlySyntax));
-                        goto PostCfgChecksDone;
-                    }
-
-
-                    foreach (var operation in ExecutionVisibility.VisibleDescendants(methodBodyIOperation))
-                    {
-                        if (ShouldSkipPostCfgDirectPurityProbe(operation, semanticModel, activeSmtAnalysis,
-                                cancellationToken)) continue;
-
-                        if (TryGetOperatorMethodForDirectPurityCheck(
-                                operation,
-                                includeCompoundAssignments: true,
-                                out var operatorMethod) &&
-                            operatorMethod != null)
-                        {
-                            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, analysisContext);
-
-                            if (!operatorPurity.IsPure)
-                            {
-                                result = PurityAnalysisResult.Impure(operation.Syntax);
-                                goto PostCfgChecksDone;
-                            }
-                        }
-                    }
-                }
-
-            PostCfgChecksDone:;
+            if (result.IsPure && methodBodyIOperation != null)
+            {
+                var visibleOperations = ExecutionVisibility.VisibleDescendants(methodBodyIOperation).ToImmutableArray();
+                var postCfgReturnState = mergedNormalExitStateFromCfg;
+                postCfgExitResourceState = visibleOperations.OfType<IUsingDeclarationOperation>().Aggregate(
+                    postCfgReturnState,
+                    static (state, declaration) => PurityResourceStateFacts.AddUsingDeclarationDisposeFacts(
+                        state,
+                        declaration));
+                result = AnalyzePostCfgCompatibility(
+                    visibleOperations,
+                    analysisContext,
+                    postCfgReturnState);
+            }
 
             if (result.IsPure &&
                 postCfgExitResourceState.HasValue &&
@@ -431,6 +226,131 @@ internal partial class PurityAnalysisEngine
         {
             visited.Remove(methodSymbol);
         }
+    }
+
+    private static PurityAnalysisResult AnalyzePostCfgCompatibility(
+        ImmutableArray<IOperation> operations,
+        PurityAnalysisContext context,
+        PurityAnalysisState returnState)
+    {
+        var semanticModel = context.SemanticModel;
+        var cancellationToken = context.CancellationToken;
+        var probeState = returnState.WithPathState(
+            SymbolicRuntimeTypeFacts.RetainExactRuntimeTypes(returnState.PathState));
+
+        foreach (var operation in operations)
+            if (operation.Kind is OperationKind.Using or OperationKind.UsingDeclaration)
+            {
+                var result = CheckSingleOperation(operation, context, probeState);
+                if (!result.IsPure) return result;
+            }
+
+        foreach (var forEach in operations.OfType<IForEachLoopOperation>())
+        {
+            if (IsPostCfgOperationUnreachable(forEach, context)) continue;
+            var result = forEach.IsAsynchronous
+                ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(forEach.Collection, context)
+                : LoopPurityRule.CheckForEachEnumeratorPurity(forEach.Collection, context);
+            if (!result.IsPure) return result;
+        }
+
+        foreach (var throwOperation in operations.OfType<IThrowOperation>())
+        {
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    throwOperation.Syntax,
+                    semanticModel,
+                    cancellationToken,
+                    context.SmtAnalysis))
+                continue;
+            if (throwOperation.Exception != null)
+            {
+                var exceptionResult = CheckSingleOperation(throwOperation.Exception, context, PurityAnalysisState.Pure);
+                if (!exceptionResult.IsPure)
+                    return PurityAnalysisResult.Impure(
+                        exceptionResult.ImpureSyntaxNode ?? throwOperation.Syntax,
+                        exceptionResult.Evidence);
+            }
+            return PurityAnalysisResult.Impure(
+                throwOperation.Syntax,
+                PurityEvidence.Create("throw", "ThrowOperationPurityRule", throwOperation));
+        }
+
+        foreach (var tryOperation in operations.OfType<ITryOperation>())
+        {
+            foreach (var catchClause in tryOperation.Catches)
+            {
+                var result = AnalyzeOperationSubtreePurity(catchClause, context);
+                if (!result.IsPure) return result;
+            }
+            if (tryOperation.Finally != null)
+            {
+                var result = AnalyzeOperationSubtreePurity(tryOperation.Finally, context);
+                if (!result.IsPure) return result;
+            }
+        }
+
+        foreach (var invocation in operations.OfType<IInvocationOperation>())
+        {
+            if (IsPostCfgOperationUnreachable(invocation, context)) continue;
+            var result = TryGetPostCfgInvocationImpurity(invocation, context, returnState);
+            if (result.HasValue) return result.Value;
+        }
+
+        foreach (var operation in operations)
+        {
+            if (IsPostCfgOperationUnreachable(operation, context) ||
+                !TryGetOperatorMethodForDirectPurityCheck(
+                    operation,
+                    includeCompoundAssignments: true,
+                    out var operatorMethod) ||
+                operatorMethod == null)
+                continue;
+            if (!PurityCalleeResolver.GetCalleePurity(operatorMethod, context).IsPure)
+                return PurityAnalysisResult.Impure(operation.Syntax);
+        }
+
+        return PurityAnalysisResult.Pure;
+    }
+
+    private static PurityAnalysisResult? TryGetPostCfgInvocationImpurity(
+        IInvocationOperation invocation,
+        PurityAnalysisContext context,
+        PurityAnalysisState returnState)
+    {
+        var semanticModel = context.SemanticModel;
+        var hasSemanticKnownImpure = PurityKnownBclSemantics.TryGetSemanticKnownImpureCatalogSource(
+            invocation,
+            out var semanticKnownImpureSource);
+        if (invocation.TargetMethod == null ||
+            PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocation) ||
+            PurityKnownBclSemantics.IsArrayInterfaceGetEnumeratorInvocation(
+                invocation,
+                semanticModel,
+                context.CancellationToken) ||
+            IsTransientCharArrayConsumedByStringConstructor(invocation, semanticModel))
+            return null;
+
+        var targetMethod = invocation.TargetMethod.OriginalDefinition;
+        PurityAnalysisResult CatalogImpurity(string? source) =>
+            ImpureResult(invocation, "catalog_hit", "MethodInvocationPurityRule", targetMethod, source);
+        if (hasSemanticKnownImpure)
+            return CatalogImpurity(semanticKnownImpureSource);
+        if (PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation(invocation)) return null;
+
+        var metadata = GetTrustedMethodPurityMetadata(targetMethod, semanticModel.Compilation);
+        var knownImpureSource = metadata.KnownImpureMemberSource;
+        if (metadata.HasConfiguredKnownImpureMember)
+            return CatalogImpurity(knownImpureSource);
+        if (metadata.HasTrustedGeneratedPurity &&
+            !MethodInvocationPurityRule.ShouldDeferToSpecializedDispatchPurity(targetMethod))
+        {
+            if (metadata.GeneratedPurity.IsPure) return null;
+            var result = CheckSingleOperation(invocation, context, returnState);
+            return result.IsPure ? null : result;
+        }
+        return knownImpureSource == null
+            ? null
+            : CatalogImpurity(knownImpureSource);
     }
 
     private static bool IsBodylessSourceMemberAssumedPure(IMethodSymbol methodSymbol)

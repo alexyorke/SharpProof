@@ -137,7 +137,7 @@
                                 "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  132,
+                                "fixtureCount":  133,
                                 "tokens":  [
                                                "SharpProofDiagnostics"
                                            ]
@@ -1233,6 +1233,10 @@
                              "path":  "SharpProof.Test/PurityAnalysisStateMergerTests.cs"
                          },
                          {
+                             "name":  "PurityDirectThrowVisibilityTests",
+                             "path":  "SharpProof.Test/PurityDirectThrowVisibilityTests.cs"
+                         },
+                         {
                              "name":  "PurityPolicyAuditTests",
                              "path":  "SharpProof.Test/PurityPolicyAuditTests.cs"
                          },
@@ -1691,7 +1695,7 @@
                                                   "KnownPrimitiveOrValueAliases",
                                                   "Shape"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  9,
                             "referencedTokens":  [
                                                      "BclPurityFallbackHeuristics",
                                                      "Classification",
@@ -1838,7 +1842,7 @@
                                                   "AnalyzerFeatureDependencies",
                                                   "AnalyzerFeatures"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "AnalyzerFeatureDependencies",
                                                      "AnalyzerFeatures"
@@ -2322,7 +2326,7 @@
                                                   "ConditionTruthCacheKey",
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2333,7 +2337,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2344,7 +2348,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2355,7 +2359,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2366,7 +2370,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2377,7 +2381,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -2388,7 +2392,7 @@
                             "declaredTypes":  [
                                                   "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -3514,7 +3518,7 @@
                             "declaredTypes":  [
                                                   "ThrowOperationPurityRule"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "ThrowOperationPurityRule"
                                                  ]
@@ -3986,7 +3990,7 @@
                             "declaredTypes":  [
                                                   "SharpProofDiagnostics"
                                               ],
-                            "referencingFixtureCount":  132,
+                            "referencingFixtureCount":  133,
                             "referencedTokens":  [
                                                      "SharpProofDiagnostics"
                                                  ]
@@ -5848,7 +5852,7 @@
                                                   "SymbolicInputDomainSynthesizer",
                                                   "Target"
                                               ],
-                            "referencingFixtureCount":  13,
+                            "referencingFixtureCount":  14,
                             "referencedTokens":  [
                                                      "Target"
                                                  ]
@@ -7212,6 +7216,7 @@
                                                                  "EffectSummarySymbolKeyFactoryTests",
                                                                  "EffectSummaryToolTests",
                                                                  "PureStateInteractionTests",
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "StructuralMethodIdentityTests"
                                                              ],
                                     "tokens":  [
@@ -7219,7 +7224,7 @@
                                                    "Classification",
                                                    "Shape"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  9
                                 },
                                 {
                                     "path":  "Shared/DotnetSarifBuildRunner.cs",
@@ -7292,13 +7297,14 @@
                                                                  "AnalyzerFeatureCompositionTests",
                                                                  "EnsuresContractTests",
                                                                  "NullableContractVerificationTests",
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReadmeGeneratedExamplesTests"
                                                              ],
                                     "tokens":  [
                                                    "AnalyzerFeatureDependencies",
                                                    "AnalyzerFeatures"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
@@ -7476,85 +7482,92 @@
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.ConditionTruth.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.Descendants.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.EvaluationPathFacts.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.SharedFacts.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchExpressions.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.SwitchStatements.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "StringLengthSmtTests"
                                                              ],
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ImpurityCatalog.cs",
@@ -8246,12 +8259,13 @@
                                     "path":  "SharpProof.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
-                                                                 "DiagnosticEvidenceTests"
+                                                                 "DiagnosticEvidenceTests",
+                                                                 "PurityDirectThrowVisibilityTests"
                                                              ],
                                     "tokens":  [
                                                    "ThrowOperationPurityRule"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/UnaryOperationPurityRule.cs",
@@ -9556,6 +9570,7 @@
                                                                  "ImpureOperationTests",
                                                                  "ImpurityCatalogAccessorTests",
                                                                  "ObjectInitializerTests",
+                                                                 "PurityDirectThrowVisibilityTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantTargetFilterTests",
                                                                  "SymbolicOperationTransferModelTests",
@@ -9565,7 +9580,7 @@
                                     "tokens":  [
                                                    "Target"
                                                ],
-                                    "fixtureCount":  13
+                                    "fixtureCount":  14
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicInputWitness.cs",

@@ -162,44 +162,39 @@ internal partial class PurityAnalysisEngine
         return PurityAnalysisState.Pure.WithPathState(pathState);
     }
 
-    private static bool ShouldSkipPostCfgDirectPurityProbe(
+    private static bool IsPostCfgOperationUnreachable(
         IOperation operation,
-        SemanticModel semanticModel,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        if (operation.Syntax == null) return false;
-
-        foreach (var syntax in GetOperationVisibilitySyntaxCandidates(operation.Syntax))
-            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                    syntax,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
-                return true;
-
-        return false;
-    }
+        PurityAnalysisContext context) =>
+        IsSyntaxProvenUnreachable(
+            operation.Syntax,
+            context.SemanticModel,
+            context.SmtAnalysis,
+            context.CancellationToken);
 
     private static bool IsImpurityProvenUnreachable(
         PurityAnalysisResult result,
         SemanticModel semanticModel,
         SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken) =>
+        !result.IsPure && IsSyntaxProvenUnreachable(
+            result.ImpureSyntaxNode,
+            semanticModel,
+            smtAnalysis,
+            cancellationToken);
+
+    private static bool IsSyntaxProvenUnreachable(
+        SyntaxNode? syntaxNode,
+        SemanticModel semanticModel,
+        SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken)
     {
-        if (result.IsPure ||
-            result.ImpureSyntaxNode == null)
-            return false;
-
-        foreach (var syntax in GetOperationVisibilitySyntaxCandidates(result.ImpureSyntaxNode))
-            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                    syntax,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
-                return true;
-
-        return false;
+        if (syntaxNode == null) return false;
+        return GetOperationVisibilitySyntaxCandidates(syntaxNode).Any(syntax =>
+            ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                syntax,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis));
     }
 
     private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax)

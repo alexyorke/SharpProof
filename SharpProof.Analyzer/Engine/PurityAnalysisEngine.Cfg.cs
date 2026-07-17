@@ -159,46 +159,18 @@ internal partial class PurityAnalysisEngine
         foreach (var op in block.Operations)
         {
             if (op == null) continue;
-
-
-
-            if (op is IFlowCaptureOperation flowCap)
+            var opResult = CheckAndTrackOperation(op, context, ref currentStateInBlock);
+            if (opResult.IsPure) continue;
+            if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis, cancellationToken)) continue;
+            if (op is not IFlowCaptureOperation && IsRecursivePlaceholderImpurity(opResult))
             {
-                var valResult = CheckSingleOperation(flowCap.Value, context, currentStateInBlock);
-                currentStateInBlock = currentStateInBlock.WithFlowCaptureResult(flowCap.Id, valResult);
-                if (!valResult.IsPure)
-                {
-                    if (IsImpurityProvenUnreachable(valResult, semanticModel, smtAnalysis, cancellationToken)) continue;
-
-                    currentStateInBlock = currentStateInBlock.WithImpurity(valResult, flowCap.Syntax);
-                    break;
-                }
-
-                currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCap, context, currentStateInBlock);
+                deferredRecursiveImpurity ??= opResult.WithEvidence(
+                    opResult.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(_signatureFormat)));
+                deferredRecursiveSyntax ??= op.Syntax;
                 continue;
             }
-
-            var opResult = CheckSingleOperation(op, context, currentStateInBlock);
-
-            if (!opResult.IsPure)
-            {
-                if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis, cancellationToken)) continue;
-
-
-                if (IsRecursivePlaceholderImpurity(opResult))
-                {
-                    deferredRecursiveImpurity ??= opResult.WithEvidence(
-                        opResult.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(_signatureFormat)));
-                    deferredRecursiveSyntax ??= op.Syntax;
-                    continue;
-                }
-
-                currentStateInBlock = currentStateInBlock.WithImpurity(opResult, op.Syntax);
-                break;
-            }
-
-
-            currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(op, context, currentStateInBlock);
+            currentStateInBlock = currentStateInBlock.WithImpurity(opResult, op.Syntax);
+            break;
         }
 
         if (!currentStateInBlock.HasPotentialImpurity && deferredRecursiveImpurity.HasValue)
@@ -302,6 +274,21 @@ internal partial class PurityAnalysisEngine
                result.Evidence.CatalogSource == "recursive_call";
     }
 
+    private static PurityAnalysisResult CheckAndTrackOperation(
+        IOperation operation,
+        PurityAnalysisContext context,
+        ref PurityAnalysisState state)
+    {
+        var result = operation is IFlowCaptureOperation capture
+            ? CheckSingleOperation(capture.Value, context, state)
+            : CheckSingleOperation(operation, context, state);
+        if (operation is IFlowCaptureOperation flowCapture)
+            state = state.WithFlowCaptureResult(flowCapture.Id, result);
+        if (result.IsPure)
+            state = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(operation, context, state);
+        return result;
+    }
+
 
     private static PurityAnalysisResult AnalyzeOperationSubtreePurity(
         IOperation rootOperation,
@@ -325,20 +312,8 @@ internal partial class PurityAnalysisEngine
                 : operation;
             if (!visitedOperations.Add(operationToAnalyze)) continue;
 
-            if (operation is IFlowCaptureOperation flowCaptureOperation)
-            {
-                var valueResult = CheckSingleOperation(flowCaptureOperation.Value, context, currentState);
-                currentState = currentState.WithFlowCaptureResult(flowCaptureOperation.Id, valueResult);
-                if (!valueResult.IsPure) return valueResult;
-
-                currentState = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCaptureOperation, context, currentState);
-                continue;
-            }
-
-            var operationResult = CheckSingleOperation(operationToAnalyze, context, currentState);
+            var operationResult = CheckAndTrackOperation(operationToAnalyze, context, ref currentState);
             if (!operationResult.IsPure) return operationResult;
-
-            currentState = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(operationToAnalyze, context, currentState);
         }
 
         return currentState.HasPotentialImpurity
@@ -346,41 +321,4 @@ internal partial class PurityAnalysisEngine
             : PurityAnalysisResult.Pure;
     }
 
-    private static SyntaxNode? TryGetDirectThrowOnlySyntax(SyntaxNode? bodySyntaxNode)
-    {
-        switch (bodySyntaxNode)
-        {
-            case BlockSyntax blockSyntax
-                when blockSyntax.Statements.Count == 1:
-                return TryGetDirectThrowOnlySyntax(blockSyntax.Statements[0]);
-            case ThrowStatementSyntax throwStatementSyntax:
-                return throwStatementSyntax;
-            case ArrowExpressionClauseSyntax arrowExpressionClauseSyntax
-                when arrowExpressionClauseSyntax.Expression is ThrowExpressionSyntax throwExpressionSyntax:
-                return throwExpressionSyntax;
-            case ThrowExpressionSyntax directThrowExpressionSyntax:
-                return directThrowExpressionSyntax;
-            case MethodDeclarationSyntax methodDeclarationSyntax
-                when methodDeclarationSyntax.ExpressionBody != null:
-                return TryGetDirectThrowOnlySyntax(methodDeclarationSyntax.ExpressionBody);
-            case MethodDeclarationSyntax methodDeclarationSyntax
-                when methodDeclarationSyntax.Body != null:
-                return TryGetDirectThrowOnlySyntax(methodDeclarationSyntax.Body);
-            case LocalFunctionStatementSyntax localFunctionStatementSyntax
-                when localFunctionStatementSyntax.ExpressionBody != null:
-                return TryGetDirectThrowOnlySyntax(localFunctionStatementSyntax.ExpressionBody);
-            case LocalFunctionStatementSyntax localFunctionStatementSyntax
-                when localFunctionStatementSyntax.Body != null:
-                return TryGetDirectThrowOnlySyntax(localFunctionStatementSyntax.Body);
-            case SimpleLambdaExpressionSyntax simpleLambdaExpressionSyntax:
-                return TryGetDirectThrowOnlySyntax(simpleLambdaExpressionSyntax.Body);
-            case ParenthesizedLambdaExpressionSyntax parenthesizedLambdaExpressionSyntax:
-                return TryGetDirectThrowOnlySyntax(parenthesizedLambdaExpressionSyntax.Body);
-            case AnonymousMethodExpressionSyntax anonymousMethodExpressionSyntax
-                when anonymousMethodExpressionSyntax.Block != null:
-                return TryGetDirectThrowOnlySyntax(anonymousMethodExpressionSyntax.Block);
-            default:
-                return null;
-        }
-    }
 }

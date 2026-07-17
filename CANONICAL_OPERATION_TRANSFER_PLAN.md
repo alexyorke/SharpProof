@@ -698,6 +698,18 @@ the unused preview .NET API may break when it obstructs the canonical design.
     propagation/finally helper forest while retaining `ApplyTransferFunction`
     and post-CFG compatibility policy as explicit adjacent owners. The closed
     replacement is 119 nonblank lines and removes 102 net production lines.
+  - [x] Replace repeated Purity block-operation and post-CFG compatibility
+    plumbing with one typed check-and-track transition plus one ordered
+    compatibility coordinator. Flow captures still record results before
+    failure, recursive placeholders remain CFG-only deferred, and subtree
+    analysis retains raw evidence without CFG reachability pruning. The
+    coordinator materializes visible operations once and preserves using,
+    foreach, throw, catch/finally, invocation, operator, and missing-disposal
+    precedence with distinct return, exact-runtime probe, and exit-resource
+    states. Eight direct callable shapes plus a nested-callable boundary prove
+    that visible `IThrowOperation` syntax and throw evidence subsume the deleted
+    syntax-only fallback. The closed replacement removes 115 net production
+    lines.
 - [x] If the transfer deletion does not meet the LOC gate, collapse remaining
   unused preview query wrappers into the canonical result graph; keep CLI and
   JSON/SARIF projections byte-compatible.
@@ -1163,6 +1175,7 @@ the unused preview .NET API may break when it obstructs the canonical design.
 | Phase 7 canonical purity assignment envelope | Commit `db309060` replaces the Analyzer assignment branch fan-out with one ordered target envelope and transition. Three direct invariants lock RHS-span local versions, fixed ref-closure ownership/disposal alias snapshots, and declaration delegate null-resolution recovery. `SymbolicOperationTransferModelTests` pass 47/47; the combined affected Purity/alias/resource/delegate/oracle/exception batch passes 679/679; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,551 plus the same two MainGeneral skips. The Release solution warning-as-error build has zero warnings and errors. Architecture metrics report no oversized files/partials, overparted partials, unassigned or ambiguous files, or dependency violations. Production LOC falls by 238 to 105,077 across 444 files, or -2,599 from the rewrite start; tracked test LOC is 145,542. |
 | Phase 7 canonical purity metadata merge | Commit `2459e840` makes `PurityAnalysisStateMerger` perform one ordered impurity/capture pass and one generic common-key intersection around a single canonical all-path state merge. Three direct tests characterize empty/singleton, pair, and three-state metadata/path behavior; the affected CFG/operation/delegate/alias/evidence batch passes 492/492; MainSmtAnalyzer passes 487/487; and all main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic test-impact inventory includes the new fixture and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, and architecture violation buckets remain zero. Production LOC falls by 102 to 104,975 across 444 files, or -2,701 from the rewrite start; tracked test LOC is 145,672. |
 | Phase 7 inline purity CFG scheduler | Commit `2b418660` replaces the Analyzer-local worklist class, traversal carrier, branch propagator, and recursive finally completion helper with one 119-line coordinator-local scheduler. It preserves conditional-before-fallthrough order, constant-edge selection, feasibility pruning, structural continuation identity, block-ordinal revisit merging, queue deduplication, the exact `blocks * 200` bound, return ownership before finally, nested finally order, insertion-ordered exit evidence, and all-at-once normal-exit merging. The focused branch/merge/operation/try/loop/using/disposal/recursion/evidence/exception-region batch passes 523/523; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,554 plus the same two MainGeneral skips. The deterministic impact inventory drops only the two deleted private types and validates at 39/39. The Release solution warning-as-error build has zero warnings and errors, architecture violation buckets remain zero, and exact empty-evidence projection is retained. Production LOC falls by 102 to 104,873 across 444 files, or -2,803 from the rewrite start; tracked test LOC remains 145,672. |
+| Phase 7 ordered purity operation compatibility | One typed check-and-track helper now owns flow-capture result recording and pure-only state sidecars across CFG and subtree analysis, while callers retain their distinct unreachable and recursive-placeholder policy. One coordinator materializes visible operations once and applies using, foreach, direct throw, catch/finally, invocation, and operator compatibility stages before the unchanged missing-resource-disposal check. The 37-line syntax-only direct-throw fallback and repeated `goto`/enumeration plumbing are deleted. The eight-shape direct-throw table plus nested-callable boundary passes 17/17; the requested focused parity batch passes 707/707; deterministic impact inventory coverage passes 39/39; MainSmtAnalyzer passes 487/487; and all Main lanes pass 5,571 plus the same two MainGeneral skips. Release solution warning-as-error is clean and every architecture violation bucket is zero. Production LOC falls by 115 to 104,758 across 444 files, or -2,918 from the rewrite start; tracked test LOC is 145,849. |
 
 ## Current Checkpoint
 
@@ -1559,14 +1572,21 @@ the unused preview .NET API may break when it obstructs the canonical design.
   ownership, continuation identity, merging, evidence, and fallback behavior
   remain green. Production LOC is 104,873 across 444 files, down 102 in this
   tranche and 2,803 from the rewrite start; tracked test LOC remains 145,672.
-- Next cheapest step: inventory the now-adjacent Purity block-operation transfer
-  loop and post-CFG resource/final-result closure against the canonical
-  assignment envelope, metadata merger, and operation results. Accept the next
-  vertical slice only if one closed replacement removes at least 100 net lines
-  while preserving recursive-placeholder order, branch-value evidence,
-  ownership/disposal exit policy, normalized state, versions, and conservative
+  Purity operation checking now has one typed flow-capture/state-sidecar
+  transition shared by CFG and subtree callers, and post-CFG compatibility has
+  one ordered coordinator over a single visible-operation inventory. Direct
+  throw syntax/evidence parity passes for eight callable shapes and a nested
+  boundary; all requested focused and lane gates remain green. Production LOC
+  is 104,758 across 444 files, down 115 in this tranche and 2,918 from the
+  rewrite start; tracked test LOC is 145,849.
+- Next cheapest step: inventory the remaining Purity resource/lifetime
+  transition wrappers and final-result/exception-path adapters against the
+  canonical assignment envelope, operation coordinator, and state merger.
+  Accept the next closed vertical slice only if it removes at least 100 net
+  production lines while preserving alias-based ownership, reverse disposal,
+  return escape, using-declaration exit timing, evidence, and conservative
   fallback.
-- Blockers: the 11,000-line production target still requires 8,197 lines. The
+- Blockers: the 11,000-line production target still requires 8,082 lines. The
   structural fallback and remaining Analyzer CFG/transfer adapters remain
   reachable for typed CFG `Unsupported` cases. The user has authorized the
   required major rearchitecture; its remaining blocker is differential parity,
