@@ -127,7 +127,7 @@ internal static class SmtFormulaNormalizer
     {
         if (source.Kind != replacement.Kind ||
             EqualityComparer<SmtFormula>.Default.Equals(source, replacement) ||
-            CountFormulaNodes(replacement) > MaxEqualitySubstitutionReplacementNodes ||
+            SmtFormulaTraversal.Enumerate(replacement).Skip(MaxEqualitySubstitutionReplacementNodes).Any() ||
             WouldCreateSubstitutionCycle(source, replacement, substitutions, substitutions.Count + 1))
             return;
 
@@ -143,55 +143,15 @@ internal static class SmtFormulaNormalizer
         int remainingDepth)
     {
         if (remainingDepth < 0) return true;
-
-        switch (replacement)
+        foreach (var candidate in SmtFormulaTraversal.Enumerate(replacement).OfType<SmtVariable>())
         {
-            case SmtVariable variable:
-                if (EqualityComparer<SmtFormula>.Default.Equals(variable, source)) return true;
-
-                return substitutions.TryGetValue(variable, out var nested) &&
-                       WouldCreateSubstitutionCycle(source, nested, substitutions, remainingDepth - 1);
-            case SmtUnaryFormula unaryFormula:
-                return WouldCreateSubstitutionCycle(source, unaryFormula.Operand, substitutions, remainingDepth);
-            case SmtBinaryFormula binaryFormula:
-                return WouldCreateSubstitutionCycle(source, binaryFormula.Left, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, binaryFormula.Right, substitutions, remainingDepth);
-            case SmtIntegerUnaryTerm integerUnaryTerm:
-                return WouldCreateSubstitutionCycle(source, integerUnaryTerm.Operand, substitutions, remainingDepth);
-            case SmtIntegerBinaryTerm integerBinaryTerm:
-                return WouldCreateSubstitutionCycle(source, integerBinaryTerm.Left, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, integerBinaryTerm.Right, substitutions, remainingDepth);
-            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
-                return WouldCreateSubstitutionCycle(source, opaqueIntegerTerm.Left, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, opaqueIntegerTerm.Right, substitutions, remainingDepth);
-            case SmtStringLengthTerm stringLengthTerm:
-                return WouldCreateSubstitutionCycle(source, stringLengthTerm.Value, substitutions, remainingDepth);
-            case SmtStringConcatTerm stringConcatTerm:
-                return WouldCreateSubstitutionCycle(source, stringConcatTerm.Left, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, stringConcatTerm.Right, substitutions, remainingDepth);
-            case SmtStringContainsFormula stringContains:
-                return WouldCreateSubstitutionCycle(source, stringContains.Value, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, stringContains.Search, substitutions, remainingDepth);
-            case SmtStringStartsWithFormula stringStartsWith:
-                return WouldCreateSubstitutionCycle(source, stringStartsWith.Value, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, stringStartsWith.Prefix, substitutions, remainingDepth);
-            case SmtStringEndsWithFormula stringEndsWith:
-                return WouldCreateSubstitutionCycle(source, stringEndsWith.Value, substitutions, remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, stringEndsWith.Suffix, substitutions, remainingDepth);
-            case SmtRegexMatchFormula regexMatch:
-                return WouldCreateSubstitutionCycle(source, regexMatch.Value, substitutions, remainingDepth);
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                return WouldCreateSubstitutionCycle(source, runtimeTypeTest.Value, substitutions, remainingDepth);
-            case SmtConditionalFormula conditionalFormula:
-                return WouldCreateSubstitutionCycle(source, conditionalFormula.Condition, substitutions,
-                           remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, conditionalFormula.WhenTrue, substitutions,
-                           remainingDepth) ||
-                       WouldCreateSubstitutionCycle(source, conditionalFormula.WhenFalse, substitutions,
-                           remainingDepth);
-            default:
-                return false;
+            if (candidate.Equals(source)) return true;
+            if (substitutions.TryGetValue(candidate, out var nested) &&
+                WouldCreateSubstitutionCycle(source, nested, substitutions, remainingDepth - 1))
+                return true;
         }
+
+        return false;
     }
 
     private static SmtFormula SubstituteEqualityAliases(
@@ -218,153 +178,59 @@ internal static class SmtFormulaNormalizer
         return current;
     }
 
-    private static int CountFormulaNodes(SmtFormula formula)
-    {
-        var count = 0;
-        foreach (var unused in SmtFormulaTraversal.Enumerate(formula)) count++;
-
-        return count;
-    }
-
     private static SmtFormula SimplifyBooleanConstants(SmtFormula formula, out bool changed)
     {
         changed = false;
-        if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } unaryFormula)
+        var current = formula;
+        while (true)
         {
-            var operand = SimplifyBooleanConstants(unaryFormula.Operand, out var operandChanged);
-            if (operand is SmtBooleanConstant booleanConstant)
-            {
-                changed = true;
+            current = SmtFormulaTraversal.RewriteBottomUp(current, SimplifyBooleanNode, out var passChanged);
+            if (!passChanged) break;
+            changed = true;
+        }
+
+        return current;
+    }
+
+    private static SmtFormula SimplifyBooleanNode(SmtFormula formula)
+    {
+        if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+        {
+            if (negated.Operand is SmtBooleanConstant booleanConstant)
                 return new SmtBooleanConstant(!booleanConstant.Value);
-            }
-
-            if (operand is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } nestedNot)
-            {
-                changed = true;
-                return nestedNot.Operand;
-            }
-
-            if (TryNegateFormula(operand, out var negatedFormula))
-            {
-                changed = true;
-                return SimplifyBooleanConstants(negatedFormula, out _);
-            }
-
-            changed = operandChanged;
-            return operandChanged ? new SmtUnaryFormula(SmtUnaryOperator.Not, operand) : formula;
+            if (negated.Operand is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } nested)
+                return nested.Operand;
+            if (negated.Operand is SmtBinaryFormula comparison &&
+                SmtComparisonOperatorFacts.IsComparison(comparison.Operator))
+                return new SmtBinaryFormula(
+                    SmtComparisonOperatorFacts.Negate(comparison.Operator),
+                    comparison.Left,
+                    comparison.Right);
+            if (negated.Operand is SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
+                } logical)
+                return new SmtBinaryFormula(
+                    logical.Operator == SmtBinaryOperator.And ? SmtBinaryOperator.Or : SmtBinaryOperator.And,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, logical.Left),
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, logical.Right));
+            return formula;
         }
 
-        if (formula is not SmtBinaryFormula binaryFormula) return formula;
-
-        if (binaryFormula.Operator is not SmtBinaryOperator.And and not SmtBinaryOperator.Or) return formula;
-
-        var left = SimplifyBooleanConstants(binaryFormula.Left, out var leftChanged);
-        var right = SimplifyBooleanConstants(binaryFormula.Right, out var rightChanged);
-        changed = leftChanged || rightChanged;
-
-        if (binaryFormula.Operator == SmtBinaryOperator.And)
-        {
-            if (left is SmtBooleanConstant { Value: false } ||
-                right is SmtBooleanConstant { Value: false })
+        if (formula is not SmtBinaryFormula
             {
-                changed = true;
-                return new SmtBooleanConstant(false);
-            }
+                Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
+            } binary)
+            return formula;
 
-            if (left is SmtBooleanConstant { Value: true })
-            {
-                changed = true;
-                return right;
-            }
-
-            if (right is SmtBooleanConstant { Value: true })
-            {
-                changed = true;
-                return left;
-            }
-
-            if (EqualityComparer<SmtFormula>.Default.Equals(left, right))
-            {
-                changed = true;
-                return left;
-            }
-
-            if (AreSyntacticNegations(left, right))
-            {
-                changed = true;
-                return new SmtBooleanConstant(false);
-            }
-        }
-        else
-        {
-            if (left is SmtBooleanConstant { Value: true } ||
-                right is SmtBooleanConstant { Value: true })
-            {
-                changed = true;
-                return new SmtBooleanConstant(true);
-            }
-
-            if (left is SmtBooleanConstant { Value: false })
-            {
-                changed = true;
-                return right;
-            }
-
-            if (right is SmtBooleanConstant { Value: false })
-            {
-                changed = true;
-                return left;
-            }
-
-            if (EqualityComparer<SmtFormula>.Default.Equals(left, right))
-            {
-                changed = true;
-                return left;
-            }
-
-            if (AreSyntacticNegations(left, right))
-            {
-                changed = true;
-                return new SmtBooleanConstant(true);
-            }
-        }
-
-        return changed ? new SmtBinaryFormula(binaryFormula.Operator, left, right) : formula;
-    }
-
-    private static bool TryNegateFormula(SmtFormula formula, out SmtFormula negatedFormula)
-    {
-        if (formula is SmtBinaryFormula binaryFormula)
-        {
-            if (SmtComparisonOperatorFacts.IsComparison(binaryFormula.Operator))
-            {
-                var negatedOperator = SmtComparisonOperatorFacts.Negate(binaryFormula.Operator);
-                negatedFormula = new SmtBinaryFormula(negatedOperator, binaryFormula.Left, binaryFormula.Right);
-                return true;
-            }
-
-            if (binaryFormula.Operator is SmtBinaryOperator.And or SmtBinaryOperator.Or)
-            {
-                var operatorAfterNegation = binaryFormula.Operator == SmtBinaryOperator.And
-                    ? SmtBinaryOperator.Or
-                    : SmtBinaryOperator.And;
-                negatedFormula = new SmtBinaryFormula(
-                    operatorAfterNegation,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, binaryFormula.Left),
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, binaryFormula.Right));
-                return true;
-            }
-        }
-
-        negatedFormula = null!;
-        return false;
-    }
-
-    private static bool AreSyntacticNegations(SmtFormula left, SmtFormula right)
-    {
-        return (left is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } leftNot &&
-                EqualityComparer<SmtFormula>.Default.Equals(leftNot.Operand, right)) ||
-               (right is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } rightNot &&
-                EqualityComparer<SmtFormula>.Default.Equals(rightNot.Operand, left));
+        var isAnd = binary.Operator == SmtBinaryOperator.And;
+        if (binary.Left is SmtBooleanConstant left)
+            return left.Value == isAnd ? binary.Right : new SmtBooleanConstant(!isAnd);
+        if (binary.Right is SmtBooleanConstant right)
+            return right.Value == isAnd ? binary.Left : new SmtBooleanConstant(!isAnd);
+        if (binary.Left.Equals(binary.Right)) return binary.Left;
+        return SmtComparisonOperatorFacts.AreComplements(binary.Left, binary.Right)
+            ? new SmtBooleanConstant(!isAnd)
+            : formula;
     }
 }
