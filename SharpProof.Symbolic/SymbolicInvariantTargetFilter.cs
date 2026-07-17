@@ -35,50 +35,6 @@ internal static class SymbolicInvariantTargetFilter
             .ToArray();
     }
 
-    internal static IReadOnlyList<string> SelectFacts(
-        IReadOnlyList<string> facts,
-        IReadOnlyList<SymbolicInvariantTargetSummary> filteredTargetSummaries,
-        IReadOnlyList<string> invariantTargets,
-        Func<SymbolicInvariantTargetSummary, IReadOnlyList<string>> factSelector)
-    {
-        if (invariantTargets.Count == 0) return facts;
-
-        return filteredTargetSummaries
-            .SelectMany(factSelector)
-            .Where(static fact => !string.IsNullOrWhiteSpace(fact))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    internal static IReadOnlyList<string> GetMatchedTargetFilters(
-        IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
-        IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries,
-        IReadOnlyList<string> invariantTargets)
-    {
-        if (invariantTargets.Count == 0) return Array.Empty<string>();
-
-        var availableTargets = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var summary in targetSummaries) availableTargets.Add(NormalizeTarget(summary.Target));
-
-        foreach (var summary in targetPathSummaries) availableTargets.Add(NormalizeTarget(summary.Target));
-
-        return invariantTargets
-            .Select(NormalizeTarget)
-            .Where(availableTargets.Contains)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    internal static IReadOnlyList<string> GetMatchedTargetFilters(
-        SymbolicInvariantQueryView query,
-        IReadOnlyList<string> invariantTargets)
-    {
-        return GetMatchedTargetFilters(
-            query.TargetSummaries,
-            query.TargetPathSummaries,
-            invariantTargets);
-    }
-
     internal static IReadOnlyList<string> GetUnmatchedTargetFilters(
         IReadOnlyList<string> invariantTargets,
         IReadOnlyList<string> matchedTargetFilters)

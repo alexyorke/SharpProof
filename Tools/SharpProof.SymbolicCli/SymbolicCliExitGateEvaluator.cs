@@ -134,12 +134,12 @@ internal static class SymbolicCliExitGateEvaluator
     {
         if (!options.MaximumConservativeUnknowns.HasValue ||
             result is not SymbolicQueryResult queryResult ||
-            queryResult.InvariantQuery.UnknownFactCount <= options.MaximumConservativeUnknowns.Value)
+            queryResult.MergedPathFacts.ConservativeUnknownCount <= options.MaximumConservativeUnknowns.Value)
             return;
 
         failures.Add(new SymbolicCliExitGateFailure(
             "conservative-unknowns",
-            "actual=" + queryResult.InvariantQuery.UnknownFactCount.ToString(CultureInfo.InvariantCulture) +
+            "actual=" + queryResult.MergedPathFacts.ConservativeUnknownCount.ToString(CultureInfo.InvariantCulture) +
             "; maximum=" + options.MaximumConservativeUnknowns.Value.ToString(CultureInfo.InvariantCulture) + "."));
     }
 
@@ -181,7 +181,7 @@ internal static class SymbolicCliExitGateEvaluator
             return metric switch
             {
                 "program-points" => queryResult.ProgramPointCount,
-                "conservative-unknowns" => queryResult.InvariantQuery.UnknownFactCount,
+                "conservative-unknowns" => queryResult.MergedPathFacts.ConservativeUnknownCount,
                 "proof-unknowns" => queryResult.ProgramPointSummary.ProofOutcomes.UnknownCount,
                 "reachability-unknowns" => queryResult.Reachability.UnknownCount,
                 _ => throw new InvalidOperationException("Unsupported invariant compact threshold metric: " + metric)

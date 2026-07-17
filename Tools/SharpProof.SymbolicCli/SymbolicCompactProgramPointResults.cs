@@ -43,7 +43,8 @@ internal sealed record SymbolicCompactProgramPointResult(
             SymbolicCompactOutputTruncation.FromInvariant(observed),
             SymbolicCompactOutputTruncation.FromInvariant(conservative));
 
-        var invariantQuery = SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options);
+        var invariantQuery = SymbolicCompactInvariantQueryView.FromQueryView(
+            SymbolicInvariantQueryView.From(result), options);
         return new SymbolicCompactProgramPointResult(
             SymbolicOrderedJson.Object(
                 ("filePath", result.FilePath), ("line", result.Line), ("column", result.Column),
@@ -223,11 +224,11 @@ internal sealed record SymbolicCompactInvariantQueryView(
     {
         var targets = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetSummaries, options.InvariantTargets, static summary => summary.Target);
-        var mustFacts = SymbolicInvariantTargetFilter.SelectFacts(
+        var mustFacts = SymbolicInvariantQueryView.SelectFacts(
             query.MustFacts, targets, options.InvariantTargets, static summary => summary.MustFacts);
-        var maybeFacts = SymbolicInvariantTargetFilter.SelectFacts(
+        var maybeFacts = SymbolicInvariantQueryView.SelectFacts(
             query.MaybeFacts, targets, options.InvariantTargets, static summary => summary.MaybeFacts);
-        var unknownFacts = SymbolicInvariantTargetFilter.SelectFacts(
+        var unknownFacts = SymbolicInvariantQueryView.SelectFacts(
             query.UnknownFacts, targets, options.InvariantTargets, static summary => summary.UnknownFacts);
         var text = options.HasInvariantTargetFilter
             ? SymbolicInvariantService.FormatMergedInvariantFacts(mustFacts.Concat(unknownFacts).ToArray())
@@ -245,7 +246,7 @@ internal sealed record SymbolicCompactInvariantQueryView(
         var pathSummaries = visiblePathTargets.Select(target => ProjectTargetPathSummary(target, options)).ToArray();
         var visibleDiagnostics = SymbolicCompactProjection.Take(query.Diagnostics, options.MaxConditions);
         var diagnostics = visibleDiagnostics.Select(diagnostic => ProjectDiagnostic(diagnostic, options)).ToArray();
-        var matched = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(query, options.InvariantTargets);
+        var matched = query.GetMatchedTargets(options.InvariantTargets);
         var unmatched = SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matched);
         var visibleMatched = SymbolicCompactProjection.Take(matched, options.MaxConditions);
         var visibleUnmatched = SymbolicCompactProjection.Take(unmatched, options.MaxConditions);

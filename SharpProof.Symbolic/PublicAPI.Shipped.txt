@@ -1,6 +1,4 @@
 #nullable enable
-const SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence = 8 -> int
-const SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.DefaultMaxConditions = 8 -> int
 const SharpProof.Symbolic.SymbolicProgramPointKinds.Expression = "Expression" -> string!
 const SharpProof.Symbolic.SymbolicProgramPointKinds.Other = "Other" -> string!
 const SharpProof.Symbolic.SymbolicProgramPointKinds.Statement = "Statement" -> string!
@@ -219,47 +217,6 @@ SharpProof.Symbolic.SymbolicInvariantMergeKind
 SharpProof.Symbolic.SymbolicInvariantMergeKind.Conjunction = 0 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
 SharpProof.Symbolic.SymbolicInvariantMergeKind.ConservativeFactMerge = 2 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
 SharpProof.Symbolic.SymbolicInvariantMergeKind.DistinctFactUnion = 1 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.Code.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.Count.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.Evidence.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.EvidenceTotalCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.EvidenceTruncated.get -> bool
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.Message.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic.Severity.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryStatus.Conservative = 1 -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryStatus.Exact = 0 -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryStatus.Unreachable = 3 -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryStatus.Unresolved = 2 -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryView
-SharpProof.Symbolic.SymbolicInvariantQueryView.CandidateProgramPointCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.DiagnosticCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInvariantQueryDiagnostic!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.HasMaybeFacts.get -> bool
-SharpProof.Symbolic.SymbolicInvariantQueryView.HasUnknowns.get -> bool
-SharpProof.Symbolic.SymbolicInvariantQueryView.HasUnresolvedAnalysis.get -> bool
-SharpProof.Symbolic.SymbolicInvariantQueryView.IsUnreachable.get -> bool
-SharpProof.Symbolic.SymbolicInvariantQueryView.MaybeFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.MaybeFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.MergeKind.get -> SharpProof.Symbolic.SymbolicInvariantMergeKind
-SharpProof.Symbolic.SymbolicInvariantQueryView.MustFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.MustFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.ProofOutcomes.get -> SharpProof.Symbolic.SymbolicProofOutcomeSummary!
-SharpProof.Symbolic.SymbolicInvariantQueryView.Reachability.get -> SharpProof.Symbolic.SymbolicReachabilitySummary!
-SharpProof.Symbolic.SymbolicInvariantQueryView.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
-SharpProof.Symbolic.SymbolicInvariantQueryView.Status.get -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantQueryView.StatusReason.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryView.Summary.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryView.TargetPathSummaries.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInvariantTargetPathSummary!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.TargetPathSummaryCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.TargetSummaries.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInvariantTargetSummary!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.TargetSummaryCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.Text.get -> string!
-SharpProof.Symbolic.SymbolicInvariantQueryView.UnknownDiagnostics.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.UnknownFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantQueryView.UnknownFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantQueryView.UnreachableProgramPointCount.get -> int
 SharpProof.Symbolic.SymbolicInvariantResult
 SharpProof.Symbolic.SymbolicInvariantResult.ConditionCount.get -> int
 SharpProof.Symbolic.SymbolicInvariantResult.Conditions.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInvariantCondition!>!
@@ -268,40 +225,6 @@ SharpProof.Symbolic.SymbolicInvariantResult.HasConservativeUnknowns.get -> bool
 SharpProof.Symbolic.SymbolicInvariantResult.IsTrivial.get -> bool
 SharpProof.Symbolic.SymbolicInvariantResult.MergedInvariantText.get -> string!
 SharpProof.Symbolic.SymbolicInvariantResult.MergeKind.get -> SharpProof.Symbolic.SymbolicInvariantMergeKind
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.Conditions.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ConditionsTruncated.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ConservativeUnknownCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.HasPathConditions.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.HasProofs.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.HasUnknownProofs.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.PathConditionCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProgramPointCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProofProvenFalseCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProofProvenTrueCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProofTotalCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProofUnknownCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ProofUnreachableCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ReachableProgramPointCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.ReasonCode.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.SmtConditionCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.StatusReason.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.Summary.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetPathSummary.Target.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.HasMaybeFacts.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.HasUnknowns.get -> bool
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.MaybeFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.MaybeFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.MustFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.MustFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.ReasonCode.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.Status.get -> SharpProof.Symbolic.SymbolicInvariantQueryStatus
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.StatusReason.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.Summary.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.Target.get -> string!
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.UnknownFactCount.get -> int
-SharpProof.Symbolic.SymbolicInvariantTargetSummary.UnknownFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
 SharpProof.Symbolic.SymbolicMergedPathFacts
 SharpProof.Symbolic.SymbolicMergedPathFacts.AlwaysFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
 SharpProof.Symbolic.SymbolicMergedPathFacts.CandidateProgramPointCount.get -> int
@@ -375,7 +298,6 @@ SharpProof.Symbolic.SymbolicQueryResult.ConditionProofs.get -> System.Collection
 SharpProof.Symbolic.SymbolicQueryResult.FilePath.get -> string!
 SharpProof.Symbolic.SymbolicQueryResult.Filter(SharpProof.Symbolic.SymbolicSourceQueryFilter! filter) -> SharpProof.Symbolic.SymbolicQueryResult!
 SharpProof.Symbolic.SymbolicQueryResult.InvariantInfo.get -> SharpProof.Symbolic.SymbolicInvariantInfo!
-SharpProof.Symbolic.SymbolicQueryResult.InvariantQuery.get -> SharpProof.Symbolic.SymbolicInvariantQueryView!
 SharpProof.Symbolic.SymbolicQueryResult.Line.get -> int?
 SharpProof.Symbolic.SymbolicQueryResult.LineCount.get -> int?
 SharpProof.Symbolic.SymbolicQueryResult.MergedPathFacts.get -> SharpProof.Symbolic.SymbolicMergedPathFacts!

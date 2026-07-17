@@ -413,7 +413,6 @@ SharpProof.Symbolic.SymbolicProgramPointResult.Facts.get -> System.Collections.G
 SharpProof.Symbolic.SymbolicProgramPointResult.FilePath.get -> string!
 SharpProof.Symbolic.SymbolicProgramPointResult.Invariant.get -> SharpProof.Symbolic.SymbolicInvariantResult!
 SharpProof.Symbolic.SymbolicProgramPointResult.InvariantInfo.get -> SharpProof.Symbolic.SymbolicInvariantInfo!
-SharpProof.Symbolic.SymbolicProgramPointResult.InvariantQuery.get -> SharpProof.Symbolic.SymbolicInvariantQueryView!
 SharpProof.Symbolic.SymbolicProgramPointResult.Line.get -> int
 SharpProof.Symbolic.SymbolicProgramPointResult.MergedInvariantText.get -> string!
 SharpProof.Symbolic.SymbolicProgramPointResult.MethodName.get -> string?
@@ -438,8 +437,6 @@ SharpProof.Symbolic.SymbolicProgramPointResult.RequestedPositionDistance.get -> 
 SharpProof.Symbolic.SymbolicProgramPointResult.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
 SharpProof.Symbolic.SymbolicProgramPointResult.SymbolicFacts.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicFactInfo!>!
 static SharpProof.Symbolic.SymbolicConditionProofSummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofSummary!>!
-static SharpProof.Symbolic.SymbolicInvariantQueryView.FromMergedPathFacts(SharpProof.Symbolic.SymbolicInvariantResult! invariant, SharpProof.Symbolic.SymbolicMergedPathFacts! mergedPathFacts, SharpProof.Symbolic.SymbolicReachabilitySummary! reachability, SharpProof.Symbolic.SymbolicProofOutcomeSummary! proofOutcomes, SharpProof.Symbolic.SymbolicSmtDiagnostics! smtDiagnostics, System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>? programPoints = null) -> SharpProof.Symbolic.SymbolicInvariantQueryView!
-static SharpProof.Symbolic.SymbolicInvariantQueryView.FromPoint(SharpProof.Symbolic.SymbolicProgramPointResult! result) -> SharpProof.Symbolic.SymbolicInvariantQueryView!
 static SharpProof.Symbolic.SymbolicMergedPathFacts.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicMergedPathFacts!
 static SharpProof.Symbolic.SymbolicProgramPointSummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicProgramPointSummary!
 static SharpProof.Symbolic.SymbolicReachabilitySummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicReachabilitySummary!

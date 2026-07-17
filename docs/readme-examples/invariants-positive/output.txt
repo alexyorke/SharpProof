@@ -11,7 +11,7 @@ Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoint
 Invariant query text: value > 0
 Invariant query status: Exact
 Invariant query status reason: all_candidate_program_points_exact
-Invariant query summary: Invariant query is exact for the selected reachable program points.
+Invariant query summary: Invariant analysis is exact.
 Invariant query must facts: value > 0
 Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
 Invariant query target summary: All selected reachable program points agree on the facts for this target.

@@ -90,7 +90,6 @@ public sealed class SymbolicProgramPointResult
             Invariant.ConditionCount);
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-        InvariantQuery = SymbolicInvariantQueryView.FromPoint(this);
     }
 
     public string FilePath { get; }
@@ -158,8 +157,6 @@ public sealed class SymbolicProgramPointResult
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public SymbolicInvariantQueryView InvariantQuery { get; }
 
     private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
     {

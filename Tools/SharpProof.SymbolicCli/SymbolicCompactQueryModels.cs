@@ -222,7 +222,9 @@ internal sealed record SymbolicCompactQueryProjection(
             : result.ObservedInvariant.Conditions.Select(static condition => condition.Text).ToArray();
         var conservativeInvariant = point?.Invariant ?? result.MergedInvariant;
         var mergedPathFacts = point == null ? result.MergedPathFacts : null;
-        var sourceInvariantQuery = point?.InvariantQuery ?? result.InvariantQuery;
+        var sourceInvariantQuery = point != null
+            ? SymbolicInvariantQueryView.From(point)
+            : SymbolicInvariantQueryView.From(result);
         var reachability = point == null
             ? result.Reachability
             : SymbolicReachabilitySummary.FromProgramPoints(sourceProgramPoints);
@@ -351,7 +353,7 @@ internal sealed record SymbolicCompactQueryProjection(
         var (observedInvariant, conservativeInvariant, invariantQuery,
             conditionProofs, programPoints, smtDiagnostics, truncation) = CreateScopeData(
             result.ObservedInvariant, result.Facts, result.MergedInvariant, result.MergedPathFacts,
-            result.InvariantQuery,
+            SymbolicInvariantQueryView.From(result),
             SymbolicConditionProofSummary.FromProgramPoints(result.ProgramPoints),
             result.ProgramPoints,
             result.SmtDiagnostics,

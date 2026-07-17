@@ -13,7 +13,7 @@ internal static class SymbolicCliTextRenderer
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Merged invariant merge: {result.InvariantInfo.MergeKind}");
     Console.WriteLine($"Merged invariant conditions: {result.InvariantInfo.ConditionCount}");
-    PrintInvariantQuery("Merged invariant query", result.InvariantQuery, options);
+    PrintInvariantQuery("Merged invariant query", SymbolicInvariantQueryView.From(result), options);
     PrintMergedPathFacts("Merged path facts", result.MergedPathFacts);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
@@ -64,7 +64,7 @@ internal static class SymbolicCliTextRenderer
     Console.WriteLine($"{scopeLabel} merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"{scopeLabel} invariant merge: {result.InvariantInfo.MergeKind}");
     Console.WriteLine($"{scopeLabel} invariant conditions: {result.InvariantInfo.ConditionCount}");
-    PrintInvariantQuery(scopeLabel + " invariant query", result.InvariantQuery, options);
+    PrintInvariantQuery(scopeLabel + " invariant query", SymbolicInvariantQueryView.From(result), options);
     PrintMergedPathFacts(scopeLabel + " merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(FilterConditionProofs(result.ConditionProofs, options, static proof => proof.Target));
     foreach (var point in result.ProgramPoints)
@@ -428,7 +428,7 @@ internal static class SymbolicCliTextRenderer
 
     if (options.HasInvariantTargetFilter)
     {
-        var matchedTargetFilters = GetMatchedInvariantTargetFilters(options, targetSummaries, targetPathSummaries);
+        var matchedTargetFilters = query.GetMatchedTargets(options.InvariantTargets);
         var unmatchedTargetFilters = GetUnmatchedInvariantTargetFilters(options, matchedTargetFilters);
         Console.WriteLine(label + " target filter: " + string.Join(", ", options.InvariantTargets));
         Console.WriteLine(
@@ -472,22 +472,11 @@ internal static class SymbolicCliTextRenderer
     SymbolicCliOptions options,
     Func<SymbolicInvariantTargetSummary, IReadOnlyList<string>> factSelector)
 {
-    return SymbolicInvariantTargetFilter.SelectFacts(
+    return SymbolicInvariantQueryView.SelectFacts(
         facts,
         targetSummaries,
         options.InvariantTargets,
         factSelector);
-}
-
-    private static IReadOnlyList<string> GetMatchedInvariantTargetFilters(
-    SymbolicCliOptions options,
-    IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
-    IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries)
-{
-    return SymbolicInvariantTargetFilter.GetMatchedTargetFilters(
-        targetSummaries,
-        targetPathSummaries,
-        options.InvariantTargets);
 }
 
     private static IReadOnlyList<string> GetUnmatchedInvariantTargetFilters(
@@ -592,7 +581,7 @@ internal static class SymbolicCliTextRenderer
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
     Console.WriteLine($"Conservative unknown conditions: {result.Invariant.ConservativeUnknownCount}");
     PrintAnalysisTruncation(result.AnalysisTruncation);
-    PrintInvariantQuery("Invariant query", result.InvariantQuery, options);
+    PrintInvariantQuery("Invariant query", SymbolicInvariantQueryView.From(result), options);
     if (result.Invariant.ConditionCount != 0)
     {
         Console.WriteLine("Invariant conditions:");

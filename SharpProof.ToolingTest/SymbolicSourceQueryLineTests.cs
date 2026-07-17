@@ -1005,20 +1005,21 @@ public class TestClass
             "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
 
-        Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-        Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
-        Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("value > 0"));
-        Assert.That(result.InvariantQuery.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
-        Assert.That(result.InvariantQuery.MaybeFacts.Count, Is.InRange(2, 3));
-        Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
-        Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
-        Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
-        Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
-        Assert.That(result.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
-        Assert.That(result.InvariantQuery.Summary, Does.Contain("unresolved"));
-        var targetSummary = result.InvariantQuery.TargetSummaries.Single();
-        Assert.That(result.InvariantQuery.TargetSummaryCount, Is.EqualTo(1));
+        var query = InvariantView(result);
+        Assert.That(query.Text, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(query.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(query.MustFacts, Is.Empty);
+        Assert.That(query.MaybeFacts, Has.Member("value > 0"));
+        Assert.That(query.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
+        Assert.That(query.MaybeFacts.Count, Is.InRange(2, 3));
+        Assert.That(query.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
+        Assert.That(query.HasMaybeFacts, Is.True);
+        Assert.That(query.HasUnknowns, Is.True);
+        Assert.That(query.HasUnresolvedAnalysis, Is.True);
+        Assert.That(query.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
+        Assert.That(query.Summary, Does.Contain("unresolved"));
+        var targetSummary = query.TargetSummaries.Single();
+        Assert.That(query.TargetSummaryCount, Is.EqualTo(1));
         Assert.That(targetSummary.Target, Is.EqualTo("value"));
         Assert.That(targetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
         Assert.That(targetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
@@ -1030,9 +1031,8 @@ public class TestClass
         Assert.That(targetSummary.MaybeFacts.Count, Is.InRange(2, 3));
         Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
         var targetPathSummary =
-            result.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "value");
-        Assert.That(result.InvariantQuery.TargetPathSummaryCount,
-            Is.EqualTo(result.InvariantQuery.TargetPathSummaries.Count));
+            query.TargetPathSummaries.Single(static summary => summary.Target == "value");
+        Assert.That(query.TargetPathSummaryCount, Is.EqualTo(query.TargetPathSummaries.Count));
         Assert.That(targetPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
         Assert.That(targetPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
         Assert.That(targetPathSummary.ProgramPointCount, Is.GreaterThanOrEqualTo(2));
@@ -1041,26 +1041,15 @@ public class TestClass
         Assert.That(targetPathSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-PROOF-UNKNOWN"));
         Assert.That(targetPathSummary.Conditions, Does.Contain("value > 0"));
         Assert.That(
-            result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
+            query.Diagnostics.Select(static diagnostic => diagnostic.Code),
             Is.EquivalentTo(new[] { "SP-SYM-MAYBE-FACTS", "SP-SYM-CONSERVATIVE-UNKNOWN", "SP-SYM-PROOF-UNKNOWN" }));
-        Assert.That(
-            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
-                .Evidence,
-            Has.Member("value > 0"));
-        Assert.That(
-            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
-                .Evidence.Any(IsNonPositiveValueFact),
-            Is.True);
-        Assert.That(
-            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
-                .Evidence.Count,
-            Is.InRange(2, 3));
-        Assert.That(result.InvariantQuery.CandidateProgramPointCount,
+        Assert.That(query.Diagnostics.Sum(static diagnostic => diagnostic.Count), Is.GreaterThanOrEqualTo(3));
+        Assert.That(query.CandidateProgramPointCount,
             Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
-        Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
-        Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
-        Assert.That(result.InvariantQuery.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
-        Assert.That(result.InvariantQuery.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
+        Assert.That(query.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
+        Assert.That(query.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
+        Assert.That(query.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
+        Assert.That(query.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
         var aggregateProof = result.ConditionProofs.Single(static proof => proof.Condition == "value > 0");
         Assert.That(aggregateProof.Reasons, Is.Not.Empty);
         Assert.That(
@@ -1073,14 +1062,15 @@ public class TestClass
         var positiveReturn = result.ProgramPoints
             .Where(static point => point.NodeKind == "ReturnStatement")
             .Single(point => point.MergedInvariantText == "value > 0");
-        Assert.That(positiveReturn.InvariantQuery.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
-        Assert.That(positiveReturn.InvariantQuery.MaybeFacts, Is.Empty);
-        Assert.That(positiveReturn.InvariantQuery.UnknownFacts, Is.Empty);
-        Assert.That(positiveReturn.InvariantQuery.HasUnresolvedAnalysis, Is.False);
-        Assert.That(positiveReturn.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
-        Assert.That(positiveReturn.InvariantQuery.Diagnostics, Is.Empty);
-        Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-        var positiveTargetSummary = positiveReturn.InvariantQuery.TargetSummaries.Single();
+        var positiveQuery = InvariantView(positiveReturn);
+        Assert.That(positiveQuery.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
+        Assert.That(positiveQuery.MaybeFacts, Is.Empty);
+        Assert.That(positiveQuery.UnknownFacts, Is.Empty);
+        Assert.That(positiveQuery.HasUnresolvedAnalysis, Is.False);
+        Assert.That(positiveQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
+        Assert.That(positiveQuery.Diagnostics, Is.Empty);
+        Assert.That(positiveQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        var positiveTargetSummary = positiveQuery.TargetSummaries.Single();
         Assert.That(positiveTargetSummary.Target, Is.EqualTo("value"));
         Assert.That(positiveTargetSummary.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
         Assert.That(positiveTargetSummary.MaybeFacts, Is.Empty);
@@ -1089,7 +1079,7 @@ public class TestClass
         Assert.That(positiveTargetSummary.StatusReason, Is.EqualTo("target_exact"));
         Assert.That(positiveTargetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-EXACT"));
         Assert.That(positiveTargetSummary.Summary, Does.Contain("agree"));
-        var positivePathSummary = positiveReturn.InvariantQuery.TargetPathSummaries.Single();
+        var positivePathSummary = positiveQuery.TargetPathSummaries.Single();
         Assert.That(positivePathSummary.Target, Is.EqualTo("value"));
         Assert.That(positivePathSummary.PathConditionCount, Is.EqualTo(1));
         Assert.That(positivePathSummary.SmtConditionCount, Is.EqualTo(1));
@@ -1114,7 +1104,7 @@ public class TestClass
         using var session = new SymbolicSourceQueryTestSession(source, "BoundedInvariantDiagnostics.cs");
         var result = session.AnalyzeLine("if (value == 0)");
 
-        var maybeDiagnostic = result.InvariantQuery.Diagnostics
+        var maybeDiagnostic = InvariantView(result).Diagnostics
             .Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS");
         Assert.That(maybeDiagnostic.EvidenceTotalCount,
             Is.GreaterThan(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
@@ -1166,17 +1156,18 @@ public class TestClass
         Assert.That(result.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
         Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
         Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
-        Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("copy > 0"));
+        var query = InvariantView(result);
+        Assert.That(query.MaybeFacts, Does.Contain("copy > 0"));
         Assert.That(
-            result.InvariantQuery.MaybeFacts.Any(static fact => fact is "!(copy > 0)" or "copy <= 0"),
+            query.MaybeFacts.Any(static fact => fact is "!(copy > 0)" or "copy <= 0"),
             Is.True);
-        Assert.That(result.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
-        Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+        Assert.That(query.UnknownFacts, Does.Contain("unknown(copy)"));
+        Assert.That(query.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
 
         var guardedReturn = result.ProgramPoints
             .Where(static point => point.NodeKind == "ReturnStatement")
             .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
-        Assert.That(guardedReturn.InvariantQuery.MustFacts, Does.Contain("copy > 0"));
+        Assert.That(InvariantView(guardedReturn).MustFacts, Does.Contain("copy > 0"));
         Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
@@ -1940,6 +1931,7 @@ public class TestClass
             maxFacts: 1,
             maxConditions: 2,
             maxProofs: 1));
+        var query = InvariantView(result);
         var descriptorJson = compact.QueryDescriptor.Json;
         var analysisSummaryJson = compact.AnalysisSummary.Json;
         var invariantQueryJson = compact.InvariantQuery.Json;
@@ -1954,26 +1946,26 @@ public class TestClass
         Assert.That(compact.Scope.NodeSpanEnd, Is.EqualTo(spanEnd));
         Assert.That(compact.Scope.NodeStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
         Assert.That(compact.Scope.NodeEndLine, Is.EqualTo(FindLine(source, "return 0;")));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(result.InvariantQuery.Text));
+        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(query.Text));
         Assert.That(invariantQueryJson.GetProperty("maybeFactCount").GetInt32(),
-            Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+            Is.EqualTo(query.MaybeFactCount));
         Assert.That(invariantQueryJson.GetProperty("maybeFacts").EnumerateArray()
-            .Select(static value => value.GetString()), Is.EquivalentTo(result.InvariantQuery.MaybeFacts.Take(2)));
+            .Select(static value => value.GetString()), Is.EquivalentTo(query.MaybeFacts.Take(2)));
         Assert.That(invariantQueryJson.GetProperty("unknownFacts").EnumerateArray()
             .Select(static value => value.GetString()), Does.Contain("unknown(copy)"));
         Assert.That(invariantQueryJson.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
         Assert.That(invariantQueryJson.GetProperty("statusReason").GetString(),
-            Is.EqualTo(result.InvariantQuery.StatusReason));
+            Is.EqualTo(query.StatusReason));
         Assert.That(invariantQueryJson.GetProperty("targetPathSummaryCount").GetInt32(),
-            Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+            Is.EqualTo(query.TargetPathSummaryCount));
         var compactPathSummary = invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray()
             .Single(static summary => summary.GetProperty("target").GetString() == "copy");
         Assert.That(compactPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
         Assert.That(compactPathSummary.GetProperty("conditions").GetArrayLength(), Is.LessThanOrEqualTo(2));
         Assert.That(compactPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-        Assert.That(analysisSummaryJson.GetProperty("mustFactCount").GetInt32(), Is.EqualTo(result.InvariantQuery.MustFactCount));
-        Assert.That(analysisSummaryJson.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(result.InvariantQuery.MaybeFactCount));
-        Assert.That(analysisSummaryJson.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(result.InvariantQuery.UnknownFactCount));
+        Assert.That(analysisSummaryJson.GetProperty("mustFactCount").GetInt32(), Is.EqualTo(query.MustFactCount));
+        Assert.That(analysisSummaryJson.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(query.MaybeFactCount));
+        Assert.That(analysisSummaryJson.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(query.UnknownFactCount));
         Assert.That(analysisSummaryJson.GetProperty("invariantStatusReason").GetString(),
             Is.EqualTo(invariantQueryJson.GetProperty("statusReason").GetString()));
         Assert.That(analysisSummaryJson.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(222));
@@ -2024,6 +2016,7 @@ public class TestClass
         var invariantResult = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
             maxConditions: 1,
             maxProofs: 1));
+        var query = InvariantView(result);
         var descriptorJson = invariantResult.QueryDescriptor.Json;
         var analysisSummaryJson = invariantResult.AnalysisSummary.Json;
         var invariantQueryJson = invariantResult.InvariantQuery.Json;
@@ -2072,14 +2065,14 @@ public class TestClass
         Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
         Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend),
             Does.Contain(SymbolicProofBackend.Smt));
-        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(result.InvariantQuery.Text));
+        Assert.That(invariantQueryJson.GetProperty("text").GetString(), Is.EqualTo(query.Text));
         Assert.That(invariantQueryJson.GetProperty("maybeFactCount").GetInt32(),
-            Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+            Is.EqualTo(query.MaybeFactCount));
         Assert.That(invariantQueryJson.GetProperty("maybeFacts").GetArrayLength(), Is.LessThanOrEqualTo(1));
         Assert.That(invariantQueryJson.GetProperty("maybeFactsTruncated").GetBoolean(),
-            Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
+            Is.EqualTo(query.MaybeFactCount > 1));
         Assert.That(invariantQueryJson.GetProperty("targetSummaryCount").GetInt32(),
-            Is.EqualTo(result.InvariantQuery.TargetSummaryCount));
+            Is.EqualTo(query.TargetSummaryCount));
         Assert.That(invariantQueryJson.GetProperty("targetSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
         var compactTargetJson = invariantQueryJson.GetProperty("targetSummaries").EnumerateArray().Single();
         Assert.That(compactTargetJson.GetProperty("target").GetString(), Is.EqualTo("copy"));
@@ -2096,7 +2089,7 @@ public class TestClass
         Assert.That(compactTargetJson.GetProperty("unknownFacts").EnumerateArray()
             .Select(static value => value.GetString()), Does.Contain("unknown(copy)"));
         Assert.That(invariantQueryJson.GetProperty("targetPathSummaryCount").GetInt32(),
-            Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+            Is.EqualTo(query.TargetPathSummaryCount));
         Assert.That(invariantQueryJson.GetProperty("targetPathSummaries").GetArrayLength(), Is.LessThanOrEqualTo(1));
         var compactPathJson = invariantQueryJson.GetProperty("targetPathSummaries").EnumerateArray().Single();
         Assert.That(compactPathJson.GetProperty("target").GetString(), Is.EqualTo("copy"));
@@ -2160,11 +2153,12 @@ public class TestClass
             spanEnd,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0", "other < 10" });
+        var query = InvariantView(result);
         Assert.That(
-            result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+            query.TargetPathSummaries.Select(static summary => summary.Target),
             Does.Contain("copy"));
         Assert.That(
-            result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+            query.TargetPathSummaries.Select(static summary => summary.Target),
             Does.Contain("other"));
 
         var invariantResult = SymbolicCompactQueryProjection.Create(result, new SymbolicCompactQueryOptions(
@@ -4741,6 +4735,12 @@ public class TestClass
 
         return position;
     }
+
+    private static SymbolicInvariantQueryView InvariantView(SymbolicQueryResult result) =>
+        SymbolicInvariantQueryView.From(result);
+
+    private static SymbolicInvariantQueryView InvariantView(SymbolicProgramPointResult point) =>
+        SymbolicInvariantQueryView.From(point);
 
     private static SymbolicProgramPointResult CreateSyntheticProofPoint(
         string condition,

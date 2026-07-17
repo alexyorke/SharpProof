@@ -961,7 +961,6 @@ public sealed class SymbolicQueryResult
         SymbolicReachabilitySummary reachability,
         IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
         SymbolicSmtDiagnostics smtDiagnostics,
-        SymbolicInvariantQueryView invariantQuery,
         IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
@@ -975,7 +974,6 @@ public sealed class SymbolicQueryResult
         Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
         ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
         LineGroups = lineGroups ?? Array.Empty<SymbolicQueryLineGroup>();
         InvariantInfo = new SymbolicInvariantInfo(
             MergedInvariant.MergedInvariantText,
@@ -1026,8 +1024,6 @@ public sealed class SymbolicQueryResult
     public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
-
-    public SymbolicInvariantQueryView InvariantQuery { get; }
 
     public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
 
@@ -1182,8 +1178,7 @@ public sealed class SymbolicQueryResult
             SymbolicProgramPointSummary.FromProgramPoints(new[] { point }),
             SymbolicReachabilitySummary.FromProgramPoints(new[] { point }),
             SymbolicConditionProofSummary.FromProgramPoints(new[] { point }),
-            point.SmtDiagnostics,
-            point.InvariantQuery);
+            point.SmtDiagnostics);
     }
 
     private static SymbolicQueryResult FromAggregate(
@@ -1213,13 +1208,6 @@ public sealed class SymbolicQueryResult
             programPointSummary.Reachability,
             conditionProofs,
             diagnostics,
-            SymbolicInvariantQueryView.FromMergedPathFacts(
-                mergedInvariant,
-                mergedPathFacts,
-                programPointSummary.Reachability,
-                programPointSummary.ProofOutcomes,
-                diagnostics,
-                programPoints),
             lineGroups);
     }
 }
