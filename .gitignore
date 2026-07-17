@@ -363,3 +363,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 *.trx
+
+# Leftover analysis/audit dumps written to the repo by tooling runs
+/CODE_REVIEW_RESULTS.json
+/*_audit*.json
+/symbol-equality-audit.json
+**/Engine/Rules/findings.json
