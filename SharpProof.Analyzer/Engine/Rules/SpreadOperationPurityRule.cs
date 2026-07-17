@@ -4,17 +4,15 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class SpreadOperationPurityRule : IPurityRule
+internal sealed class SpreadOperationPurityRule : PurityRuleBase<ISpreadOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Spread);
+    protected override OperationKind Kind => OperationKind.Spread;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        ISpreadOperation spreadOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not ISpreadOperation spreadOperation) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         if (spreadOperation.Operand == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var operandResult = PurityAnalysisEngine.CheckSingleOperation(spreadOperation.Operand, context, currentState);

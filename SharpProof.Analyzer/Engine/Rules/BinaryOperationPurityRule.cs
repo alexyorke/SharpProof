@@ -4,14 +4,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class BinaryOperationPurityRule : IPurityRule
+internal sealed class BinaryOperationPurityRule : PurityRuleBase<IBinaryOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Binary);
+    protected override OperationKind Kind => OperationKind.Binary;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IBinaryOperation binaryOperation,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is IBinaryOperation binaryOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         var leftResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.LeftOperand, context, currentState);

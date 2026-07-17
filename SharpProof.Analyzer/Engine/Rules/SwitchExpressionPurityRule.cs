@@ -4,15 +4,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class SwitchExpressionPurityRule : IPurityRule
+internal sealed class SwitchExpressionPurityRule : PurityRuleBase<ISwitchExpressionOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.SwitchExpression);
+    protected override OperationKind Kind => OperationKind.SwitchExpression;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ISwitchExpressionOperation switchExpression,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is ISwitchExpressionOperation switchExpression))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         var valueResult = PurityAnalysisEngine.CheckSingleOperation(switchExpression.Value, context, currentState);

@@ -6,14 +6,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class AwaitPurityRule : IPurityRule
+internal sealed class AwaitPurityRule : PurityRuleBase<IAwaitOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Await);
+    protected override OperationKind Kind => OperationKind.Await;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IAwaitOperation awaitOperation,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is IAwaitOperation awaitOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         var awaitedExpressionResult =

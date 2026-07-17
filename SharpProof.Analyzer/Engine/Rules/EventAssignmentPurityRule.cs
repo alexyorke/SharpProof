@@ -4,15 +4,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class EventAssignmentPurityRule : IPurityRule
+internal sealed class EventAssignmentPurityRule : PurityRuleBase<IEventAssignmentOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.EventAssignment);
+    protected override OperationKind Kind => OperationKind.EventAssignment;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IEventAssignmentOperation eventAssignment,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not IEventAssignmentOperation eventAssignment)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         // Subscribing or unsubscribing to an event mutates the event's invocation list (stateful) => impure.

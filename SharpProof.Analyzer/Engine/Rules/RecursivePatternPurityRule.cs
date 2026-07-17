@@ -4,26 +4,25 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class RecursivePatternPurityRule : IPurityRule
+internal sealed class RecursivePatternPurityRule : PurityRuleBase<IRecursivePatternOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.RecursivePattern);
+    protected override OperationKind Kind => OperationKind.RecursivePattern;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IRecursivePatternOperation recursivePatternOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is IRecursivePatternOperation recursivePatternOperation &&
-            recursivePatternOperation.DeconstructSymbol is IMethodSymbol deconstructMethod)
+        if (recursivePatternOperation.DeconstructSymbol is IMethodSymbol deconstructMethod)
         {
             var deconstructResult = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                 deconstructMethod,
-                operation.Syntax,
+                recursivePatternOperation.Syntax,
                 context);
             if (!deconstructResult.IsPure)
                 return deconstructResult;
         }
 
-        return ChildOperationsPurityRule.CheckChildOperationsArePure(operation, context, currentState);
+        return ChildOperationsPurityRule.CheckChildOperationsArePure(recursivePatternOperation, context, currentState);
     }
 }

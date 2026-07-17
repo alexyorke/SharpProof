@@ -5,14 +5,13 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ArrayCreationPurityRule : IPurityRule
+internal sealed class ArrayCreationPurityRule : PurityRuleBase<IArrayCreationOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.ArrayCreation);
+    protected override OperationKind Kind => OperationKind.ArrayCreation;
 
-    public PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisState currentState)
+    protected override PurityAnalysisResult CheckTyped(IArrayCreationOperation arrayCreation,
+        PurityAnalysisContext context, PurityAnalysisState currentState)
     {
-        if (!(operation is IArrayCreationOperation arrayCreation)) return PurityAnalysisResult.Pure;
 
 
         var isParamsArray = arrayCreation.Parent is IArgumentOperation argumentOperation &&

@@ -4,14 +4,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class CoalesceOperationPurityRule : IPurityRule
+internal sealed class CoalesceOperationPurityRule : PurityRuleBase<ICoalesceOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Coalesce);
+    protected override OperationKind Kind => OperationKind.Coalesce;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ICoalesceOperation coalesceOperation,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is ICoalesceOperation coalesceOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         var leftResult = PurityAnalysisEngine.CheckSingleOperation(coalesceOperation.Value, context, currentState);

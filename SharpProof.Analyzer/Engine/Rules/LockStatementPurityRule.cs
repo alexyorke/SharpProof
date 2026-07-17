@@ -4,14 +4,13 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class LockStatementPurityRule : IPurityRule
+internal sealed class LockStatementPurityRule : PurityRuleBase<ILockOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Lock);
+    protected override OperationKind Kind => OperationKind.Lock;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ILockOperation lockOp,
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        var lockOp = (ILockOperation)operation;
 
         var isSynchronizationAllowed = context.ContainingMethodSymbol != null &&
                                        context.AttributePolicy.HasAttribute(
