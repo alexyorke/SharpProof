@@ -1229,6 +1229,10 @@
                              "path":  "SharpProof.Test/PureStateInteractionTests.cs"
                          },
                          {
+                             "name":  "PurityAnalysisStateMergerTests",
+                             "path":  "SharpProof.Test/PurityAnalysisStateMergerTests.cs"
+                         },
+                         {
                              "name":  "PurityPolicyAuditTests",
                              "path":  "SharpProof.Test/PurityPolicyAuditTests.cs"
                          },
@@ -1515,6 +1519,10 @@
                          {
                              "name":  "SymbolicLoopTransferLowererTests",
                              "path":  "SharpProof.Test/SymbolicLoopTransferLowererTests.cs"
+                         },
+                         {
+                             "name":  "SymbolicMutationInventoryTests",
+                             "path":  "SharpProof.Test/SymbolicMutationInventoryTests.cs"
                          },
                          {
                              "name":  "SymbolicOperationTransferModelTests",
@@ -2414,7 +2422,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2425,7 +2433,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2436,7 +2444,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2450,7 +2458,7 @@
                                                   "CfgTraversalPoint",
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2465,9 +2473,11 @@
                                                   "PurityAnalysisState",
                                                   "PurityEvidence"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
+                                                     "PotentialTargets",
                                                      "PurityAnalysisEngine",
+                                                     "PurityAnalysisResult",
                                                      "PurityAnalysisState",
                                                      "PurityEvidence"
                                                  ]
@@ -2478,7 +2488,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2490,7 +2500,7 @@
                                                   "PurityAnalysisEngine",
                                                   "TrustedMethodPurityMetadata"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2501,7 +2511,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2512,27 +2522,32 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisStateMerger"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PurityAnalysisStateMerger"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityAssignmentEnvelope.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PreservedAliases",
+                                                  "PurityAssignmentEnvelope",
+                                                  "PurityAssignmentTarget",
+                                                  "PurityAssignmentTargetEffects",
+                                                  "PurityAssignmentTransition",
+                                                  "PurityDelegateUpdateKind"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "PurityAssignmentEnvelope",
+                                                     "PurityAssignmentTransition"
                                                  ]
                         },
                         {
                             "path":  "SharpProof.Analyzer/Engine/PurityAssignmentStateTransfer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "PurityAssignmentStateTransfer"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAssignmentStateTransfer.SymbolicAssignments.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PreservedAliasState",
                                                   "PurityAssignmentStateTransfer"
                                               ],
                             "referencingFixtureCount":  0,
@@ -2601,9 +2616,9 @@
                             "declaredTypes":  [
                                                   "PurityOperationTransferAdapter"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "PurityOperationTransferAdapter"
+
                                                  ]
                         },
                         {
@@ -2626,9 +2641,9 @@
                             "declaredTypes":  [
                                                   "PurityResourceStateFacts"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PurityResourceStateFacts"
                                                  ]
                         },
                         {
@@ -2637,9 +2652,9 @@
                             "declaredTypes":  [
                                                   "PurityResourceStateFacts"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PurityResourceStateFacts"
                                                  ]
                         },
                         {
@@ -2648,9 +2663,9 @@
                             "declaredTypes":  [
                                                   "PurityResourceStateFacts"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PurityResourceStateFacts"
                                                  ]
                         },
                         {
@@ -2659,9 +2674,9 @@
                             "declaredTypes":  [
                                                   "PuritySymbolicStateFacts"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PuritySymbolicStateFacts"
                                                  ]
                         },
                         {
@@ -3103,9 +3118,9 @@
                             "declaredTypes":  [
                                                   "IPurityRule"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "IPurityRule"
                                                  ]
                         },
                         {
@@ -3345,9 +3360,9 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisContext"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "PurityAnalysisContext"
                                                  ]
                         },
                         {
@@ -4764,7 +4779,7 @@
                                                   "SymbolicTypeTestAtom",
                                                   "SymbolicVariableTerm"
                                               ],
-                            "referencingFixtureCount":  12,
+                            "referencingFixtureCount":  13,
                             "referencedTokens":  [
                                                      "SymbolicAliasAtom",
                                                      "SymbolicArrayDimensionLengthTerm",
@@ -5230,7 +5245,7 @@
                                                   "GuardedState",
                                                   "SymbolicStateMerger"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicStateMerger"
                                                  ]
@@ -5379,7 +5394,7 @@
                                                   "SmtAnalysisMode",
                                                   "SmtAnalysisOptions"
                                               ],
-                            "referencingFixtureCount":  21,
+                            "referencingFixtureCount":  22,
                             "referencedTokens":  [
                                                      "SmtAnalysisMode",
                                                      "SmtAnalysisOptions"
@@ -5391,7 +5406,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  20,
+                            "referencingFixtureCount":  21,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -5808,7 +5823,7 @@
                             "declaredTypes":  [
                                                   "SymbolicFactFactory"
                                               ],
-                            "referencingFixtureCount":  7,
+                            "referencingFixtureCount":  8,
                             "referencedTokens":  [
                                                      "SymbolicFactFactory"
                                                  ]
@@ -5960,6 +5975,18 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicMutationInventory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicMutationInventory",
+                                                  "SymbolicMutationInventoryEntry"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicMutationInventory"
                                                  ]
                         },
                         {
@@ -6377,7 +6404,7 @@
                             "declaredTypes":  [
                                                   "SymbolicStateValueFacts"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicStateValueFacts"
                                                  ]
@@ -7558,106 +7585,139 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgBranchAssumptions.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgReturnValues.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgTransfer.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
+                                                   "PotentialTargets",
                                                    "PurityAnalysisEngine",
+                                                   "PurityAnalysisResult",
                                                    "PurityAnalysisState",
                                                    "PurityEvidence"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.DelegateTargets.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Recursive.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "PurityAnalysisStateMergerTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityAnalysisStateMerger"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAssignmentEnvelope.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityAssignmentEnvelope",
+                                                   "PurityAssignmentTransition"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityCalleeResolver.cs",
@@ -7682,13 +7742,46 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityOperationTransferAdapter.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "SymbolicOperationTransferModelTests"
                                                              ],
                                     "tokens":  [
-                                                   "PurityOperationTransferAdapter"
+                                                   "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.Diagnostics.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.ReleasePaths.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PuritySymbolicStateFacts.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PuritySymbolicStateFacts"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -7811,6 +7904,17 @@
                                                              ],
                                     "tokens":  [
                                                    "InterpolatedStringPurityRule"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/IPurityRule.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "IPurityRule"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -8027,6 +8131,17 @@
                                                              ],
                                     "tokens":  [
                                                    "PropertyReferencePurityRule"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/PurityAnalysisContext.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicOperationTransferModelTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityAnalysisContext"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -8783,6 +8898,7 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "CfgBranchAssumptionTests",
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantServiceTests",
@@ -8847,7 +8963,7 @@
                                                    "SymbolicTypeTestAtom",
                                                    "SymbolicVariableTerm"
                                                ],
-                                    "fixtureCount":  12
+                                    "fixtureCount":  13
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
@@ -9055,12 +9171,13 @@
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicStateMerger.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "PurityAnalysisStateMergerTests",
                                                                  "SymbolicStateMergerTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicStateMerger"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/MethodBodyOperationResolver.cs",
@@ -9139,6 +9256,7 @@
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantServiceTests",
                                                                  "SymbolicIrTests",
+                                                                 "SymbolicOperationTransferModelTests",
                                                                  "SymbolicProofPipelineTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
@@ -9149,7 +9267,7 @@
                                                    "SmtAnalysisMode",
                                                    "SmtAnalysisOptions"
                                                ],
-                                    "fixtureCount":  21
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
@@ -9170,6 +9288,7 @@
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantServiceTests",
                                                                  "SymbolicIrTests",
+                                                                 "SymbolicOperationTransferModelTests",
                                                                  "SymbolicProofPipelineTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
@@ -9179,7 +9298,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  20
+                                    "fixtureCount":  21
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaReferenceScanner.cs",
@@ -9407,13 +9526,14 @@
                                                                  "SymbolicInputWitnessTests",
                                                                  "SymbolicIrTests",
                                                                  "SymbolicLoopTransferLowererTests",
+                                                                 "SymbolicMutationInventoryTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicVariableNameFactsTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicFactFactory"
                                                ],
-                                    "fixtureCount":  7
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicFormulaDisplay.cs",
@@ -9496,6 +9616,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicInvariantTargetFilter"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicMutationInventory.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "SymbolicMutationInventoryTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicMutationInventory"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9784,12 +9915,13 @@
                                     "path":  "SharpProof.Symbolic/SymbolicStateValueFacts.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "SymbolicCfgProgramPointStateCollectorTests"
+                                                                 "SymbolicCfgProgramPointStateCollectorTests",
+                                                                 "SymbolicMutationInventoryTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicStateValueFacts"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicUnknownReasonTaxonomy.cs",
