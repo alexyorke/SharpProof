@@ -145,7 +145,7 @@ internal class AwaitPurityRule : IPurityRule
         ITypeSymbol awaiterType,
         Compilation compilation)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var method in awaiterType.GetMembers()
                      .OfType<IMethodSymbol>()
@@ -163,8 +163,8 @@ internal class AwaitPurityRule : IPurityRule
         {
             var interfaceType = compilation.GetTypeByMetadataName(interfaceName);
             if (interfaceType == null ||
-                (!SymbolEqualityComparer.Default.Equals(namedAwaiterType, interfaceType) &&
-                 !namedAwaiterType.AllInterfaces.Contains(interfaceType, SymbolEqualityComparer.Default)))
+                (!SymbolEq.AreEqual(namedAwaiterType, interfaceType) &&
+                 !namedAwaiterType.AllInterfaces.Contains(interfaceType, SymbolEq.Default)))
                 continue;
 
             foreach (var interfaceMethod in interfaceType.GetMembers()

@@ -440,7 +440,7 @@ internal static class MethodEnsuresAnalyzer
         IParameterSymbol parameter,
         IMethodSymbol methodSymbol)
     {
-        return SymbolEqualityComparer.Default.Equals(
+        return SymbolEq.AreEqual(
             parameter.ContainingSymbol?.OriginalDefinition,
             methodSymbol.OriginalDefinition);
     }

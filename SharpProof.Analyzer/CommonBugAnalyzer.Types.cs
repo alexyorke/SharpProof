@@ -108,7 +108,7 @@ internal static partial class CommonBugAnalyzer
                             Target: IFieldReferenceOperation target,
                             Value: { } value
                         } &&
-                        SymbolEqualityComparer.Default.Equals(target.Field, field) &&
+                        SymbolEq.AreEqual(target.Field, field) &&
                         Unwrap(value) is IObjectCreationOperation)
                         return true;
             }

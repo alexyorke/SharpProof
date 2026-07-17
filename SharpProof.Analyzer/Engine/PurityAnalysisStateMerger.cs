@@ -47,7 +47,7 @@ internal static class PurityAnalysisStateMerger
             IntersectCommon(
                 states,
                 static state => state.DelegateTargetMap,
-                SymbolEqualityComparer.Default,
+                SymbolEq.Default,
                 static (left, right) => (true, PotentialTargets.Merge(left, right))),
             captures,
             IntersectCommon(
@@ -64,7 +64,7 @@ internal static class PurityAnalysisStateMerger
                 states,
                 static state => state.FlowCaptureSymbols,
                 null,
-                static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)
+                static (left, right) => SymbolEq.AreEqual(left, right)
                     ? (true, left)
                     : (false, left)));
     }

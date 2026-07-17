@@ -13,7 +13,7 @@ internal sealed class CompilationPurityService : IDisposable
     private readonly object _fixedPointLock = new();
 
     private readonly ConcurrentDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> _purityCache =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEq.Default);
 
     private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> _semanticModelCache = new();
 

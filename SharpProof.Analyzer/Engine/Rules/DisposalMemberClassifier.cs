@@ -20,7 +20,7 @@ internal static class DisposalMemberClassifier
         bool async)
     {
         var methodName = async ? "DisposeAsync" : "Dispose";
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var method in TypeHierarchyEnumeration
                      .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
@@ -57,8 +57,8 @@ internal static class DisposalMemberClassifier
         var interfaceMethod = disposable?.GetMembers(methodName).OfType<IMethodSymbol>().FirstOrDefault();
         if (disposable != null && interfaceMethod != null)
         {
-            if (SymbolEqualityComparer.Default.Equals(type, disposable) ||
-                type.AllInterfaces.Contains(disposable, SymbolEqualityComparer.Default))
+            if (SymbolEq.AreEqual(type, disposable) ||
+                type.AllInterfaces.Contains(disposable, SymbolEq.Default))
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 

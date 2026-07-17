@@ -29,7 +29,7 @@ internal partial class PropertyReferencePurityRule
 
         var formattableStringType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.FormattableString");
         if (formattableStringType == null ||
-            !SymbolEqualityComparer.Default.Equals(propertySymbol.ContainingType?.OriginalDefinition,
+            !SymbolEq.AreEqual(propertySymbol.ContainingType?.OriginalDefinition,
                 formattableStringType))
             return false;
 

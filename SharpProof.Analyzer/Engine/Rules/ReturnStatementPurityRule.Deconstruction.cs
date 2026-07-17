@@ -33,7 +33,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             designation.FirstAncestorOrSelf<AssignmentExpressionSyntax>() is not { } assignment ||
             !TryGetTupleElementExpression(assignment.Right, path, out initializerSyntax) ||
             semanticModel.GetDeclaredSymbol(designation, cancellationToken) is not ILocalSymbol declaredSymbol ||
-            !SymbolEqualityComparer.Default.Equals(declaredSymbol, localSymbol))
+            !SymbolEq.AreEqual(declaredSymbol, localSymbol))
         {
             initializerSyntax = null!;
             declarationSyntax = null!;
@@ -124,7 +124,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         if (target is IdentifierNameSyntax identifierName &&
             semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol targetLocal &&
-            SymbolEqualityComparer.Default.Equals(targetLocal, localSymbol))
+            SymbolEq.AreEqual(targetLocal, localSymbol))
             return true;
 
         if (target is TupleExpressionSyntax tuple)
@@ -155,7 +155,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         if (designation is SingleVariableDesignationSyntax singleVariable &&
             semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken) is ILocalSymbol declaredLocal &&
-            SymbolEqualityComparer.Default.Equals(declaredLocal, localSymbol))
+            SymbolEq.AreEqual(declaredLocal, localSymbol))
             return true;
 
         if (designation is ParenthesizedVariableDesignationSyntax parenthesized)

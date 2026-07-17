@@ -307,7 +307,7 @@ internal static partial class ExceptionFlowAnalyzer
         ITypeSymbol candidate)
     {
         return symbols.Any(symbol =>
-            SymbolEqualityComparer.Default.Equals(symbol.OriginalDefinition, candidate.OriginalDefinition));
+            SymbolEq.AreEqual(symbol.OriginalDefinition, candidate.OriginalDefinition));
     }
 
     private static string FormatAllowedTypes(EffectiveExceptionContract contract)

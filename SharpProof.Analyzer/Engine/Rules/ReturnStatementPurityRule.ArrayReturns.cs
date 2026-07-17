@@ -14,7 +14,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         return IsAllowedTrustedArrayReturn(
             returnedValue,
             semanticModel,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken,
             out methodSymbol);
     }
@@ -66,7 +66,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             {
                 var branchVisited = firstAlternative
                     ? visitedLocals
-                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default);
+                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEq.Default);
                 if (!IsAllowedTrustedArrayReturn(
                         alternative,
                         semanticModel,
@@ -164,7 +164,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 returnedValue,
                 semanticModel,
                 expectedKind,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                new HashSet<ILocalSymbol>(SymbolEq.Default),
                 cancellationToken,
                 out var sourceOperation,
                 out methodSymbol))
@@ -231,7 +231,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             {
                 var branchVisited = firstAlternative
                     ? visitedLocals
-                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default);
+                    : new HashSet<ILocalSymbol>(visitedLocals, SymbolEq.Default);
                 firstAlternative = false;
                 if (TryResolveReturnedArrayViewSource(
                         alternative,

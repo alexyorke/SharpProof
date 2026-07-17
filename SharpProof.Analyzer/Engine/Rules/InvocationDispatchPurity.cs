@@ -41,7 +41,7 @@ internal static class InvocationDispatchPurity
                 hasExactReceiverType,
                 context.CancellationToken)
             .Where(method => !method.IsAbstract && !method.IsExtern)
-            .ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            .ToImmutableHashSet<IMethodSymbol>(SymbolEq.Default);
 
         if (CanHaveExternalDispatchTargets(invokedMethodSymbol, invocationOperation, knownReceiverType,
                 hasExactReceiverType))
@@ -69,7 +69,7 @@ internal static class InvocationDispatchPurity
 
         foreach (var candidateMethod in candidateMethods)
         {
-            if (SymbolEqualityComparer.Default.Equals(
+            if (SymbolEq.AreEqual(
                     candidateMethod.OriginalDefinition,
                     context.ContainingMethodSymbol.OriginalDefinition))
                 continue;

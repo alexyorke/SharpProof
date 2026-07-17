@@ -20,7 +20,7 @@ internal partial class MethodInvocationPurityRule
         var interfaceImplementationTarget = invokedMethodSymbol.ContainingType?.TypeKind == TypeKind.Interface
             ? invokedMethodSymbol
             : target;
-        var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var targets = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         if (target.ContainingType?.TypeKind == TypeKind.Interface)
         {
@@ -54,7 +54,7 @@ internal partial class MethodInvocationPurityRule
                     }
                     else
                     {
-                        if (!SymbolEqualityComparer.Default.Equals(type.OriginalDefinition,
+                        if (!SymbolEq.AreEqual(type.OriginalDefinition,
                                 knownReceiverType.OriginalDefinition) &&
                             !TypeHierarchyEnumeration.DerivesFrom(type, knownReceiverType))
                             continue;
@@ -88,7 +88,7 @@ internal partial class MethodInvocationPurityRule
             {
                 if (hasExactReceiverType &&
                     knownReceiverType != null &&
-                    (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+                    (SymbolEq.AreEqual(knownReceiverType.OriginalDefinition,
                          baseType.OriginalDefinition) ||
                      TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
                 {
@@ -100,7 +100,7 @@ internal partial class MethodInvocationPurityRule
 
                 if (knownReceiverType != null &&
                     knownReceiverType.IsSealed &&
-                    (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+                    (SymbolEq.AreEqual(knownReceiverType.OriginalDefinition,
                          baseType.OriginalDefinition) ||
                      TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
                 {
@@ -157,7 +157,7 @@ internal partial class MethodInvocationPurityRule
     private static bool HasMatchingSignature(IMethodSymbol candidate, IMethodSymbol interfaceMethod)
     {
         if (candidate.Parameters.Length != interfaceMethod.Parameters.Length ||
-            !SymbolEqualityComparer.Default.Equals(candidate.ReturnType, interfaceMethod.ReturnType))
+            !SymbolEq.AreEqual(candidate.ReturnType, interfaceMethod.ReturnType))
             return false;
 
         for (var i = 0; i < candidate.Parameters.Length; i++)
@@ -165,7 +165,7 @@ internal partial class MethodInvocationPurityRule
             var candidateParameter = candidate.Parameters[i];
             var interfaceParameter = interfaceMethod.Parameters[i];
             if (candidateParameter.RefKind != interfaceParameter.RefKind ||
-                !SymbolEqualityComparer.Default.Equals(candidateParameter.Type, interfaceParameter.Type))
+                !SymbolEq.AreEqual(candidateParameter.Type, interfaceParameter.Type))
                 return false;
         }
 
@@ -178,7 +178,7 @@ internal partial class MethodInvocationPurityRule
         for (var type = sealedReceiverType; type != null; type = type.BaseType)
             foreach (var member in type.GetMembers())
                 if (member is IMethodSymbol method &&
-                    (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition,
+                    (SymbolEq.AreEqual(method.OriginalDefinition,
                          targetMethod.OriginalDefinition) ||
                      TypeHierarchyEnumeration.OverridesTargetMethod(method, targetMethod) ||
                      TypeHierarchyEnumeration.ExplicitlyImplements(method, targetMethod)))

@@ -37,7 +37,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             objectCreationOperation.Type is not INamedTypeSymbol awaiterType)
             return false;
 
-        if (!SymbolEqualityComparer.Default.Equals(containingMethodSymbol.ReturnType, awaiterType)) return false;
+        if (!SymbolEq.AreEqual(containingMethodSymbol.ReturnType, awaiterType)) return false;
 
         return HasAwaiterPattern(awaiterType, compilation);
     }
@@ -59,9 +59,9 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ICriticalNotifyCompletion");
 
         return (notifyCompletion != null &&
-                awaiterType.AllInterfaces.Contains(notifyCompletion, SymbolEqualityComparer.Default)) ||
+                awaiterType.AllInterfaces.Contains(notifyCompletion, SymbolEq.Default)) ||
                (criticalNotifyCompletion != null &&
-                awaiterType.AllInterfaces.Contains(criticalNotifyCompletion, SymbolEqualityComparer.Default));
+                awaiterType.AllInterfaces.Contains(criticalNotifyCompletion, SymbolEq.Default));
     }
 
     private static bool IsKnownPureArrayFactoryReturn(

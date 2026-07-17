@@ -61,14 +61,14 @@ internal partial class AssignmentPurityRule : IPurityRule
             var valueType = valueOperation.Type;
 
             if (targetType != null && valueType != null &&
-                !SymbolEqualityComparer.Default.Equals(targetType, valueType))
+                !SymbolEq.AreEqual(targetType, valueType))
             {
                 IConversionOperation? conversionOp = null;
 
 
                 if (valueOperation is IConversionOperation topLevelConv &&
                     topLevelConv.Conversion.IsImplicit &&
-                    SymbolEqualityComparer.Default.Equals(topLevelConv.Type, targetType))
+                    SymbolEq.AreEqual(topLevelConv.Type, targetType))
                 {
                     conversionOp = topLevelConv;
                 }
@@ -77,9 +77,9 @@ internal partial class AssignmentPurityRule : IPurityRule
                     conversionOp = valueOperation.DescendantsAndSelf()
                         .OfType<IConversionOperation>()
                         .FirstOrDefault(conv => conv.Conversion.IsImplicit &&
-                                                SymbolEqualityComparer.Default.Equals(conv.Type, targetType) &&
+                                                SymbolEq.AreEqual(conv.Type, targetType) &&
                                                 conv.Operand != null &&
-                                                SymbolEqualityComparer.Default.Equals(conv.Operand.Type, valueType));
+                                                SymbolEq.AreEqual(conv.Operand.Type, valueType));
                     if (conversionOp != null)
                     {
                     }

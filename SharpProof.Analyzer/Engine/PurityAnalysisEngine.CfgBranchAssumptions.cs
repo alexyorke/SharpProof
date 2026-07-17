@@ -206,7 +206,7 @@ internal partial class PurityAnalysisEngine
         if (isNull && symbol is { } ownedSymbol &&
             (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(ownedSymbol, currentState) ||
              currentState.PathState.Facts.Any(fact =>
-                 SymbolEqualityComparer.Default.Equals(fact.Symbol, ownedSymbol) &&
+                 SymbolEq.AreEqual(fact.Symbol, ownedSymbol) &&
                  fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } or
                      SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed })))
             return false;

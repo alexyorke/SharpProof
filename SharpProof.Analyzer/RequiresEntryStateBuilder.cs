@@ -159,7 +159,7 @@ internal static class RequiresEntryStateBuilder
             cancellationToken);
         if (referencedSymbols.Any(symbol =>
                 symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, methodSymbol)))
+                !SymbolEq.AreEqual(parameter.ContainingSymbol, methodSymbol)))
             return false;
 
         return !referencedSymbols.Any(symbol => SymbolMutationFacts.ContainsMutation(

@@ -122,7 +122,7 @@ internal static class PurityConcreteReceiverResolver
     {
         if (TryResolveKnownConcreteType(first, currentState, compilation, out var firstType) &&
             TryResolveKnownConcreteType(second, currentState, compilation, out var secondType) &&
-            SymbolEqualityComparer.Default.Equals(firstType, secondType))
+            SymbolEq.AreEqual(firstType, secondType))
         {
             concreteType = firstType;
             return true;
@@ -212,7 +212,7 @@ internal static class PurityConcreteReceiverResolver
         for (var type = exactReceiverType; type != null; type = type.BaseType)
             foreach (var member in type.GetMembers())
                 if (member is IMethodSymbol method &&
-                    (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, originalTarget) ||
+                    (SymbolEq.AreEqual(method.OriginalDefinition, originalTarget) ||
                      TypeHierarchyEnumeration.OverridesTargetMethod(method, originalTarget) ||
                      TypeHierarchyEnumeration.ExplicitlyImplements(method, originalTarget)))
                     return method;
@@ -248,7 +248,7 @@ internal static class PurityConcreteReceiverResolver
                 .GetMembers(propertySymbol.Name)
                 .OfType<IPropertySymbol>()
                 .FirstOrDefault(property =>
-                    SymbolEqualityComparer.Default.Equals(property.OriginalDefinition,
+                    SymbolEq.AreEqual(property.OriginalDefinition,
                         propertySymbol.OriginalDefinition) ||
                     DispatchedMemberResolution.OverridesProperty(property, propertySymbol));
             if (implementation == null) continue;

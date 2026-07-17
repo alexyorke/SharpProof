@@ -278,7 +278,7 @@ internal static partial class CommonBugAnalyzer
             .Select(node => context.SemanticModel.GetSymbolInfo(node, context.CancellationToken).Symbol)
             .OfType<IParameterSymbol>()
             .Any(parameter => method.Parameters.Any(candidate =>
-                SymbolEqualityComparer.Default.Equals(candidate, parameter)));
+                SymbolEq.AreEqual(candidate, parameter)));
     }
 
     private static bool ReferencesParameter(IOperation operation, IMethodSymbol method)
@@ -286,7 +286,7 @@ internal static partial class CommonBugAnalyzer
         return operation.DescendantsAndSelf()
             .OfType<IParameterReferenceOperation>()
             .Any(reference => method.Parameters.Any(parameter =>
-                SymbolEqualityComparer.Default.Equals(parameter, reference.Parameter)));
+                SymbolEq.AreEqual(parameter, reference.Parameter)));
     }
 
     private static bool IsBlockingResultProperty(IPropertyReferenceOperation propertyReference)

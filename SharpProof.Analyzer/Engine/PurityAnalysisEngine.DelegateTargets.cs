@@ -15,7 +15,7 @@ internal partial class PurityAnalysisEngine
         HashSet<ISymbol>? resolvingInitializerSymbols = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        resolvingInitializerSymbols ??= new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        resolvingInitializerSymbols ??= new HashSet<ISymbol>(SymbolEq.Default);
         var unwrapped = SkipImplicitConversions(valueOperation);
         if (unwrapped == null) return null;
         if (unwrapped is IFlowCaptureReferenceOperation flowCaptureReference &&
@@ -141,7 +141,7 @@ internal partial class PurityAnalysisEngine
                 var model = semanticModel.Compilation.GetSemanticModel(assignment.SyntaxTree);
                 var targetOperation = model.GetOperation(assignment.Left, cancellationToken);
                 var targetSymbol = TryResolveSymbol(SkipImplicitConversions(targetOperation));
-                if (SymbolEqualityComparer.Default.Equals(targetSymbol, fieldSymbol)) return true;
+                if (SymbolEq.AreEqual(targetSymbol, fieldSymbol)) return true;
             }
         }
 
@@ -233,7 +233,7 @@ internal partial class PurityAnalysisEngine
 
         var enumerableType = semanticModel.Compilation.GetTypeByMetadataName("System.Linq.Enumerable");
         if (enumerableType == null ||
-            !SymbolEqualityComparer.Default.Equals(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
+            !SymbolEq.AreEqual(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
             return false;
 
         var parent = invocationOperation.Parent;

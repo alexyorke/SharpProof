@@ -41,7 +41,7 @@ internal static partial class CommonBugAnalyzer
 
             var left = GetStableLocalOrParameter(binary.LeftOperand);
             var right = GetStableLocalOrParameter(binary.RightOperand);
-            if (left == null || !SymbolEqualityComparer.Default.Equals(left, right)) continue;
+            if (left == null || !SymbolEq.AreEqual(left, right)) continue;
 
             Report(
                 context,
@@ -147,7 +147,7 @@ internal static partial class CommonBugAnalyzer
                 continue;
 
             var consumed = operations.OfType<ILocalReferenceOperation>().Any(reference =>
-                SymbolEqualityComparer.Default.Equals(reference.Local, declarator.Symbol));
+                SymbolEq.AreEqual(reference.Local, declarator.Symbol));
             if (consumed) continue;
 
             Report(

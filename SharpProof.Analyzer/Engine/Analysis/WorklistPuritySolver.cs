@@ -18,10 +18,10 @@ internal static class WorklistPuritySolver
     {
         cancellationToken.ThrowIfCancellationRequested();
         var results =
-            new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default);
+            new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEq.Default);
         var engine = new PurityAnalysisEngine(smtAnalysis, attributePolicy);
         var worklist = new Queue<IMethodSymbol>();
-        var reverse = new Dictionary<IMethodSymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
+        var reverse = new Dictionary<IMethodSymbol, HashSet<IMethodSymbol>>(SymbolEq.Default);
 
         foreach (var method in graph
                      .OrderBy(kvp => kvp.Value.Count)
@@ -35,7 +35,7 @@ internal static class WorklistPuritySolver
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!reverse.TryGetValue(callee, out var callers))
                     {
-                        callers = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+                        callers = new HashSet<IMethodSymbol>(SymbolEq.Default);
                         reverse[callee] = callers;
                     }
 
@@ -67,7 +67,7 @@ internal static class WorklistPuritySolver
             }
         }
 
-        return results.ToImmutableDictionary(SymbolEqualityComparer.Default);
+        return results.ToImmutableDictionary(SymbolEq.Default);
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CreateUnknownExternalResult(IMethodSymbol method)

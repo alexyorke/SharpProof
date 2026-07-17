@@ -111,7 +111,7 @@ internal static partial class CommonBugAnalyzer
             {
                 if (IsInsideNestedCallable(operation, loop.Body)) continue;
                 if (!TryGetCollectionMutation(operation, out var receiver, out var mutationName) ||
-                    !SymbolEqualityComparer.Default.Equals(collectionSymbol, GetReferencedSymbol(receiver)))
+                    !SymbolEq.AreEqual(collectionSymbol, GetReferencedSymbol(receiver)))
                     continue;
 
                 Report(
@@ -186,7 +186,7 @@ internal static partial class CommonBugAnalyzer
                 {
                     var referenced = context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol;
                     var captured = variables.FirstOrDefault(variable =>
-                        SymbolEqualityComparer.Default.Equals(variable, referenced));
+                        SymbolEq.AreEqual(variable, referenced));
                     if (captured == null) continue;
 
                     Report(

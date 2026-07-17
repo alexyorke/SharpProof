@@ -17,7 +17,7 @@ internal static partial class ExceptionFlowEngine
         HashSet<IMethodSymbol>? visitedMethods = null)
     {
         var isRoot = visitedMethods == null;
-        visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+        visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEq.Default)
         {
             methodSymbol.OriginalDefinition
         };

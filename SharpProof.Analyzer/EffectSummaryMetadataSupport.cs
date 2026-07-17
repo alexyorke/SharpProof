@@ -93,7 +93,7 @@ internal static class SummaryAssemblyReferenceResolver
         {
             var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
             if (assemblySymbol == null ||
-                !SymbolEqualityComparer.Default.Equals(assemblySymbol, containingAssembly))
+                !SymbolEq.AreEqual(assemblySymbol, containingAssembly))
                 continue;
 
             var referencePath = reference.FilePath;

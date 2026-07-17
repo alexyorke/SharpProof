@@ -323,12 +323,12 @@ internal static class RuleAnalysisHelper
         var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
         if (unwrappedTarget is not ILocalReferenceOperation localReferenceOperation) return false;
 
-        return SymbolEqualityComparer.Default.Equals(localReferenceOperation.Local, local) ||
+        return SymbolEq.AreEqual(localReferenceOperation.Local, local) ||
                IsRefLocalAliasForLocal(
                    localReferenceOperation.Local,
                    local,
                    semanticModel,
-                   new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                   new HashSet<ISymbol>(SymbolEq.Default),
                    cancellationToken);
     }
 
@@ -349,7 +349,7 @@ internal static class RuleAnalysisHelper
         {
             if (unwrappedInitializer is not ILocalReferenceOperation initializerLocalReference) continue;
 
-            if (SymbolEqualityComparer.Default.Equals(initializerLocalReference.Local, targetLocal) ||
+            if (SymbolEq.AreEqual(initializerLocalReference.Local, targetLocal) ||
                 IsRefLocalAliasForLocal(initializerLocalReference.Local, targetLocal, semanticModel, visited,
                     cancellationToken))
                 return true;
@@ -391,7 +391,7 @@ internal static class RuleAnalysisHelper
 
                 if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not
                         IParameterReferenceOperation parameterReference ||
-                    !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
+                    !SymbolEq.AreEqual(parameterReference.Parameter, parameter))
                     continue;
 
                 if (targetMatches(assignmentOperation.Target)) return true;

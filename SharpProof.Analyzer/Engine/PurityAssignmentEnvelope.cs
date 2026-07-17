@@ -157,7 +157,7 @@ internal sealed record PurityAssignmentEnvelope(
         ILocalSymbol local, PurityAnalysisContext context)
     {
         var result = ImmutableArray.CreateBuilder<ILocalSymbol>();
-        AddWrittenLocals(local, context, result, new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+        AddWrittenLocals(local, context, result, new HashSet<ISymbol>(SymbolEq.Default));
         return result.ToImmutable();
     }
 
@@ -283,7 +283,7 @@ internal static class PurityAssignmentTransition
             if (transition.IsExact) state = state.WithPathState(transition.State);
         }
         var source = TryResolveTrackedSymbol(value, valueState);
-        return source == null || SymbolEqualityComparer.Default.Equals(source, target) ||
+        return source == null || SymbolEq.AreEqual(source, target) ||
                SymbolicFactFactory.GetTrackedSymbolType(source)?.IsReferenceType != true ||
                SymbolicFactFactory.GetTrackedSymbolType(target)?.IsReferenceType != true
             ? state
@@ -373,11 +373,11 @@ internal static class PurityAssignmentTransition
             : PurityResourceStateFacts.HasDisposedResourceFactForTerm(term, state);
         if (!preserve) return ImmutableArray<ISymbol>.Empty;
         var result = ImmutableArray.CreateBuilder<ISymbol>();
-        var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<ISymbol>(SymbolEq.Default);
         foreach (var fact in state.PathState.Facts)
             if (fact is { Polarity: true, Confidence: SymbolicFactConfidence.Exact,
                     Atom: SymbolicAliasAtom { MayAlias: true } alias, Symbol: { } symbol } &&
-                Equals(alias.Source, term) && !SymbolEqualityComparer.Default.Equals(symbol, reassigned) &&
+                Equals(alias.Source, term) && !SymbolEq.AreEqual(symbol, reassigned) &&
                 seen.Add(symbol))
                 result.Add(symbol);
         return result.ToImmutable();

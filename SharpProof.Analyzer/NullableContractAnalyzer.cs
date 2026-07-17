@@ -478,7 +478,7 @@ internal static class NullableContractAnalyzer
                 IPropertyReferenceOperation property => property.Property.OriginalDefinition,
                 _ => null
             };
-            if (target != null && SymbolEqualityComparer.Default.Equals(target, member.OriginalDefinition))
+            if (target != null && SymbolEq.AreEqual(target, member.OriginalDefinition))
                 return true;
         }
 

@@ -229,7 +229,7 @@ internal class ObjectCreationPurityRule : IPurityRule
         var targetDefinition = targetMethod.OriginalDefinition;
         if (enumerableType == null ||
             targetDefinition.Name != "ToArray" ||
-            !SymbolEqualityComparer.Default.Equals(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
+            !SymbolEq.AreEqual(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
             return false;
 
         var sourceOperation = invocationOperation.Instance;

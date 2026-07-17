@@ -450,7 +450,7 @@ internal static class InferredContractSuggestionAnalyzer
 
         var distinctSymbols = symbols
             .Select(static symbol => symbol!)
-            .Distinct<INamedTypeSymbol>(SymbolEqualityComparer.Default)
+            .Distinct<INamedTypeSymbol>(SymbolEq.Default)
             .OrderBy(static symbol => symbol.ToDisplayString(), StringComparer.Ordinal)
             .ToArray();
         if (distinctSymbols.Length is < 1 or > 4)

@@ -514,7 +514,7 @@ internal static class MethodPurityAnalyzer
         INamedTypeSymbol? pureAttributeSymbol)
     {
         return HasPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol,
-            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+            new HashSet<IMethodSymbol>(SymbolEq.Default));
     }
 
     private static bool HasInheritedPurityEnforcement(
@@ -522,7 +522,7 @@ internal static class MethodPurityAnalyzer
         INamedTypeSymbol? enforcePureAttributeSymbol,
         INamedTypeSymbol? pureAttributeSymbol)
     {
-        var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+        var visited = new HashSet<IMethodSymbol>(SymbolEq.Default)
         {
             methodSymbol.OriginalDefinition
         };
@@ -561,9 +561,9 @@ internal static class MethodPurityAnalyzer
         {
             var attributeClass = attributeData.AttributeClass?.OriginalDefinition;
             if (enforcePureAttributeSymbol != null &&
-                SymbolEqualityComparer.Default.Equals(attributeClass, enforcePureAttributeSymbol)) return true;
+                SymbolEq.AreEqual(attributeClass, enforcePureAttributeSymbol)) return true;
             if (pureAttributeSymbol != null &&
-                SymbolEqualityComparer.Default.Equals(attributeClass, pureAttributeSymbol)) return true;
+                SymbolEq.AreEqual(attributeClass, pureAttributeSymbol)) return true;
         }
 
         if (methodSymbol.OverriddenMethod != null &&
@@ -591,7 +591,7 @@ internal static class MethodPurityAnalyzer
             foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
                 if (containingType.FindImplementationForInterfaceMember(interfaceMember) is IMethodSymbol
                         implementationMethod &&
-                    SymbolEqualityComparer.Default.Equals(
+                    SymbolEq.AreEqual(
                         implementationMethod.OriginalDefinition,
                         methodSymbol.OriginalDefinition))
                     yield return interfaceMember;

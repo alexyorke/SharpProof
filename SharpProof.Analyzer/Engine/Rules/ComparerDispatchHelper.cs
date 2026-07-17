@@ -189,7 +189,7 @@ internal static class ComparerDispatchHelper
     {
         if (comparerType is not INamedTypeSymbol namedComparerType) yield break;
 
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         foreach (var interfaceType in namedComparerType.AllInterfaces)
         {
             if (!IsComparerInterface(interfaceType)) continue;

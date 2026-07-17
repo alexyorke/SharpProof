@@ -11,7 +11,7 @@ internal static class MethodContractHierarchy
     {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         for (var current = method; current != null; current = current.OverriddenMethod)
         {
             cancellationToken.ThrowIfCancellationRequested();

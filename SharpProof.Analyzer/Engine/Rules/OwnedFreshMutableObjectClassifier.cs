@@ -24,7 +24,7 @@ internal static class OwnedFreshMutableObjectClassifier
                 observationSyntax,
                 context.SemanticModel,
                 currentState,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                new HashSet<ILocalSymbol>(SymbolEq.Default),
                 context.CancellationToken);
 
         return (operation is IFieldReferenceOperation fieldReference &&
@@ -48,7 +48,7 @@ internal static class OwnedFreshMutableObjectClassifier
             observationSyntax,
             semanticModel,
             currentState,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken);
     }
 
@@ -97,7 +97,7 @@ internal static class OwnedFreshMutableObjectClassifier
                 member,
                 observationSyntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                new HashSet<ILocalSymbol>(SymbolEq.Default),
                 cancellationToken,
                 out var valueOperation))
             return false;
@@ -106,7 +106,7 @@ internal static class OwnedFreshMutableObjectClassifier
             valueOperation,
             observationSyntax,
             semanticModel,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken);
     }
 
@@ -170,7 +170,7 @@ internal static class OwnedFreshMutableObjectClassifier
         foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), member))
+            if (!SymbolEq.AreEqual(GetReferencedMemberSymbol(assignment.Target), member))
                 continue;
 
             valueOperation = assignment.Value;
@@ -326,7 +326,7 @@ internal static class OwnedFreshMutableObjectClassifier
         };
 
         return targetMember != null &&
-               SymbolEqualityComparer.Default.Equals(targetMember, memberSymbol) &&
+               SymbolEq.AreEqual(targetMember, memberSymbol) &&
                RuleAnalysisHelper.IsThisOrImplicitInstance(targetInstance);
     }
 
@@ -539,7 +539,7 @@ internal static class OwnedFreshMutableObjectClassifier
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
-                !SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                !SymbolEq.AreEqual(assignedSymbol, localSymbol))
                 continue;
 
             current = IsFreshMutableAssignmentValue(
@@ -576,7 +576,7 @@ internal static class OwnedFreshMutableObjectClassifier
             valueOperation,
             observationSyntax,
             semanticModel,
-            new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(visitedLocals, SymbolEq.Default),
             cancellationToken);
     }
 

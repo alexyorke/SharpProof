@@ -569,7 +569,7 @@ internal class DelegateCreationPurityRule : IPurityRule
             localSymbol,
             delegateCreationSyntax,
             semanticModel,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken);
     }
 

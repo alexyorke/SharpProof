@@ -34,7 +34,7 @@ internal static class DispatchedMemberResolution
                      receiverType,
                      rootMethod.Name))
             if (candidate.Parameters.Length == rootMethod.Parameters.Length &&
-                (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootMethod.OriginalDefinition) ||
+                (SymbolEq.AreEqual(candidate.OriginalDefinition, rootMethod.OriginalDefinition) ||
                  TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(candidate, rootMethod)))
                 return candidate.OriginalDefinition;
 
@@ -133,7 +133,7 @@ internal static class DispatchedMemberResolution
     internal static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
     {
         for (var current = property; current != null; current = current.OverriddenProperty)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+            if (SymbolEq.AreEqual(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
 
         return false;
@@ -147,7 +147,7 @@ internal static class DispatchedMemberResolution
             type,
             interfaceType => interfaceType.OriginalDefinition.ToDisplayString() == "System.IEquatable<T>" &&
                              interfaceType.TypeArguments.Length == 1 &&
-                             SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], type),
+                             SymbolEq.AreEqual(interfaceType.TypeArguments[0], type),
             nameof(IEquatable<object>.Equals),
             1,
             out implementation);
@@ -161,7 +161,7 @@ internal static class DispatchedMemberResolution
             type,
             interfaceType => interfaceType.OriginalDefinition.ToDisplayString() == "System.IComparable<T>" &&
                              interfaceType.TypeArguments.Length == 1 &&
-                             SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], type),
+                             SymbolEq.AreEqual(interfaceType.TypeArguments[0], type),
             nameof(IComparable<object>.CompareTo),
             1,
             out implementation);

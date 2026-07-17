@@ -217,6 +217,6 @@ internal static partial class CommonBugAnalyzer
         if (attributeType == null) return null;
 
         return symbol.GetAttributes().FirstOrDefault(attribute =>
-            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType));
+            SymbolEq.AreEqual(attribute.AttributeClass, attributeType));
     }
 }

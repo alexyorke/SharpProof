@@ -106,7 +106,7 @@ internal static class PuritySymbolicStateFacts
         var containingBlock = writeSyntax.FirstAncestorOrSelf<BlockSyntax>();
         if (containingBlock == null) return false;
 
-        var borrowedLocals = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        var borrowedLocals = new HashSet<ISymbol>(SymbolEq.Default);
         var changed = true;
         while (changed)
         {
@@ -120,7 +120,7 @@ internal static class PuritySymbolicStateFacts
                         sourceLocal)
                     continue;
 
-                if ((SymbolEqualityComparer.Default.Equals(sourceLocal, targetLocal) ||
+                if ((SymbolEq.AreEqual(sourceLocal, targetLocal) ||
                      borrowedLocals.Contains(sourceLocal)) &&
                     borrowedLocals.Add(refLocal))
                     changed = true;
@@ -146,7 +146,7 @@ internal static class PuritySymbolicStateFacts
             if (identifierName.SpanStart <= writeSyntax.SpanStart) continue;
 
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol usedLocal &&
-                SymbolEqualityComparer.Default.Equals(usedLocal, localSymbol))
+                SymbolEq.AreEqual(usedLocal, localSymbol))
                 return true;
         }
 

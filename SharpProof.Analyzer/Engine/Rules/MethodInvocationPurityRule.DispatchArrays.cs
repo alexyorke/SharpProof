@@ -78,7 +78,7 @@ internal partial class MethodInvocationPurityRule
             {
                 if (TryGetKnownArrayReceiverType(conditional.WhenTrue, out var whenTrueType) &&
                     TryGetKnownArrayReceiverType(conditional.WhenFalse, out var whenFalseType) &&
-                    SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
+                    SymbolEq.AreEqual(whenTrueType, whenFalseType))
                 {
                     arrayType = whenTrueType;
                     return true;

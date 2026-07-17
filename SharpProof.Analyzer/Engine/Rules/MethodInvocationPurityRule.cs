@@ -453,7 +453,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 "metadata");
 
 
-        if (SymbolEqualityComparer.Default.Equals(
+        if (SymbolEq.AreEqual(
                 originalDefinitionSymbol,
                 context.ContainingMethodSymbol.OriginalDefinition))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;

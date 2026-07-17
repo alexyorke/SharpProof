@@ -12,7 +12,7 @@ namespace SharpProof.Analyzer;
 internal sealed class AnalyzerSession : IDisposable
 {
     private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEq.Default);
 
     private readonly ConcurrentDictionary<string, TrustedBoundaryReviewFinding> _trustedBoundaryFindings =
         new(StringComparer.Ordinal);

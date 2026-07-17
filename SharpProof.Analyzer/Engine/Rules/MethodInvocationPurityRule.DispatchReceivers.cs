@@ -52,7 +52,7 @@ internal partial class MethodInvocationPurityRule
 
                 if (whenTrueType != null &&
                     whenFalseType != null &&
-                    SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
+                    SymbolEq.AreEqual(whenTrueType, whenFalseType))
                     return whenTrueType;
 
                 return current.Type as INamedTypeSymbol;
@@ -128,7 +128,7 @@ internal partial class MethodInvocationPurityRule
     private static INamedTypeSymbol? ResolveConstrainedSealedType(ITypeParameterSymbol typeParameter)
     {
         return ResolveConstrainedSealedType(typeParameter,
-            new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default));
+            new HashSet<ITypeParameterSymbol>(SymbolEq.Default));
     }
 
     private static INamedTypeSymbol? ResolveConstrainedSealedType(
@@ -162,7 +162,7 @@ internal partial class MethodInvocationPurityRule
             if (resolvedConstraintType == null) continue;
 
             if (constrainedType != null &&
-                !SymbolEqualityComparer.Default.Equals(constrainedType, resolvedConstraintType))
+                !SymbolEq.AreEqual(constrainedType, resolvedConstraintType))
                 return null;
 
             constrainedType = resolvedConstraintType;

@@ -247,7 +247,7 @@ internal static partial class CommonBugAnalyzer
         INamedTypeSymbol? jsonIgnoreAttribute,
         CancellationToken cancellationToken)
     {
-        var path = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var path = new HashSet<INamedTypeSymbol>(SymbolEq.Default);
         return Visit(root, root, path, 0);
 
         bool Visit(
@@ -263,7 +263,7 @@ internal static partial class CommonBugAnalyzer
             {
                 var next = GetSerializableSourceType(memberType);
                 if (next == null) continue;
-                if (SymbolEqualityComparer.Default.Equals(next.OriginalDefinition, target.OriginalDefinition))
+                if (SymbolEq.AreEqual(next.OriginalDefinition, target.OriginalDefinition))
                     return true;
                 if (Visit(next, target, currentPath, depth + 1)) return true;
             }

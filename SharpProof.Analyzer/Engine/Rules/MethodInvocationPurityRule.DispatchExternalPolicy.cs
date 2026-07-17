@@ -23,7 +23,7 @@ internal partial class MethodInvocationPurityRule
 
         if (knownReceiverType != null &&
             knownReceiverType.IsSealed &&
-            (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+            (SymbolEq.AreEqual(knownReceiverType.OriginalDefinition,
                  methodSymbol.ContainingType.OriginalDefinition) ||
              TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, methodSymbol.ContainingType)))
             return false;
@@ -46,7 +46,7 @@ internal partial class MethodInvocationPurityRule
 
         if (hasExactReceiverType &&
             knownReceiverType != null &&
-            (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+            (SymbolEq.AreEqual(knownReceiverType.OriginalDefinition,
                  methodSymbol.ContainingType?.OriginalDefinition) ||
              (methodSymbol.ContainingType != null &&
               TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, methodSymbol.ContainingType))))
@@ -73,7 +73,7 @@ internal partial class MethodInvocationPurityRule
         if (!IsTypeEffectivelyExternallyAccessible(concreteReceiverType)) return false;
 
         if (concreteReceiverType.TypeKind == TypeKind.Interface &&
-            SymbolEqualityComparer.Default.Equals(
+            SymbolEq.AreEqual(
                 concreteReceiverType.OriginalDefinition,
                 interfaceSymbol.OriginalDefinition))
             return true;

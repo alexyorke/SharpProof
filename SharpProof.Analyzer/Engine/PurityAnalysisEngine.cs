@@ -118,11 +118,11 @@ internal partial class PurityAnalysisEngine
         var sourceNode = GetDeclaringSyntax(methodSymbol, cancellationToken);
         var limits = _purityService?.AnalysisLimits ?? SymbolicAnalysisLimitContext.Limits;
         using var limitScope = SymbolicAnalysisLimitContext.Push(limits, sourceNode);
-        var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEqualityComparer.Default);
+        var visited = new HashSet<IMethodSymbol>(SymbolEq.Default);
+        var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEq.Default);
         if (initialPurityCache != null)
             foreach (var entry in initialPurityCache)
-                if (!SymbolEqualityComparer.Default.Equals(entry.Key, methodSymbol))
+                if (!SymbolEq.AreEqual(entry.Key, methodSymbol))
                     purityCache[entry.Key] = entry.Value;
 
 
@@ -252,7 +252,7 @@ internal partial class PurityAnalysisEngine
             FirstImpurityEvidence = firstImpurityEvidence;
 
             DelegateTargetMap = delegateTargetMap ??
-                                ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
+                                ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEq.Default);
             FlowCaptures = flowCaptures ?? ImmutableDictionary<CaptureId, PurityAnalysisResult>.Empty;
             FlowCaptureTargets = flowCaptureTargets ?? ImmutableDictionary<CaptureId, PotentialTargets>.Empty;
             FlowCaptureSymbols = flowCaptureSymbols ?? ImmutableDictionary.Create<CaptureId, ISymbol>();
@@ -282,7 +282,7 @@ internal partial class PurityAnalysisEngine
                    MapsEqual(FlowCaptureTargets, other.FlowCaptureTargets,
                        static (left, right) => left.Equals(right)) &&
                    MapsEqual(FlowCaptureSymbols, other.FlowCaptureSymbols,
-                       static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
+                       static (left, right) => SymbolEq.AreEqual(left, right)) &&
                    SymbolicStatesEqual(PathState, other.PathState);
         }
 
@@ -317,7 +317,7 @@ internal partial class PurityAnalysisEngine
 
             foreach (var kvp in DelegateTargetMap.OrderBy(kv => kv.Key.Name))
             {
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Key);
+                hash = hash * 23 + SymbolEq.Default.GetHashCode(kvp.Key);
                 hash = hash * 23 + kvp.Value.GetHashCode();
             }
 
@@ -337,7 +337,7 @@ internal partial class PurityAnalysisEngine
             foreach (var kvp in FlowCaptureSymbols.OrderBy(kv => kv.Key.GetHashCode()))
             {
                 hash = hash * 23 + kvp.Key.GetHashCode();
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
+                hash = hash * 23 + SymbolEq.Default.GetHashCode(kvp.Value);
             }
 
             foreach (var fact in PathState.Facts) hash = hash * 23 + fact.GetHashCode();
@@ -508,7 +508,7 @@ internal partial class PurityAnalysisEngine
             return PathState.Facts.Any(fact =>
                 fact.Polarity &&
                 fact.Confidence == SymbolicFactConfidence.Exact &&
-                SymbolEqualityComparer.Default.Equals(fact.Symbol, localSymbol) &&
+                SymbolEq.AreEqual(fact.Symbol, localSymbol) &&
                 fact.Atom is SymbolicOwnershipAtom ownership &&
                 Equals(ownership.Value, term) &&
                 fact.Provenance.StartsWith("analyzer.array.acquire.", StringComparison.Ordinal));
@@ -611,7 +611,7 @@ internal partial class PurityAnalysisEngine
 
         private PotentialTargets(ImmutableHashSet<IMethodSymbol>? methodSymbols, bool isUnresolved)
         {
-            MethodSymbols = methodSymbols ?? ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
+            MethodSymbols = methodSymbols ?? ImmutableHashSet.Create<IMethodSymbol>(SymbolEq.Default);
             IsUnresolved = isUnresolved;
         }
 
@@ -622,7 +622,7 @@ internal partial class PurityAnalysisEngine
         {
             if (methodSymbol == null) return Empty;
             return new PotentialTargets(
-                ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default, methodSymbol));
+                ImmutableHashSet.Create<IMethodSymbol>(SymbolEq.Default, methodSymbol));
         }
 
 
@@ -648,7 +648,7 @@ internal partial class PurityAnalysisEngine
         {
             var hash = IsUnresolved ? 31 : 17;
             foreach (var symbol in MethodSymbols.OrderBy(s => s.Name))
-                hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(symbol);
+                hash = hash * 23 + SymbolEq.Default.GetHashCode(symbol);
             return hash;
         }
     }

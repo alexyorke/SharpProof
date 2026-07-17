@@ -327,7 +327,7 @@ internal static class TrustedBoundaryReviewAnalyzer
     {
         if (ImpurityCatalog.TryGetConfiguredKnownPureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
-               !SymbolEqualityComparer.Default.Equals(symbol, method) &&
+               !SymbolEq.AreEqual(symbol, method) &&
                ImpurityCatalog.TryGetConfiguredKnownPureMember(method, configuration, out configuredValue);
     }
 
@@ -339,7 +339,7 @@ internal static class TrustedBoundaryReviewAnalyzer
     {
         if (ImpurityCatalog.TryGetConfiguredKnownImpureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
-               !SymbolEqualityComparer.Default.Equals(symbol, method) &&
+               !SymbolEq.AreEqual(symbol, method) &&
                ImpurityCatalog.TryGetConfiguredKnownImpureMember(method, configuration, out configuredValue);
     }
 
@@ -357,7 +357,7 @@ internal static class TrustedBoundaryReviewAnalyzer
                 out configuredValue))
             return true;
         return method != null &&
-               !SymbolEqualityComparer.Default.Equals(symbol, method) &&
+               !SymbolEq.AreEqual(symbol, method) &&
                ImpurityCatalog.TryGetConfiguredImpureBoundary(
                    method,
                    configuration,
@@ -372,7 +372,7 @@ internal static class TrustedBoundaryReviewAnalyzer
     {
         if (ImpurityCatalog.TryGetBuiltInKnownPureMember(symbol, out catalogValue)) return true;
         return method != null &&
-               !SymbolEqualityComparer.Default.Equals(symbol, method) &&
+               !SymbolEq.AreEqual(symbol, method) &&
                ImpurityCatalog.TryGetBuiltInKnownPureMember(method, out catalogValue);
     }
 
@@ -389,7 +389,7 @@ internal static class TrustedBoundaryReviewAnalyzer
             return true;
         }
 
-        if (method != null && !SymbolEqualityComparer.Default.Equals(symbol, method))
+        if (method != null && !SymbolEq.AreEqual(symbol, method))
         {
             source = ImpurityCatalog.GetKnownImpureMemberSource(method);
             if (!string.IsNullOrWhiteSpace(source) &&

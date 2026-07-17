@@ -81,7 +81,7 @@ internal partial class MethodInvocationPurityRule
                    localReference.Local,
                    sourceOperation.Syntax,
                    context.SemanticModel,
-                   new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                   new HashSet<ILocalSymbol>(SymbolEq.Default),
                    context.CancellationToken,
                    out _,
                    out var initializerOperation) &&
@@ -110,7 +110,7 @@ internal partial class MethodInvocationPurityRule
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<INamedTypeSymbol>(SymbolEq.Default);
 
         AddConcreteLinqEnumeratorType(getEnumerator.ReturnType, seen);
         AddNestedLinqEnumeratorTypes(sourceType, seen);

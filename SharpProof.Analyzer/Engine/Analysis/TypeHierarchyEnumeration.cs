@@ -57,7 +57,7 @@ internal static class TypeHierarchyEnumeration
     internal static bool IsSameOrOverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
     {
         for (var current = method; current != null; current = current.OverriddenMethod)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+            if (SymbolEq.AreEqual(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
 
         return false;
@@ -89,9 +89,9 @@ internal static class TypeHierarchyEnumeration
     {
         foreach (var current in EnumerateBaseTypes(candidate))
         {
-            if (SymbolEqualityComparer.Default.Equals(current, expectedBase)) return true;
+            if (SymbolEq.AreEqual(current, expectedBase)) return true;
             if (identityPolicy == TypeIdentityPolicy.ExactOrOriginalDefinition &&
-                SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, expectedBase.OriginalDefinition))
+                SymbolEq.AreEqual(current.OriginalDefinition, expectedBase.OriginalDefinition))
                 return true;
         }
 
@@ -117,7 +117,7 @@ internal static class TypeHierarchyEnumeration
         bool includeTypeSelf = true,
         bool includeUnimplementedInterfaceMember = true)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         var interfaceTypes = includeTypeSelf ? type.AllInterfaces.Prepend(type) : type.AllInterfaces;
         foreach (var interfaceType in interfaceTypes)
         {
@@ -143,7 +143,7 @@ internal static class TypeHierarchyEnumeration
     internal static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
     {
         foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
-            if (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition,
+            if (SymbolEq.AreEqual(implemented.OriginalDefinition,
                     interfaceMethod.OriginalDefinition))
                 return true;
 
@@ -158,11 +158,11 @@ internal static class TypeHierarchyEnumeration
         if (interfaceSymbol == null) return false;
 
         if (includeInterfaceSelf &&
-            SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, interfaceSymbol.OriginalDefinition))
+            SymbolEq.AreEqual(type.OriginalDefinition, interfaceSymbol.OriginalDefinition))
             return true;
 
         return type.AllInterfaces.Any(candidate =>
-            SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
+            SymbolEq.AreEqual(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
     }
 
     internal static bool DerivesFrom(
@@ -171,7 +171,7 @@ internal static class TypeHierarchyEnumeration
         bool includeSelf = false)
     {
         for (var current = includeSelf ? type : type.BaseType; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, potentialBase.OriginalDefinition))
+            if (SymbolEq.AreEqual(current.OriginalDefinition, potentialBase.OriginalDefinition))
                 return true;
 
         return false;

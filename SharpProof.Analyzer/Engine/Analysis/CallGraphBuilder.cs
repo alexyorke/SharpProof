@@ -17,12 +17,12 @@ internal static class CallGraphBuilder
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
+        var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEq.Default);
         var allNamedTypes = TypeHierarchyEnumeration
             .EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace, cancellationToken)
             .ToImmutableArray();
         var dispatchTargetCache =
-            new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(SymbolEqualityComparer.Default);
+            new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(SymbolEq.Default);
 
         foreach (var tree in compilation.SyntaxTrees)
         {
@@ -37,9 +37,9 @@ internal static class CallGraphBuilder
                 var containingMethod =
                     model.GetEnclosingSymbol(body.Syntax.SpanStart, cancellationToken) as IMethodSymbol;
                 if (containingMethod == null) continue;
-                var callees = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+                var callees = new HashSet<IMethodSymbol>(SymbolEq.Default);
                 var delegateTargetsBySymbol =
-                    new Dictionary<ISymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
+                    new Dictionary<ISymbol, HashSet<IMethodSymbol>>(SymbolEq.Default);
                 foreach (var inv in body.Descendants().OfType<IInvocationOperation>())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -243,7 +243,7 @@ internal static class CallGraphBuilder
                 }
 
                 edges[containingMethod.OriginalDefinition] =
-                    ImmutableHashSet.CreateRange<IMethodSymbol>(SymbolEqualityComparer.Default, callees);
+                    ImmutableHashSet.CreateRange<IMethodSymbol>(SymbolEq.Default, callees);
             }
         }
 
@@ -304,7 +304,7 @@ internal static class CallGraphBuilder
             }
         }
 
-        return edges.ToImmutableDictionary(SymbolEqualityComparer.Default);
+        return edges.ToImmutableDictionary(SymbolEq.Default);
     }
 
     private static void AddDelegateTarget(
@@ -328,7 +328,7 @@ internal static class CallGraphBuilder
         callees.Add(targetMethod);
         if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var targets))
         {
-            targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            targets = new HashSet<IMethodSymbol>(SymbolEq.Default);
             delegateTargetsBySymbol[targetSymbol] = targets;
         }
 

@@ -45,7 +45,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     private static bool IsInstanceMemberOfConstructedType(ISymbol member, INamedTypeSymbol constructedType)
     {
         return member is IFieldSymbol { IsStatic: false } or IPropertySymbol { IsStatic: false } &&
-               SymbolEqualityComparer.Default.Equals(member.ContainingType.OriginalDefinition,
+               SymbolEq.AreEqual(member.ContainingType.OriginalDefinition,
                    constructedType.OriginalDefinition);
     }
 
@@ -54,7 +54,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         foreach (var member in recordType.GetMembers())
             if (member is IPropertySymbol property &&
                 string.Equals(property.Name, parameter.Name, StringComparison.OrdinalIgnoreCase) &&
-                SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
+                SymbolEq.AreEqual(property.Type, parameter.Type))
                 return true;
 
         return false;

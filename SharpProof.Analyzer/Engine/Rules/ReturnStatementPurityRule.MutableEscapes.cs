@@ -287,7 +287,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             localSymbol,
             returnedValue,
             semanticModel,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken,
             out escapeSyntax,
             out escapeSymbol,
@@ -307,7 +307,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 localSymbol,
                 returnedValue.Syntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                new HashSet<ILocalSymbol>(SymbolEq.Default),
                 cancellationToken,
                 out _,
                 out var initializerOperation))

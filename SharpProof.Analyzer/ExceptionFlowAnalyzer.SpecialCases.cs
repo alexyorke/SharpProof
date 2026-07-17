@@ -12,7 +12,7 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var knownTargets = new Dictionary<ISymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
+        var knownTargets = new Dictionary<ISymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEq.Default);
         foreach (var node in GetRelevantDescendantsAndSelf<SyntaxNode>(methodNode))
         {
             UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
@@ -184,7 +184,7 @@ internal static partial class ExceptionFlowAnalyzer
         {
             case IMethodReferenceOperation methodReference:
                 methods = ImmutableHashSet.Create<IMethodSymbol>(
-                    SymbolEqualityComparer.Default,
+                    SymbolEq.Default,
                     methodReference.Method);
                 return true;
             case IDelegateCreationOperation delegateCreation:
@@ -247,7 +247,7 @@ internal static partial class ExceptionFlowAnalyzer
         if (isConditional && knownTargets.TryGetValue(symbol, out var existing))
             knownTargets[symbol] = existing.Add(target);
         else
-            knownTargets[symbol] = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default, target);
+            knownTargets[symbol] = ImmutableHashSet.Create<IMethodSymbol>(SymbolEq.Default, target);
     }
 
     private static bool TryGetInvokedLocalSymbol(

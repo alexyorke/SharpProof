@@ -151,7 +151,7 @@ internal partial class MethodInvocationPurityRule
         var enumerableType = compilation.GetTypeByMetadataName("System.Linq.Enumerable");
         var definition = GetExtensionDefinition(methodSymbol);
         return enumerableType != null &&
-               SymbolEqualityComparer.Default.Equals(definition.ContainingType?.OriginalDefinition, enumerableType);
+               SymbolEq.AreEqual(definition.ContainingType?.OriginalDefinition, enumerableType);
     }
 
     private static bool IsLinqSourceLessFactory(IMethodSymbol methodSymbol)
@@ -447,7 +447,7 @@ internal partial class MethodInvocationPurityRule
         string metadataName)
     {
         return context.SemanticModel.Compilation.GetTypeByMetadataName(metadataName) is { } metadataType &&
-               SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, metadataType);
+               SymbolEq.AreEqual(methodSymbol.ContainingType?.OriginalDefinition, metadataType);
     }
 
     private static bool TryCheckStringComparerInvocationPurity(
@@ -554,7 +554,7 @@ internal partial class MethodInvocationPurityRule
 
         var outParameter = methodSymbol.Parameters[methodSymbol.Parameters.Length - 1];
         return outParameter.RefKind == RefKind.Out &&
-               SymbolEqualityComparer.Default.Equals(outParameter.Type, methodSymbol.TypeParameters[0]);
+               SymbolEq.AreEqual(outParameter.Type, methodSymbol.TypeParameters[0]);
     }
 
     private static bool TryCheckEnumParsePurity(

@@ -29,7 +29,7 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     internal static IEnumerable<IMethodSymbol> EnumerateRuntimeMembers(ITypeSymbol enumeratorType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var method in EnumerateInstanceMethods(enumeratorType, "MoveNext", 0))
             if (seen.Add(method.OriginalDefinition))
@@ -46,7 +46,7 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     internal static IEnumerable<IMethodSymbol> EnumerateAsyncRuntimeMembers(ITypeSymbol enumeratorType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var method in EnumerateInstanceMethods(enumeratorType, "MoveNextAsync", 0))
             if (seen.Add(method.OriginalDefinition))
@@ -63,7 +63,7 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         var hasPatternMethod = false;
 
         foreach (var getEnumerator in collectionType
@@ -105,7 +105,7 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     internal static IEnumerable<IMethodSymbol> EnumerateGetAsyncEnumeratorImplementations(ITypeSymbol collectionType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var getAsyncEnumerator in collectionType
                      .GetMembers("GetAsyncEnumerator")
