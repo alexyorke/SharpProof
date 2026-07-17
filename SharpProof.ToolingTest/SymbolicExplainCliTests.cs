@@ -159,25 +159,16 @@ public sealed class SymbolicExplainCliTests
     public async Task SymbolicCli_ExplainSarif_FromJsonRequest_EmitsSarif21Results()
     {
         var source = CreateMachineReportSource();
-        var request = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            mode = "explain",
-            source = new { text = source, filePath = "virtual/ExplainSarif.cs" },
-            target = new
-            {
-                kind = "point",
-                line = FindLine(source, "throw new InvalidOperationException"),
-                column = 17
-            },
-            output = new
-            {
-                format = "sarif",
-                maxDiagnostics = 1,
-                maxHazards = 1,
-                maxItems = 1
-            }
-        });
+        var request = SymbolicCliTestHost.CreateJsonRequest(
+            "explain",
+            "--source-text", source,
+            "--source-file-name", "virtual/ExplainSarif.cs",
+            "--line", FindLine(source, "throw new InvalidOperationException").ToString(),
+            "--column", "17",
+            "--sarif",
+            "--report-max-diagnostics", "1",
+            "--report-max-hazards", "1",
+            "--report-max-items", "1");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", request).ConfigureAwait(false);
 

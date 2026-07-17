@@ -2695,71 +2695,42 @@ public class TestClass
                               }
                               #endif
                               """;
-        var requestJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            mode = "query",
-            source = new
-            {
-                text = source,
-                filePath = "virtual/RequestSample.cs",
-                sourceMap = new
-                {
-                    sourceUri = "editor://workspace/RequestSample.cs",
-                    originalStartLine = 11,
-                    originalStartColumn = 3
-                }
-            },
-            target = new
-            {
-                kind = "line",
-                line = FindLine(source, "if (value > 0)")
-            },
-            references = new[] { typeof(object).Assembly.Location },
-            parseOptions = new
-            {
-                languageVersion = "preview",
-                preprocessorSymbols = new[] { "REQUEST" },
-                nullable = "enable",
-                allowUnsafe = false,
-                documentationMode = "parse",
-                platform = "AnyCpu",
-                optimization = "Debug",
-                assemblyName = "Request.Assembly"
-            },
-            impliedConditions = new[] { "value > 0" },
-            smt = new
-            {
-                mode = "bounded",
-                timeoutMs = 337,
-                methodBudgetMs = 2337,
-                maxPathConditions = 37,
-                maxExpressionNodes = 337,
-                transientRetries = 1,
-                recycleContextOnTransientFailure = false,
-                disposeContextOnExit = true
-            },
-            analysisLimits = new Dictionary<string, int>
-            {
-                ["merged-if-else-facts"] = 13
-            },
-            query = new
-            {
-                checkReachability = true,
-                includeExpressionProgramPoints = true,
-                includeCurrentStatementCompletionFacts = true,
-                invariantTargets = new[] { "value" }
-            },
-            output = new
-            {
-                format = "compactJson",
-                maxLines = 1,
-                maxPoints = 3,
-                maxFacts = 3,
-                maxConditions = 3,
-                maxProofs = 3
-            }
-        });
+        var requestJson = SymbolicCliTestHost.CreateJsonRequest(
+            "--source-text", source,
+            "--source-file-name", "virtual/RequestSample.cs",
+            "--source-map-uri", "editor://workspace/RequestSample.cs",
+            "--source-map-original-line", "11",
+            "--source-map-original-column", "3",
+            "--line", FindLine(source, "if (value > 0)").ToString(),
+            "--line-invariants",
+            "--reference", typeof(object).Assembly.Location,
+            "--language-version", "preview",
+            "--define", "REQUEST",
+            "--nullable", "enable",
+            "--documentation-mode", "parse",
+            "--platform", "AnyCpu",
+            "--optimization", "Debug",
+            "--assembly-name", "Request.Assembly",
+            "--implies", "value > 0",
+            "--smt-mode", "bounded",
+            "--smt-timeout-ms", "337",
+            "--smt-method-budget-ms", "2337",
+            "--smt-max-path-conditions", "37",
+            "--smt-max-expression-nodes", "337",
+            "--smt-transient-retries", "1",
+            "--smt-keep-context-on-transient-failure",
+            "--smt-dispose-context-on-exit",
+            "--analysis-limit", "merged-if-else-facts=13",
+            "--check-reachability",
+            "--line-expressions",
+            "--post-line-invariants",
+            "--invariant-target", "value",
+            "--compact-json",
+            "--max-lines", "1",
+            "--max-points", "3",
+            "--max-facts", "3",
+            "--max-conditions", "3",
+            "--max-proofs", "3");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2786,30 +2757,16 @@ public class TestClass
                                   public static int Identity(int value) => value;
                               }
                               """;
-        var requestJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            mode = "explain",
-            source = new
-            {
-                text = source,
-                filePath = "virtual/RequestStdinSample.cs",
-                sourceMap = new
-                {
-                    sourceUri = "editor://workspace/OriginalRequest.cs",
-                    originalStartLine = 21,
-                    originalStartColumn = 5
-                }
-            },
-            target = new
-            {
-                kind = "point",
-                line = FindLine(source, "Identity"),
-                column = FindColumn(source, "Identity")
-            },
-            smt = new { mode = "disabled" },
-            output = new { format = "text" }
-        });
+        var requestJson = SymbolicCliTestHost.CreateJsonRequest(
+            "explain",
+            "--source-text", source,
+            "--source-file-name", "virtual/RequestStdinSample.cs",
+            "--source-map-uri", "editor://workspace/OriginalRequest.cs",
+            "--source-map-original-line", "21",
+            "--source-map-original-column", "5",
+            "--line", FindLine(source, "Identity").ToString(),
+            "--column", FindColumn(source, "Identity").ToString(),
+            "--smt-mode", "disabled");
 
         var result = await SymbolicCliTestHost.RunWithInputAsync(
             requestJson,
@@ -2827,10 +2784,9 @@ public class TestClass
     {
         const string requestJson = """
                                    {
-                                     "schemaVersion": 1,
-                                     "source": { "text": "class C { }" },
-                                     "target": { "kind": "point", "line": 1 },
-                                     "outputTypo": { "format": "json" }
+                                     "schemaVersion": 2,
+                                     "arguments": ["--source-text", "class C { }", "--line", "1"],
+                                     "argumentsTypo": []
                                    }
                                    """;
 
@@ -2842,7 +2798,7 @@ public class TestClass
         Assert.That(document.RootElement.GetProperty("error").GetProperty("code").GetString(),
             Is.EqualTo(SymbolicErrorCodes.ParseFailed));
         Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(),
-            Does.Contain("outputTypo"));
+            Does.Contain("argumentsTypo"));
     }
 
     [Test]
@@ -2857,21 +2813,14 @@ public class TestClass
                                   }
                               }
                               """;
-        var requestJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            source = new { text = source, filePath = "virtual/RequestGateSample.cs" },
-            target = new { kind = "line", line = FindLine(source, "if (value > 0)") },
-            output = new { format = "compactJson" },
-            gates = new
-            {
-                maxConservativeUnknowns = 0,
-                compactThresholds = new Dictionary<string, int>
-                {
-                    ["program-points"] = 10
-                }
-            }
-        });
+        var requestJson = SymbolicCliTestHost.CreateJsonRequest(
+            "--source-text", source,
+            "--source-file-name", "virtual/RequestGateSample.cs",
+            "--line", FindLine(source, "if (value > 0)").ToString(),
+            "--line-invariants",
+            "--compact-json",
+            "--max-conservative-unknowns", "0",
+            "--fail-on-compact-threshold", "program-points=10");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2906,19 +2855,23 @@ public class TestClass
                                   }
                               }
                               """;
-        var requestJson = JsonSerializer.Serialize(new
+        var modeOption = mode switch
         {
-            schemaVersion = 1,
-            mode,
-            source = new { text = source, filePath = "virtual/RequestModes.cs" },
-            target = new { kind = "line", line = FindLine(source, targetMarker) },
-            smt = new { mode = "disabled" },
-            output = new
-            {
-                format = "compactJson",
-                maxHazards = mode == "runtimeHazards" ? 5 : (int?)null
-            }
-        });
+            "runtimeHazards" => "--runtime-hazards",
+            "capabilities" => "--capabilities",
+            _ => "--complexity"
+        };
+        var requestArguments = new List<string>
+        {
+            modeOption,
+            "--source-text", source,
+            "--source-file-name", "virtual/RequestModes.cs",
+            "--line", FindLine(source, targetMarker).ToString(),
+            "--smt-mode", "disabled",
+            "--compact-json"
+        };
+        if (mode == "runtimeHazards") requestArguments.AddRange(new[] { "--max-hazards", "5" });
+        var requestJson = SymbolicCliTestHost.CreateJsonRequest(requestArguments.ToArray());
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2939,20 +2892,15 @@ public class TestClass
                                   public static void Throw() => throw new InvalidOperationException();
                               }
                               """;
-        var requestJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            mode = "runtimeHazards",
-            source = new { text = source, filePath = "virtual/RequestHazards.cs" },
-            target = new { kind = "line", line = FindLine(source, "throw new InvalidOperationException") },
-            query = new
-            {
-                hazardStatuses = new[] { "Proven" },
-                hazardExceptionTypes = new[] { "System.InvalidOperationException" },
-                hazardCategories = new[] { "direct_throw" }
-            },
-            output = new { format = "json" }
-        });
+        var requestJson = SymbolicCliTestHost.CreateJsonRequest(
+            "--runtime-hazards",
+            "--source-text", source,
+            "--source-file-name", "virtual/RequestHazards.cs",
+            "--line", FindLine(source, "throw new InvalidOperationException").ToString(),
+            "--hazard-status", "Proven",
+            "--hazard-exception-type", "System.InvalidOperationException",
+            "--hazard-category", "direct_throw",
+            "--json");
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
@@ -2997,9 +2945,9 @@ public class TestClass
             {
                 Arguments = new[]
                 {
-                    "--request-json", "{\"schemaVersion\":2,\"source\":{\"text\":\"class C { }\"},\"target\":{\"kind\":\"point\",\"line\":1}}"
+                    "--request-json", "{\"schemaVersion\":1,\"arguments\":[\"--source-text\",\"class C { }\",\"--line\",\"1\"]}"
                 },
-                Error = "schemaVersion must be 1"
+                Error = "schemaVersion must be 2"
             }
         };
 

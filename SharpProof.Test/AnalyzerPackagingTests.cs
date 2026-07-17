@@ -1830,11 +1830,11 @@ namespace TestNamespace {
             ("SymbolicCliOptions.cs", "--source-map-uri <uri>"),
             ("SymbolicCliOptions.cs", "--request-json <json>"),
             ("SymbolicCliOptions.cs", "--request-json-stdin"),
-            ("SymbolicCliJsonRequest.cs", "SchemaVersion != 1"),
+            ("SymbolicCliJsonRequest.cs", "SchemaVersion != 2"),
             ("SymbolicCliJsonRequest.cs", "JsonUnmappedMemberHandling.Disallow"),
-            ("SymbolicCliJsonRequest.cs", "--smt-timeout-ms"),
-            ("SymbolicCliJsonRequest.cs", "--analysis-limit"),
-            ("SymbolicCliJsonRequest.cs", "--compact-json"));
+            ("SymbolicCliJsonRequest.cs", "nested JSON request selector"),
+            ("SymbolicCliJsonRequest.cs", "request.Arguments.Any(string.IsNullOrWhiteSpace)"),
+            ("SymbolicCliJsonRequest.cs", "return request.Arguments.ToArray()"));
     }
 
     [Test]
@@ -1846,10 +1846,10 @@ namespace TestNamespace {
             ("SymbolicCliOptions.cs", "--report-max-diagnostics <n>"),
             ("SymbolicCliOptions.cs", "--report-max-hazards <n>"),
             ("SymbolicCliOptions.cs", "--report-max-items <n>"),
-            ("SymbolicCliJsonRequest.cs", "case \"sarif\":"),
-            ("SymbolicCliJsonRequest.cs", "case \"markdown\":"),
-            ("SymbolicCliJsonRequest.cs", "MaxDiagnostics"),
-            ("SymbolicCliJsonRequest.cs", "MaxItems"),
+            ("SymbolicCliJsonRequest.cs", "public string[]? Arguments"),
+            ("SymbolicCliJsonRequest.cs", "return request.Arguments.ToArray()"),
+            ("SymbolicCliJsonRequest.cs", "nested JSON request selector"),
+            ("SymbolicCliJsonRequest.cs", "JsonUnmappedMemberHandling.Disallow"),
             ("SymbolicCliExplainReport.cs", "public override string Kind => \"explain\""),
             ("SymbolicCompactDomainResults.cs", "public int SchemaVersion => 1"),
             ("SymbolicCliExplainReport.cs", "public JsonElement Invariant"),
@@ -1873,7 +1873,7 @@ namespace TestNamespace {
             ("SymbolicCliOptions.cs", "--max-conservative-unknowns <n>"),
             ("SymbolicCliOptions.cs", "--fail-on-compact-truncation"),
             ("SymbolicCliOptions.cs", "--fail-on-compact-threshold <metric=max>"),
-            ("SymbolicCliJsonRequest.cs", "SymbolicCliJsonGateOptions"),
+            ("SymbolicCliJsonRequest.cs", "return request.Arguments.ToArray()"),
             ("SymbolicCliExitGateEvaluator.cs", "SymbolicCliExitGateFailure"),
             ("SymbolicCliExitGateEvaluator.cs", "ComplexityComparison.Incomparable"));
     }

@@ -52,99 +52,51 @@ the containing document. `explain` prints this metadata when present.
 
 Automation can provide a strict, versioned request inline with
 `--request-json <json>` or stream it through `--request-json-stdin`. A request
-selector is the only CLI argument because every query setting belongs in the
-envelope.
+selector is the only CLI argument. The envelope carries the canonical CLI
+argument vector, so command-line and JSON requests cannot drift into separate
+grammars.
 
 ```json
 {
-  "schemaVersion": 1,
-  "mode": "query",
-  "source": {
-    "text": "#if FEATURE\nclass C { int M(int value) => value; }\n#endif",
-    "filePath": "virtual/Buffer.cs",
-    "sourceMap": {
-      "sourceUri": "file:///workspace/Original.cs",
-      "originalStartLine": 80,
-      "originalStartColumn": 5
-    }
-  },
-  "target": {
-    "kind": "point",
-    "line": 2,
-    "column": 11
-  },
-  "references": ["C:/reference-assemblies/System.Runtime.dll"],
-  "parseOptions": {
-    "languageVersion": "preview",
-    "preprocessorSymbols": ["FEATURE"],
-    "nullable": "enable",
-    "allowUnsafe": false,
-    "documentationMode": "parse",
-    "platform": "AnyCpu",
-    "optimization": "Debug",
-    "assemblyName": "Editor.Buffer"
-  },
-  "impliedConditions": ["value >= 0"],
-  "smt": {
-    "mode": "bounded",
-    "timeoutMs": 300,
-    "methodBudgetMs": 2000,
-    "maxPathConditions": 32,
-    "maxExpressionNodes": 300,
-    "transientRetries": 1,
-    "recycleContextOnTransientFailure": true,
-    "disposeContextOnExit": false
-  },
-  "analysisLimits": {
-    "merged-if-else-facts": 24
-  },
-  "query": {
-    "checkReachability": true,
-    "includeExpressionProgramPoints": false,
-    "includeCurrentStatementCompletionFacts": false,
-    "invariantTargets": ["value"]
-  },
-  "output": {
-    "format": "compactJson",
-    "maxLines": 10,
-    "maxPoints": 50,
-    "maxFacts": 20,
-    "maxConditions": 20,
-    "maxProofs": 20
-  },
-  "gates": {
-    "failOnUnprovenImplies": true,
-    "maxConservativeUnknowns": 0,
-    "failOnCompactTruncation": true,
-    "compactThresholds": {
-      "program-points": 100
-    }
-  }
+  "schemaVersion": 2,
+  "arguments": [
+    "--source-text", "#if FEATURE\nclass C { int M(int value) => value; }\n#endif",
+    "--source-file-name", "virtual/Buffer.cs",
+    "--source-map-uri", "file:///workspace/Original.cs",
+    "--source-map-original-line", "80",
+    "--source-map-original-column", "5",
+    "--line", "2",
+    "--column", "11",
+    "--define", "FEATURE",
+    "--nullable", "enable",
+    "--implies", "value >= 0",
+    "--smt-mode", "bounded",
+    "--smt-timeout-ms", "300",
+    "--analysis-limit", "merged-if-else-facts=24",
+    "--check-reachability",
+    "--invariant-target", "value",
+    "--compact-json",
+    "--max-points", "50",
+    "--fail-on-unproven-implies"
+  ]
 }
 ```
 
-Supported `mode` values are `query`, `explain`, `runtimeHazards`,
-`complexity`, and `capabilities`. Target kinds are `point`, `line`,
-`position`, `span`, `lineSpan`, and `allLines`; each kind requires its matching
-location fields. Output formats are `text`, `json`, `compactJson`,
-`invariantJson`, `sarif`, and `markdown`; the last two require `mode: "explain"`.
-Explain output accepts `maxDiagnostics`, `maxHazards`, and `maxItems` as report
-limits. Runtime-hazard requests can also set
-`query.includeUnprovenHazards`, `query.failOnHazard`, and repeated
-`query.hazardKinds`; compact output accepts `maxHazards`.
+Every entry is exactly one CLI token. Use the same mode, target, analysis,
+output, and gate arguments documented by `--help`; put the `explain` command
+first when requesting an explain report. Nested `--request-json` selectors are
+rejected.
 
 For the composed JSON schema, SARIF projection, Markdown layout, and exact
 limit semantics, see [machine-readable explain reports](explain-reports.md).
 
-Schema version 1 rejects unknown properties, unsupported values, missing
-required target fields, invalid budgets, and incompatible query combinations
-as usage errors. This makes misspelled automation settings visible instead of
-silently accepting a different query.
+Schema version 2 rejects unknown envelope properties, blank arguments, nested
+request selectors, invalid budgets, and incompatible query combinations. This
+makes misspelled automation settings visible instead of silently accepting a
+different query.
 
-The optional `gates` object carries the same CI policies as the command-line
-exit gates. Gate failures return exit code 1 and are written to stderr while
-the requested JSON result remains on stdout. See [CI exit-code
-gates](ci-exit-gates.md).
+Gate arguments return exit code 1 on failure and are written to stderr while
+the requested JSON result remains on stdout. See [CI exit-code gates](ci-exit-gates.md).
 
 Malformed envelopes and other failed JSON-oriented requests return a typed
 `kind: "error"` document on stdout with a stable `SPQ` code. See the [typed

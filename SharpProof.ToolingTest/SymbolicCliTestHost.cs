@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace SharpProof.Test;
@@ -22,6 +23,9 @@ internal static class SymbolicCliTestHost
     {
         return await RunWithInputAsync(null, arguments).ConfigureAwait(false);
     }
+
+    public static string CreateJsonRequest(params string[] arguments) =>
+        JsonSerializer.Serialize(new { schemaVersion = 2, arguments });
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithInputAsync(
         string? standardInput,

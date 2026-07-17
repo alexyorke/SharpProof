@@ -48,5 +48,12 @@ should consume `SymbolicQueryResult`, `SymbolicProgramPointResult`,
 machine-readable schema should invoke the CLI with `--compact-json`; its JSON
 property names and shapes are unchanged.
 
-This change affects only the preview .NET surface. Existing CLI forms and JSON
-property names remain compatible.
+The compact query schema is now the sole invariant JSON result schema; the
+former invariant-only envelope and its duplicate focus/query-summary fields
+were removed.
+
+The standalone JSON request envelope now uses schema version 2 with a single
+`arguments` string array. The former nested source, target, query, output, and
+gate objects were unreleased compatibility DTOs that duplicated the CLI
+grammar. Pass each canonical CLI token as one array entry; nested request
+selectors are rejected.
