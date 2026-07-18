@@ -55,6 +55,9 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Complexity result shaping and stable driver, unknown-reason, and callee
   deduplication live in `SymbolicComplexityResultProjector`, separate from the
   analysis session and cost modeling.
+- [x] Complexity sequence/branch combination, loop multiplication, summary
+  creation, and driver/callee evidence construction live in
+  `SymbolicComplexityAlgebra`; duplicate session-owned algebra was deleted.
 
 ## Current evidence
 
@@ -83,5 +86,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract complexity loop modeling, call summaries, and cost algebra from the
-analysis session while deleting superseded orchestration.
+Extract complexity loop modeling and call summaries from the analysis session
+while deleting superseded orchestration.
