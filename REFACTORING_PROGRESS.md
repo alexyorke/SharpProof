@@ -129,6 +129,10 @@ This is the active source of truth for the comprehensive refactor. Read
   method input. Subnode proof validation is centralized on that input, and the
   parallel node/semantic-model/method tuples were deleted without weakening
   unknown or unsupported outcomes.
+- [x] `SymbolicIrProofResult` owns proof-result construction, cache-hit/status
+  projection, SMT outcome mapping, proof-stage classification, and structured
+  unknown-reason mapping. `SymbolicProofService` no longer owns result
+  projection or mixes it with state encoding and solver orchestration.
 
 ## Current evidence
 
@@ -157,6 +161,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Decompose `SymbolicProofService` by lowering/encoding, solver execution, and
-result projection responsibilities, using existing differential proof tests to
-delete duplicated static orchestration in bounded green tranches.
+Extract bounded proof and encoded-state cache ownership from
+`SymbolicProofService`, including per-SMT-service lifetime and process fallback
+behavior, then delete the nested cache implementation.
