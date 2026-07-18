@@ -152,6 +152,10 @@ This is the active source of truth for the comprehensive refactor. Read
   and literals. `Z3RegexTranslator` is now parser/AST orchestration over the
   existing normalizer, validator, character-range service, and expression
   factory instead of constructing primitive solver expressions itself.
+- [x] The EffectSummary executable `Program` now owns only top-level invocation
+  and argument-error handling. CLI orchestration moved to `EffectSummaryCli`,
+  deleting the monolithic host class from the executable entry-point file while
+  preserving command behavior and generated artifacts.
 
 ## Current evidence
 
@@ -180,6 +184,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Decompose the EffectSummary executable host: inventory `Program` responsibilities
-and move one coherent input-resolution or output/reporting stage behind a typed
-stage boundary while preserving exact command behavior and golden artifacts.
+Extract EffectSummary progress/checkpoint persistence from `EffectSummaryCli`
+behind a typed store, then delete the corresponding CLI-owned helpers while
+preserving resume fingerprints and generated artifacts.
