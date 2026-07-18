@@ -170,6 +170,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] `GeneratedPurityCatalogReader` now owns persisted catalog metadata
   extraction, structural identity parsing, and tolerant optional-field
   projection. The CLI-owned JSON traversal and entry adapter were deleted.
+- [x] `EffectSummaryAnalysisPipeline` now composes assembly summarization,
+  symbol filtering, fixed-point purity classification, fallback inventory, and
+  document projection. The CLI-owned document-construction helper was deleted,
+  leaving the CLI responsible for command-mode orchestration.
 
 ## Current evidence
 
@@ -198,6 +202,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Reduce EffectSummary document construction to a typed analysis/report pipeline,
-delete the CLI-owned construction helper, then audit whether the
-EffectSummary/tool-host tranche can be closed.
+Standardize top-level argument-error/help execution for the lightweight command
+tools through a small tooling-core host abstraction, without changing each
+tool's exit codes or output streams.

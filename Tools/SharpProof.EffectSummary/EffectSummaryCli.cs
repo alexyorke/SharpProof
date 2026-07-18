@@ -31,7 +31,7 @@ internal static class EffectSummaryCli
 
         if (!string.IsNullOrWhiteSpace(options.ShardOutputPath)) return RunSharded(options);
 
-        EffectSummaryOutputWriter.WriteDocument(BuildDocument(options), options.OutputPath);
+        EffectSummaryOutputWriter.WriteDocument(EffectSummaryAnalysisPipeline.Analyze(options), options.OutputPath);
         return 0;
     }
 
@@ -104,7 +104,9 @@ internal static class EffectSummaryCli
             }
 
             completedOutputPaths.Remove(outputPath);
-            var effectSummary = BuildDocument(options, externalGeneratedPurityEntries: resolvedPurityEntries);
+            var effectSummary = EffectSummaryAnalysisPipeline.Analyze(
+                options,
+                externalGeneratedPurityEntries: resolvedPurityEntries);
             EffectSummaryOutputWriter.WriteDocument(effectSummary, options.OutputPath);
             if (effectSummary.GeneratedPurityCatalog != null)
                 resolvedPurityEntries = EffectSummaryCatalogReporting.MergeGeneratedPurityEntries(
@@ -142,7 +144,9 @@ internal static class EffectSummaryCli
             if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 
             completedOutputPaths.Remove(outputPath);
-            EffectSummaryOutputWriter.WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
+            EffectSummaryOutputWriter.WriteDocument(
+                EffectSummaryAnalysisPipeline.Analyze(options, new[] { assemblyPath }),
+                outputPath);
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
                 EffectSummaryProgressStore.SaveSharded(
@@ -154,62 +158,6 @@ internal static class EffectSummaryCli
         if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
 
         return 0;
-    }
-
-    private static EffectSummaryDocument BuildDocument(
-        CliOptions options,
-        IReadOnlyList<string>? inputAssemblies = null,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
-    {
-        var assemblies = inputAssemblies ?? EffectSummaryInputResolver.ResolveAssemblies(options);
-
-        var reports = assemblies
-            .Select(path => AssemblyEffectSummarizer.Summarize(
-                path,
-                options.Limit,
-                options.SymbolPrefixes,
-                options.ExactSymbols,
-                options.CanonicalKeys,
-                options.IncludeCallees,
-                options.MaxDepth,
-                options.IncludeTransitiveRoots,
-                options.MaxExceptionEdges) with
-            {
-                ArtifactSource = options.GetArtifactSource(path)
-            })
-            .ToArray();
-
-        if (options.ExcludedSymbolPrefixes.Count > 0)
-            reports = reports
-                .Select(report => ArtifactSpecSymbolFilter.Exclude(report, options.ExcludedSymbolPrefixes))
-                .ToArray();
-
-        PurityClassificationReport? purityClassificationReport = null;
-        GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
-        if (options.IncludePurityClassification || options.CompareManualCatalogs)
-        {
-            var classificationOutput = PurityClassificationEngine.Classify(
-                reports,
-                options.CompareManualCatalogs,
-                externalGeneratedPurityEntries);
-            reports = classificationOutput.Assemblies;
-            purityClassificationReport = classificationOutput.Report;
-            generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
-        }
-
-        var bclFallbackInventory = options.IncludeBclFallbackInventory
-            ? BclFallbackInventoryBuilder.Build(reports)
-            : null;
-
-        var document = new EffectSummaryDocument(
-            EffectSummarySchemaContract.CurrentVersion,
-            DateTimeOffset.UtcNow,
-            reports,
-            purityClassificationReport,
-            generatedPurityCatalog,
-            bclFallbackInventory);
-
-        return document;
     }
 
     private static void PrintHelp()
