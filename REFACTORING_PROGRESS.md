@@ -147,6 +147,11 @@ This is the active source of truth for the comprehensive refactor. Read
   short-circuit assumptions, and unsupported-encoding classification. Direct
   consumers use the encoder; the proof service shrank to solver-oriented
   classification, budgets, and cache coordination.
+- [x] `Z3RegexExpressionFactory` owns primitive Z3 regex construction,
+  all-character creation/caching, ranges, dot semantics, concatenation, loops,
+  and literals. `Z3RegexTranslator` is now parser/AST orchestration over the
+  existing normalizer, validator, character-range service, and expression
+  factory instead of constructing primitive solver expressions itself.
 
 ## Current evidence
 
@@ -175,6 +180,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Decompose the remaining Z3 regex encoder by moving parser/AST translation away
-from solver expression construction, preserving typed unsupported fallback and
-the existing normalization/validation boundary.
+Decompose the EffectSummary executable host: inventory `Program` responsibilities
+and move one coherent input-resolution or output/reporting stage behind a typed
+stage boundary while preserving exact command behavior and golden artifacts.
