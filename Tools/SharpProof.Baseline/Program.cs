@@ -1,79 +1,77 @@
 using SharpProof.Tools.Baseline;
 using SharpProof.Tools.Shared;
 
-BaselineCommandOptions options;
-try
+return await ToolCommandHost.RunAsync(
+    () => RunAsync(args),
+    argumentErrorExitCode: 64,
+    Console.Error,
+    static _ => WriteUsage());
+
+static async Task<int> RunAsync(string[] args)
 {
-    options = BaselineCommandOptions.Parse(args);
-}
-catch (ArgumentException ex)
-{
-    Console.Error.WriteLine(ex.Message);
-    WriteUsage();
-    return 64;
-}
+    var options = BaselineCommandOptions.Parse(args);
+    if (options.ShowHelp)
+    {
+        WriteUsage();
+        return 0;
+    }
 
-if (options.ShowHelp)
-{
-    WriteUsage();
-    return 0;
-}
-
-if (!options.IsValid(out var error))
-{
-    Console.Error.WriteLine(error);
-    WriteUsage();
-    return 64;
-}
-
-switch (options.Command)
-{
-    case "generate":
-        {
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
-            var json = SharpProofBaseline.ToJson(current);
-            if (options.OutputPath == null)
-                Console.Write(json);
-            else
-                await File.WriteAllTextAsync(options.OutputPath, json);
-
-            return 0;
-        }
-
-    case "explain":
-        {
-            var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
-            foreach (var explanation in SharpProofBaseline.Explain(baseline, current))
-                Console.WriteLine(FormatExplanation(explanation));
-
-            return 0;
-        }
-
-    case "prune":
-        {
-            var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
-            var result = SharpProofBaseline.Prune(baseline, current);
-            var outputPath = options.OutputPath ?? options.BaselinePath!;
-            await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(result.Baseline));
-            Console.Error.WriteLine("Kept " + result.Kept + " baseline entries; pruned " + result.Pruned + ".");
-            return 0;
-        }
-
-    case "migrate":
-        {
-            var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
-            var outputPath = options.OutputPath ?? options.BaselinePath!;
-            await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(baseline));
-            Console.Error.WriteLine("Migrated baseline evidence to schema v2.");
-            return 0;
-        }
-
-    default:
-        Console.Error.WriteLine("Unknown command '" + options.Command + "'.");
+    if (!options.IsValid(out var error))
+    {
+        Console.Error.WriteLine(error);
         WriteUsage();
         return 64;
+    }
+
+    switch (options.Command)
+    {
+        case "generate":
+            {
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
+                var json = SharpProofBaseline.ToJson(current);
+                if (options.OutputPath == null)
+                    Console.Write(json);
+                else
+                    await File.WriteAllTextAsync(options.OutputPath, json);
+
+                return 0;
+            }
+
+        case "explain":
+            {
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
+                foreach (var explanation in SharpProofBaseline.Explain(baseline, current))
+                    Console.WriteLine(FormatExplanation(explanation));
+
+                return 0;
+            }
+
+        case "prune":
+            {
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs);
+                var result = SharpProofBaseline.Prune(baseline, current);
+                var outputPath = options.OutputPath ?? options.BaselinePath!;
+                await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(result.Baseline));
+                Console.Error.WriteLine("Kept " + result.Kept + " baseline entries; pruned " + result.Pruned + ".");
+                return 0;
+            }
+
+        case "migrate":
+            {
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var outputPath = options.OutputPath ?? options.BaselinePath!;
+                await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(baseline));
+                Console.Error.WriteLine("Migrated baseline evidence to schema v2.");
+                return 0;
+            }
+
+        default:
+            Console.Error.WriteLine("Unknown command '" + options.Command + "'.");
+            WriteUsage();
+            return 64;
+    }
 }
 
 static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(IReadOnlyCollection<string> inputs)

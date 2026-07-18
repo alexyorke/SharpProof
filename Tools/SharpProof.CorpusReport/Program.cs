@@ -2,37 +2,35 @@ using System.Text.Json;
 using SharpProof.Tools.CorpusReport;
 using SharpProof.Tools.Shared;
 
-CorpusReportOptions options;
-try
+return await ToolCommandHost.RunAsync(
+    () => RunAsync(args),
+    argumentErrorExitCode: 64,
+    Console.Error,
+    static _ => WriteUsage());
+
+static async Task<int> RunAsync(string[] args)
 {
-    options = CorpusReportOptions.Parse(args);
+    var options = CorpusReportOptions.Parse(args);
+    if (options.ShowHelp || options.Inputs.Count == 0)
+    {
+        WriteUsage();
+        return options.ShowHelp ? 0 : 1;
+    }
+
+    using var materializedInputs = await DotnetSarifBuildRunner.MaterializeAsync(options.Inputs);
+    var sarifInputs = materializedInputs.Inputs
+        .Select(static input => new SarifCorpusInput(input.InputName, input.SarifPath))
+        .ToArray();
+
+    var report = SarifCorpusReport.CreateFromSarifFiles(sarifInputs);
+    var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+    if (options.OutputPath is null)
+        Console.WriteLine(json);
+    else
+        File.WriteAllText(options.OutputPath, json);
+
+    return 0;
 }
-catch (ArgumentException ex)
-{
-    Console.Error.WriteLine(ex.Message);
-    WriteUsage();
-    return 64;
-}
-
-if (options.ShowHelp || options.Inputs.Count == 0)
-{
-    WriteUsage();
-    return options.ShowHelp ? 0 : 1;
-}
-
-using var materializedInputs = await DotnetSarifBuildRunner.MaterializeAsync(options.Inputs);
-var sarifInputs = materializedInputs.Inputs
-    .Select(static input => new SarifCorpusInput(input.InputName, input.SarifPath))
-    .ToArray();
-
-var report = SarifCorpusReport.CreateFromSarifFiles(sarifInputs);
-var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
-if (options.OutputPath is null)
-    Console.WriteLine(json);
-else
-    File.WriteAllText(options.OutputPath, json);
-
-return 0;
 
 static void WriteUsage()
 {

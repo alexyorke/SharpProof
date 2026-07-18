@@ -178,6 +178,9 @@ This is the active source of truth for the comprehensive refactor. Read
   boundary for command tools. EffectSummary and Fuzz now use it with their
   existing exit codes and usage streams; duplicate top-level catch blocks were
   deleted and the architecture dependency allowlist records both edges.
+- [x] Baseline and CorpusReport now execute through `ToolCommandHost`; their
+  duplicate parse/catch blocks were deleted while distinct no-input behavior,
+  invalid-argument exit code 64, usage text, and stderr routing remain exact.
 
 ## Current evidence
 
@@ -206,6 +209,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Migrate Baseline and CorpusReport argument-error execution to
-`ToolCommandHost`, deleting their duplicate top-level catch blocks while
-preserving exact usage text, exit codes, and output streams.
+Audit SymbolicCli's top-level error policy and migrate only its matching
+argument-error boundary to `ToolCommandHost`, preserving its richer request,
+project-load, cancellation, and SMT error classifications.
