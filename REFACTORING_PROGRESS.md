@@ -52,6 +52,9 @@ This is the active source of truth for the comprehensive refactor. Read
   `SymbolicProgramPointProjector` over an immutable query context. Syntax-tree
   aggregation and direct node queries share it, and duplicate node projection
   was deleted.
+- [x] Complexity result shaping and stable driver, unknown-reason, and callee
+  deduplication live in `SymbolicComplexityResultProjector`, separate from the
+  analysis session and cost modeling.
 
 ## Current evidence
 
@@ -80,5 +83,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Decompose complexity modeling into loop, call-summary, cost-algebra, and
-projection responsibilities while deleting superseded orchestration.
+Extract complexity loop modeling, call summaries, and cost algebra from the
+analysis session while deleting superseded orchestration.
