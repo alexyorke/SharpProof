@@ -64,6 +64,11 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Complexity sequence/branch combination, loop multiplication, summary
   creation, and driver/callee evidence construction live in
   `SymbolicComplexityAlgebra`; duplicate session-owned algebra was deleted.
+- [x] Complexity expression-to-cost projection lives in
+  `SymbolicComplexityCostModel`, shared by loop modeling and callee
+  substitution. Loop bound recognition, step validation, dependency tracking,
+  and mutation analysis live in `SymbolicComplexityLoopModel`; the former
+  `AnalysisSession` implementations were deleted.
 
 ## Current evidence
 
@@ -92,5 +97,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract complexity loop modeling and call summaries from the analysis session
-while deleting superseded orchestration.
+Extract complexity call resolution, source-summary recursion, and callee cost
+substitution from the analysis session while deleting superseded orchestration.
