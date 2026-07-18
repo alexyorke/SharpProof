@@ -74,6 +74,10 @@ This is the active source of truth for the comprehensive refactor. Read
   substitution, and callee evidence live in `SymbolicComplexityCallModel`.
   Recursive summary caching remains the sole responsibility of the reduced
   `AnalysisSession`, and its duplicate call-model methods were deleted.
+- [x] Regex character-class normalization is isolated in
+  `Z3RegexCharacterRanges`: bounded category/shorthand expansion caching,
+  range merging, and complement construction are separate from Z3 encoding.
+  The duplicate translator-owned caches and range algorithms were deleted.
 
 ## Current evidence
 
@@ -102,5 +106,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Split `Z3RegexTranslator` into normalization, supported-fragment validation,
-encoding, and fallback classification while preserving conservative unknowns.
+Continue splitting `Z3RegexTranslator`: extract anchor/option normalization and
+supported-fragment validation from Z3 encoding while preserving conservative
+fallback classification.

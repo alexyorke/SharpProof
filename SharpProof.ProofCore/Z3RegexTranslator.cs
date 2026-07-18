@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
-using SharpProof.ProofCore.Collections;
 
 namespace SharpProof.ProofCore.Smt;
 
@@ -11,20 +10,7 @@ internal sealed class Z3RegexTranslator
     // Keep large Unicode category unions conservative; Z3 range-heavy regexes can get expensive
     // and smaller shorthand/category classes cover the common analyzer facts precisely.
     private const int MaxCharacterClassRangeCount = 512;
-    private const int RegexCharacterRangeCacheLimit = 1024;
     private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
-
-    private static readonly BoundedConcurrentCache<(string Pattern, RegexOptions Options), CharacterRange[]>
-        RegexCharacterRangeCache = new(RegexCharacterRangeCacheLimit);
-
-    private static readonly Lazy<CharacterRange[]> DecimalDigitRanges =
-        new(() => CreateRegexCharacterRangesOrEmpty((@"\d", RegexOptions.None)));
-
-    private static readonly Lazy<CharacterRange[]> WhitespaceRanges =
-        new(() => CreateRegexCharacterRangesOrEmpty((@"\s", RegexOptions.None)));
-
-    private static readonly Lazy<CharacterRange[]> WordRanges = new(() =>
-        CreateRegexCharacterRangesOrEmpty((@"\w", RegexOptions.None)));
 
     private readonly bool _canUseIgnoreCase;
     private readonly Context _context;
@@ -383,7 +369,7 @@ internal sealed class Z3RegexTranslator
         out ReExpr regex)
     {
         regex = null!;
-        if (!TryCreateCharacterRangesRegex(WordRanges.Value, out var wordChar)) return false;
+        if (!TryCreateCharacterRangesRegex(Z3RegexCharacterRanges.Word, out var wordChar)) return false;
 
         var nonWordChar = _context.MkDiff(CreateAnyCharRegex(), wordChar);
         var leftWord = ConstrainPrefixEnd(prefix, wordChar);
@@ -797,7 +783,7 @@ internal sealed class Z3RegexTranslator
         {
             if (parts.Any(static part => part.IsApproximation || part.Ranges == null)) return false;
 
-            var complementRanges = ComplementRanges(MergeRanges(parts.SelectMany(static part => part.Ranges!)));
+            var complementRanges = Z3RegexCharacterRanges.Complement(Z3RegexCharacterRanges.Merge(parts.SelectMany(static part => part.Ranges!)));
             if (!TryCreateCharacterRangesRegex(complementRanges, out regex)) return false;
         }
 
@@ -928,7 +914,7 @@ internal sealed class Z3RegexTranslator
     private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex)
     {
         regex = default;
-        if (TryGetShorthandCharacterRanges(escaped, out var shorthandRanges))
+        if (Z3RegexCharacterRanges.TryGetShorthand(escaped, out var shorthandRanges))
         {
             regex = CreateCharacterClassTranslation(shorthandRanges);
             return true;
@@ -938,37 +924,18 @@ internal sealed class Z3RegexTranslator
         {
             if (!TryReadRegexCategoryName(out var categoryName)) return false;
 
-            if (!TryGetCharacterRanges(@"\p{" + categoryName + "}", out var categoryRanges))
+            if (!Z3RegexCharacterRanges.TryGet(@"\p{" + categoryName + "}", out var categoryRanges))
             {
                 regex = new RegexClassTranslation(CreateAnyCharRegex(), false, null);
                 return true;
             }
 
-            var ranges = escaped == 'p' ? categoryRanges : ComplementRanges(categoryRanges);
+            var ranges = escaped == 'p' ? categoryRanges : Z3RegexCharacterRanges.Complement(categoryRanges);
             regex = CreateCharacterClassTranslation(ranges);
             return true;
         }
 
         return false;
-    }
-
-    private static bool TryGetShorthandCharacterRanges(char escaped, out CharacterRange[] ranges)
-    {
-        var baseRanges = escaped switch
-        {
-            'd' or 'D' => DecimalDigitRanges.Value,
-            's' or 'S' => WhitespaceRanges.Value,
-            'w' or 'W' => WordRanges.Value,
-            _ => null,
-        };
-        if (baseRanges is null)
-        {
-            ranges = Array.Empty<CharacterRange>();
-            return false;
-        }
-
-        ranges = escaped is 'D' or 'S' or 'W' ? ComplementRanges(baseRanges) : baseRanges;
-        return true;
     }
 
     private RegexClassTranslation CreateCharacterClassTranslation(CharacterRange[] ranges)
@@ -1009,7 +976,7 @@ internal sealed class Z3RegexTranslator
         regex = null!;
         try
         {
-            if (!TryGetCharacterRanges(atomPattern, options, out var ranges)) return false;
+            if (!Z3RegexCharacterRanges.TryGet(atomPattern, options, out var ranges)) return false;
 
             regex = CreateCharacterRangesRegex(ranges);
             return true;
@@ -1018,126 +985,6 @@ internal sealed class Z3RegexTranslator
         {
             return false;
         }
-    }
-
-    private static bool TryGetCharacterRanges(string atomPattern, out CharacterRange[] ranges)
-    {
-        return TryGetCharacterRanges(atomPattern, RegexOptions.None, out ranges);
-    }
-
-    private static bool TryGetCharacterRanges(string atomPattern, RegexOptions options, out CharacterRange[] ranges)
-    {
-        ranges = Array.Empty<CharacterRange>();
-        try
-        {
-            ranges = GetOrAddRegexCharacterRanges((atomPattern, options));
-            return ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
-        }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
-        {
-            return false;
-        }
-    }
-
-    private static CharacterRange[] GetOrAddRegexCharacterRanges(
-        (string Pattern, RegexOptions Options) key)
-    {
-        return RegexCharacterRangeCache.GetOrAdd(key, CreateRegexCharacterRanges);
-    }
-
-    private static CharacterRange[] CreateRegexCharacterRanges((string Pattern, RegexOptions Options) key)
-    {
-        var ranges = new List<CharacterRange>();
-        char? rangeStart = null;
-        var previous = '\0';
-        var regex = new Regex(@"\A(?:" + key.Pattern + @")\z", key.Options, RegexSyntaxValidationTimeout);
-        for (var codePoint = 0; codePoint <= char.MaxValue; codePoint++)
-        {
-            var current = (char)codePoint;
-            if (regex.IsMatch(current.ToString()))
-            {
-                rangeStart ??= current;
-                previous = current;
-                continue;
-            }
-
-            if (rangeStart is { } start)
-            {
-                ranges.Add(new CharacterRange(start, previous));
-                rangeStart = null;
-            }
-        }
-
-        if (rangeStart is { } finalStart) ranges.Add(new CharacterRange(finalStart, previous));
-
-        return ranges.ToArray();
-    }
-
-    private static CharacterRange[] CreateRegexCharacterRangesOrEmpty((string Pattern, RegexOptions Options) key)
-    {
-        try
-        {
-            return CreateRegexCharacterRanges(key);
-        }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
-        {
-            return Array.Empty<CharacterRange>();
-        }
-    }
-
-    private static CharacterRange[] MergeRanges(IEnumerable<CharacterRange> ranges)
-    {
-        var ordered = ranges
-            .OrderBy(static range => range.Start)
-            .ThenBy(static range => range.End)
-            .ToArray();
-        if (ordered.Length == 0) return Array.Empty<CharacterRange>();
-
-        var merged = new List<CharacterRange>();
-        var currentStart = ordered[0].Start;
-        var currentEnd = ordered[0].End;
-        for (var index = 1; index < ordered.Length; index++)
-        {
-            var range = ordered[index];
-            if (range.Start <= currentEnd ||
-                (currentEnd != char.MaxValue && range.Start == currentEnd + 1))
-            {
-                if (range.End > currentEnd) currentEnd = range.End;
-
-                continue;
-            }
-
-            merged.Add(new CharacterRange(currentStart, currentEnd));
-            currentStart = range.Start;
-            currentEnd = range.End;
-        }
-
-        merged.Add(new CharacterRange(currentStart, currentEnd));
-        return merged.ToArray();
-    }
-
-    private static CharacterRange[] ComplementRanges(IEnumerable<CharacterRange> ranges)
-    {
-        var merged = MergeRanges(ranges);
-        var complement = new List<CharacterRange>();
-        var nextStart = 0;
-        foreach (var range in merged)
-        {
-            if (nextStart < range.Start)
-                complement.Add(new CharacterRange((char)nextStart, (char)(range.Start - 1)));
-
-            if (range.End == char.MaxValue)
-            {
-                nextStart = char.MaxValue + 1;
-                break;
-            }
-
-            nextStart = range.End + 1;
-        }
-
-        if (nextStart <= char.MaxValue) complement.Add(new CharacterRange((char)nextStart, char.MaxValue));
-
-        return complement.ToArray();
     }
 
     private bool TryReadRegexCategoryName(out string categoryName)
@@ -1502,13 +1349,6 @@ internal sealed class Z3RegexTranslator
         public bool IsExact { get; } = isExact;
 
         public CharacterRange[]? Ranges { get; } = ranges;
-    }
-
-    private readonly struct CharacterRange(char start, char end)
-    {
-        public char Start { get; } = start;
-
-        public char End { get; } = end;
     }
 
     private readonly struct RegexOptionScope(bool ignorePatternWhitespace, bool singleline, bool ignoreCase)
