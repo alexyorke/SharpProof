@@ -9,7 +9,6 @@ internal static class EffectSummarySemanticWrapperRules
         new(HasPureTypeIdentityWrapperPattern, "none"),
         new(HasPureStringHashWrapperPattern, "none"),
         new(HasPureCharReplaceStringWrapperPattern, "internal_only"),
-        new(HasPureStringSubstringWrapperPattern, "internal_only"),
         new(HasPureFreshAllocatedStringCopyCorePattern, "internal_only"),
         new(HasPureStringLengthCheckedConcatWrapperPattern, "internal_only"),
         new(HasPureStringArrayConcatWrapperPattern, "internal_only"),
@@ -135,17 +134,6 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
                    string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
-    }
-
-    internal static bool HasPureStringSubstringWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_static_field") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(static call =>
-                   string.Equals(call, "string.InternalSubString(int, int)->string", StringComparison.Ordinal)) &&
-               summary.Calls.Any(static call => string.Equals(call,
-                   "string.ThrowSubstringArgumentOutOfRange(int, int)->void", StringComparison.Ordinal)) &&
-               summary.Calls.All(IsStringSubstringWrapperCall);
     }
 
     internal static bool HasPureCharReplaceStringWrapperPattern(MethodEffectSummary summary)
@@ -333,9 +321,6 @@ internal static class EffectSummarySemanticWrapperRules
         Exact(SemanticCallFamily.StringHash, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int"),
         Exact(SemanticCallFamily.StringHash, "System.Marvin.get_DefaultSeed()->ulong"),
         Exact(SemanticCallFamily.StringHash, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1"),
-        Exact(SemanticCallFamily.StringSubstring, "string.InternalSubString(int, int)->string"),
-        Exact(SemanticCallFamily.StringSubstring, "string.ThrowSubstringArgumentOutOfRange(int, int)->void"),
-        Exact(SemanticCallFamily.StringSubstring, "string.get_Length()->int"),
         Exact(SemanticCallFamily.FreshAllocatedStringCopy, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0"),
         Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0"),
         Exact(SemanticCallFamily.CharReplaceString, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0"),
@@ -383,7 +368,6 @@ internal static class EffectSummarySemanticWrapperRules
         TypeIdentity = 1 << 7,
         TypeIdentityAnchor = 1 << 8,
         StringHash = 1 << 9,
-        StringSubstring = 1 << 10,
         FreshAllocatedStringCopy = 1 << 11,
         CharReplaceString = 1 << 12,
         StringLengthCheckedConcat = 1 << 13,
@@ -435,9 +419,6 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsStringHashWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.StringHash);
-
-    internal static bool IsStringSubstringWrapperCall(string callSymbol) =>
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringSubstring);
 
     internal static bool IsFreshAllocatedStringCopyCoreCall(string callSymbol) =>
         IsBufferMemmoveCall(callSymbol) ||

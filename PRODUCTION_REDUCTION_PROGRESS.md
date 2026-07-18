@@ -103,12 +103,20 @@ Tests are excluded from the metric and must not be deleted.
   EffectSummary assembly-document reader. Each remains reachable and owns
   distinct proof, loop-invalidation, or exception-summary behavior; none is a
   compatibility adapter that can be removed without deleting a feature.
+- [x] Removed the remaining substring semantic-wrapper rule after its dedicated
+  runtime slice proved generic fixed-point inference preserves the catalog.
+- [x] Replaced 332 net lines of handwritten impacted-test path rules and live
+  token scans with the generated inventory's exact dependencies, source-root
+  ownership, and reverse project closure. Explicit analyzer modules retain
+  validated partial selection; inferred production mappings conservatively
+  require the full suite, so missing lexical references cannot under-test a
+  semantic change.
 
 ## Current evidence
 
-- Maintained production: 106,041 lines; net reduction: 1,585 lines; remaining
-  reduction: 18,415. The first sixteen deletion slices removed 2,521 production
-  C# lines and have repaid the inferred-summary/architecture foundation.
+- Maintained production: 105,716 lines (99,804 C#, 5,032 scripts, and 880
+  specifications); net reduction: 1,910 lines; remaining reduction: 18,090.
+  This tranche removed 351 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
@@ -122,8 +130,10 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Replace the next complete Symbolic execution or ProofCore semantic owner whose
-superseded path repays at least 350 maintained-production lines. Require focused
-normalized-result and conservative-unknown parity before deleting the old path
-in the same tranche; do not revisit the independently required string-hash,
-type-identity, CFG/loop-transfer, or EffectSummary assembly-reader owners.
+Replace the next complete duplicated semantic or orchestration owner whose
+superseded path repays at least 350 maintained-production lines. Prefer inferred
+or canonical analysis over manual catalogs when characterization proves it is
+complete; otherwise preserve the explicit owner. Require focused parity before
+deleting the old path in the same tranche, and do not revisit the independently
+required string-hash, type-identity, CFG/loop-transfer, or EffectSummary
+assembly-reader owners.

@@ -122,24 +122,11 @@ public sealed class ImpactedTestSelectionScriptTests
     [Test]
     public async Task ListOnlyJson_SelectsExpandedSymbolicSmtFixturesForConditionTranslator()
     {
-        using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs");
+        const string changedFile = "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs";
+        using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs", "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("filterTooLong").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("ExpressionSmtTranslationTests"));
-        Assert.That(fixtures, Does.Contain("ExpressionAtomSmtTests"));
-        Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-        Assert.That(fixtures, Does.Contain("ElementAccessSmtTests"));
-        Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
-        Assert.That(fixtures, Does.Contain("RegexTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Symbolic SMT string-length and regex translation change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Symbolic");
     }
 
     [Test]
@@ -148,17 +135,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.ProofCore/Z3FormulaEncoder.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("RegexTests"));
-        Assert.That(fixtures, Does.Contain("ProofCoreZ3SmokeTests"));
-        Assert.That(fixtures, Does.Contain("SmtAnalysisServiceTests"));
-        Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("ProofCore SMT formula or encoder change"));
-        Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("RegexTests"));
+        AssertUsesInferredModuleClosure(root, changedFile, "ProofCore");
     }
 
     [Test]
@@ -167,37 +145,18 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.ProofCore/SmtSolver.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("RegexTests"));
-        Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("ProofCore SMT solver change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "ProofCore");
     }
 
     [Test]
     public async Task ListOnlyJson_SelectsAnalyzerSmtFixturesForExceptionPathFacts()
     {
-        using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs");
+        const string changedFile = "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs";
+        using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("filterTooLong").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("ExceptionFlowPathFactStressTests"));
-        Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
-        Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(
-            GetEvidenceReasons(root, "path-map"),
-            Has.Some.Contains("Exception flow and runtime-hazard analyzer change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -206,16 +165,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicSourceQueryLineTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Symbolic runtime-hazard query change"));
-        Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Symbolic");
     }
 
     [Test]
@@ -224,16 +175,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Configuration/ConfigKeys.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Analyzer runtime-hazard configuration change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -242,15 +185,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Analyzer runtime-hazard configuration change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -259,17 +195,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
-        Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SMT path-fact analyzer rule change"));
-        Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -324,17 +251,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("PatternSmtInvariantTests"));
-        Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Analyzer as-conversion and runtime type-test SMT change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -343,16 +261,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
-        Assert.That(fixtures, Does.Contain("ObjectEqualsDispatchTests"));
-        Assert.That(fixtures, Does.Contain("ComparisonDispatchTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Field/property initializer receiver analysis change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -362,19 +272,9 @@ public sealed class ImpactedTestSelectionScriptTests
         const string exceptionQueryFile = "SharpProof.Analyzer/ExceptionFlowQuery.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(exceptionSitesFile + "," + exceptionQueryFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
-        Assert.That(fixtures, Does.Contain("ExceptionReachabilitySmtTests"));
-        Assert.That(fixtures, Does.Contain("AuthoringRuntimeHazardDiagnosticTests"));
-        Assert.That(
-            GetEvidenceEntry(root, exceptionSitesFile, "path-map").GetProperty("reason").GetString(),
-            Is.EqualTo("Exception site reachability and runtime-hazard analyzer change"));
-        Assert.That(
-            GetEvidenceEntry(root, exceptionQueryFile, "path-map").GetProperty("reason").GetString(),
-            Is.EqualTo("Exception flow query reachability and runtime-hazard change"));
+        AssertUsesInferredModuleClosure(root, exceptionSitesFile, "Analyzer");
+        AssertUsesInferredModuleClosure(root, exceptionQueryFile, "Analyzer");
     }
 
     [Test]
@@ -383,17 +283,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("SymbolicProgramPointFactTests"));
-        Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
-        Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-        Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Analyzer symbolic state-merge and path-fact change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
     }
 
     [Test]
@@ -402,15 +293,8 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Symbolic/SymbolicProgramPointFacts.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "path-map");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(fixtures, Does.Contain("SymbolicProgramPointFactTests"));
-        Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(),
-            Is.EqualTo("Symbolic program-point fact extraction change"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Symbolic");
     }
 
     [Test]
@@ -512,11 +396,14 @@ public sealed class ImpactedTestSelectionScriptTests
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
         Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
-        Assert.That(GetStringArray(root, "selectedTestFixtures"), Is.Empty);
+        Assert.That(GetStringArray(root, "selectedTestFixtures"), Is.Not.Empty);
         Assert.That(
             GetStringArray(root, "fullSuiteFallbackReasons").Single(),
-            Does.Contain("has no impacted-test mapping"));
-        Assert.That(root.GetProperty("testFilter").GetString(), Is.Empty);
+            Does.Contain("uses inferred module-closure selection"));
+        Assert.That(
+            GetEvidenceEntry(root, "SharpProof.Analyzer/Engine/Analysis/FutureUnmappedAnalyzerFile.cs",
+                "inventory-module-closure").GetProperty("module").GetString(),
+            Is.EqualTo("Analyzer"));
     }
 
     [Test]
@@ -525,16 +412,11 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "Tools/SharpProof.SymbolicCli/Program.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(20, changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
         var command = root.GetProperty("suggestedCommand").GetString();
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Does.Contain("SymbolicSourceQueryLineTests"));
-        Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
-        Assert.That(fixtures, Does.Contain("AnalyzerPackagingTests"));
+        AssertUsesInferredModuleClosure(root, changedFile, "SymbolicCli");
         Assert.That(command, Does.Contain("-Workers 20"));
-        Assert.That(command, Does.Contain("-Filter"));
+        Assert.That(command, Does.Contain("-TestLane All"));
     }
 
     [Test]
@@ -543,15 +425,10 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "Tools/SharpProof.Fuzz.Core/Program.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
         var command = root.GetProperty("suggestedCommand").GetString();
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
-        Assert.That(fixtures, Does.Contain("FuzzToolTests"));
-        Assert.That(fixtures, Does.Contain("RoslynShapeManifestCoverageTests"));
-        Assert.That(command, Does.Contain("-TestLane Tooling"));
+        AssertUsesInferredModuleClosure(root, changedFile, "FuzzCore");
+        Assert.That(command, Does.Contain("-TestLane All"));
     }
 
     [Test]
@@ -562,9 +439,8 @@ public sealed class ImpactedTestSelectionScriptTests
         var root = recommendation.RootElement;
         var evidence = GetEvidenceEntry(root, changedFile, "inventory-symbol-reference");
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+        AssertUsesInferredModuleClosure(root, changedFile, "CodeFixes");
+        Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("All"));
         Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("SharpProofCodeFixTests"));
         Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("CodeFixes"));
         Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("SharpProofCodeFixTests"));
@@ -847,13 +723,21 @@ public sealed class ImpactedTestSelectionScriptTests
                 entry.GetProperty("source").GetString() == source);
     }
 
-    private static string[] GetEvidenceReasons(JsonElement root, string source)
+    private static void AssertUsesInferredModuleClosure(
+        JsonElement root,
+        string changedFile,
+        string expectedModule)
     {
-        return root.GetProperty("selectionEvidence")
-            .EnumerateArray()
-            .Where(entry => entry.GetProperty("source").GetString() == source)
-            .Select(entry => entry.GetProperty("reason").GetString() ?? string.Empty)
-            .ToArray();
+        var evidence = GetEvidenceEntry(root, changedFile, "inventory-module-closure");
+
+        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+        Assert.That(GetStringArray(root, "selectedTestFixtures"), Is.Not.Empty);
+        Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo(expectedModule));
+        Assert.That(evidence.GetProperty("reason").GetString(),
+            Does.StartWith("Generated module dependency closure impacts modules:"));
+        Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"),
+            Has.Some.Contains("uses inferred module-closure selection"));
     }
 
     private static string FindRepositoryRoot()

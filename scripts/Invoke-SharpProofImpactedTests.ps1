@@ -857,6 +857,61 @@ function Get-InventoryHighFanoutReason
     return ''
 }
 
+function Get-InventoryModule
+{
+    param(
+        [AllowNull()]$Inventory,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if ($null -eq $Inventory -or $null -eq $Inventory.modules)
+    {
+        return $null
+    }
+
+    return $Inventory.modules | Where-Object {
+        @($_.sourceRoots | Where-Object {
+            $Path.StartsWith([string]$_, [StringComparison]::OrdinalIgnoreCase)
+        }).Count -gt 0
+    } | Select-Object -First 1
+}
+
+function Get-InventoryReverseModuleClosure
+{
+    param(
+        [Parameter(Mandatory = $true)]$DirectModule,
+        [Parameter(Mandatory = $true)][object[]]$Modules
+    )
+
+    $impacted = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+    [void]$impacted.Add([string]$DirectModule.name)
+    $changed = $true
+    while ($changed)
+    {
+        $changed = $false
+        $impactedProjects = @($Modules |
+            Where-Object { $impacted.Contains([string]$_.name) } |
+            ForEach-Object { @($_.sourceRoots) } |
+            ForEach-Object { [System.IO.Path]::GetFileName(([string]$_).TrimEnd('/')) })
+        foreach ($module in $Modules)
+        {
+            if ($impacted.Contains([string]$module.name) -or
+                [string]::Equals([string]$module.name, 'TestInfrastructure', [StringComparison]::OrdinalIgnoreCase))
+            {
+                continue
+            }
+
+            if (@($module.allowedProjectReferences | Where-Object { $impactedProjects -contains [string]$_ }).Count -gt 0)
+            {
+                [void]$impacted.Add([string]$module.name)
+                $changed = $true
+            }
+        }
+    }
+
+    return @($impacted | Sort-Object)
+}
+
 function Add-InventoryMappedTests
 {
     param(
@@ -873,169 +928,64 @@ function Add-InventoryMappedTests
         [Parameter()]
         [AllowNull()]
         [AllowEmptyCollection()]
-        [System.Collections.Generic.List[object]]$Evidence = $null
+        [System.Collections.Generic.List[object]]$Evidence = $null,
+
+        [Parameter()]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[string]]$FullSuiteReasons = $null
     )
 
     $dependency = Get-InventoryDependency -Inventory $Inventory -Path $Path
-    if ($null -eq $dependency)
+    if ($null -ne $dependency)
     {
-        return $false
+        $fixtures = @($dependency.selectedTestFixtures | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($fixtures.Count -gt 0)
+        {
+            Add-TestClasses $Set $fixtures
+            Add-SelectionEvidence `
+                -Evidence $Evidence `
+                -Path $Path `
+                -Source 'inventory-symbol-reference' `
+                -Reason 'Generated inventory maps changed source symbols to referencing test fixtures' `
+                -SelectedTestFixtures $fixtures `
+                -Tokens @($dependency.tokens | ForEach-Object { [string]$_ }) `
+                -Module ([string]$dependency.module)
+        }
     }
 
-    $fixtures = @($dependency.selectedTestFixtures | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    if ($fixtures.Count -eq 0)
+    $directModule = Get-InventoryModule -Inventory $Inventory -Path $Path
+    if ($null -eq $directModule)
     {
-        return $false
+        return $null -ne $dependency
     }
 
+    $closure = @(Get-InventoryReverseModuleClosure -DirectModule $directModule -Modules @($Inventory.modules))
+    $fixtures = @($Inventory.fixtureDependencies |
+        Where-Object { $closure -contains [string]$_.module } |
+        ForEach-Object { @($_.selectedTestFixtures) } |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Sort-Object -Unique)
     Add-TestClasses $Set $fixtures
     Add-SelectionEvidence `
         -Evidence $Evidence `
         -Path $Path `
-        -Source 'inventory-symbol-reference' `
-        -Reason 'Generated inventory maps changed source symbols to referencing test fixtures' `
+        -Source 'inventory-module-closure' `
+        -Reason "Generated module dependency closure impacts modules: $($closure -join ', ')" `
         -SelectedTestFixtures $fixtures `
-        -Tokens @($dependency.tokens | ForEach-Object { [string]$_ }) `
-        -Module ([string]$dependency.module)
+        -Module ([string]$directModule.name)
+
+    if ($null -ne $FullSuiteReasons)
+    {
+        Add-FullSuiteFallbackReason `
+            -Reasons $FullSuiteReasons `
+            -Evidence $Evidence `
+            -Path $Path `
+            -Reason "$Path uses inferred module-closure selection, which requires full-suite validation"
+    }
 
     return $true
-}
-
-function Add-ProofCoreSmtTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-TestClasses $Set @(
-        'ProofCoreZ3SmokeTests',
-        'ProofCorePurityProofTests',
-        'ProofCoreRoslynLoweringTests',
-        'ProofCoreBackedPurityFlowTests',
-        'SmtAnalysisServiceTests',
-        'SemanticOracleSmtTests',
-        'ExpressionSmtTranslationTests',
-        'ExpressionAtomSmtTests',
-        'StringLengthSmtTests')
-}
-
-function Add-RegexSmtTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-ProofCoreSmtTestClasses $Set
-    Add-TestClasses $Set @(
-        'RegexTests')
-}
-
-function Add-ProofCoreFormulaEncoderTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-RegexSmtTestClasses $Set
-    Add-TestClasses $Set @(
-        'ExceptionReachabilitySmtTests',
-        'SymbolicRuntimeHazardQueryTests')
-}
-
-function Add-SymbolicSmtTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-ProofCoreSmtTestClasses $Set
-    Add-TestClasses $Set @(
-        'ElementAccessSmtTests',
-        'ForeachSmtInvariantTests',
-        'LoopExitSmtInvariantTests',
-        'PathFactExpressionReachabilityTests',
-        'PathSensitiveSmtInvariantTests',
-        'PatternSmtInvariantTests',
-        'ReferenceReachabilitySmtTests',
-        'SymbolicProgramPointFactTests',
-        'SymbolicRuntimeHazardQueryTests',
-        'SymbolicSourceQueryLineTests')
-}
-
-function Add-RuntimeHazardSmtTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-TestClasses $Set @(
-        'SmtAnalysisServiceTests',
-        'SemanticOracleSmtTests',
-        'SymbolicRuntimeHazardQueryTests',
-        'SymbolicSourceQueryLineTests',
-        'DiagnosticEvidenceTests')
-}
-
-function Add-ExceptionReachabilityRuntimeHazardTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-TestClasses $Set @(
-        'AuthoringRuntimeHazardDiagnosticTests',
-        'DiagnosticEvidenceTests',
-        'ExceptionFlowPathFactStressTests',
-        'ExceptionFlowPropagationRegressionTests',
-        'ExceptionHandlingTests',
-        'ExceptionReachabilitySmtTests',
-        'RecursiveExceptionFlowTests',
-        'SemanticOracleSmtTests',
-        'SymbolicRuntimeHazardQueryTests',
-        'SymbolicSourceQueryLineTests',
-        'ThrowExpressionTests')
-}
-
-function Add-AnalyzerSmtTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-SymbolicSmtTestClasses $Set
-    Add-TestClasses $Set @(
-        'ExceptionReachabilitySmtTests',
-        'ExceptionFlowPathFactStressTests',
-        'ExceptionFlowPropagationRegressionTests',
-        'ExceptionHandlingTests',
-        'RecursiveExceptionFlowTests')
-}
-
-function Add-RuntimeHazardAnalyzerTestClasses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set
-    )
-
-    Add-AnalyzerSmtTestClasses $Set
-    Add-TestClasses $Set @(
-        'DiagnosticEvidenceTests')
 }
 
 function Get-TestClassFromFile
@@ -1056,258 +1006,6 @@ function Get-TestClassFromFile
     }
 
     return ''
-}
-
-function Get-TypeSearchTokens
-{
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $tokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    $stem = [System.IO.Path]::GetFileNameWithoutExtension($Path)
-    if ($stem.Length -ge 5)
-    {
-        [void]$tokens.Add($stem)
-    }
-
-    if (Test-Path -LiteralPath $Path)
-    {
-        $text = Get-Content -LiteralPath $Path -Raw
-        foreach ($match in [regex]::Matches(
-                     $text,
-                     '\b(?:class|struct|interface|enum|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)'))
-        {
-            $token = $match.Groups[1].Value
-            if ($token.Length -ge 5)
-            {
-                [void]$tokens.Add($token)
-            }
-        }
-    }
-
-    return $tokens | Where-Object { $_ -notin $script:IgnoredTypeTokens }
-}
-
-function Add-TestFilesReferencingTokens
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set,
-
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [string[]]$Tokens
-    )
-
-    $ripgrep = Get-Command -Name 'rg' -ErrorAction SilentlyContinue
-
-    foreach ($token in $Tokens)
-    {
-        if ($null -ne $ripgrep)
-        {
-            $matches = @(& $ripgrep.Source -l -F $token SharpProof.Test SharpProof.ToolingTest -g '*.cs' 2>$null)
-        }
-        else
-        {
-            $testFiles = @(& git ls-files --cached --others --exclude-standard -- 'SharpProof.Test/*.cs' 'SharpProof.ToolingTest/*.cs')
-            if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while inventorying test sources.' }
-            $matches = @($testFiles |
-                Select-String -SimpleMatch -Pattern $token -List |
-                ForEach-Object { $_.Path })
-        }
-
-        foreach ($match in $matches)
-        {
-            $repoPath = Convert-ToRepoPath $match
-            if ($repoPath -eq 'SharpProof.ToolingTest/ImpactedTestSelectionScriptTests.cs')
-            {
-                continue
-            }
-
-            $className = Get-TestClassFromFile $repoPath
-            Add-TestClass -Set $Set -ClassName $className
-        }
-    }
-}
-
-function Add-PathMappedTests
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
-
-        [Parameter()]
-        [AllowNull()]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.List[object]]$Evidence = $null
-    )
-
-    $before = @($Set | Sort-Object)
-
-    switch -Regex ($Path)
-    {
-        '^SharpProof\.ProofCore/(SmtFormula|Z3FormulaEncoder)\.cs$' {
-            Add-ProofCoreFormulaEncoderTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT formula or encoder change' $before $Set
-            break
-        }
-        '^SharpProof\.ProofCore/SmtSolver\.cs$' {
-            Add-RegexSmtTestClasses $Set
-            Add-RuntimeHazardSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT solver change' $before $Set
-            break
-        }
-        '^SharpProof\.ProofCore/' {
-            Add-ProofCoreSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT solver and proof-search change' $before $Set
-            break
-        }
-        '^SharpProof\.Symbolic/SymbolicRuntimeHazardQueryService\.cs$' {
-            Add-RuntimeHazardSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic runtime-hazard query change' $before $Set
-            break
-        }
-        '^SharpProof\.Symbolic/SymbolicProgramPointFacts\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic program-point fact extraction change' $before $Set
-            break
-        }
-        '^SharpProof\.Symbolic/Smt/(CSharpConditionToFormula|SmtAnalysisService|SwitchPathConditionBuilder)\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-TestClasses $Set @('RegexTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic SMT string-length and regex translation change' $before $Set
-            break
-        }
-        '^SharpProof\.Symbolic/' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic SMT query surface change' $before $Set
-            break
-        }
-        '^Tools/SharpProof\.SymbolicCli/' {
-            Add-TestClasses $Set @('SymbolicSourceQueryLineTests', 'SymbolicRuntimeHazardQueryTests', 'AnalyzerPackagingTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic CLI query surface change' $before $Set
-            break
-        }
-        '^Tools/SharpProof\.Fuzz(\.Core)?/' {
-            Add-TestClasses $Set @('FuzzToolTests', 'RoslynShapeManifestCoverageTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Fuzz tool change' $before $Set
-            break
-        }
-        '^Tools/SharpProof\.CorpusReport(\.Core)?/' {
-            Add-TestClasses $Set @('CorpusReportTests', 'RoslynConstructCoverageTests', 'RoslynShapeManifestCoverageTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Corpus report tool change' $before $Set
-            break
-        }
-        '^Tools/SharpProof\.EffectSummary/' {
-            Add-TestClasses $Set @('EffectSummaryToolTests', 'ExceptionSummaryCatalogValidationTests', 'AnalyzerPackagingTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Effect summary tool change' $before $Set
-            break
-        }
-        '^SharpProof\.Package/' {
-            Add-TestClasses $Set @('AnalyzerPackagingTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer package change' $before $Set
-            break
-        }
-        '^SharpProof\.Vsix/' {
-            Add-TestClasses $Set @('AnalyzerPackagingTests', 'AssemblyLoadingTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'VSIX packaging change' $before $Set
-            break
-        }
-        '^SharpProof\.CodeFixes/' {
-            Add-TestClasses $Set @('SharpProofCodeFixTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Code fix change' $before $Set
-            break
-        }
-        '^SharpProof\.Attributes/' {
-            Add-TestClasses $Set @('AttributeResolutionTests', 'AttributePlacementPurityTests', 'BoundaryAttributeTests', 'BasicPurityTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Public analyzer attributes change' $before $Set
-            break
-        }
-        '^Shared/' {
-            Add-TestClasses $Set @('AnalyzerPackagingTests', 'EffectSummaryToolTests', 'ExceptionSummaryCatalogValidationTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Shared build/runtime support change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Configuration/(AnalyzerConfiguration|AnalyzerConfigurationOptionRegistry|ConfigKeys)\.cs$' {
-            Add-TestClasses $Set @('DiagnosticEvidenceTests', 'SemanticOracleSmtTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard configuration change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/ExceptionFlowQuery\.cs$' {
-            Add-ExceptionReachabilityRuntimeHazardTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow query reachability and runtime-hazard change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/ExceptionFlowAnalyzer\.ExceptionSites\.cs$' {
-            Add-ExceptionReachabilityRuntimeHazardTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception site reachability and runtime-hazard analyzer change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/ExceptionFlowAnalyzer(\.(ExceptionSites|PathFacts|PropertyFlow|ResourceCallSites|SpecialCases))?\.cs$' {
-            Add-RuntimeHazardAnalyzerTestClasses $Set
-            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow and runtime-hazard analyzer change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Engine/PurityAnalysisStateMerger\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-TestClasses $Set @('DiagnosticEvidenceTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer symbolic state-merge and path-fact change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Engine/ExecutionVisibility\.cs$' {
-            Add-AnalyzerSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT execution-visibility change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Engine/Rules/(BinaryOperationPurityRule|CoalesceOperationPurityRule|ConditionalAccessPurityRule|ConditionalOperationPurityRule)\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-TestClasses $Set @('DiagnosticEvidenceTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT path-fact analyzer rule change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper\.cs$' {
-            Add-TestClasses $Set @('ObjectEqualsDispatchTests', 'ComparisonDispatchTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Field/property initializer receiver analysis change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/Engine/Rules/MethodInvocationPurityRule\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-RuntimeHazardSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer as-conversion and runtime type-test SMT change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/.*Hazard.*\.cs$' {
-            Add-RuntimeHazardSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard SMT change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/.*(Exception|Throw|Catch|Finally)' {
-            Add-AnalyzerSmtTestClasses $Set
-            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests', 'DiagnosticEvidenceTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception or runtime-hazard analyzer change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/.*(Smt|SemanticOracle|PathFact|Regex|String|Invariant)' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-TestClasses $Set @('RegexTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer SMT/path-fact/string/regex change' $before $Set
-            break
-        }
-        '^SharpProof\.Analyzer/.*(EffectSummary|GeneratedPurity|Catalog|Summary)' {
-            Add-TestClasses $Set @(
-                'AnalyzerPackagingTests',
-                'EffectSummaryToolTests',
-                'ExceptionSummaryCatalogValidationTests',
-                'DiagnosticEvidenceTests')
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Generated effect-summary or catalog change' $before $Set
-            break
-        }
-    }
 }
 
 function Join-TestFilter
@@ -1469,7 +1167,6 @@ function Format-TestWrapperCommand
 }
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$script:IgnoredTypeTokens = @(Get-SharpProofIgnoredImpactTypeTokens)
 Push-Location $script:RepoRoot
 try
 {
@@ -1626,9 +1323,13 @@ try
 
         if ($path -match '\.csproj$')
         {
-            $beforeCount = $testClasses.Count
-            Add-PathMappedTests $testClasses $path $selectionEvidence
-            if ($testClasses.Count -eq $beforeCount)
+            $hasInventoryMapping = Add-InventoryMappedTests `
+                -Set $testClasses `
+                -Path $path `
+                -Inventory $impactInventory `
+                -Evidence $selectionEvidence `
+                -FullSuiteReasons $fullReasons
+            if (-not $hasInventoryMapping)
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path changes project references or package graph"
             }
@@ -1660,63 +1361,30 @@ try
             }
         }
 
-        $beforeMappedCount = $testClasses.Count
-        $beforeMappedEvidenceCount = $selectionEvidence.Count
-        Add-PathMappedTests $testClasses $path $selectionEvidence
-        $hasPathMapEvidence = $selectionEvidence.Count -gt $beforeMappedEvidenceCount
-        $hasInventoryEvidence = Add-InventoryMappedTests $testClasses $path $impactInventory $selectionEvidence
+        $hasInventoryEvidence = Add-InventoryMappedTests `
+            -Set $testClasses `
+            -Path $path `
+            -Inventory $impactInventory `
+            -Evidence $selectionEvidence `
+            -FullSuiteReasons $fullReasons
 
         if ($path -match '^SharpProof\.Analyzer/')
         {
-            $tokens = @(Get-TypeSearchTokens $path)
-            $beforeTokenReferences = @($testClasses | Sort-Object)
-            Add-TestFilesReferencingTokens $testClasses $tokens
-            $tokenSelected = @(Get-AddedTestClasses -Set $testClasses -Before $beforeTokenReferences)
-            if ($tokenSelected.Count -gt 0)
-            {
-                Add-SelectionEvidence `
-                    -Evidence $selectionEvidence `
-                    -Path $path `
-                    -Source 'token-reference' `
-                    -Reason 'Test files reference production type tokens from the changed file' `
-                    -SelectedTestFixtures $tokenSelected `
-                    -Tokens $tokens
-            }
-
             $inventoryHighFanoutReason = Get-InventoryHighFanoutReason -Inventory $impactInventory -Path $path
             if (-not [string]::IsNullOrWhiteSpace($inventoryHighFanoutReason))
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is $inventoryHighFanoutReason"
             }
-            elseif ($path -match '^SharpProof\.Analyzer/Engine/(PurityAnalysisEngine|CompilationPurityService|Rules/RuleRegistry)\.cs$')
-            {
-                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is high-fanout analyzer core"
-            }
-            elseif ($path -match '\.cs$' -and -not $hasPathMapEvidence -and -not $hasInventoryEvidence -and $testClasses.Count -eq $beforeMappedCount)
+            elseif ($path -match '\.cs$' -and -not $hasInventoryEvidence)
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }
         }
-        elseif ($path -match '^(SharpProof\.Symbolic|SharpProof\.ProofCore|Tools|SharpProof\.CodeFixes|SharpProof\.Attributes|SharpProof\.Package|SharpProof\.Vsix|Shared)/')
+        elseif ($path -match '^(SharpProof\.Symbolic|SharpProof\.ProofCore|SharpProof\.Contracts|SharpProof\.Tooling\.Core|Tools|SharpProof\.CodeFixes|SharpProof\.Attributes|SharpProof\.Package|SharpProof\.Vsix)/')
         {
-            if ($path -match '^SharpProof\.ProofCore/(SmtFormula|Z3FormulaEncoder)\.cs$')
+            if (-not $hasInventoryEvidence)
             {
-                continue
-            }
-
-            $tokens = @(Get-TypeSearchTokens $path)
-            $beforeTokenReferences = @($testClasses | Sort-Object)
-            Add-TestFilesReferencingTokens $testClasses $tokens
-            $tokenSelected = @(Get-AddedTestClasses -Set $testClasses -Before $beforeTokenReferences)
-            if ($tokenSelected.Count -gt 0)
-            {
-                Add-SelectionEvidence `
-                    -Evidence $selectionEvidence `
-                    -Path $path `
-                    -Source 'token-reference' `
-                    -Reason 'Test files reference production type tokens from the changed file' `
-                    -SelectedTestFixtures $tokenSelected `
-                    -Tokens $tokens
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }
         }
         elseif (-not ($path -match '^(SharpProof\.Demo|SharpProof\.Smoke\.Net472)/'))
