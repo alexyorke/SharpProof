@@ -233,11 +233,20 @@ This is the active source of truth for the comprehensive refactor. Read
 ## Current evidence
 
 - Branch: `codex/nullable-contract-verification`.
-- Handwritten production source: 99,712 lines across 437 files.
+- Handwritten production source: 101,408 lines across 491 files, 7,983 fewer
+  lines than the immutable starting baseline.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,147 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
+- Release validation passes with warnings as errors for ProofCore, Symbolic,
+  Attributes, Analyzer, CodeFixes, NuGet packaging, Symbolic CLI, EffectSummary,
+  and VSIX.
+- Generated README/example pages, configuration reference, test-impact
+  inventory, production metrics, and refactoring metrics all verify current.
+- The six-lane matrix covers exact CLI/package/VSIX, seeded fuzz,
+  EffectSummary, architecture, and public-API boundary fixtures; the Tooling
+  lane contributes 616 passing tests.
 
 ## Remaining tranches
 
@@ -252,11 +261,11 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Decompose EffectSummary host and standardize lightweight tool hosting.
 - [x] Finish test-lane/repository organization and remove dead compatibility
   paths.
-- [ ] Run final Release, six-lane, package-consumer, NuGet, VSIX, generated-doc,
+- [x] Run final Release, six-lane, package-consumer, NuGet, VSIX, generated-doc,
   fuzz, EffectSummary, architecture, and public-API gates.
 
 ## Next cheapest step
 
-Run the final comprehensive Release, packaging, consumer, generated-doc, fuzz,
-EffectSummary, architecture, and public-API gates; repair any regression and
-record the final evidence.
+No implementation tranche remains. Keep this file as the historical completion
+record and require the architecture and release gates for subsequent feature
+work.

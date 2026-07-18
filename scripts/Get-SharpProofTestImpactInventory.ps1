@@ -117,16 +117,25 @@ function Test-TokenReference
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script:Modules = @(
-    [ordered]@{ name = 'Analyzer'; sourceRoots = @('SharpProof.Analyzer/'); allowedProjectReferences = @('SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.ProofCore') },
-    [ordered]@{ name = 'Symbolic'; sourceRoots = @('SharpProof.Symbolic/'); allowedProjectReferences = @('SharpProof.ProofCore') },
-    [ordered]@{ name = 'ProofCore'; sourceRoots = @('SharpProof.ProofCore/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'CodeFixes'; sourceRoots = @('SharpProof.CodeFixes/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes') },
+    [ordered]@{ name = 'Contracts'; sourceRoots = @('SharpProof.Contracts/'); allowedProjectReferences = @() },
     [ordered]@{ name = 'Attributes'; sourceRoots = @('SharpProof.Attributes/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'Shared'; sourceRoots = @('Shared/'); allowedProjectReferences = @() },
+    [ordered]@{ name = 'ProofCore'; sourceRoots = @('SharpProof.ProofCore/'); allowedProjectReferences = @() },
+    [ordered]@{ name = 'Symbolic'; sourceRoots = @('SharpProof.Symbolic/'); allowedProjectReferences = @('SharpProof.Attributes', 'SharpProof.Contracts', 'SharpProof.ProofCore') },
+    [ordered]@{ name = 'Analyzer'; sourceRoots = @('SharpProof.Analyzer/'); allowedProjectReferences = @('SharpProof.Attributes', 'SharpProof.Contracts', 'SharpProof.Symbolic', 'SharpProof.ProofCore') },
+    [ordered]@{ name = 'CodeFixes'; sourceRoots = @('SharpProof.CodeFixes/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes') },
+    [ordered]@{ name = 'ToolingCore'; sourceRoots = @('SharpProof.Tooling.Core/'); allowedProjectReferences = @() },
+    [ordered]@{ name = 'EffectSummary'; sourceRoots = @('Tools/SharpProof.EffectSummary/'); allowedProjectReferences = @('SharpProof.Contracts', 'SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'SymbolicCliCore'; sourceRoots = @('Tools/SharpProof.SymbolicCli.Core/'); allowedProjectReferences = @('SharpProof.Symbolic') },
+    [ordered]@{ name = 'SymbolicCli'; sourceRoots = @('Tools/SharpProof.SymbolicCli/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.SymbolicCli.Core', 'SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'FuzzCore'; sourceRoots = @('Tools/SharpProof.Fuzz.Core/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'FuzzCli'; sourceRoots = @('Tools/SharpProof.Fuzz/'); allowedProjectReferences = @('SharpProof.Fuzz.Core') },
+    [ordered]@{ name = 'BaselineCore'; sourceRoots = @('Tools/SharpProof.Baseline.Core/'); allowedProjectReferences = @('SharpProof.Contracts', 'SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'BaselineCli'; sourceRoots = @('Tools/SharpProof.Baseline/'); allowedProjectReferences = @('SharpProof.Baseline.Core', 'SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'CorpusReportCore'; sourceRoots = @('Tools/SharpProof.CorpusReport.Core/'); allowedProjectReferences = @('SharpProof.Tooling.Core') },
+    [ordered]@{ name = 'CorpusReportCli'; sourceRoots = @('Tools/SharpProof.CorpusReport/'); allowedProjectReferences = @('SharpProof.CorpusReport.Core', 'SharpProof.Tooling.Core') },
     [ordered]@{ name = 'Packaging'; sourceRoots = @('SharpProof.Package/'); allowedProjectReferences = @('SharpProof.CodeFixes') },
-    [ordered]@{ name = 'VSIX'; sourceRoots = @('SharpProof.Vsix/', 'Tools/VsixHarness/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Analyzer', 'SharpProof.Symbolic') },
-    [ordered]@{ name = 'Tools'; sourceRoots = @('Tools/SharpProof.Baseline.Core/', 'Tools/SharpProof.Baseline/', 'Tools/SharpProof.CorpusReport.Core/', 'Tools/SharpProof.CorpusReport/', 'Tools/SharpProof.EffectSummary/', 'Tools/SharpProof.Fuzz.Core/', 'Tools/SharpProof.Fuzz/', 'Tools/SharpProof.SymbolicCli/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.Baseline.Core', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core') },
-    [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('SharpProof.Test/', 'SharpProof.ToolingTest/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Attributes', 'SharpProof.Analyzer', 'SharpProof.Symbolic', 'SharpProof.ProofCore', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core', 'SharpProof.SymbolicCli') }
+    [ordered]@{ name = 'VSIX'; sourceRoots = @('SharpProof.Vsix/', 'Tools/VsixHarness/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Analyzer', 'SharpProof.Contracts', 'SharpProof.Symbolic') },
+    [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('SharpProof.Testing/', 'SharpProof.Test/', 'SharpProof.ToolingTest/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Attributes', 'SharpProof.Analyzer', 'SharpProof.Contracts', 'SharpProof.Symbolic', 'SharpProof.ProofCore', 'SharpProof.Tooling.Core', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core', 'SharpProof.SymbolicCli.Core') }
 )
 $script:IgnoredTypeTokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
 foreach ($token in Get-SharpProofIgnoredImpactTypeTokens)

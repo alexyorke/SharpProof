@@ -632,7 +632,9 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(inventory.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
         Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Analyzer"));
         Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Symbolic"));
-        Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Shared"));
+        Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Contracts"));
+        Assert.That(GetStringArray(inventory, "modules"), Does.Contain("ToolingCore"));
+        Assert.That(GetStringArray(inventory, "modules"), Does.Not.Contain("Shared"));
         Assert.That(moduleManifest.GetProperty("loaded").GetBoolean(), Is.True);
         Assert.That(moduleManifest.GetProperty("valid").GetBoolean(), Is.True);
         Assert.That(moduleManifest.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
@@ -670,7 +672,10 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(moduleNames, Does.Contain("Analyzer"));
         Assert.That(moduleNames, Does.Contain("Symbolic"));
         Assert.That(moduleNames, Does.Contain("ProofCore"));
-        Assert.That(moduleNames, Does.Contain("Shared"));
+        Assert.That(moduleNames, Does.Contain("Contracts"));
+        Assert.That(moduleNames, Does.Contain("ToolingCore"));
+        Assert.That(moduleNames, Does.Contain("SymbolicCliCore"));
+        Assert.That(moduleNames, Does.Not.Contain("Shared"));
         Assert.That(moduleNames, Does.Contain("TestInfrastructure"));
         Assert.That(fixtureNames, Does.Contain("ImpactedTestSelectionScriptTests"));
         Assert.That(fixtureNames, Does.Contain("SymbolicSourceQueryLineTests"));
