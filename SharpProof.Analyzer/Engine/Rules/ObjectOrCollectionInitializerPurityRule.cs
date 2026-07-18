@@ -1,22 +1,17 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ObjectOrCollectionInitializerPurityRule : IPurityRule
+internal class ObjectOrCollectionInitializerPurityRule : PurityRuleBase<IObjectOrCollectionInitializerOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.ObjectOrCollectionInitializer);
+    protected override OperationKind Kind => OperationKind.ObjectOrCollectionInitializer;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IObjectOrCollectionInitializerOperation initializer, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not IObjectOrCollectionInitializerOperation initializer)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-
         foreach (var initOp in initializer.Initializers)
         {
             IOperation? valueToCheck = null;

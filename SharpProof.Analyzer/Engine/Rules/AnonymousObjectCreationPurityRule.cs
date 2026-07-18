@@ -1,22 +1,17 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class AnonymousObjectCreationPurityRule : IPurityRule
+internal sealed class AnonymousObjectCreationPurityRule : PurityRuleBase<IAnonymousObjectCreationOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.AnonymousObjectCreation);
+    protected override OperationKind Kind => OperationKind.AnonymousObjectCreation;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IAnonymousObjectCreationOperation anonymousObjectCreationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not IAnonymousObjectCreationOperation anonymousObjectCreationOperation)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         foreach (var initializer in anonymousObjectCreationOperation.Initializers)
         {
             if (initializer is ISimpleAssignmentOperation assignment)

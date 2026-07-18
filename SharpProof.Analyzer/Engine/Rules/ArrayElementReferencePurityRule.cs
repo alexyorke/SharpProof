@@ -1,20 +1,16 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ArrayElementReferencePurityRule : IPurityRule
+internal class ArrayElementReferencePurityRule : PurityRuleBase<IArrayElementReferenceOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.ArrayElementReference);
+    protected override OperationKind Kind => OperationKind.ArrayElementReference;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IArrayElementReferenceOperation arrayElementReference, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is IArrayElementReferenceOperation arrayElementReference))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         var arrayRefResult =
             PurityAnalysisEngine.CheckSingleOperation(arrayElementReference.ArrayReference, context, currentState);
         if (!arrayRefResult.IsPure) return arrayRefResult;

@@ -1,21 +1,16 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class CollectionExpressionPurityRule : IPurityRule
+internal class CollectionExpressionPurityRule : PurityRuleBase<ICollectionExpressionOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.CollectionExpression);
+    protected override OperationKind Kind => OperationKind.CollectionExpression;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        ICollectionExpressionOperation collectionExpression, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is ICollectionExpressionOperation collectionExpression))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-
         var targetType = collectionExpression.Type;
 
         if (targetType != null)

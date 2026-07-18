@@ -1,22 +1,17 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ImplicitIndexerReferencePurityRule : IPurityRule
+internal sealed class ImplicitIndexerReferencePurityRule : PurityRuleBase<IImplicitIndexerReferenceOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.ImplicitIndexerReference);
+    protected override OperationKind Kind => OperationKind.ImplicitIndexerReference;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
             implicitIndexerReferenceOperation.Instance,
             context,

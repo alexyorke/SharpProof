@@ -1,22 +1,17 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class InlineArrayAccessPurityRule : IPurityRule
+internal sealed class InlineArrayAccessPurityRule : PurityRuleBase<IInlineArrayAccessOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.InlineArrayAccess);
+    protected override OperationKind Kind => OperationKind.InlineArrayAccess;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IInlineArrayAccessOperation inlineArrayAccessOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (operation is not IInlineArrayAccessOperation inlineArrayAccessOperation)
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         if (inlineArrayAccessOperation.Instance == null ||
             inlineArrayAccessOperation.Argument == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(inlineArrayAccessOperation.Syntax);

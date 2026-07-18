@@ -1,26 +1,18 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class IsNullPurityRule : IPurityRule
+internal class IsNullPurityRule : PurityRuleBase<IIsNullOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.IsNull
-    );
+    protected override OperationKind Kind => OperationKind.IsNull;
 
-    public PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisState currentState)
+    protected override PurityAnalysisResult CheckTyped(IIsNullOperation isNullOperation,
+        PurityAnalysisContext context, PurityAnalysisState currentState)
     {
-        if (operation is IIsNullOperation isNullOperation)
-        {
-            var operandResult = CheckSingleOperation(isNullOperation.Operand, context, currentState);
-            if (!operandResult.IsPure) return operandResult;
-
-            return PurityAnalysisResult.Pure;
-        }
+        var operandResult = CheckSingleOperation(isNullOperation.Operand, context, currentState);
+        if (!operandResult.IsPure) return operandResult;
 
         return PurityAnalysisResult.Pure;
     }

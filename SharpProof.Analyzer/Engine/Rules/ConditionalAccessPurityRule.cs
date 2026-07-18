@@ -3,17 +3,14 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ConditionalAccessPurityRule : IPurityRule
+internal class ConditionalAccessPurityRule : PurityRuleBase<IConditionalAccessOperation>
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => new[] { OperationKind.ConditionalAccess };
+    protected override OperationKind Kind => OperationKind.ConditionalAccess;
 
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+        IConditionalAccessOperation conditionalAccessOperation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (!(operation is IConditionalAccessOperation conditionalAccessOperation))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-
         var operationResult =
             PurityAnalysisEngine.CheckSingleOperation(conditionalAccessOperation.Operation, context, currentState);
         if (!operationResult.IsPure) return operationResult;
