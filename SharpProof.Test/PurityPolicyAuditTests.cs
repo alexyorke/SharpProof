@@ -9,6 +9,18 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class PurityPolicyAuditTests
 {
+    private static readonly string[] BoundaryPolicyIds =
+    {
+        "member_impure_attribute",
+        "member_pure_external_attribute",
+        "recognized_external_pure_attribute",
+        "assembly_impure_attribute",
+        "assembly_pure_external_attribute",
+        "additional_generated_summary",
+        "built_in_generated_summary",
+        "built_in_purity_catalog"
+    };
+
     [Test]
     public void ConfigurationRegistry_MarksEveryPurityPolicyKnob()
     {
@@ -41,37 +53,13 @@ public sealed class PurityPolicyAuditTests
     }
 
     [Test]
-    public void BoundaryRegistry_IsStableUniqueAndBackedByPublicAttributeTargets()
+    public void BoundaryContract_IsDocumentedAndBackedByPublicAttributeTargets()
     {
-        var boundaries = PurityPolicyAuditRegistry.BoundarySources;
-        Assert.That(
-            boundaries.Select(static boundary => boundary.Id),
-            Is.EqualTo(new[]
-            {
-                "member_impure_attribute",
-                "member_pure_external_attribute",
-                "recognized_external_pure_attribute",
-                "assembly_impure_attribute",
-                "assembly_pure_external_attribute",
-                "additional_generated_summary",
-                "built_in_generated_summary",
-                "built_in_purity_catalog"
-            }));
-        Assert.That(
-            boundaries.Select(static boundary => boundary.Id).Distinct(StringComparer.Ordinal).Count(),
-            Is.EqualTo(boundaries.Length));
-        Assert.That(
-            boundaries.Select(static boundary => boundary.DecisionStage),
-            Is.Ordered.Ascending);
-        Assert.That(boundaries, Has.All.Property(nameof(PurityBoundaryPolicy.DecisionRule)).Not.Empty);
+        Assert.That(BoundaryPolicyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(BoundaryPolicyIds.Length));
+        AssertAttributeBoundary(typeof(ImpureAttribute));
+        AssertAttributeBoundary(typeof(PureExternalAttribute));
 
-        AssertAttributeBoundary(typeof(ImpureAttribute), "member_impure_attribute", "assembly_impure_attribute");
-        AssertAttributeBoundary(
-            typeof(PureExternalAttribute),
-            "member_pure_external_attribute",
-            "assembly_pure_external_attribute");
-
-        void AssertAttributeBoundary(Type attributeType, string memberPolicyId, string assemblyPolicyId)
+        static void AssertAttributeBoundary(Type attributeType)
         {
             var usage = attributeType.GetCustomAttributes(typeof(AttributeUsageAttribute), false)
                 .OfType<AttributeUsageAttribute>()
@@ -80,10 +68,6 @@ public sealed class PurityPolicyAuditTests
             Assert.That(usage.ValidOn.HasFlag(AttributeTargets.Constructor), Is.True, attributeType.FullName);
             Assert.That(usage.ValidOn.HasFlag(AttributeTargets.Property), Is.True, attributeType.FullName);
             Assert.That(usage.ValidOn.HasFlag(AttributeTargets.Assembly), Is.True, attributeType.FullName);
-            Assert.That(boundaries.Single(boundary => boundary.Id == memberPolicyId).Source,
-                Is.EqualTo(attributeType.FullName));
-            Assert.That(boundaries.Single(boundary => boundary.Id == assemblyPolicyId).Source,
-                Is.EqualTo(attributeType.FullName));
         }
     }
 
@@ -158,8 +142,8 @@ public sealed class PurityPolicyAuditTests
         foreach (var option in AnalyzerConfigurationOptionRegistry.PurityPolicyOptions)
             Assert.That(policyDocument, Does.Contain("`" + option.Key + "`"), option.Key);
 
-        foreach (var boundary in PurityPolicyAuditRegistry.BoundarySources)
-            Assert.That(policyDocument, Does.Contain("`" + boundary.Id + "`"), boundary.Id);
+        foreach (var boundaryPolicyId in BoundaryPolicyIds)
+            Assert.That(policyDocument, Does.Contain("`" + boundaryPolicyId + "`"), boundaryPolicyId);
 
         Assert.That(policyDocument, Does.Contain("sharpproof.impurity.catalog_source"));
         Assert.That(policyDocument, Does.Contain("[Pure]` and `[EnforcePure]"));

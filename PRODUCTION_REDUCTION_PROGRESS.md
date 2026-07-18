@@ -44,11 +44,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Routed divide, modulo, checked arithmetic, checked update, compound
   assignment, and checked conversion hazards through one operation-level
   candidate adapter. Deleted seven syntax-specific forwarding routes.
+- [x] Removed the production `PurityPolicyAuditRegistry`, which duplicated
+  analyzer behavior solely for test inspection. The retained audit tests now
+  own their expected documentation contract and continue exercising the real
+  configuration and precedence paths.
 
 ## Current evidence
 
-- Maintained production: 107,599 lines; net reduction: 27 lines; remaining
-  reduction: 19,973. The first three deletion slices removed 304 production
+- Maintained production: 107,537 lines; net reduction: 89 lines; remaining
+  reduction: 19,911. The first four deletion slices removed 366 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -63,6 +67,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Expand operation-level runtime-hazard discovery into the remaining families
-whose canonical lowerers already own classification, trigger construction, and
-unknown behavior; retain syntax only for source discovery and Roslyn gaps.
+Remove the next complete duplicate semantic owner or test-only production seam;
+migrate retained tests to the canonical owner before deleting the superseded
+path.
