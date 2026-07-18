@@ -42,30 +42,9 @@ internal sealed class Z3RegexTranslator
 
         if (!IsValidDotNetRegexPattern(pattern, options)) return false;
 
-        var multiline = (options & RegexOptions.Multiline) != 0;
-        var startAnchored = TryFindLeadingStartAnchor(
-            pattern,
-            options,
-            !multiline,
-            out var startAnchorStart,
-            out var startAnchorLength);
-        var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
-        var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
-        var dollarEndAnchored = !strictEndAnchored &&
-                                !finalNewlineEndAnchored &&
-                                !multiline &&
-                                pattern.EndsWith("$", StringComparison.Ordinal) &&
-                                !IsEscaped(pattern, pattern.Length - 1);
-        var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
-        var bodyEnd = pattern.Length - bodyEndTrim;
-        if (bodyEnd < 0 ||
-            (startAnchored && startAnchorStart + startAnchorLength > bodyEnd))
-            return false;
+        if (!Z3RegexPatternNormalizer.TryNormalize(pattern, options, out var normalized)) return false;
 
-        var bodyPattern = pattern.Substring(0, bodyEnd);
-        if (startAnchored) bodyPattern = bodyPattern.Remove(startAnchorStart, startAnchorLength);
-
-        var translator = new Z3RegexTranslator(context, bodyPattern, options);
+        var translator = new Z3RegexTranslator(context, normalized.Body, options);
         if (!translator.TryParseExpression(out var body)) return false;
 
         translator.SkipIgnoredPatternTrivia();
@@ -73,92 +52,12 @@ internal sealed class Z3RegexTranslator
 
         regex = body;
         isExact = translator._isExact;
-        if (!startAnchored) regex = context.MkConcat(translator.CreateAnyStringRegex(), regex);
+        if (!normalized.StartAnchored) regex = context.MkConcat(translator.CreateAnyStringRegex(), regex);
 
-        if (dollarEndAnchored || finalNewlineEndAnchored)
+        if (normalized.DollarEndAnchored || normalized.FinalNewlineEndAnchored)
             regex = context.MkConcat(regex, translator.CreateOptionalFinalNewlineRegex());
-        else if (!strictEndAnchored) regex = context.MkConcat(regex, translator.CreateAnyStringRegex());
+        else if (!normalized.StrictEndAnchored) regex = context.MkConcat(regex, translator.CreateAnyStringRegex());
 
-        return true;
-    }
-
-    private static bool TryFindLeadingStartAnchor(
-        string pattern,
-        RegexOptions options,
-        bool allowCaretAnchor,
-        out int anchorStart,
-        out int anchorLength)
-    {
-        anchorStart = -1;
-        anchorLength = 0;
-        var index = 0;
-        var optionScope = CreateInitialOptionScope(options);
-        var canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
-        while (true)
-        {
-            SkipIgnoredPatternTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
-            if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope,
-                    out var nextIndex)) break;
-
-            optionScope = nextScope;
-            index = nextIndex;
-        }
-
-        if (index >= pattern.Length) return false;
-
-        if (pattern[index] == '^' && allowCaretAnchor)
-        {
-            anchorStart = index;
-            anchorLength = 1;
-            return true;
-        }
-
-        if (index + 1 < pattern.Length &&
-            pattern[index] == '\\' &&
-            pattern[index + 1] is 'A' or 'G')
-        {
-            anchorStart = index;
-            anchorLength = 2;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static RegexOptionScope CreateInitialOptionScope(RegexOptions options)
-    {
-        return new RegexOptionScope(
-            (options & RegexOptions.IgnorePatternWhitespace) != 0,
-            (options & RegexOptions.Singleline) != 0,
-            (options & RegexOptions.IgnoreCase) != 0);
-    }
-
-    private static bool TryReadInlineOptionGroup(
-        string pattern,
-        int start,
-        RegexOptionScope currentScope,
-        bool canUseIgnoreCase,
-        out RegexOptionScope nextScope,
-        out int nextIndex)
-    {
-        nextScope = currentScope;
-        nextIndex = start;
-        if (start + 2 >= pattern.Length ||
-            pattern[start] != '(' ||
-            pattern[start + 1] != '?')
-            return false;
-
-        var index = start + 2;
-        if (!TryReadRegexOptionsUntil(
-                pattern,
-                ref index,
-                ')',
-                currentScope,
-                canUseIgnoreCase,
-                out nextScope))
-            return false;
-
-        nextIndex = index;
         return true;
     }
 
@@ -574,7 +473,7 @@ internal sealed class Z3RegexTranslator
     private bool TryParseRegexOptionsUntil(char terminator, out RegexOptionScope groupOptions)
     {
         var position = _position;
-        if (!TryReadRegexOptionsUntil(
+        if (!Z3RegexPatternNormalizer.TryReadOptionsUntil(
                 _pattern,
                 ref position,
                 terminator,
@@ -584,73 +483,6 @@ internal sealed class Z3RegexTranslator
             return false;
 
         _position = position;
-        return true;
-    }
-
-    private static bool TryReadRegexOptionsUntil(
-        string pattern,
-        ref int position,
-        char terminator,
-        RegexOptionScope currentScope,
-        bool canUseIgnoreCase,
-        out RegexOptionScope nextScope)
-    {
-        nextScope = currentScope;
-        var nextIgnorePatternWhitespace = currentScope.IgnorePatternWhitespace;
-        var nextSingleline = currentScope.Singleline;
-        var nextIgnoreCase = currentScope.IgnoreCase;
-        var sawOption = false;
-        var sawDisableSeparator = false;
-        while (position < pattern.Length && pattern[position] != terminator)
-        {
-            var current = pattern[position];
-            if (current == '-')
-            {
-                if (sawDisableSeparator) return false;
-
-                sawDisableSeparator = true;
-                position++;
-                continue;
-            }
-
-            if (current == 'n')
-            {
-                sawOption = true;
-                position++;
-                continue;
-            }
-
-            if (current == 'x')
-            {
-                sawOption = true;
-                nextIgnorePatternWhitespace = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-
-            if (current == 's')
-            {
-                sawOption = true;
-                nextSingleline = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-
-            if (current == 'i' && canUseIgnoreCase)
-            {
-                sawOption = true;
-                nextIgnoreCase = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-
-            return false;
-        }
-
-        if (!sawOption || position >= pattern.Length || pattern[position] != terminator) return false;
-
-        position++;
-        nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
         return true;
     }
 
@@ -1096,54 +928,7 @@ internal sealed class Z3RegexTranslator
 
     private void SkipIgnoredPatternTrivia()
     {
-        SkipIgnoredPatternTrivia(_pattern, ref _position, _ignorePatternWhitespace);
-    }
-
-    private static void SkipIgnoredPatternTrivia(string pattern, ref int position, bool ignorePatternWhitespace)
-    {
-        while (position < pattern.Length)
-        {
-            if (TrySkipInlineComment(pattern, ref position)) continue;
-
-            if (!ignorePatternWhitespace) return;
-
-            var current = pattern[position];
-            if (char.IsWhiteSpace(current))
-            {
-                position++;
-                continue;
-            }
-
-            if (current == '#')
-            {
-                position++;
-                while (position < pattern.Length &&
-                       pattern[position] != '\r' &&
-                       pattern[position] != '\n')
-                    position++;
-
-                continue;
-            }
-
-            return;
-        }
-    }
-
-    private static bool TrySkipInlineComment(string pattern, ref int position)
-    {
-        if (position + 2 >= pattern.Length ||
-            pattern[position] != '(' ||
-            pattern[position + 1] != '?' ||
-            pattern[position + 2] != '#')
-            return false;
-
-        var end = position + 3;
-        while (end < pattern.Length && pattern[end] != ')') end++;
-
-        if (end >= pattern.Length) return false;
-
-        position = end + 1;
-        return true;
+        Z3RegexPatternNormalizer.SkipIgnoredTrivia(_pattern, ref _position, _ignorePatternWhitespace);
     }
 
     private ReExpr CreateAnyStringRegex()
@@ -1243,20 +1028,6 @@ internal sealed class Z3RegexTranslator
         return _position < _pattern.Length && _pattern[_position] == value;
     }
 
-    private static bool IsEscaped(string value, int index)
-    {
-        var slashCount = 0;
-        for (var current = index - 1; current >= 0 && value[current] == '\\'; current--) slashCount++;
-
-        return slashCount % 2 == 1;
-    }
-
-    private static bool EndsWithUnescapedAnchor(string value, string anchor)
-    {
-        return value.EndsWith(anchor, StringComparison.Ordinal) &&
-               !IsEscaped(value, value.Length - anchor.Length);
-    }
-
     private static bool IsValidDotNetRegexPattern(string pattern, RegexOptions options)
     {
         try
@@ -1351,12 +1122,4 @@ internal sealed class Z3RegexTranslator
         public CharacterRange[]? Ranges { get; } = ranges;
     }
 
-    private readonly struct RegexOptionScope(bool ignorePatternWhitespace, bool singleline, bool ignoreCase)
-    {
-        public bool IgnorePatternWhitespace { get; } = ignorePatternWhitespace;
-
-        public bool Singleline { get; } = singleline;
-
-        public bool IgnoreCase { get; } = ignoreCase;
-    }
 }

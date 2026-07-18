@@ -78,6 +78,10 @@ This is the active source of truth for the comprehensive refactor. Read
   `Z3RegexCharacterRanges`: bounded category/shorthand expansion caching,
   range merging, and complement construction are separate from Z3 encoding.
   The duplicate translator-owned caches and range algorithms were deleted.
+- [x] Regex anchor stripping and inline option/trivia normalization live in
+  `Z3RegexPatternNormalizer`, which produces a normalized body and explicit
+  start/end semantics before Z3 parsing begins. Duplicate translator-owned
+  anchor and lexical helpers were deleted.
 
 ## Current evidence
 
@@ -106,6 +110,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Continue splitting `Z3RegexTranslator`: extract anchor/option normalization and
-supported-fragment validation from Z3 encoding while preserving conservative
-fallback classification.
+Finish splitting `Z3RegexTranslator`: isolate supported-fragment validation and
+fallback classification from stateful Z3 encoding while preserving
+conservative unknown behavior.
