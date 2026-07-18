@@ -164,14 +164,6 @@ internal sealed class SymbolicQueryExecutor
         });
     }
 
-    public SymbolicOperationResult<SymbolicRuntimeHazardQueryResult> TryQueryRuntimeHazards(
-        SymbolicQueryContext context,
-        SymbolicRuntimeHazardQueryOptions? hazardOptions = null,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => QueryRuntimeHazards(context, hazardOptions, cancellationToken));
-    }
-
     public SymbolicComplexityResult QueryComplexity(
         SymbolicQueryContext context,
         CancellationToken cancellationToken = default)

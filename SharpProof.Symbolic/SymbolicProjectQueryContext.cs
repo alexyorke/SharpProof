@@ -218,23 +218,6 @@ internal sealed class SymbolicProjectQueryContext
             .WithAnalysisLimits(Configuration.AnalysisLimits);
     }
 
-    public SharpProofAnalysisSession CreateAnalysisSession(
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceQueryFilter? filter = null)
-    {
-        return SharpProofAnalysisSession.Create(
-            SourceInput,
-            CreateQueryOptions(
-                smtAnalysis,
-                impliedConditions,
-                includeExpressionProgramPoints,
-                includeCurrentStatementCompletionFacts,
-                filter));
-    }
-
     private static ImmutableArray<string> NormalizePaths(IEnumerable<string>? paths)
     {
         return paths?

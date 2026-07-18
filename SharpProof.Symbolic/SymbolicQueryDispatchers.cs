@@ -288,18 +288,7 @@ internal sealed class SymbolicRuntimeHazardQueryDispatcher
         SymbolicRuntimeHazardQueryOptions hazardOptions,
         CancellationToken cancellationToken)
     {
-        return target.Kind switch
-        {
-            SharpProofTargetKind.Line or SharpProofTargetKind.Point =>
-                _service.QuerySyntaxTreeRuntimeHazardsLine(
-                    syntaxTree, compilation, target.Line!.Value, options.SmtAnalysis!, cancellationToken,
-                    hazardOptions),
-            SharpProofTargetKind.Span => _service.QuerySyntaxTreeRuntimeHazardsSpan(
-                syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value,
-                options.SmtAnalysis!, cancellationToken, hazardOptions),
-            SharpProofTargetKind.AllLines => _service.QuerySyntaxTreeRuntimeHazards(
-                syntaxTree, compilation, options.SmtAnalysis!, cancellationToken, hazardOptions),
-            _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
-        };
+        return _service.QuerySyntaxTreeRuntimeHazards(
+            syntaxTree, compilation, target, options.SmtAnalysis!, cancellationToken, hazardOptions);
     }
 }

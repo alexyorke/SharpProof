@@ -16,28 +16,6 @@ internal sealed class SymbolicConditionProofEngine
         _programPointAnalyzer = programPointAnalyzer ?? throw new ArgumentNullException(nameof(programPointAnalyzer));
     }
 
-    internal SymbolicConditionProofResult ProveAtSource(
-        string sourceText,
-        string filePath,
-        int line,
-        int column,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
-            sourceText,
-            filePath,
-            SymbolicSourceCompilationKind.Query,
-            references,
-            cancellationToken,
-            compilationProfile);
-        return ProveAtSyntaxTree(
-            syntaxTree, compilation, line, column, conditionText, smtAnalysis, cancellationToken);
-    }
-
     internal SymbolicConditionProofResult ProveAtSyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,

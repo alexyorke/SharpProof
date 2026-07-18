@@ -62,11 +62,14 @@ Tests are excluded from the metric and must not be deleted.
   their duplicate result DTOs. Tests now use `SymbolicProgramPointAnalysis` and
   the canonical condition-proof executor; display and fact merging live with
   their focused projection types.
+- [x] Collapsed three runtime-hazard syntax-tree routes into one target-based
+  dispatcher path. Removed unreachable source-proof and line-analysis helpers,
+  the unused typed hazard wrapper, and a redundant project-session adapter.
 
 ## Current evidence
 
-- Maintained production: 106,886 lines; net reduction: 740 lines; remaining
-  reduction: 19,260. The first eight deletion slices removed 1,017 production
+- Maintained production: 106,795 lines; net reduction: 831 lines; remaining
+  reduction: 19,169. The first nine deletion slices removed 1,131 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -81,6 +84,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Consolidate the runtime-hazard query facade into the executor dispatcher and
-move retained source-compilation conveniences to `SharpProof.Testing`; delete
-the superseded production entry points in the same tranche.
+Inventory source-query test seams and remaining executor wrappers, then move
+retained compilation conveniences to `SharpProof.Testing` and delete the
+superseded production entry points in the same tranche.

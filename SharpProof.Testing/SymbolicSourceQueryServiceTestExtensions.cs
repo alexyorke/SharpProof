@@ -357,6 +357,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
+            SharpProofTarget.AllLines(),
             smtAnalysis,
             cancellationToken,
             options);
@@ -380,10 +381,10 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             cancellationToken,
             compilationProfile,
             SymbolicSourceCompilationKind.RuntimeHazards);
-        return service.QuerySyntaxTreeRuntimeHazardsLine(
+        return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
-            line,
+            SharpProofTarget.LineNumber(line),
             smtAnalysis,
             cancellationToken,
             options);
@@ -408,11 +409,10 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             cancellationToken,
             compilationProfile,
             SymbolicSourceCompilationKind.RuntimeHazards);
-        return service.QuerySyntaxTreeRuntimeHazardsSpan(
+        return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
-            spanStart,
-            spanEnd,
+            SharpProofTarget.Span(spanStart, spanEnd),
             smtAnalysis,
             cancellationToken,
             options);

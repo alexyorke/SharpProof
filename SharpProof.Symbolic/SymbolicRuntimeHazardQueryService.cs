@@ -25,54 +25,30 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    public SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(
+    internal SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(
         SyntaxTree syntaxTree,
         Compilation compilation,
+        SharpProofTarget target,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default,
         SymbolicRuntimeHazardQueryOptions? options = null)
     {
+        var scope = target.Kind switch
+        {
+            SharpProofTargetKind.Line or SharpProofTargetKind.Point => new RuntimeHazardScope(
+                SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken),
+                target.Line),
+            SharpProofTargetKind.Span => new RuntimeHazardScope(
+                SymbolicSourceLocation.GetSourceSpan(
+                    syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken),
+                null),
+            SharpProofTargetKind.AllLines => RuntimeHazardScope.All,
+            _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
+        };
         return QuerySyntaxTreeRuntimeHazardsCore(
             syntaxTree,
             compilation,
-            RuntimeHazardScope.All,
-            smtAnalysis,
-            cancellationToken,
-            options);
-    }
-
-    public SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsLine(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int line,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
-    {
-        var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
-        return QuerySyntaxTreeRuntimeHazardsCore(
-            syntaxTree,
-            compilation,
-            new RuntimeHazardScope(lineSpan, line),
-            smtAnalysis,
-            cancellationToken,
-            options);
-    }
-
-    public SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsSpan(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int spanStart,
-        int spanEnd,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
-    {
-        var sourceSpan = SymbolicSourceLocation.GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
-        return QuerySyntaxTreeRuntimeHazardsCore(
-            syntaxTree,
-            compilation,
-            new RuntimeHazardScope(sourceSpan, null),
+            scope,
             smtAnalysis,
             cancellationToken,
             options);

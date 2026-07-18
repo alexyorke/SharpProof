@@ -18,21 +18,6 @@ internal sealed class SymbolicSourceProgramPointExecutor
                                 throw new ArgumentNullException(nameof(conditionProofEngine));
     }
 
-    internal SymbolicProgramPointQueryContext AnalyzeAtLine(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int line,
-        int column,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
-        var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
-    }
-
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
