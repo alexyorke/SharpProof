@@ -109,6 +109,10 @@ This is the active source of truth for the comprehensive refactor. Read
   handler-family dispatch, simple-removal operations, titles, equivalence keys,
   and attribute targets. The exported provider no longer owns duplicated ID or
   removal-registration lists and dispatches typed families instead of IDs.
+- [x] Code-fix registration execution is split into focused simple-removal,
+  purity, synchronization, misplaced-requires, inferred-contract, and
+  null-forgiving handlers. The exported provider resolves the typed registry
+  entry and delegates once; its family-specific dispatch branches were deleted.
 
 ## Current evidence
 
@@ -137,6 +141,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Move code-fix family registration/execution into focused handlers behind
-`CodeFixHandlerRegistry`, leaving the exported provider as the Roslyn entry
-point and deleting its family-specific branches.
+Split `SharpProofDiagnostics` descriptor declarations by owning feature while
+keeping `AnalyzerDiagnosticCatalog` as the sole supported-diagnostics index;
+delete the monolithic declaration block and preserve descriptor identity.

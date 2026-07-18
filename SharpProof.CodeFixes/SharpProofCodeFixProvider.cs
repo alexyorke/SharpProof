@@ -39,97 +39,11 @@ namespace SharpProof
             var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
 
             if (!CodeFixHandlerRegistry.TryGet(diagnostic.Id, out var registration)) return;
-
-            if (registration is { Family: CodeFixHandlerFamily.SimpleRemoval, SimpleRemoval: { } simpleRemoval })
-            {
-                RegisterSimpleRemovalCodeFix(
-                    context,
-                    document,
-                    root,
-                    diagnostic,
-                    attributePolicy,
-                    simpleRemoval);
-                return;
-            }
-
-            switch (registration.Family)
-            {
-                case CodeFixHandlerFamily.AddPurity:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declMissing))
-                    {
-                        if (declMissing is PropertyDeclarationSyntax or IndexerDeclarationSyntax) break;
-
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Add [EnforcePure] attribute",
-                                c => AddEnforcePureAttributeAsync(document, root, declMissing, attributePolicy, c),
-                                nameof(AddEnforcePureAttributeAsync)),
-                            diagnostic);
-                    }
-
-                    break;
-
-                case CodeFixHandlerFamily.AddPurityOrRemoveSynchronization:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declAllow))
-                    {
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Add [EnforcePure] attribute",
-                                c => AddEnforcePureAttributeAsync(document, root, declAllow, attributePolicy, c),
-                                nameof(AddEnforcePureAttributeAsync) + "SP0006a"),
-                            diagnostic);
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove [AllowSynchronization] attribute",
-                                c => RemoveAttributesMatchingAsync(document, root, declAllow,
-                                    AcceptedAttribute(attributePolicy, "AllowSynchronizationAttribute"), c),
-                                nameof(RemoveAttributesMatchingAsync) + "SP0006b"),
-                            diagnostic);
-                    }
-
-                    break;
-
-                case CodeFixHandlerFamily.MisplacedRequires:
-                    if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedRequires))
-                    {
-                        if (CanMoveAttributeToGetter(misplacedRequires))
-                            context.RegisterCodeFix(
-                                CodeAction.Create(
-                                    "Move [Requires] attribute to getter",
-                                    c => MoveAttributeToGetterAsync(document, root, misplacedRequires, c),
-                                    nameof(MoveAttributeToGetterAsync) + "SP0029"),
-                                diagnostic);
-
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove misplaced [Requires] attribute",
-                                c => RemoveMisplacedAttributeAsync(document, root, misplacedRequires, c),
-                                nameof(RemoveMisplacedAttributeAsync) + "SP0029"),
-                            diagnostic);
-                    }
-
-                    break;
-
-                case CodeFixHandlerFamily.InferredContract:
-                    RegisterInferredContractCodeFix(context, document, root, diagnostic);
-                    break;
-
-                case CodeFixHandlerFamily.NullForgivingRemoval:
-                    if (TryFindNullForgivingExpression(root, diagnostic.Location.SourceSpan, out var suppression))
-                        context.RegisterCodeFix(
-                            CodeAction.Create(
-                                "Remove unnecessary null-forgiving operator",
-                                _ => Task.FromResult(document.WithSyntaxRoot(
-                                    root.ReplaceNode(
-                                        suppression,
-                                        RemoveNullForgivingOperator(suppression)))),
-                                "RemoveUnnecessaryNullForgivingOperator"),
-                            diagnostic);
-                    break;
-            }
+            CodeFixHandlers.Get(registration.Family).Register(
+                this, context, document, root, diagnostic, attributePolicy, registration);
         }
 
-        private static bool TryFindNullForgivingExpression(
+        internal static bool TryFindNullForgivingExpression(
             SyntaxNode root,
             TextSpan span,
             out PostfixUnaryExpressionSyntax suppression)
@@ -146,14 +60,14 @@ namespace SharpProof
             return false;
         }
 
-        private static ExpressionSyntax RemoveNullForgivingOperator(PostfixUnaryExpressionSyntax suppression)
+        internal static ExpressionSyntax RemoveNullForgivingOperator(PostfixUnaryExpressionSyntax suppression)
         {
             var operand = suppression.Operand;
             return operand.WithTrailingTrivia(
                 operand.GetTrailingTrivia().AddRange(suppression.GetTrailingTrivia()));
         }
 
-        private void RegisterInferredContractCodeFix(
+        internal void RegisterInferredContractCodeFix(
             CodeFixContext context,
             Document document,
             SyntaxNode root,
@@ -272,7 +186,7 @@ namespace SharpProof
             return document.WithSyntaxRoot(root.ReplaceNode(parameter, updatedParameter));
         }
 
-        private void RegisterSimpleRemovalCodeFix(
+        internal void RegisterSimpleRemovalCodeFix(
             CodeFixContext context,
             Document document,
             SyntaxNode root,
@@ -306,7 +220,7 @@ namespace SharpProof
                 diagnostic);
         }
 
-        private static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)
+        internal static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)
         {
             declaration = null!;
             for (var node = root.FindToken(position).Parent; node != null; node = node.Parent)
@@ -327,7 +241,7 @@ namespace SharpProof
             return false;
         }
 
-        private static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute)
+        internal static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute)
         {
             attribute = null!;
             var node = root.FindNode(span, false, true);
@@ -342,7 +256,7 @@ namespace SharpProof
             return list.Parent;
         }
 
-        private static bool CanMoveAttributeToGetter(AttributeSyntax attribute)
+        internal static bool CanMoveAttributeToGetter(AttributeSyntax attribute)
         {
             return AttributeTargetSyntaxFacts.IsGetterAliasTarget(GetHostForAttribute(attribute));
         }
@@ -449,14 +363,14 @@ namespace SharpProof
             return null;
         }
 
-        private static Func<INamedTypeSymbol?, bool> AcceptedAttribute(
+        internal static Func<INamedTypeSymbol?, bool> AcceptedAttribute(
             SharpProofAttributeIdentityPolicy policy,
             params string[] attributeTypeNames)
         {
             return type => attributeTypeNames.Any(name => policy.IsAccepted(type, name));
         }
 
-        private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
+        internal static Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -470,7 +384,7 @@ namespace SharpProof
             return Task.FromResult(document.WithSyntaxRoot(newRoot));
         }
 
-        private async Task<Document> MoveAttributeToGetterAsync(
+        internal static async Task<Document> MoveAttributeToGetterAsync(
             Document document,
             SyntaxNode root,
             AttributeSyntax attribute,
@@ -790,7 +704,7 @@ namespace SharpProof
             foreach (var location in diagnostic.AdditionalLocations) yield return location;
         }
 
-        private async Task<Document> RemoveAttributesMatchingAsync(
+        internal async Task<Document> RemoveAttributesMatchingAsync(
             Document document,
             SyntaxNode root,
             SyntaxNode declaration,
@@ -811,7 +725,7 @@ namespace SharpProof
             return document.WithSyntaxRoot(newRoot);
         }
 
-        private async Task<Document> AddEnforcePureAttributeAsync(
+        internal async Task<Document> AddEnforcePureAttributeAsync(
             Document document,
             SyntaxNode root,
             SyntaxNode declaration,
