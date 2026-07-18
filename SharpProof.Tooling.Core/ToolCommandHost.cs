@@ -37,4 +37,19 @@ public static class ToolCommandHost
             return argumentErrorExitCode;
         }
     }
+
+    public static async Task<int> RunAsync(
+        Func<Task<int>> command,
+        Func<Exception, bool> shouldHandle,
+        Func<Exception, int> writeError)
+    {
+        try
+        {
+            return await command().ConfigureAwait(false);
+        }
+        catch (Exception exception) when (shouldHandle(exception))
+        {
+            return writeError(exception);
+        }
+    }
 }

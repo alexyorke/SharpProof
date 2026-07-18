@@ -1892,7 +1892,8 @@ namespace TestNamespace {
 
         AssertSymbolicCliSourceContains(
             ("SymbolicCliOptions.cs", "--error-json"),
-            ("Program.cs", "SymbolicCliErrorWriter.Write(ex, args)"),
+            ("Program.cs", "ToolCommandHost.RunAsync("),
+            ("Program.cs", "SymbolicCliErrorWriter.Write(exception, args)"),
             ("SymbolicCliErrorWriter.cs", "new SymbolicErrorEnvelope(error)"),
             ("SymbolicCliErrorWriter.cs", "error.RecommendedExitCode"));
         Assert.That(errorSource, Does.Contain("public const string InvalidRequest = \"SPQ1000\""));

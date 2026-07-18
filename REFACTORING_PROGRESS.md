@@ -181,6 +181,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Baseline and CorpusReport now execute through `ToolCommandHost`; their
   duplicate parse/catch blocks were deleted while distinct no-input behavior,
   invalid-argument exit code 64, usage text, and stderr routing remain exact.
+- [x] SymbolicCli now executes through the classified `ToolCommandHost`
+  overload. Its nonfatal predicate and typed error writer remain authoritative,
+  fatal exceptions still escape, and the local top-level catch adapter was
+  deleted.
 
 ## Current evidence
 
@@ -201,7 +205,7 @@ This is the active source of truth for the comprehensive refactor. Read
   responsibility, deleting duplicate orchestration.
 - [x] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
   typed registries.
-- [ ] Decompose EffectSummary host and standardize lightweight tool hosting.
+- [x] Decompose EffectSummary host and standardize lightweight tool hosting.
 - [ ] Finish test-lane/repository organization and remove dead compatibility
   paths.
 - [ ] Run final Release, six-lane, package-consumer, NuGet, VSIX, generated-doc,
@@ -209,6 +213,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit SymbolicCli's top-level error policy and migrate only its matching
-argument-error boundary to `ToolCommandHost`, preserving its richer request,
-project-load, cancellation, and SMT error classifications.
+Audit the canonical internal analysis request/context/snapshot tranche against
+current call sites and tests; close proven requirements and identify the next
+remaining duplicated request or snapshot construction path.

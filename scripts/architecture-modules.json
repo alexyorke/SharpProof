@@ -55,7 +55,7 @@
       "name": "SymbolicCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.SymbolicCli/" ],
-      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic", "SymbolicCliCore" ]
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic", "SymbolicCliCore", "ToolingCore" ]
     },
     {
       "name": "SymbolicCliCore",

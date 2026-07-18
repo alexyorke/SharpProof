@@ -1,4 +1,11 @@
-try
+using SharpProof.Tools.Shared;
+
+return await ToolCommandHost.RunAsync(
+    () => RunAsync(args),
+    static exception => !SymbolicErrorClassifier.IsFatal(exception),
+    exception => SymbolicCliErrorWriter.Write(exception, args));
+
+static async Task<int> RunAsync(string[] args)
 {
     var expandedArguments = await SymbolicCliJsonRequest.ExpandArgumentsAsync(args, Console.In);
     var options = SymbolicCliOptions.Parse(expandedArguments);
@@ -101,8 +108,4 @@ try
     foreach (var failure in gateFailures)
         Console.Error.WriteLine($"CI gate failed [{failure.Code}]: {failure.Message}");
     return gateFailures.Count == 0 ? 0 : 1;
-}
-catch (Exception ex) when (!SymbolicErrorClassifier.IsFatal(ex))
-{
-    return SymbolicCliErrorWriter.Write(ex, args);
 }
