@@ -29,36 +29,18 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     internal static IEnumerable<IMethodSymbol> EnumerateRuntimeMembers(ITypeSymbol enumeratorType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
-
-        foreach (var method in EnumerateInstanceMethods(enumeratorType, "MoveNext", 0))
-            if (seen.Add(method.OriginalDefinition))
-                yield return method;
-
-        foreach (var getter in EnumerateCurrentGetters(enumeratorType))
-            if (seen.Add(getter.OriginalDefinition))
-                yield return getter;
-
-        foreach (var dispose in DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, false))
-            if (seen.Add(dispose.OriginalDefinition))
-                yield return dispose;
+        return EnumerateInstanceMethods(enumeratorType, "MoveNext", 0)
+            .Concat(EnumerateCurrentGetters(enumeratorType))
+            .Concat(DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, false))
+            .DistinctByOriginalDefinition();
     }
 
     internal static IEnumerable<IMethodSymbol> EnumerateAsyncRuntimeMembers(ITypeSymbol enumeratorType)
     {
-        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
-
-        foreach (var method in EnumerateInstanceMethods(enumeratorType, "MoveNextAsync", 0))
-            if (seen.Add(method.OriginalDefinition))
-                yield return method;
-
-        foreach (var getter in EnumerateCurrentGetters(enumeratorType))
-            if (seen.Add(getter.OriginalDefinition))
-                yield return getter;
-
-        foreach (var dispose in DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, true))
-            if (seen.Add(dispose.OriginalDefinition))
-                yield return dispose;
+        return EnumerateInstanceMethods(enumeratorType, "MoveNextAsync", 0)
+            .Concat(EnumerateCurrentGetters(enumeratorType))
+            .Concat(DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, true))
+            .DistinctByOriginalDefinition();
     }
 
     internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
@@ -158,11 +140,7 @@ internal static class EnumeratorRuntimeMemberClassifier
 
     private static bool IsAsyncEnumerableInterface(INamedTypeSymbol typeSymbol)
     {
-        var originalDefinition = typeSymbol.OriginalDefinition;
-        return originalDefinition.Arity == 1 &&
-               string.Equals(originalDefinition.MetadataName, "IAsyncEnumerable`1", StringComparison.Ordinal) &&
-               TypeHierarchyEnumeration.IsNamespace(
-                   originalDefinition.ContainingNamespace,
-                   "System.Collections.Generic");
+        return TypeHierarchyEnumeration.IsTypeNamed(
+            typeSymbol.OriginalDefinition, "System.Collections.Generic", "IAsyncEnumerable`1", 1);
     }
 }

@@ -109,6 +109,35 @@ internal static class TypeHierarchyEnumeration
         return string.Equals(string.Join(".", segments), expected, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Tests whether <paramref name="type"/> is the named type with the given metadata name,
+    /// generic arity, and containing namespace. Collapses the repeated
+    /// "arity + MetadataName + IsNamespace" idiom used by the runtime-member classifiers.
+    /// </summary>
+    internal static bool IsTypeNamed(
+        INamedTypeSymbol type,
+        string containingNamespace,
+        string metadataName,
+        int arity)
+    {
+        return type.Arity == arity &&
+               string.Equals(type.MetadataName, metadataName, StringComparison.Ordinal) &&
+               IsNamespace(type.ContainingNamespace, containingNamespace);
+    }
+
+    /// <summary>
+    /// Yields the methods in <paramref name="methods"/>, skipping any whose
+    /// <see cref="ISymbol.OriginalDefinition"/> was already yielded. Centralizes the
+    /// "seen set keyed on OriginalDefinition" dedup used across the member enumerators.
+    /// </summary>
+    internal static IEnumerable<IMethodSymbol> DistinctByOriginalDefinition(this IEnumerable<IMethodSymbol> methods)
+    {
+        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
+        foreach (var method in methods)
+            if (seen.Add(method.OriginalDefinition))
+                yield return method;
+    }
+
     internal static IEnumerable<IMethodSymbol> EnumerateInterfaceMethodImplementations(
         INamedTypeSymbol type,
         string memberName,

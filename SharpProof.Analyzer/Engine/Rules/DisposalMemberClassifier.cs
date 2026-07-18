@@ -20,30 +20,25 @@ internal static class DisposalMemberClassifier
         bool async)
     {
         var methodName = async ? "DisposeAsync" : "Dispose";
-        var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
-        foreach (var method in TypeHierarchyEnumeration
-                     .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
-                     .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
-            if (seen.Add(method.OriginalDefinition))
-                yield return method;
+        var baseMembers = TypeHierarchyEnumeration
+            .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
+            .Where(static method => !method.IsStatic && method.Parameters.Length == 0);
 
-        if (type is not INamedTypeSymbol namedType) yield break;
+        var interfaceMembers = type is INamedTypeSymbol namedType
+            ? TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
+                namedType,
+                methodName,
+                interfaceType => async ? IsAsyncDisposable(interfaceType) : IsDisposable(interfaceType),
+                static method => !method.IsStatic && method.Parameters.Length == 0)
+            : Enumerable.Empty<IMethodSymbol>();
 
-        foreach (var implementation in TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
-                     namedType,
-                     methodName,
-                     interfaceType => async ? IsAsyncDisposable(interfaceType) : IsDisposable(interfaceType),
-                     static method => !method.IsStatic && method.Parameters.Length == 0))
-            if (seen.Add(implementation.OriginalDefinition))
-                yield return implementation;
+        return baseMembers.Concat(interfaceMembers).DistinctByOriginalDefinition();
     }
 
     internal static bool IsAsyncDisposable(INamedTypeSymbol type)
     {
-        return type.Arity == 0 &&
-               string.Equals(type.MetadataName, "IAsyncDisposable", StringComparison.Ordinal) &&
-               TypeHierarchyEnumeration.IsNamespace(type.ContainingNamespace, "System");
+        return TypeHierarchyEnumeration.IsTypeNamed(type, "System", "IAsyncDisposable", 0);
     }
 
     private static IMethodSymbol? FindDisposalMember(

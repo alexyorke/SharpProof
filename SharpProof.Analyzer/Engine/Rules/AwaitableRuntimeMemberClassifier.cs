@@ -69,8 +69,6 @@ internal static class AwaitableRuntimeMemberClassifier
     private static bool IsSystemAction(ITypeSymbol type)
     {
         return type is INamedTypeSymbol namedType &&
-               namedType.Arity == 0 &&
-               string.Equals(namedType.MetadataName, "Action", StringComparison.Ordinal) &&
-               TypeHierarchyEnumeration.IsNamespace(namedType.ContainingNamespace, "System");
+               TypeHierarchyEnumeration.IsTypeNamed(namedType, "System", "Action", 0);
     }
 }
