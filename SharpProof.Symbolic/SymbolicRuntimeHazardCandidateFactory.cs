@@ -15,6 +15,17 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardCandidateFactory
 {
+    private static readonly TryLowerOperationHazard[] OperationHazardLowerers =
+    [
+        SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
+        SymbolicOperationLowerer.TryLowerCheckedOverflowHazard,
+        SymbolicOperationLowerer.TryLowerIndexConstructionBoundsHazard,
+        SymbolicOperationLowerer.TryLowerMathAbsOverflowHazard,
+        SymbolicOperationLowerer.TryLowerMathClampBoundsHazard,
+        SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard,
+        SymbolicOperationLowerer.TryLowerSwitchNoMatchHazard
+    ];
+
     internal static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
         SyntaxNode root,
         SemanticModel semanticModel,
@@ -44,6 +55,13 @@ internal static class SymbolicRuntimeHazardCandidateFactory
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var operation = semanticModel.GetOperation(node, cancellationToken);
+        if (operation != null)
+            foreach (var lower in OperationHazardLowerers)
+                if (lower(operation, context, out var hazard))
+                    yield return new RuntimeHazardCandidate(node, hazard);
+
         switch (node)
         {
             case ThrowStatementSyntax throwStatement:
@@ -54,36 +72,7 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                 foreach (var throwCandidate in CreateThrowCandidates(throwExpression, semanticModel, cancellationToken))
                     yield return throwCandidate;
                 break;
-            case BinaryExpressionSyntax binaryExpression:
-                if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken,
-                        out var divideCandidate)) yield return divideCandidate;
-
-                if (TryCreateCheckedOverflowCandidate(binaryExpression, semanticModel, cancellationToken,
-                        out var binaryOverflowCandidate)) yield return binaryOverflowCandidate;
-
-                break;
-            case PrefixUnaryExpressionSyntax prefixUnaryExpression:
-                if (TryCreateCheckedOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken,
-                        out var unaryOverflowCandidate)) yield return unaryOverflowCandidate;
-
-                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
-                        prefixUnaryExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out var prefixIndexCandidate))
-                    yield return prefixIndexCandidate;
-
-                break;
-            case PostfixUnaryExpressionSyntax postfixUnaryExpression:
-                if (TryCreateCheckedOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken,
-                        out var postfixOverflowCandidate)) yield return postfixOverflowCandidate;
-
-                break;
             case CastExpressionSyntax castExpression:
-                if (TryCreateCheckedOverflowCandidate(castExpression, semanticModel,
-                        cancellationToken, out var conversionOverflowCandidate))
-                    yield return conversionOverflowCandidate;
-
                 if (TryCreateNullableValueCastCandidate(castExpression, semanticModel, cancellationToken,
                         out var nullableCastCandidate)) yield return nullableCastCandidate;
 
@@ -143,31 +132,16 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 break;
             case AssignmentExpressionSyntax assignment:
-                if (TryCreateDivideByZeroCandidate(assignment, semanticModel, cancellationToken,
-                        out var compoundDivideCandidate)) yield return compoundDivideCandidate;
-
                 if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken,
                         out var deconstructionNullCandidate)) yield return deconstructionNullCandidate;
 
                 if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken,
                         out var arrayTypeMismatchCandidate)) yield return arrayTypeMismatchCandidate;
 
-                if (TryCreateCheckedOverflowCandidate(assignment, semanticModel,
-                        cancellationToken, out var compoundOverflowCandidate)) yield return compoundOverflowCandidate;
-
                 break;
             case ArrayCreationExpressionSyntax arrayCreation:
                 if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken,
                         out var negativeLengthCandidate)) yield return negativeLengthCandidate;
-
-                break;
-            case ObjectCreationExpressionSyntax objectCreation:
-                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
-                        objectCreation,
-                        semanticModel,
-                        cancellationToken,
-                        out var objectIndexCandidate))
-                    yield return objectIndexCandidate;
 
                 break;
             case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
@@ -177,15 +151,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                         cancellationToken,
                         out var negativeStackAllocLengthCandidate))
                     yield return negativeStackAllocLengthCandidate;
-
-                break;
-            case SwitchExpressionSyntax switchExpression:
-                if (TryCreateSwitchExpressionNoMatchCandidate(
-                        switchExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out var switchNoMatchCandidate))
-                    yield return switchNoMatchCandidate;
 
                 break;
             case ForEachStatementSyntax forEachStatement:
@@ -211,21 +176,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 break;
             case InvocationExpressionSyntax invocation:
-                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
-                        invocation,
-                        semanticModel,
-                        cancellationToken,
-                        out var invocationIndexCandidate))
-                    yield return invocationIndexCandidate;
-
-                if (TryCreateMathAbsOverflowCandidate(invocation, semanticModel, cancellationToken,
-                        out var mathAbsOverflowCandidate))
-                    yield return mathAbsOverflowCandidate;
-
-                if (TryCreateMathClampBoundsCandidate(invocation, semanticModel, cancellationToken,
-                        out var mathClampBoundsCandidate))
-                    yield return mathClampBoundsCandidate;
-
                 if (TryGetRegexRequiredInputExpression(invocation, semanticModel, cancellationToken, out var regexInput) &&
                     TryCreateArgumentNullCandidate(
                         invocation,
@@ -235,12 +185,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                         cancellationToken,
                         out var regexNullCandidate))
                     yield return regexNullCandidate;
-
-                if (SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard(
-                        invocation,
-                        new SymbolicLoweringContext(semanticModel, cancellationToken),
-                        out var guardHazard))
-                    yield return new RuntimeHazardCandidate(invocation, guardHazard);
 
                 if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken,
                         out var invocationDynamicCandidate)) yield return invocationDynamicCandidate;
@@ -281,51 +225,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 break;
         }
-    }
-
-    private static bool TryCreateDivideByZeroCandidate(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        return TryCreateOperationHazard(
-            site,
-            semanticModel,
-            cancellationToken,
-            SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
-            out candidate);
-    }
-
-    private static bool TryCreateCheckedOverflowCandidate(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        return TryCreateOperationHazard(
-            site,
-            semanticModel,
-            cancellationToken,
-            SymbolicOperationLowerer.TryLowerCheckedOverflowHazard,
-            out candidate);
-    }
-
-    private static bool TryCreateOperationHazard(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        TryLowerOperationHazard lower,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        var operation = semanticModel.GetOperation(site, cancellationToken);
-        if (operation == null ||
-            !lower(operation, new SymbolicLoweringContext(semanticModel, cancellationToken), out var hazard))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(site, hazard);
-        return true;
     }
 
     private delegate bool TryLowerOperationHazard(

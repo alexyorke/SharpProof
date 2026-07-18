@@ -384,10 +384,13 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerIndexConstructionBoundsHazard(
-        ExpressionSyntax expression,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation.Syntax is not ExpressionSyntax expression)
+            return NoHazard(out hazard);
+
         var lowering = SymbolicSemanticPipeline.LowerIndexConstructionArgumentOutOfRangeCondition(
             expression, context);
         if (lowering is not { IsExact: true, Value: { } trigger })
@@ -584,10 +587,13 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerSwitchNoMatchHazard(
-        SwitchExpressionSyntax switchExpression,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation.Syntax is not SwitchExpressionSyntax switchExpression)
+            return NoHazard(out hazard);
+
         SymbolicCondition? selected = null;
         foreach (var arm in switchExpression.Arms)
         {
@@ -681,12 +687,23 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerMathAbsOverflowHazard(
-        InvocationExpressionSyntax invocation,
-        ExpressionSyntax operand,
-        long overflowingValue,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation is not IInvocationOperation invocationOperation ||
+            operation.Syntax is not InvocationExpressionSyntax invocation ||
+            !invocationOperation.TargetMethod.IsStatic ||
+            !SymbolicKnownApiLowerer.IsMathAbs(invocationOperation.TargetMethod) ||
+            invocationOperation.TargetMethod.Parameters.Length != 1 ||
+            !SymbolicTypeFacts.TryGetBoundedIntegralRange(
+                invocationOperation.TargetMethod.ReturnType,
+                out var overflowingValue,
+                out _) ||
+            overflowingValue >= 0 ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var operand))
+            return NoHazard(out hazard);
+
         var value = LowerIntegerTerm(operand, context);
         if (value == null) return NoHazard(out hazard);
 
@@ -704,12 +721,19 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerMathClampBoundsHazard(
-        InvocationExpressionSyntax invocation,
-        ExpressionSyntax minExpression,
-        ExpressionSyntax maxExpression,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation is not IInvocationOperation invocationOperation ||
+            operation.Syntax is not InvocationExpressionSyntax invocation ||
+            !invocationOperation.TargetMethod.IsStatic ||
+            !SymbolicKnownApiLowerer.IsMathClamp(invocationOperation.TargetMethod) ||
+            invocationOperation.TargetMethod.Parameters.Length != 3 ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var minExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 2, out var maxExpression))
+            return NoHazard(out hazard);
+
         var min = LowerIntegerTerm(minExpression, context);
         var max = LowerIntegerTerm(maxExpression, context);
         if (min == null || max == null) return NoHazard(out hazard);
@@ -729,11 +753,12 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerKnownArgumentGuardHazard(
-        InvocationExpressionSyntax invocation,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
-        if (!SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
+        if (operation.Syntax is not InvocationExpressionSyntax invocation ||
+            !SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
                 invocation,
                 context.SemanticModel,
                 context.CancellationToken,

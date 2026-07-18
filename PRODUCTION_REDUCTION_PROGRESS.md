@@ -69,11 +69,16 @@ Tests are excluded from the metric and must not be deleted.
   `SharpProofQuery` factories. The session now dispatches simple requests by
   query kind, and the intentional breaking API snapshot no longer exposes eight
   constructor-heavy request implementation types.
+- [x] Added one deterministic operation-first runtime-hazard lowering registry
+  for arithmetic, index construction, Math.Abs/Clamp, argument guards, and
+  switch no-match. Deleted their syntax dispatch branches and forwarding
+  adapters; syntax remains only where Roslyn operations do not carry required
+  source evidence.
 
 ## Current evidence
 
-- Maintained production: 106,750 lines; net reduction: 876 lines; remaining
-  reduction: 19,124. The first ten deletion slices removed 1,208 production
+- Maintained production: 106,608 lines; net reduction: 1,018 lines; remaining
+  reduction: 18,982. The first eleven deletion slices removed 1,424 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -88,6 +93,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Replace the syntax-first runtime-hazard candidate adapters with one
-operation-first lowering registry, preserving source evidence and conservative
-unsupported outcomes while deleting the superseded adapter family.
+Move operation-exposed slicing, collection-cardinality, and array hazard shape
+discovery into the canonical lowerers, leaving the source candidate factory
+only for Roslyn gaps and evidence projection.

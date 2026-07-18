@@ -14,76 +14,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
 {
-    internal static bool TryCreateIndexConstructionArgumentOutOfRangeCandidate(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!SymbolicOperationLowerer.TryLowerIndexConstructionBoundsHazard(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken),
-            out var hazard))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(expression, hazard);
-        return true;
-    }
-
-    internal static bool TryCreateMathAbsOverflowCandidate(
-        InvocationExpressionSyntax invocation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
-            !operation.TargetMethod.IsStatic ||
-            !SymbolicKnownApiLowerer.IsMathAbs(operation.TargetMethod) ||
-            operation.TargetMethod.Parameters.Length != 1 ||
-            !SymbolicTypeFacts.TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
-            minValue >= 0 ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var operand) ||
-            !SymbolicOperationLowerer.TryLowerMathAbsOverflowHazard(
-                invocation,
-                operand,
-                minValue,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var hazard))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(invocation, hazard);
-        return true;
-    }
-
-    internal static bool TryCreateMathClampBoundsCandidate(
-        InvocationExpressionSyntax invocation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
-            !operation.TargetMethod.IsStatic ||
-            !SymbolicKnownApiLowerer.IsMathClamp(operation.TargetMethod) ||
-            operation.TargetMethod.Parameters.Length != 3 ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var minExpression) ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 2, out var maxExpression))
-            return false;
-
-        if (!SymbolicOperationLowerer.TryLowerMathClampBoundsHazard(
-                invocation,
-                minExpression,
-                maxExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var hazard))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(invocation, hazard);
-        return true;
-    }
-
     internal static bool TryGetRegexRequiredInputExpression(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
@@ -128,23 +58,6 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
                      exceptionTypeName,
                      new SymbolicLoweringContext(semanticModel, cancellationToken)))
             yield return new RuntimeHazardCandidate(throwNode, hazard);
-    }
-
-    internal static bool TryCreateSwitchExpressionNoMatchCandidate(
-        SwitchExpressionSyntax switchExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out RuntimeHazardCandidate candidate)
-    {
-        candidate = default;
-        if (!SymbolicOperationLowerer.TryLowerSwitchNoMatchHazard(
-                switchExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var hazard))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(switchExpression, hazard);
-        return true;
     }
 
     internal static bool TryCreateDeconstructionNullReceiverCandidate(
