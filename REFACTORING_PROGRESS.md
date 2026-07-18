@@ -204,6 +204,10 @@ This is the active source of truth for the comprehensive refactor. Read
   position validation, condition-proof aggregation, and program-point
   projection. The source query service's four private execution/projection
   implementations were deleted.
+- [x] `SymbolicSourceRangeQueryExecutor` now owns line, nearest-line-point,
+  span, line-span, and all-lines selection, execution, aggregation, ordering,
+  and scope projection. The source query service's range loops and selection
+  implementations were deleted, reducing it to a 243-line facade.
 
 ## Current evidence
 
@@ -232,6 +236,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract line/span/all-lines target execution from `SymbolicSourceQueryService`
-behind a focused range-query component, deleting the service-owned loops and
-selection orchestration while preserving exact scopes and ordering.
+Audit `SymbolicComplexityService` against the planned loop modeling,
+recursion/call summary, cost algebra, and result projection boundaries; extract
+the next responsibility still owned by the coordinator.
