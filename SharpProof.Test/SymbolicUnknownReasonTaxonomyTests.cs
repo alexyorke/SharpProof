@@ -9,7 +9,7 @@ using SymbolicCapability = SharpProof.Attributes.SharpProofCapability;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicUnknownReasonTaxonomyTests
+internal sealed class SymbolicUnknownReasonTaxonomyTests
 {
     private static readonly JsonSerializerOptions CanonicalJsonOptions = new()
     {

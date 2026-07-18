@@ -13,7 +13,7 @@ real wall-clock performance, allocation cost, cache effects, or JIT behavior.
 ## Result Shape
 
 `SharpProofAnalysisSession.Analyze(SharpProofQuery.Complexity(...))` returns a
-`SharpProofQueryResult` whose `ComplexityQueryPayload.Value` has:
+`SharpProofQueryResult` whose `ComplexityQueryPayload` has:
 
 - a normalized `Complexity` summary such as `O(1)`, `O(n)`, `O(n * m)`,
   `O(n^2)`, `O(Unknown)`, or `O(RecursiveUnknown)`
@@ -54,14 +54,13 @@ Use `SharpProofQuery.Complexity(...)` with a session created from:
 
 - `SharpProofAnalysisSession.FromFile(...)`
 - `SharpProofAnalysisSession.FromText(...)`
-- `SymbolicProjectQueryContext.CreateAnalysisSession(...)`
+- the CLI's internal project-loaded session adapter
 
 Supported target shapes:
 
-- `SymbolicQueryTarget.Point(...)`
-- `SymbolicQueryTarget.Position(...)`
-- `SymbolicQueryTarget.Line(...)`
-- `SymbolicQueryTarget.Node(...)`
+- `SharpProofTarget.Point(...)`
+- `SharpProofTarget.AtPosition(...)`
+- `SharpProofTarget.LineNumber(...)`
 
 Complexity queries resolve the containing method-like body. Invalid
 source/target combinations are API misuse and currently throw

@@ -10,7 +10,7 @@ namespace SharpProof.Analyzer;
 /// <summary>
 /// Provides build-loaded project context to SharpProof's analyzer and symbolic query APIs.
 /// </summary>
-public sealed class SharpProofProjectAnalysisContext
+internal sealed class SharpProofProjectAnalysisContext
 {
     public SharpProofProjectAnalysisContext(
         Compilation compilation,

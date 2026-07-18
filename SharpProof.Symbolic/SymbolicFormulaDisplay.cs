@@ -266,7 +266,7 @@ internal static class SymbolicFormulaDisplay
     }
 }
 
-public static class SymbolicProgramPointKinds
+internal static class SymbolicProgramPointKinds
 {
     public const string Statement = "Statement";
     public const string Expression = "Expression";

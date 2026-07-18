@@ -14,29 +14,22 @@ The primary entrypoint is `SharpProofAnalysisSession`:
 
 - `Analyze(SharpProofQuery.Invariant(target))` reports invariants for a file, text buffer, or loaded project.
 - `FromFile` and `FromText` create compilation-scoped sessions.
-- `SymbolicQueryTarget.Point`, `Position`, `Line`, `Span`, `LineSpan`, `AllLines`, and `Node` select the requested program point or aggregate scope.
+- `SharpProofTarget.Point`, `AtPosition`, `LineNumber`, `Span`, `LineSpan`, and `AllLines` select the requested program point or aggregate scope.
 - `SharpProofAnalysisOptions` carries SMT enablement, implied conditions, and bounded-analysis limits.
 - `SharpProofQuery.Condition(...)` checks whether a source-level condition follows at a point.
 - `SharpProofQuery.RuntimeHazards(...)` queries proven or optionally unproven runtime-hazard candidates through the same session.
-- `SymbolicProgramPointResult.Invariant` exposes a typed program-point invariant descriptor. Its `Conditions` are the SMT-backed path conditions, `MergeKind` is `Conjunction`, and `MergedInvariantText` is the condition conjunction used for proof queries.
-- `SymbolicProgramPointResult.PathConditions` is a convenience view over the typed condition descriptors, including source-like condition text such as `value > 0`, formula kind, SMT value kind, merge target, whether the condition came from a real SMT formula, and whether it is a conservative unknown placeholder.
-- `SymbolicProgramPointResult.PathConditionCount` and `ProofOutcomes` summarize the current point without requiring callers to traverse `PathConditions` or `ConditionProofs`. `SymbolicConditionProofSummary.TotalCount` is included on aggregate proof summaries.
-- `SymbolicProgramPointResult` includes both the queried point (`Line`, `Column`, `Position`) and the selected node span (`NodeSpanStart`, `NodeSpanEnd`, `NodeSpanLength`, `NodeStartLine`, `NodeStartColumn`, `NodeEndLine`, `NodeEndColumn`) so callers can re-query either by line/column or absolute position.
-- `SymbolicProgramPointResult.MethodName` reports the containing method, local function, constructor, destructor, or operator name when the selected node is inside one.
-- `SymbolicProgramPointResult.ProgramPointKind` is `Statement`, `Expression`, or `Other`, which lets tools distinguish expression points returned by `includeExpressionProgramPoints` from statement-level points without relying on Roslyn node-kind suffixes.
+- Internal program-point state retains typed invariants, source spans, containing-method identity, point kind, path conditions, and proof outcomes. Public callers receive the focused `SourceQueryPayload`; the CLI compatibility projector consumes the richer internal snapshot.
 - `SymbolicInvariantResult.ConservativeUnknownCount` and `HasConservativeUnknowns` expose conservative placeholders directly on invariant summaries.
-- A `SymbolicQueryResult` with `Scope.Kind=Line` exposes both per-program-point invariants and line-level summaries. `ObservedInvariant` remains the distinct union of facts observed across retained program points. The merged invariant is conservative and uses `MergeKind=ConservativeFactMerge`.
+- A `SourceQueryPayload` exposes the conservative merged invariant and bounded program-point count. Detailed legacy program-point state remains internal to the engine and CLI projection.
 - `SymbolicMergedPathFacts` backs conservative line and file merges. It separates facts that hold at every retained reachable-or-unknown program point (`AlwaysFacts`), facts that were observed but do not hold everywhere (`MaybeFacts`), and conservative placeholders such as `unknown(value)` (`ConservativeUnknowns`).
 - `SymbolicMergedPathFacts.ConservativeUnknownDiagnostics` explains each conservative placeholder with the target, placeholder text, reason, maybe-facts that caused it, and retained candidate/unreachable program-point counts.
 - When reachability is checked, unreachable program points are excluded from the conservative merge. If all retained points are unreachable, the conservative merged invariant is `false`.
-- A `SymbolicQueryResult` with `Scope.Kind=File` exposes all retained program points plus `ObservedInvariant`, `MergedPathFacts`, reachability summaries, and implication summaries. File observed invariants still use `MergeKind=DistinctFactUnion`.
-- `SymbolicQueryResult.ProgramPointSummary` exposes aggregate point count, total and maximum path-condition counts, reachability counts, and proof-outcome counts. These summaries are derived from retained program points and are recomputed after `SymbolicSourceQueryFilter` is applied.
-- `SymbolicSourceQueryFilter` can post-filter line or file results by exact node kind, program-point kind, exact source line, line range, containing method name, method-name substring, presence of facts, presence of path conditions, path-condition target, exact path-condition text, path-condition substring, reachability, presence of proofs, proof outcome, exact proof condition, or proof-condition substring; aggregate summaries are recomputed from the retained points.
+- File and line aggregation remains conservative. CLI filters are applied by the internal projection layer before external JSON/text rendering.
 - The CLI serializes the canonical point, line, file, capability, complexity, and runtime-hazard results through one stable lower-camel `--json` policy.
 - `analysisSummary` is the smallest status surface for tools that do not want nested payloads: it includes program-point count, invariant condition count, conservative unknown count, total/max path-condition counts, checked/known/unknown reachability counts, resolved/unknown proof counts, SMT enablement, executed query count, and `hasUnresolvedAnalysis`.
-- `SymbolicQueryResult` is the unified public result for point, line, span, and all-lines queries. It exposes program points, observed and conservative merged invariants, reachability, proof summaries, and SMT diagnostics; JSON projection belongs to the CLI adapter.
+- `SharpProofQueryResult` is the unified public result for point, line, span, and all-lines queries. Typed payloads expose focused summaries; JSON projection belongs to the CLI adapter.
 - `AnalysisTruncation` on query and runtime-hazard results reports stable `analysis_limit.*` events whenever a configured fact, branch, depth, or state-merge cap drops proof evidence. See [bounded analysis limits](analysis-limits.md).
-- `SmtDiagnostics` includes nested lifecycle options and an immutable health snapshot with transient retry/recovery counts, permanent-unavailability state, context recycle count, and generation. See [SMT lifecycle and health](smt-lifecycle.md).
+- `SourceQueryPayload.Smt` includes the stable solver health state, last failure code, and executed-query count. See [SMT lifecycle and health](smt-lifecycle.md).
 - Program points expose `ReachabilityWitness` and `InputDomainSummary`; line,
   span, file, and unified query results expose alternative
   `ReachabilityWitnesses` and a conservatively merged domain summary.

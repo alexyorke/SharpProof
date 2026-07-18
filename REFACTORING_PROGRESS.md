@@ -36,6 +36,11 @@ This is the active source of truth for the comprehensive refactor. Read
   `SharpProofQueryResult` now form the primary public API. CLI, explain modes,
   samples, documentation, and package consumers use it; the former query
   service is internal and its preview removal is recorded in the API snapshot.
+- [x] The preview compatibility cutoff is complete: legacy `Symbolic*` query,
+  result, evidence, error, budget, project-context, and raw SMT types are
+  internal. Focused immutable `SharpProof*` targets, payloads, evidence,
+  errors, budgets, and solver metadata form the exported surface; CLI adapters
+  preserve the established external schemas and bytes.
 
 ## Current evidence
 
@@ -43,14 +48,14 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,140 passing tests and two documented skips.
+- Six lanes: 6,141 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
 
 - [ ] Consolidate internal analysis request, context, and immutable snapshot
   shared by analyzer and Symbolic query consumers.
-- [ ] Redesign and reduce the public Symbolic API; adapt CLI while preserving
+- [x] Redesign and reduce the public Symbolic API; adapt CLI while preserving
   external output.
 - [ ] Decompose query/proof/source services and complexity/solver components by
   responsibility, deleting duplicate orchestration.
@@ -64,5 +69,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Project the new typed payloads without exposing legacy DTO graphs, then make
-raw Roslyn source/context types internal and shrink the public API snapshot.
+Decompose query/proof/source services into target resolution, execution,
+aggregation, and projection components, deleting duplicate orchestration as
+each responsibility moves.

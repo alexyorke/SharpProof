@@ -11,7 +11,7 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class SymbolicProofPipelineTests
+internal class SymbolicProofPipelineTests
 {
     [TestCase(SymbolicTruthValue.Unknown, SymbolicProofStatus.Unknown)]
     [TestCase(SymbolicTruthValue.ProvenTrue, SymbolicProofStatus.ProvenTrue)]

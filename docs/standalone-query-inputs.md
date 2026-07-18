@@ -113,8 +113,8 @@ using var session = SharpProofAnalysisSession.FromText(
         enableSmt: true,
         impliedConditions: new[] { "value >= 0" }));
 var response = session.Analyze(
-    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 2, column: 11)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
+    SharpProofQuery.Invariant(SharpProofTarget.Point(line: 2, column: 11)));
+var result = (SourceQueryPayload)response.Payload!;
 ```
 
 The CLI remains the public surface for standalone compilation profiles and

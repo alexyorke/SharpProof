@@ -369,7 +369,7 @@ internal sealed class SymbolicInvariantSnapshot
     public SymbolicAnalysisTruncationInfo Truncation { get; }
 }
 
-public sealed class SymbolicInvariantFactSummary
+internal sealed class SymbolicInvariantFactSummary
 {
     public SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
     {
@@ -440,7 +440,7 @@ internal sealed class SymbolicProgramPointAnalysis(
     public SymbolicAnalysisTruncationInfo Truncation { get; } = truncation ?? SymbolicAnalysisTruncationInfo.None;
 }
 
-public sealed class SymbolicSmtDiagnostics
+internal sealed class SymbolicSmtDiagnostics
 {
     private readonly SymbolicSmtDiagnosticsSnapshot snapshot;
 
@@ -582,7 +582,7 @@ internal sealed class SymbolicSmtDiagnosticsSnapshot(
     public SmtSolverLifecycleOptions Lifecycle { get; } = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
 }
 
-public enum SymbolicReachability
+internal enum SymbolicReachability
 {
     NotChecked,
     Unknown,

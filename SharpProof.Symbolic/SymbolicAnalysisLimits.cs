@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicAnalysisLimits
+internal sealed class SymbolicAnalysisLimits
 {
     public static readonly SymbolicAnalysisLimits Default = new();
 
@@ -101,7 +101,7 @@ public sealed class SymbolicAnalysisLimits
     }
 }
 
-public enum SymbolicAnalysisLimitKind
+internal enum SymbolicAnalysisLimitKind
 {
     IfElseFactMerge,
     SwitchFactMerge,
@@ -116,7 +116,7 @@ public enum SymbolicAnalysisLimitKind
     GuardFactsPerTargetPerState
 }
 
-public sealed class SymbolicAnalysisTruncationEvent
+internal sealed class SymbolicAnalysisTruncationEvent
 {
     internal SymbolicAnalysisTruncationEvent(
         SymbolicAnalysisLimitKind kind,
@@ -170,7 +170,7 @@ public sealed class SymbolicAnalysisTruncationEvent
     }
 }
 
-public sealed class SymbolicAnalysisTruncationInfo
+internal sealed class SymbolicAnalysisTruncationInfo
 {
     public static readonly SymbolicAnalysisTruncationInfo None = new(
         Array.Empty<SymbolicAnalysisTruncationEvent>());

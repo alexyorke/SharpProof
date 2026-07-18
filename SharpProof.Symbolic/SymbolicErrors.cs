@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Symbolic;
 
-public static class SymbolicErrorCodes
+internal static class SymbolicErrorCodes
 {
     public const string InvalidRequest = "SPQ1000";
     public const string InvalidTarget = "SPQ1001";
@@ -18,7 +18,7 @@ public static class SymbolicErrorCodes
     public const string InternalFailure = "SPQ9000";
 }
 
-public static class SymbolicErrorExitCodes
+internal static class SymbolicErrorExitCodes
 {
     public const int GateFailure = 1;
     public const int Usage = 64;
@@ -30,7 +30,7 @@ public static class SymbolicErrorExitCodes
     public const int Canceled = 130;
 }
 
-public enum SymbolicErrorCategory
+internal enum SymbolicErrorCategory
 {
     Usage,
     Input,
@@ -43,7 +43,7 @@ public enum SymbolicErrorCategory
     Internal
 }
 
-public sealed class SymbolicError
+internal sealed class SymbolicError
 {
     public SymbolicError(
         string code,
@@ -106,7 +106,7 @@ public sealed class SymbolicError
     }
 }
 
-public sealed class SymbolicErrorEnvelope
+internal sealed class SymbolicErrorEnvelope
 {
     public SymbolicErrorEnvelope(SymbolicError error)
     {
@@ -120,7 +120,7 @@ public sealed class SymbolicErrorEnvelope
     public SymbolicError Error { get; }
 }
 
-public sealed class SymbolicQueryException : Exception
+internal sealed class SymbolicQueryException : Exception
 {
     public SymbolicQueryException(SymbolicError error)
         : base(error?.Message)
@@ -137,7 +137,7 @@ public sealed class SymbolicQueryException : Exception
     public SymbolicError Error { get; }
 }
 
-public sealed class SymbolicOperationResult<T>
+internal sealed class SymbolicOperationResult<T>
     where T : class
 {
     private SymbolicOperationResult(T? value, SymbolicError? error)
@@ -167,7 +167,7 @@ public sealed class SymbolicOperationResult<T>
     }
 }
 
-public static class SymbolicErrorClassifier
+internal static class SymbolicErrorClassifier
 {
     public static SymbolicError FromException(Exception exception)
     {

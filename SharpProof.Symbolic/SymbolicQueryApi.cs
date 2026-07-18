@@ -516,7 +516,7 @@ internal sealed class SymbolicQueryExecutor
     }
 }
 
-public sealed class SymbolicQueryContext
+internal sealed class SymbolicQueryContext
 {
     public SymbolicQueryContext(
         SymbolicSourceInput source,
@@ -535,7 +535,7 @@ public sealed class SymbolicQueryContext
     public SymbolicQueryOptions Options { get; }
 }
 
-public sealed class SymbolicQueryOptions
+internal sealed class SymbolicQueryOptions
 {
     public static readonly SymbolicQueryOptions Default = new();
 
@@ -626,7 +626,7 @@ internal static class SymbolicQueryOptionHelpers
     }
 }
 
-public sealed class SymbolicSourceInput
+internal sealed class SymbolicSourceInput
 {
     internal const string DefaultFilePath = "SharpProof.Symbolic.Query.cs";
 
@@ -747,7 +747,7 @@ public sealed class SymbolicSourceInput
     }
 }
 
-public enum SymbolicSourceInputKind
+internal enum SymbolicSourceInputKind
 {
     File,
     Text,
@@ -755,7 +755,7 @@ public enum SymbolicSourceInputKind
     Node
 }
 
-public sealed class SymbolicQueryTarget
+internal sealed class SymbolicQueryTarget
 {
     private SymbolicQueryTarget(
         SymbolicQueryTargetKind kind,
@@ -877,7 +877,7 @@ public sealed class SymbolicQueryTarget
     }
 }
 
-public enum SymbolicQueryTargetKind
+internal enum SymbolicQueryTargetKind
 {
     Point,
     Position,
@@ -888,7 +888,7 @@ public enum SymbolicQueryTargetKind
     Node
 }
 
-public enum SymbolicQueryScopeKind
+internal enum SymbolicQueryScopeKind
 {
     Point,
     Line,
@@ -896,7 +896,7 @@ public enum SymbolicQueryScopeKind
     File
 }
 
-public sealed class SymbolicQueryScope
+internal sealed class SymbolicQueryScope
 {
     internal SymbolicQueryScope(
         SymbolicQueryScopeKind kind,
@@ -951,7 +951,7 @@ public sealed class SymbolicQueryScope
     internal int? EndColumn { get; }
 }
 
-public sealed class SymbolicQueryResult
+internal sealed class SymbolicQueryResult
 {
     private SymbolicQueryResult(
         SymbolicQueryScope scope,

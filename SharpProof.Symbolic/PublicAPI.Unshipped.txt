@@ -1,440 +1,506 @@
 #nullable enable
+*REMOVED*const SharpProof.Symbolic.SymbolicProgramPointKinds.Expression = "Expression" -> string!
+*REMOVED*const SharpProof.Symbolic.SymbolicProgramPointKinds.Other = "Other" -> string!
+*REMOVED*const SharpProof.Symbolic.SymbolicProgramPointKinds.Statement = "Statement" -> string!
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisMode.Bounded = 1 -> SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisMode.Deep = 2 -> SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisMode.Off = 0 -> SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.IsEnabled.get -> bool
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.MaxExpressionNodes.get -> int
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.MaxPathConditions.get -> int
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.MethodBudget.get -> System.TimeSpan
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.Mode.get -> SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.QueryTimeout.get -> System.TimeSpan
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.SmtAnalysisOptions(SharpProof.Symbolic.Smt.SmtAnalysisMode mode, System.TimeSpan queryTimeout, System.TimeSpan methodBudget, int maxPathConditions, int maxExpressionNodes, bool useSharedResultCache = false) -> void
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.UseSharedResultCache.get -> bool
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisOptions.WithOverrides(System.TimeSpan? queryTimeout = null, System.TimeSpan? methodBudget = null, int? maxPathConditions = null, int? maxExpressionNodes = null) -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService.CacheEntryCount.get -> int
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService.Dispose() -> void
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService.ExecutedQueryCount.get -> int
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService.Options.get -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+*REMOVED*SharpProof.Symbolic.Smt.SmtAnalysisService.SmtAnalysisService(SharpProof.Symbolic.Smt.SmtAnalysisOptions! options) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.CacheEntryCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.ExecutedQueryCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.MaxExpressionNodes.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.MaxPathConditions.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.MethodBudgetMilliseconds.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.SymbolicBudgetInfo(int maxPathConditions, int maxExpressionNodes, int timeoutMilliseconds, int methodBudgetMilliseconds, int executedQueryCount, int cacheEntryCount) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicBudgetInfo.TimeoutMilliseconds.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.CapabilityText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.HasUnknowns.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.IsConservative.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.Sites.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.SymbolicCapabilityResult(string! filePath, string! methodName, string! methodDisplayName, string! declarationKind, int spanStart, int spanEnd, int startLine, int startColumn, int endLine, int endColumn, SharpProof.Attributes.SharpProofCapability capabilities, string! capabilityText, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>? sites = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>? unknownReasons = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityResult.UnknownReasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.CapabilityText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.IsTransitive.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.IsUnknown.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.OperationKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.OperationText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SiteKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SourceColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SourceLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SourceSpanLength.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SourceSpanStart.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SymbolDisplayName.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.SymbolicCapabilitySite(SharpProof.Attributes.SharpProofCapability capabilities, string! capabilityText, string! siteKind, string! operationKind, string! operationText, string! symbolDisplayName, bool isTransitive, bool isUnknown, SharpProof.Symbolic.SymbolicCapabilityUnknownReason unknownReason, int sourceSpanStart, int sourceSpanLength, int sourceLine, int sourceColumn) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilitySite.UnknownReason.get -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.CancellationRequested = 8 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.DynamicDispatch = 3 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.ExternalSourceBoundary = 7 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.MetadataClassificationUnavailable = 4 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.NoContainingMethodLikeBody = 2 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.None = 0 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.RecursiveSourceCycle = 6 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.Unknown = 9 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.UnsupportedOperation = 5 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicCapabilityUnknownReason.UnsupportedTarget = 1 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.ComplexityText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.IsConservative.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.Kind.get -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.MethodDisplayName.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.SymbolicComplexityCalleeInfo(string! methodDisplayName, string! complexityText, SharpProof.Symbolic.SymbolicComplexityKind kind, bool isConservative, SharpProof.Symbolic.SymbolicComplexityUnknownReason unknownReason) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityCalleeInfo.UnknownReason.get -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.Description.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.Kind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.SourceColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.SourceLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.SourceSpanLength.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.SourceSpanStart.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityDriverInfo.SymbolicComplexityDriverInfo(string! kind, string! description, int sourceSpanStart, int sourceSpanLength, int sourceLine, int sourceColumn) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.IsConservative.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.IsRecursiveUnknown.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.IsUnknown.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.Kind.get -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.SymbolicComplexityInfo(string! text, SharpProof.Symbolic.SymbolicComplexityKind kind, bool isConservative, bool isUnknown, bool isRecursiveUnknown) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityInfo.Text.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Constant = 0 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Linear = 1 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Max = 4 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Product = 2 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Quadratic = 3 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.RecursiveUnknown = 6 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityKind.Unknown = 5 -> SharpProof.Symbolic.SymbolicComplexityKind
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult.CalleeSummaries.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityCalleeInfo!>!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult.Complexity.get -> SharpProof.Symbolic.SymbolicComplexityInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult.Drivers.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityDriverInfo!>!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult.SymbolicComplexityResult(string! filePath, string! methodName, string! methodDisplayName, string! declarationKind, int spanStart, int spanEnd, int startLine, int startColumn, int endLine, int endColumn, SharpProof.Symbolic.SymbolicComplexityInfo! complexity, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityDriverInfo!>? drivers = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityUnknownReason>? unknownReasons = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityCalleeInfo!>? calleeSummaries = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityResult.UnknownReasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityUnknownReason>!
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.CancellationRequested = 10 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.DynamicDispatch = 7 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.ExternalCallee = 6 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.NoContainingMethodLikeBody = 2 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.None = 0 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.RecursiveCycle = 8 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.Unknown = 11 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.UnknownCallee = 5 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.UnsupportedLoopShape = 3 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.UnsupportedOperation = 9 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.UnsupportedTarget = 1 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicComplexityUnknownReason.UnsupportedWhileLoop = 4 -> SharpProof.Symbolic.SymbolicComplexityUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary.Count.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary.GetDisplayReason() -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary.Reason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary.SymbolicConditionProofReasonSummary(SharpProof.Symbolic.SymbolicTruthValue truthValue, string! reason, int count) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofReasonSummary.TruthValue.get -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Column.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Condition.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.ContainsRequestedPosition.get -> bool?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.DisplayKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.FilePath.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.GetDisplayReason() -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Line.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.MethodName.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeEndColumn.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeEndLine.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeKind.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeSpanEnd.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeSpanLength.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeSpanStart.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeStartColumn.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.NodeStartLine.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Position.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.ProgramPointKind.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Proof.get -> SharpProof.Symbolic.SymbolicProofInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Reason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.RequestedColumn.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.RequestedLine.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.RequestedPosition.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.RequestedPositionDistance.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.Target.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.TruthValue.get -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofResult.ValueKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Condition.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.DisplayKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.HasMixedReachableOutcomes.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.HoldsOnAllReachablePoints.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Proof.get -> SharpProof.Symbolic.SymbolicProofInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.ProvenFalseCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.ProvenTrueCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.ReachableCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Reasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofReasonSummary!>!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.RefutedOnAllReachablePoints.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.ResolvedCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Status.get -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Summary.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.SymbolicConditionProofSummary(string! condition, int unknownCount, int provenTrueCount, int provenFalseCount, int unreachableCount, int? totalCount = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofReasonSummary!>? reasons = null, string? target = null, string? formulaKind = null, string? valueKind = null, string? formulaText = null, bool isSolverBacked = false) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.Target.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.TotalCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.UnknownCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.UnreachableCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummary.ValueKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.AlwaysFalse = 3 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.AlwaysTrue = 2 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.Mixed = 4 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.None = 0 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.Unknown = 5 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConditionProofSummaryStatus.UnreachableOnly = 1 -> SharpProof.Symbolic.SymbolicConditionProofSummaryStatus
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.CandidateProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.GetDisplayReason() -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.MaybeFactCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.MaybeFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.Reason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.SymbolicConservativeUnknownDiagnostic(string! target, string! unknownText, string! reason, System.Collections.Generic.IReadOnlyList<string!>! maybeFacts, int candidateProgramPointCount, int unreachableProgramPointCount) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.Target.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.UnknownText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic.UnreachableProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.Confidence.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.EvidenceKey.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.Kind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.Provenance.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.SourceSpanLength.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.SourceSpanStart.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.SymbolicFactInfo(string! kind, string! text, string! provenance, string! confidence, int sourceSpanStart, int sourceSpanLength, string? symbolKey = null, string? evidenceKey = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.SymbolKey.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicFactInfo.Text.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.DisplayKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.Index.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.IsConservativeUnknown.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.IsSolverBacked.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.Target.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.Text.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantCondition.ValueKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantFactSummary
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantFactSummary.Facts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantFactSummary.MergedInvariantText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantFactSummary.SymbolicInvariantFactSummary(System.Collections.Generic.IReadOnlyList<string!>! facts) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.ConditionCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.Facts.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicFactInfo!>!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.MergedText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.MergeKind.get -> SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.Proofs.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicProofInfo!>!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantInfo.SymbolicInvariantInfo(string! mergedText, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicFactInfo!>? facts = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicProofInfo!>? proofs = null, SharpProof.Symbolic.SymbolicInvariantMergeKind mergeKind = SharpProof.Symbolic.SymbolicInvariantMergeKind.Conjunction, int conditionCount = 0) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantMergeKind.Conjunction = 0 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantMergeKind.ConservativeFactMerge = 2 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantMergeKind.DistinctFactUnion = 1 -> SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.ConditionCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.Conditions.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInvariantCondition!>!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.ConservativeUnknownCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.HasConservativeUnknowns.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.IsTrivial.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.MergedInvariantText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicInvariantResult.MergeKind.get -> SharpProof.Symbolic.SymbolicInvariantMergeKind
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.AlwaysFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.CandidateProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.ConservativeUnknownCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.ConservativeUnknownDiagnostics.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConservativeUnknownDiagnostic!>!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.ConservativeUnknowns.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.IsUnreachable.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.MaybeFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.MergedFacts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.MergedInvariantText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicMergedPathFacts.UnreachableProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.DeclarationKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.EndColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.EndLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.FilePath.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.MethodDisplayName.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.MethodName.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.SpanEnd.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.SpanStart.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.StartColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.StartLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicMethodResult.SymbolicMethodResult(string? filePath, string? methodName, string? methodDisplayName, string? declarationKind, int spanStart, int spanEnd, int startLine, int startColumn, int endLine, int endColumn) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointKinds
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.MaxPathConditionCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.ProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.ProofOutcomes.get -> SharpProof.Symbolic.SymbolicProofOutcomeSummary!
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.Reachability.get -> SharpProof.Symbolic.SymbolicReachabilitySummary!
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.SymbolicProgramPointSummary(int programPointCount, int totalPathConditionCount, int maxPathConditionCount, SharpProof.Symbolic.SymbolicReachabilitySummary! reachability, SharpProof.Symbolic.SymbolicProofOutcomeSummary! proofOutcomes) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicProgramPointSummary.TotalPathConditionCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofBackend
+*REMOVED*SharpProof.Symbolic.SymbolicProofBackend.None = 0 -> SharpProof.Symbolic.SymbolicProofBackend
+*REMOVED*SharpProof.Symbolic.SymbolicProofBackend.Smt = 2 -> SharpProof.Symbolic.SymbolicProofBackend
+*REMOVED*SharpProof.Symbolic.SymbolicProofBackend.Syntactic = 1 -> SharpProof.Symbolic.SymbolicProofBackend
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.Backend.get -> SharpProof.Symbolic.SymbolicProofBackend
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.Budget.get -> SharpProof.Symbolic.SymbolicBudgetInfo?
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.CacheHit.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.ConditionText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.DisplayKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.Reason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.Status.get -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.SymbolicProofInfo(SharpProof.Symbolic.SymbolicProofStatus status, SharpProof.Symbolic.SymbolicProofBackend backend, SharpProof.Symbolic.SymbolicUnknownReason unknownReason, string! reason, bool cacheHit, SharpProof.Symbolic.SymbolicBudgetInfo? budget, string? target = null, string? conditionText = null, string? displayKind = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.Target.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicProofInfo.UnknownReason.get -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.ProvenFalseCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.ProvenTrueCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.SymbolicProofOutcomeSummary(int totalCount, int unknownCount, int provenTrueCount, int provenFalseCount, int unreachableCount) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.TotalCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.UnknownCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofOutcomeSummary.UnreachableCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus.ProvenFalse = 4 -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus.ProvenTrue = 3 -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus.Reachable = 1 -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus.Unknown = 0 -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicProofStatus.Unreachable = 2 -> SharpProof.Symbolic.SymbolicProofStatus
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.Filter.get -> SharpProof.Symbolic.SymbolicSourceQueryFilter?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.ImpliedConditions.get -> System.Collections.Immutable.ImmutableArray<string!>
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.IncludeCurrentStatementCompletionFacts.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.IncludeExpressionProgramPoints.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.References.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.MetadataReference!>
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.SmtAnalysis.get -> SharpProof.Symbolic.Smt.SmtAnalysisService?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryOptions.SymbolicQueryOptions(System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.MetadataReference!>? references = null, SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis = null, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, bool includeExpressionProgramPoints = false, bool includeCurrentStatementCompletionFacts = false, SharpProof.Symbolic.SymbolicSourceQueryFilter? filter = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.Column.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.ConditionProofs.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofSummary!>!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.FilePath.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.Filter(SharpProof.Symbolic.SymbolicSourceQueryFilter! filter) -> SharpProof.Symbolic.SymbolicQueryResult!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.InvariantInfo.get -> SharpProof.Symbolic.SymbolicInvariantInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.Line.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.LineCount.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.MergedPathFacts.get -> SharpProof.Symbolic.SymbolicMergedPathFacts!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.ObservedInvariant.get -> SharpProof.Symbolic.SymbolicInvariantResult!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.Position.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.ProgramPointCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.ProgramPointSummary.get -> SharpProof.Symbolic.SymbolicProgramPointSummary!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.Reachability.get -> SharpProof.Symbolic.SymbolicReachabilitySummary!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.ScopeKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.SpanEnd.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryResult.SpanStart.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryService
+*REMOVED*SharpProof.Symbolic.SymbolicQueryService.SymbolicQueryService() -> void
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.ColumnNumber.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.EndColumn.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.EndLine.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.IncludeNestedCallables.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.Kind.get -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.LineNumber.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.PositionOffset.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.SpanEnd.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.SpanStart.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.StartColumn.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTarget.StartLine.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.AllLines = 5 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.Line = 2 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.LineSpan = 4 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.Node = 6 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.Point = 0 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.Position = 1 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicQueryTargetKind.Span = 3 -> SharpProof.Symbolic.SymbolicQueryTargetKind
+*REMOVED*SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicReachability.NotChecked = 0 -> SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicReachability.Reachable = 2 -> SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicReachability.Unknown = 1 -> SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicReachability.Unreachable = 3 -> SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary.NotCheckedCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary.ReachableCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary.SymbolicReachabilitySummary(int notCheckedCount, int unknownCount, int reachableCount, int unreachableCount) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary.UnknownCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicReachabilitySummary.UnreachableCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Category.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Column.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.ExceptionType.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.FilePath.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.GetDisplayStatusReason() -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.InvariantInfo.get -> SharpProof.Symbolic.SymbolicInvariantInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Kind.get -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Line.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.MergedInvariantText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.NodeEndColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.NodeEndLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.NodeKind.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.NodeStartColumn.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.NodeStartLine.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.OperationText.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.PathConditionCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Proof.get -> SharpProof.Symbolic.SymbolicProofInfo!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Reachability.get -> SharpProof.Symbolic.SymbolicReachability
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.ReachabilityReason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.SpanEnd.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.SpanLength.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.SpanStart.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.Status.get -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.StatusReason.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.SymbolicFacts.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicFactInfo!>!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.TriggerCondition.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazard.TriggerPrecondition.get -> SharpProof.Symbolic.SymbolicFactInfo?
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.ArgumentNull = 15 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.ArgumentOutOfRange = 6 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.ArrayTypeMismatch = 8 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.CheckedIntegralOverflow = 7 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.DirectThrow = 0 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.DivideByZero = 2 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.DynamicNullBinding = 11 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.IndexOutOfRange = 5 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.InvalidCast = 10 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.NegativeArrayLength = 13 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.NegativeStackAllocLength = 14 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.NullableValueWithoutValue = 4 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.NullDereference = 3 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.Rethrow = 1 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.SwitchExpressionNoMatch = 12 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardKind.UnboxNull = 9 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions.Includes(SharpProof.Symbolic.SymbolicRuntimeHazardKind kind) -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions.IncludeUnprovenCandidates.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions.Kinds.get -> System.Collections.Immutable.ImmutableHashSet<SharpProof.Symbolic.SymbolicRuntimeHazardKind>!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions.SymbolicRuntimeHazardQueryOptions(bool includeUnprovenCandidates = false, System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicRuntimeHazardKind>? kinds = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.FilePath.get -> string!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.HazardCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.Hazards.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicRuntimeHazard!>!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.Line.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.LineCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.ScopeEnd.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.ScopeStart.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardStatus.Proven = 0 -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardStatus.Unknown = 2 -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardStatus.Unreachable = 1 -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicRuntimeHazardStatus.Unsupported = 3 -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.CacheEntryCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.ExecutedQueryCount.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.IsConfigured.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.IsEnabled.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.MaxExpressionNodes.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.MaxPathConditions.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.MethodBudgetMs.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.Mode.get -> SharpProof.Symbolic.Smt.SmtAnalysisMode
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.QueryTimeoutMs.get -> int
+*REMOVED*SharpProof.Symbolic.SymbolicSmtDiagnostics.SymbolicSmtDiagnostics(bool isConfigured, SharpProof.Symbolic.Smt.SmtAnalysisMode mode, bool isEnabled, int queryTimeoutMs, int methodBudgetMs, int maxPathConditions, int maxExpressionNodes, int executedQueryCount, int cacheEntryCount) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.Compilation.get -> Microsoft.CodeAnalysis.Compilation?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.FilePath.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.Kind.get -> SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.Node.get -> Microsoft.CodeAnalysis.SyntaxNode?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.SemanticModel.get -> Microsoft.CodeAnalysis.SemanticModel?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.SourceText.get -> string?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInput.SyntaxTree.get -> Microsoft.CodeAnalysis.SyntaxTree?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInputKind.File = 0 -> SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInputKind.Node = 3 -> SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInputKind.SyntaxTree = 2 -> SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceInputKind.Text = 1 -> SharpProof.Symbolic.SymbolicSourceInputKind
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ConditionTargets.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ConditionTextContains.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ConditionTexts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.IsEmpty.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.LineEnd.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.Lines.get -> System.Collections.Generic.IReadOnlyList<int>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.LineStart.get -> int?
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.MethodNameContains.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.MethodNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.NodeKinds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ProgramPointKinds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ProofConditionContains.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ProofConditions.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.ProofOutcomes.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicTruthValue>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.Reachability.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicReachability>!
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.RequireFacts.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.RequirePathConditions.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.RequireProofs.get -> bool
+*REMOVED*SharpProof.Symbolic.SymbolicSourceQueryFilter.SymbolicSourceQueryFilter(System.Collections.Generic.IEnumerable<string!>? nodeKinds = null, bool requireFacts = false, System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicReachability>? reachability = null, System.Collections.Generic.IEnumerable<string!>? methodNames = null, bool requirePathConditions = false, System.Collections.Generic.IEnumerable<string!>? conditionTargets = null, System.Collections.Generic.IEnumerable<string!>? conditionTexts = null, System.Collections.Generic.IEnumerable<string!>? conditionTextContains = null, System.Collections.Generic.IEnumerable<string!>? methodNameContains = null, System.Collections.Generic.IEnumerable<int>? lines = null, int? lineStart = null, int? lineEnd = null, System.Collections.Generic.IEnumerable<string!>? programPointKinds = null, bool requireProofs = false, System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicTruthValue>? proofOutcomes = null, System.Collections.Generic.IEnumerable<string!>? proofConditions = null, System.Collections.Generic.IEnumerable<string!>? proofConditionContains = null) -> void
+*REMOVED*SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicTruthValue.ProvenFalse = 2 -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicTruthValue.ProvenTrue = 1 -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicTruthValue.Unknown = 0 -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicTruthValue.Unreachable = 3 -> SharpProof.Symbolic.SymbolicTruthValue
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.CancellationRequested = 8 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.EncodingFailure = 9 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.ExpressionBudgetExceeded = 7 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.MethodBudgetExceeded = 5 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.None = 0 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.PathConditionBudgetExceeded = 6 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.SmtDisabled = 2 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.SmtUnavailable = 3 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.Timeout = 4 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.Unknown = 10 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*SharpProof.Symbolic.SymbolicUnknownReason.UnsupportedIrEncoding = 1 -> SharpProof.Symbolic.SymbolicUnknownReason
+*REMOVED*static readonly SharpProof.Symbolic.Smt.SmtAnalysisOptions.Default -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+*REMOVED*static readonly SharpProof.Symbolic.SymbolicQueryOptions.Default -> SharpProof.Symbolic.SymbolicQueryOptions!
+*REMOVED*static readonly SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions.Default -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions!
+*REMOVED*static readonly SharpProof.Symbolic.SymbolicSmtDiagnostics.NotConfigured -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
+*REMOVED*static readonly SharpProof.Symbolic.SymbolicSourceQueryFilter.Empty -> SharpProof.Symbolic.SymbolicSourceQueryFilter!
+*REMOVED*static SharpProof.Symbolic.Smt.SmtAnalysisOptions.ForMode(SharpProof.Symbolic.Smt.SmtAnalysisMode mode) -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+*REMOVED*static SharpProof.Symbolic.SymbolicInvariantCondition.FromConservativeUnknown(int index, string! text) -> SharpProof.Symbolic.SymbolicInvariantCondition!
+*REMOVED*static SharpProof.Symbolic.SymbolicInvariantCondition.FromText(int index, string! text) -> SharpProof.Symbolic.SymbolicInvariantCondition!
+*REMOVED*static SharpProof.Symbolic.SymbolicInvariantResult.FromFacts(System.Collections.Generic.IReadOnlyList<string!>! facts, string? mergedInvariantText = null, SharpProof.Symbolic.SymbolicInvariantMergeKind mergeKind = SharpProof.Symbolic.SymbolicInvariantMergeKind.DistinctFactUnion) -> SharpProof.Symbolic.SymbolicInvariantResult!
+*REMOVED*static SharpProof.Symbolic.SymbolicInvariantResult.FromMergedPathFacts(SharpProof.Symbolic.SymbolicMergedPathFacts! facts) -> SharpProof.Symbolic.SymbolicInvariantResult!
+*REMOVED*static SharpProof.Symbolic.SymbolicProgramPointKinds.Normalize(string? programPointKind, string? nodeKind = null) -> string!
+*REMOVED*static SharpProof.Symbolic.SymbolicProofOutcomeSummary.FromProofs(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicConditionProofResult!>! proofs) -> SharpProof.Symbolic.SymbolicProofOutcomeSummary!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.AllLines() -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.Line(int line) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.LineSpan(int startLine, int startColumn, int endLine, int endColumn) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.Node(bool includeNestedCallables = false) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.Point(int line, int column = 1) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.Position(int position) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicQueryTarget.Span(int spanStart, int spanEnd) -> SharpProof.Symbolic.SymbolicQueryTarget!
+*REMOVED*static SharpProof.Symbolic.SymbolicSmtDiagnostics.FromService(SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis) -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
+*REMOVED*static SharpProof.Symbolic.SymbolicSourceInput.FromFile(string! filePath) -> SharpProof.Symbolic.SymbolicSourceInput!
+*REMOVED*static SharpProof.Symbolic.SymbolicSourceInput.FromNode(Microsoft.CodeAnalysis.SyntaxNode! node, Microsoft.CodeAnalysis.SemanticModel! semanticModel) -> SharpProof.Symbolic.SymbolicSourceInput!
+*REMOVED*static SharpProof.Symbolic.SymbolicSourceInput.FromSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree! syntaxTree, Microsoft.CodeAnalysis.Compilation! compilation) -> SharpProof.Symbolic.SymbolicSourceInput!
+*REMOVED*static SharpProof.Symbolic.SymbolicSourceInput.FromText(string! sourceText, string? filePath = null) -> SharpProof.Symbolic.SymbolicSourceInput!
+abstract SharpProof.Symbolic.SharpProofQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+abstract SharpProof.Symbolic.SharpProofQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "exact-v2" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 2 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticVersionPropertyName = "sharpproof.evidence.schema_version" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.LegacyUnversionedVersion = 0 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 2 -> int
-SharpProof.Symbolic.SharpProofEvidenceSchema
-SharpProof.Symbolic.SymbolicSourceCompilationProfile
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.AllowUnsafe.get -> bool
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.AssemblyName.get -> string?
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.DocumentationMode.get -> Microsoft.CodeAnalysis.DocumentationMode
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.LanguageVersion.get -> Microsoft.CodeAnalysis.CSharp.LanguageVersion
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.NullableContext.get -> Microsoft.CodeAnalysis.NullableContextOptions
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.OptimizationLevel.get -> Microsoft.CodeAnalysis.OptimizationLevel
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.Platform.get -> Microsoft.CodeAnalysis.Platform
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.PreprocessorSymbols.get -> System.Collections.Immutable.ImmutableArray<string!>
-SharpProof.Symbolic.SymbolicSourceCompilationProfile.SymbolicSourceCompilationProfile(Microsoft.CodeAnalysis.CSharp.LanguageVersion languageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview, System.Collections.Generic.IEnumerable<string!>? preprocessorSymbols = null, Microsoft.CodeAnalysis.NullableContextOptions nullableContext = Microsoft.CodeAnalysis.NullableContextOptions.Disable, bool allowUnsafe = false, Microsoft.CodeAnalysis.DocumentationMode documentationMode = Microsoft.CodeAnalysis.DocumentationMode.Parse, Microsoft.CodeAnalysis.Platform platform = Microsoft.CodeAnalysis.Platform.AnyCpu, Microsoft.CodeAnalysis.OptimizationLevel optimizationLevel = Microsoft.CodeAnalysis.OptimizationLevel.Debug, string? assemblyName = null) -> void
-SharpProof.Symbolic.SymbolicSourceInput.CompilationProfile.get -> SharpProof.Symbolic.SymbolicSourceCompilationProfile?
-SharpProof.Symbolic.SymbolicSourceInput.SourceMap.get -> SharpProof.Symbolic.SymbolicSourceMap?
-SharpProof.Symbolic.SymbolicRuntimeHazardKind.InvalidCollectionCardinality = 16 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
-static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaVersion) -> bool
-static SharpProof.Symbolic.SymbolicSourceInput.FromFile(string! filePath, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile) -> SharpProof.Symbolic.SymbolicSourceInput!
-static SharpProof.Symbolic.SymbolicSourceInput.FromTextWithProfile(string! sourceText, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile, string? filePath = null) -> SharpProof.Symbolic.SymbolicSourceInput!
-SharpProof.Symbolic.SymbolicSourceInput.WithSourceMap(SharpProof.Symbolic.SymbolicSourceMap! sourceMap) -> SharpProof.Symbolic.SymbolicSourceInput!
-SharpProof.Symbolic.SymbolicSourceMap
-SharpProof.Symbolic.SymbolicSourceMap.OriginalStartColumn.get -> int
-SharpProof.Symbolic.SymbolicSourceMap.OriginalStartLine.get -> int
-SharpProof.Symbolic.SymbolicSourceMap.SourceUri.get -> string!
-SharpProof.Symbolic.SymbolicSourceMap.SymbolicSourceMap(string! sourceUri, int originalStartLine = 1, int originalStartColumn = 1) -> void
-static readonly SharpProof.Symbolic.SymbolicSourceCompilationProfile.Default -> SharpProof.Symbolic.SymbolicSourceCompilationProfile!
-SharpProof.Symbolic.SymbolicDomainPredicate
-SharpProof.Symbolic.SymbolicDomainPredicate.IsNegated.get -> bool
-SharpProof.Symbolic.SymbolicDomainPredicate.Kind.get -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicate.Reason.get -> string!
-SharpProof.Symbolic.SymbolicDomainPredicate.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicDomainPredicate.Text.get -> string!
-SharpProof.Symbolic.SymbolicDomainPredicate.Value.get -> string?
-SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Alternative = 13 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.BooleanValue = 12 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.CollectionLength = 10 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Equality = 0 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.IndexBound = 11 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Inequality = 1 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Nullness = 3 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Range = 2 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.RegularExpression = 9 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.StringContains = 8 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.StringContent = 5 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.StringLength = 4 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.StringPrefix = 6 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.StringSuffix = 7 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicDomainPredicateKind.Unsupported = 14 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
-SharpProof.Symbolic.SymbolicInputDomain
-SharpProof.Symbolic.SymbolicInputDomain.AlternativeCount.get -> int
-SharpProof.Symbolic.SymbolicInputDomain.CollectionLengthRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
-SharpProof.Symbolic.SymbolicInputDomain.DomainKind.get -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomain.ExactString.get -> string?
-SharpProof.Symbolic.SymbolicInputDomain.IntegerRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
-SharpProof.Symbolic.SymbolicInputDomain.IsIndex.get -> bool
-SharpProof.Symbolic.SymbolicInputDomain.Name.get -> string!
-SharpProof.Symbolic.SymbolicInputDomain.Nullness.get -> SharpProof.Symbolic.SymbolicNullness
-SharpProof.Symbolic.SymbolicInputDomain.Predicates.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicDomainPredicate!>!
-SharpProof.Symbolic.SymbolicInputDomain.Reason.get -> string!
-SharpProof.Symbolic.SymbolicInputDomain.RegularExpressions.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInputDomain.RelatedCollection.get -> string?
-SharpProof.Symbolic.SymbolicInputDomain.RequiredPrefixes.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInputDomain.RequiredSubstrings.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInputDomain.RequiredSuffixes.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInputDomain.Role.get -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputDomain.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicInputDomain.StringLengthRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
-SharpProof.Symbolic.SymbolicInputDomain.SymbolicNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicInputDomain.ValueKind.get -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Boolean = 1 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Collection = 5 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Index = 6 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Integer = 2 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Reference = 3 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.String = 4 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainKind.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputDomainKind
-SharpProof.Symbolic.SymbolicInputDomainSummary
-SharpProof.Symbolic.SymbolicInputDomainSummary.AlternativeCount.get -> int
-SharpProof.Symbolic.SymbolicInputDomainSummary.DomainCount.get -> int
-SharpProof.Symbolic.SymbolicInputDomainSummary.Domains.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputDomain!>!
-SharpProof.Symbolic.SymbolicInputDomainSummary.HasApproximation.get -> bool
-SharpProof.Symbolic.SymbolicInputDomainSummary.HasUnsupportedDomains.get -> bool
-SharpProof.Symbolic.SymbolicInputDomainSummary.Reason.get -> string!
-SharpProof.Symbolic.SymbolicInputDomainSummary.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.Derived = 5 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.Local = 2 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.Parameter = 1 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.Receiver = 3 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.ReceiverState = 4 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputRole.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputValueKind.Boolean = 1 -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputValueKind.Integer = 2 -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputValueKind.Reference = 3 -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputValueKind.String = 4 -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputValueKind.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicInputWitness
-SharpProof.Symbolic.SymbolicInputWitness.AssignmentCount.get -> int
-SharpProof.Symbolic.SymbolicInputWitness.Assignments.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicSatisfyingAssignment!>!
-SharpProof.Symbolic.SymbolicInputWitness.DomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
-SharpProof.Symbolic.SymbolicInputWitness.IsAvailable.get -> bool
-SharpProof.Symbolic.SymbolicInputWitness.Reason.get -> string!
-SharpProof.Symbolic.SymbolicInputWitness.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicIntegerRange
-SharpProof.Symbolic.SymbolicIntegerRange.ExactValue.get -> long?
-SharpProof.Symbolic.SymbolicIntegerRange.HasLowerBound.get -> bool
-SharpProof.Symbolic.SymbolicIntegerRange.HasUpperBound.get -> bool
-SharpProof.Symbolic.SymbolicIntegerRange.IsExact.get -> bool
-SharpProof.Symbolic.SymbolicIntegerRange.Maximum.get -> long?
-SharpProof.Symbolic.SymbolicIntegerRange.MaximumInclusive.get -> bool
-SharpProof.Symbolic.SymbolicIntegerRange.Minimum.get -> long?
-SharpProof.Symbolic.SymbolicIntegerRange.MinimumInclusive.get -> bool
-SharpProof.Symbolic.SymbolicNullness
-SharpProof.Symbolic.SymbolicNullness.NotNull = 2 -> SharpProof.Symbolic.SymbolicNullness
-SharpProof.Symbolic.SymbolicNullness.Null = 1 -> SharpProof.Symbolic.SymbolicNullness
-SharpProof.Symbolic.SymbolicNullness.Unknown = 0 -> SharpProof.Symbolic.SymbolicNullness
-SharpProof.Symbolic.SymbolicSatisfyingAssignment
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.BooleanValue.get -> bool?
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.IntegerValue.get -> long?
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.IsNull.get -> bool?
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.Reason.get -> string!
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.Role.get -> SharpProof.Symbolic.SymbolicInputRole
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.SourceName.get -> string!
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.StringValue.get -> string?
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.SymbolicName.get -> string!
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.Value.get -> string!
-SharpProof.Symbolic.SymbolicSatisfyingAssignment.ValueKind.get -> SharpProof.Symbolic.SymbolicInputValueKind
-SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicWitnessStatus.Approximate = 2 -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicWitnessStatus.Exact = 1 -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicWitnessStatus.None = 0 -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicWitnessStatus.Unsupported = 3 -> SharpProof.Symbolic.SymbolicWitnessStatus
-SharpProof.Symbolic.SymbolicConditionProofResult.CounterexampleWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
-SharpProof.Symbolic.SymbolicConditionProofResult.Witness.get -> SharpProof.Symbolic.SymbolicInputWitness!
-SharpProof.Symbolic.SymbolicRuntimeHazard.TriggerWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
-SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
-SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.TriggerWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
-SharpProof.Symbolic.SymbolicQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
-SharpProof.Symbolic.SymbolicQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
-SharpProof.Symbolic.SymbolicCapabilityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
-SharpProof.Symbolic.SymbolicCapabilitySite.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
-SharpProof.Symbolic.SymbolicComplexityCalleeInfo.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
-SharpProof.Symbolic.SymbolicComplexityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
-SharpProof.Symbolic.SymbolicProofInfo.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
-SharpProof.Symbolic.SymbolicRuntimeHazard.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
-SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.AnalysisUnavailable = 14 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.Cancellation = 12 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.DynamicDispatch = 4 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.ExternalBoundary = 5 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.InvalidInput = 13 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.NativeSolverFailure = 10 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.None = 0 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.RecursiveAnalysis = 6 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverBudget = 8 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverDisabled = 7 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverEncodingFailure = 11 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverTimeout = 9 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.Unknown = 15 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedLibraryModel = 3 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedOperation = 2 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedSyntax = 1 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonInfo
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.Category.get -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.Code.get -> string!
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsConfigurationRelated.get -> bool
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsRetryable.get -> bool
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsUnknown.get -> bool
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.RawReason.get -> string!
-SharpProof.Symbolic.SymbolicUnknownReasonInfo.Source.get -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.Capability = 1 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.Complexity = 2 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.Ensures = 5 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.Proof = 0 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.Purity = 4 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicUnknownReasonSource.RuntimeHazard = 3 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
-SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget = 9 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.ForeachElementFacts = 4 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState = 10 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.IfElseFactMerge = 0 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState = 8 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.MergedPathConditions = 7 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements = 5 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.StructuralNullStateDepth = 6 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.SwitchFactMerge = 1 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.TryCompletionBranches = 3 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimitKind.TryFactMerge = 2 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisLimits
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxFactChoiceCombinationsPerTarget.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxFiniteForeachElementFacts.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxGuardFactsPerTargetPerState.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergeableFactsPerTargetPerState.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedIfElseFacts.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedPathConditions.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedSwitchFacts.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedTryFacts.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxScopedBlockCompletionStatements.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxStructuralNullStateDepth.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.MaxTryCompletionBranches.get -> int
-SharpProof.Symbolic.SymbolicAnalysisLimits.SymbolicAnalysisLimits(int maxMergedIfElseFacts = 16, int maxMergedSwitchFacts = 32, int maxMergedTryFacts = 16, int maxTryCompletionBranches = 8, int maxFiniteForeachElementFacts = 8, int maxScopedBlockCompletionStatements = 32, int maxStructuralNullStateDepth = 4, int maxMergedPathConditions = 32, int maxMergeableFactsPerTargetPerState = 4, int maxFactChoiceCombinationsPerTarget = 64, int maxGuardFactsPerTargetPerState = 6) -> void
-SharpProof.Symbolic.SymbolicAnalysisLimits.WithOverrides(int? maxMergedIfElseFacts = null, int? maxMergedSwitchFacts = null, int? maxMergedTryFacts = null, int? maxTryCompletionBranches = null, int? maxFiniteForeachElementFacts = null, int? maxScopedBlockCompletionStatements = null, int? maxStructuralNullStateDepth = null, int? maxMergedPathConditions = null, int? maxMergeableFactsPerTargetPerState = null, int? maxFactChoiceCombinationsPerTarget = null, int? maxGuardFactsPerTargetPerState = null) -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Code.get -> string!
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Kind.get -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Limit.get -> int
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Observed.get -> int
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Provenance.get -> string!
-SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.SourceSpanStart.get -> int?
-SharpProof.Symbolic.SymbolicAnalysisTruncationInfo
-SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.Events.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicAnalysisTruncationEvent!>!
-SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.IsTruncated.get -> bool
-static readonly SharpProof.Symbolic.SymbolicAnalysisLimits.Default -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-static readonly SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.None -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-SharpProof.Symbolic.SymbolicQueryOptions.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-SharpProof.Symbolic.SymbolicQueryOptions.WithAnalysisLimits(SharpProof.Symbolic.SymbolicAnalysisLimits! analysisLimits) -> SharpProof.Symbolic.SymbolicQueryOptions!
-SharpProof.Symbolic.SymbolicQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-SharpProof.Symbolic.SymbolicConditionProofResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-SharpProof.Symbolic.SymbolicRuntimeHazard.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-SharpProof.Symbolic.Smt.SmtAnalysisHealth
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.ConsecutiveTransientFailureCount.get -> int
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.ContextGeneration.get -> long
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.ContextRecycleCount.get -> int
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.IsAvailable.get -> bool
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.IsPermanentlyUnavailable.get -> bool
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.LastFailureCode.get -> string!
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.RecoveredTransientFailureCount.get -> int
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.State.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealth.TransientRetryCount.get -> int
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Degraded = 2 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Disabled = 0 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Disposed = 4 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState.PermanentlyUnavailable = 3 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Ready = 1 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
-SharpProof.Symbolic.Smt.SmtAnalysisOptions.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
-SharpProof.Symbolic.Smt.SmtAnalysisOptions.WithLifecycle(SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions! lifecycle) -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
-SharpProof.Symbolic.Smt.SmtAnalysisService.CacheEvictionCount.get -> long
-SharpProof.Symbolic.Smt.SmtAnalysisService.CacheHitCount.get -> long
-SharpProof.Symbolic.Smt.SmtAnalysisService.CacheMissCount.get -> long
-SharpProof.Symbolic.Smt.SmtAnalysisService.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
-SharpProof.Symbolic.Smt.SmtAnalysisService.IsPermanentlyUnavailable.get -> bool
-SharpProof.Symbolic.Smt.SmtAnalysisService.RecycleCurrentThreadSolverContext() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
-SharpProof.Symbolic.Smt.SmtAnalysisService.RequestGlobalSolverContextRecycle() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
-static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheEntryCount.get -> int
-static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheEvictionCount.get -> long
-static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheHitCount.get -> long
-static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheMissCount.get -> long
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.DisposedCurrentThreadContext.get -> bool
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.LocalCacheEntryCount.get -> int
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.RequestedGeneration.get -> long
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.Scope.get -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.SharedCacheEntryCount.get -> int
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope.AllThreadsOnNextUse = 1 -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
-SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope.CurrentThread = 0 -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.DisposeCurrentThreadContextOnServiceDispose.get -> bool
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.MaxTransientRetries.get -> int
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.RecycleContextOnTransientFailure.get -> bool
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.SmtSolverLifecycleOptions(int maxTransientRetries = 1, bool recycleContextOnTransientFailure = true, bool disposeCurrentThreadContextOnServiceDispose = true) -> void
-static readonly SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.Default -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
-SharpProof.Symbolic.SymbolicSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
-SharpProof.Symbolic.SymbolicSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
-SharpProof.Symbolic.SymbolicProjectConfiguration
-SharpProof.Symbolic.SymbolicProjectConfiguration.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-SharpProof.Symbolic.SymbolicProjectConfiguration.SmtOptions.get -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
-static SharpProof.Symbolic.SymbolicProjectConfiguration.FromAnalyzerOptions(Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions! analyzerOptions) -> SharpProof.Symbolic.SymbolicProjectConfiguration!
-SharpProof.Symbolic.SymbolicProjectQueryContext
-SharpProof.Symbolic.SymbolicProjectQueryContext.AdditionalFilePaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicProjectQueryContext.AnalyzerConfigPaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicProjectQueryContext.AnalyzerOptions.get -> Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions!
-SharpProof.Symbolic.SymbolicProjectQueryContext.Compilation.get -> Microsoft.CodeAnalysis.Compilation!
-SharpProof.Symbolic.SymbolicProjectQueryContext.Configuration.get -> SharpProof.Symbolic.SymbolicProjectConfiguration!
-SharpProof.Symbolic.SymbolicProjectQueryContext.CreateQueryOptions(SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis = null, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, bool includeExpressionProgramPoints = false, bool includeCurrentStatementCompletionFacts = false, SharpProof.Symbolic.SymbolicSourceQueryFilter? filter = null) -> SharpProof.Symbolic.SymbolicQueryOptions!
-SharpProof.Symbolic.SymbolicProjectQueryContext.EffectSummaryFileCount.get -> int
-SharpProof.Symbolic.SymbolicProjectQueryContext.HasBaseline.get -> bool
-SharpProof.Symbolic.SymbolicProjectQueryContext.ProjectFilePath.get -> string?
-SharpProof.Symbolic.SymbolicProjectQueryContext.ProjectName.get -> string!
-SharpProof.Symbolic.SymbolicProjectQueryContext.SolutionFilePath.get -> string?
-SharpProof.Symbolic.SymbolicProjectQueryContext.SourceInput.get -> SharpProof.Symbolic.SymbolicSourceInput!
-SharpProof.Symbolic.SymbolicProjectQueryContext.SymbolicProjectQueryContext(Microsoft.CodeAnalysis.Compilation! compilation, Microsoft.CodeAnalysis.SyntaxTree! syntaxTree, Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions! analyzerOptions, string! projectName, string? projectFilePath = null, string? solutionFilePath = null, System.Collections.Generic.IEnumerable<string!>? analyzerConfigPaths = null) -> void
-SharpProof.Symbolic.SymbolicProjectQueryContext.SyntaxTree.get -> Microsoft.CodeAnalysis.SyntaxTree!
-SharpProof.Symbolic.SymbolicError
-SharpProof.Symbolic.SymbolicError.Category.get -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicError.Code.get -> string!
-SharpProof.Symbolic.SymbolicError.Details.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
-SharpProof.Symbolic.SymbolicError.IsRetryable.get -> bool
-SharpProof.Symbolic.SymbolicError.Message.get -> string!
-SharpProof.Symbolic.SymbolicError.RecommendedExitCode.get -> int
-SharpProof.Symbolic.SymbolicError.SymbolicError(string! code, SharpProof.Symbolic.SymbolicErrorCategory category, string! message, int recommendedExitCode, bool isRetryable = false, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>? details = null) -> void
-SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Cancellation = 7 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Input = 1 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Internal = 8 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Parse = 3 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Project = 4 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Solver = 5 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Timeout = 6 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Unsupported = 2 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorCategory.Usage = 0 -> SharpProof.Symbolic.SymbolicErrorCategory
-SharpProof.Symbolic.SymbolicErrorClassifier
-static SharpProof.Symbolic.SymbolicErrorClassifier.FromException(System.Exception! exception) -> SharpProof.Symbolic.SymbolicError!
-static SharpProof.Symbolic.SymbolicErrorClassifier.IsFatal(System.Exception! exception) -> bool
-SharpProof.Symbolic.SymbolicErrorCodes
-const SharpProof.Symbolic.SymbolicErrorCodes.Canceled = "SPQ3000" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.InternalFailure = "SPQ9000" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.InvalidRequest = "SPQ1000" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.InvalidTarget = "SPQ1001" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.NativeSolverUnavailable = "SPQ2000" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.ParseFailed = "SPQ1200" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.ProjectLoadFailed = "SPQ1300" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.ReferenceNotFound = "SPQ1101" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.SolverFailed = "SPQ2001" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.SourceNotFound = "SPQ1100" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.TimedOut = "SPQ2100" -> string!
-const SharpProof.Symbolic.SymbolicErrorCodes.UnsupportedTarget = "SPQ1002" -> string!
-SharpProof.Symbolic.SymbolicErrorEnvelope
-SharpProof.Symbolic.SymbolicErrorEnvelope.Error.get -> SharpProof.Symbolic.SymbolicError!
-SharpProof.Symbolic.SymbolicErrorEnvelope.Kind.get -> string!
-SharpProof.Symbolic.SymbolicErrorEnvelope.SchemaVersion.get -> int
-SharpProof.Symbolic.SymbolicErrorEnvelope.SymbolicErrorEnvelope(SharpProof.Symbolic.SymbolicError! error) -> void
-SharpProof.Symbolic.SymbolicErrorExitCodes
-const SharpProof.Symbolic.SymbolicErrorExitCodes.Canceled = 130 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.GateFailure = 1 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.InternalFailure = 70 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.InvalidData = 65 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.MissingInput = 66 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.TemporaryFailure = 75 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.Unavailable = 69 -> int
-const SharpProof.Symbolic.SymbolicErrorExitCodes.Usage = 64 -> int
-SharpProof.Symbolic.SymbolicOperationResult<T>
-SharpProof.Symbolic.SymbolicOperationResult<T>.Error.get -> SharpProof.Symbolic.SymbolicError?
-SharpProof.Symbolic.SymbolicOperationResult<T>.IsSuccess.get -> bool
-SharpProof.Symbolic.SymbolicOperationResult<T>.Value.get -> T?
-static SharpProof.Symbolic.SymbolicOperationResult<T>.Failure(SharpProof.Symbolic.SymbolicError! error) -> SharpProof.Symbolic.SymbolicOperationResult<T!>!
-static SharpProof.Symbolic.SymbolicOperationResult<T>.Success(T! value) -> SharpProof.Symbolic.SymbolicOperationResult<T!>!
-SharpProof.Symbolic.SymbolicQueryException
-SharpProof.Symbolic.SymbolicQueryException.Error.get -> SharpProof.Symbolic.SymbolicError!
-SharpProof.Symbolic.SymbolicQueryException.SymbolicQueryException(SharpProof.Symbolic.SymbolicError! error) -> void
-SharpProof.Symbolic.SymbolicQueryException.SymbolicQueryException(SharpProof.Symbolic.SymbolicError! error, System.Exception! innerException) -> void
-SharpProof.Symbolic.SymbolicBudgetInfo.Cache.get -> SharpProof.Symbolic.SymbolicCacheInfo?
-SharpProof.Symbolic.SymbolicBudgetInfo.SymbolicBudgetInfo(int maxPathConditions, int maxExpressionNodes, int timeoutMilliseconds, int methodBudgetMilliseconds, int executedQueryCount, int cacheEntryCount, SharpProof.Symbolic.SymbolicCacheInfo? cache) -> void
-SharpProof.Symbolic.SymbolicCacheInfo
-SharpProof.Symbolic.SymbolicCacheInfo.Entries.get -> int
-SharpProof.Symbolic.SymbolicCacheInfo.Evictions.get -> long
-SharpProof.Symbolic.SymbolicCacheInfo.Hits.get -> long
-SharpProof.Symbolic.SymbolicCacheInfo.Misses.get -> long
-SharpProof.Symbolic.SymbolicCacheInfo.SymbolicCacheInfo(long hits, long misses, int entries, long evictions) -> void
-SharpProof.Symbolic.SymbolicProofInfo.Stage.get -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofInfo.Support.get -> SharpProof.Symbolic.SymbolicProofSupport
-SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.Budgeting = 4 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.Lowering = 1 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.None = 0 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.Normalization = 2 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.ResultMapping = 6 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.SmtExecution = 5 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofStage.SyntacticClassification = 3 -> SharpProof.Symbolic.SymbolicProofStage
-SharpProof.Symbolic.SymbolicProofSupport
-SharpProof.Symbolic.SymbolicProofSupport.Approximate = 1 -> SharpProof.Symbolic.SymbolicProofSupport
-SharpProof.Symbolic.SymbolicProofSupport.Exact = 0 -> SharpProof.Symbolic.SymbolicProofSupport
-SharpProof.Symbolic.SymbolicProofSupport.Unsupported = 2 -> SharpProof.Symbolic.SymbolicProofSupport
-SharpProof.Symbolic.SymbolicQueryContext
-SharpProof.Symbolic.SymbolicQueryContext.Options.get -> SharpProof.Symbolic.SymbolicQueryOptions!
-SharpProof.Symbolic.SymbolicQueryContext.Source.get -> SharpProof.Symbolic.SymbolicSourceInput!
-SharpProof.Symbolic.SymbolicQueryContext.SymbolicQueryContext(SharpProof.Symbolic.SymbolicSourceInput! source, SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicQueryOptions? options = null) -> void
-SharpProof.Symbolic.SymbolicQueryContext.Target.get -> SharpProof.Symbolic.SymbolicQueryTarget!
-SharpProof.Symbolic.SymbolicQueryResult.Scope.get -> SharpProof.Symbolic.SymbolicQueryScope!
-SharpProof.Symbolic.SymbolicQueryScope
-SharpProof.Symbolic.SymbolicQueryScope.Column.get -> int?
-SharpProof.Symbolic.SymbolicQueryScope.FilePath.get -> string!
-SharpProof.Symbolic.SymbolicQueryScope.Kind.get -> SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryScope.Line.get -> int?
-SharpProof.Symbolic.SymbolicQueryScope.LineCount.get -> int?
-SharpProof.Symbolic.SymbolicQueryScope.Position.get -> int?
-SharpProof.Symbolic.SymbolicQueryScope.SpanEnd.get -> int?
-SharpProof.Symbolic.SymbolicQueryScope.SpanStart.get -> int?
-SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryScopeKind.File = 3 -> SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryScopeKind.Line = 1 -> SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryScopeKind.Point = 0 -> SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryScopeKind.Span = 2 -> SharpProof.Symbolic.SymbolicQueryScopeKind
-SharpProof.Symbolic.SymbolicQueryResult.ProgramPoints.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicProgramPointResult!>!
-SharpProof.Symbolic.SymbolicSourceQueryFilter.Matches(SharpProof.Symbolic.SymbolicProgramPointResult! result) -> bool
-SharpProof.Symbolic.SymbolicProgramPointResult
-SharpProof.Symbolic.SymbolicProgramPointResult.Column.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.ConditionProofs.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofResult!>!
-SharpProof.Symbolic.SymbolicProgramPointResult.ContainsRequestedPosition.get -> bool?
-SharpProof.Symbolic.SymbolicProgramPointResult.Facts.get -> System.Collections.Generic.IReadOnlyList<string!>!
-SharpProof.Symbolic.SymbolicProgramPointResult.FilePath.get -> string!
-SharpProof.Symbolic.SymbolicProgramPointResult.Invariant.get -> SharpProof.Symbolic.SymbolicInvariantResult!
-SharpProof.Symbolic.SymbolicProgramPointResult.InvariantInfo.get -> SharpProof.Symbolic.SymbolicInvariantInfo!
-SharpProof.Symbolic.SymbolicProgramPointResult.Line.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.MergedInvariantText.get -> string!
-SharpProof.Symbolic.SymbolicProgramPointResult.MethodName.get -> string?
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeEndColumn.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeEndLine.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeKind.get -> string!
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeSpanEnd.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeSpanLength.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeSpanStart.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeStartColumn.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.NodeStartLine.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.PathConditionCount.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.Position.get -> int
-SharpProof.Symbolic.SymbolicProgramPointResult.ProgramPointKind.get -> string!
-SharpProof.Symbolic.SymbolicProgramPointResult.ProofOutcomes.get -> SharpProof.Symbolic.SymbolicProofOutcomeSummary!
-SharpProof.Symbolic.SymbolicProgramPointResult.Reachability.get -> SharpProof.Symbolic.SymbolicReachability
-SharpProof.Symbolic.SymbolicProgramPointResult.ReachabilityReason.get -> string!
-SharpProof.Symbolic.SymbolicProgramPointResult.RequestedColumn.get -> int?
-SharpProof.Symbolic.SymbolicProgramPointResult.RequestedLine.get -> int?
-SharpProof.Symbolic.SymbolicProgramPointResult.RequestedPosition.get -> int?
-SharpProof.Symbolic.SymbolicProgramPointResult.RequestedPositionDistance.get -> int?
-SharpProof.Symbolic.SymbolicProgramPointResult.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicSmtDiagnostics!
-SharpProof.Symbolic.SymbolicProgramPointResult.SymbolicFacts.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicFactInfo!>!
-static SharpProof.Symbolic.SymbolicConditionProofSummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicConditionProofSummary!>!
-static SharpProof.Symbolic.SymbolicMergedPathFacts.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicMergedPathFacts!
-static SharpProof.Symbolic.SymbolicProgramPointSummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicProgramPointSummary!
-static SharpProof.Symbolic.SymbolicReachabilitySummary.FromProgramPoints(System.Collections.Generic.IEnumerable<SharpProof.Symbolic.SymbolicProgramPointResult!>! programPoints) -> SharpProof.Symbolic.SymbolicReachabilitySummary!
-SharpProof.Symbolic.SymbolicProgramPointResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
-SharpProof.Symbolic.SymbolicProgramPointResult.ReachabilityWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
-SharpProof.Symbolic.SymbolicProgramPointResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
-abstract SharpProof.Symbolic.SharpProofQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
-abstract SharpProof.Symbolic.SharpProofQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
 override sealed SharpProof.Symbolic.CapabilityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
 override sealed SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
 override sealed SharpProof.Symbolic.ComplexityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
@@ -492,9 +558,24 @@ override SharpProof.Symbolic.RuntimeHazardQueryPayload.<Clone>$() -> SharpProof.
 override SharpProof.Symbolic.RuntimeHazardQueryPayload.Equals(object? obj) -> bool
 override SharpProof.Symbolic.RuntimeHazardQueryPayload.GetHashCode() -> int
 override SharpProof.Symbolic.RuntimeHazardQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.SharpProofAnalysisBudget.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofAnalysisBudget.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofAnalysisBudget.ToString() -> string!
+override SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofAnalysisOptions.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofAnalysisOptions.ToString() -> string!
 override SharpProof.Symbolic.SharpProofBudgetMetadata.Equals(object? obj) -> bool
 override SharpProof.Symbolic.SharpProofBudgetMetadata.GetHashCode() -> int
 override SharpProof.Symbolic.SharpProofBudgetMetadata.ToString() -> string!
+override SharpProof.Symbolic.SharpProofError.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofError.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofError.ToString() -> string!
+override SharpProof.Symbolic.SharpProofEvidence.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofEvidence.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofEvidence.ToString() -> string!
+override SharpProof.Symbolic.SharpProofHazard.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofHazard.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofHazard.ToString() -> string!
 override SharpProof.Symbolic.SharpProofLocation.Equals(object? obj) -> bool
 override SharpProof.Symbolic.SharpProofLocation.GetHashCode() -> int
 override SharpProof.Symbolic.SharpProofLocation.ToString() -> string!
@@ -507,6 +588,15 @@ override SharpProof.Symbolic.SharpProofQueryPayload.ToString() -> string!
 override SharpProof.Symbolic.SharpProofQueryResult.Equals(object? obj) -> bool
 override SharpProof.Symbolic.SharpProofQueryResult.GetHashCode() -> int
 override SharpProof.Symbolic.SharpProofQueryResult.ToString() -> string!
+override SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofRuntimeHazardOptions.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofRuntimeHazardOptions.ToString() -> string!
+override SharpProof.Symbolic.SharpProofSmtMetadata.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofSmtMetadata.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofSmtMetadata.ToString() -> string!
+override SharpProof.Symbolic.SharpProofTarget.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofTarget.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofTarget.ToString() -> string!
 override SharpProof.Symbolic.SharpProofTruncationReason.Equals(object? obj) -> bool
 override SharpProof.Symbolic.SharpProofTruncationReason.GetHashCode() -> int
 override SharpProof.Symbolic.SharpProofTruncationReason.ToString() -> string!
@@ -522,65 +612,140 @@ override SharpProof.Symbolic.SourceQueryPayload.Equals(object? obj) -> bool
 override SharpProof.Symbolic.SourceQueryPayload.GetHashCode() -> int
 override SharpProof.Symbolic.SourceQueryPayload.ToString() -> string!
 SharpProof.Symbolic.CapabilityQuery
-SharpProof.Symbolic.CapabilityQuery.CapabilityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.CapabilityQuery.CapabilityQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.CapabilityQuery.Equals(SharpProof.Symbolic.CapabilityQuery? other) -> bool
 SharpProof.Symbolic.CapabilityQueryPayload
-SharpProof.Symbolic.CapabilityQueryPayload.CapabilityQueryPayload(SharpProof.Symbolic.SymbolicCapabilityResult! Value) -> void
-SharpProof.Symbolic.CapabilityQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicCapabilityResult! Value) -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Capabilities.get -> string!
 SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.CapabilityQueryPayload? other) -> bool
-SharpProof.Symbolic.CapabilityQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicCapabilityResult!
-SharpProof.Symbolic.CapabilityQueryPayload.Value.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.HasUnknowns.get -> bool
+SharpProof.Symbolic.CapabilityQueryPayload.Method.get -> string!
+SharpProof.Symbolic.CapabilityQueryPayload.Sites.get -> System.Collections.Immutable.ImmutableArray<string!>
 SharpProof.Symbolic.ComplexityQuery
-SharpProof.Symbolic.ComplexityQuery.ComplexityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.ComplexityQuery.ComplexityQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.ComplexityQuery.Equals(SharpProof.Symbolic.ComplexityQuery? other) -> bool
 SharpProof.Symbolic.ComplexityQueryPayload
-SharpProof.Symbolic.ComplexityQueryPayload.ComplexityQueryPayload(SharpProof.Symbolic.SymbolicComplexityResult! Value) -> void
-SharpProof.Symbolic.ComplexityQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicComplexityResult! Value) -> void
+SharpProof.Symbolic.ComplexityQueryPayload.CalleeSummaries.get -> System.Collections.Immutable.ImmutableArray<string!>
+SharpProof.Symbolic.ComplexityQueryPayload.Complexity.get -> string!
+SharpProof.Symbolic.ComplexityQueryPayload.Drivers.get -> System.Collections.Immutable.ImmutableArray<string!>
 SharpProof.Symbolic.ComplexityQueryPayload.Equals(SharpProof.Symbolic.ComplexityQueryPayload? other) -> bool
-SharpProof.Symbolic.ComplexityQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicComplexityResult!
-SharpProof.Symbolic.ComplexityQueryPayload.Value.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.IsConservative.get -> bool
+SharpProof.Symbolic.ComplexityQueryPayload.Method.get -> string!
 SharpProof.Symbolic.ConditionQuery
-SharpProof.Symbolic.ConditionQuery.ConditionQuery(SharpProof.Symbolic.SymbolicQueryTarget! target, string! conditionText) -> void
+SharpProof.Symbolic.ConditionQuery.ConditionQuery(SharpProof.Symbolic.SharpProofTarget! target, string! conditionText) -> void
 SharpProof.Symbolic.ConditionQuery.ConditionText.get -> string!
 SharpProof.Symbolic.ConditionQuery.Equals(SharpProof.Symbolic.ConditionQuery? other) -> bool
 SharpProof.Symbolic.ConditionQueryPayload
-SharpProof.Symbolic.ConditionQueryPayload.ConditionQueryPayload(SharpProof.Symbolic.SymbolicConditionProofResult! Value) -> void
-SharpProof.Symbolic.ConditionQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicConditionProofResult! Value) -> void
+SharpProof.Symbolic.ConditionQueryPayload.Condition.get -> string!
 SharpProof.Symbolic.ConditionQueryPayload.Equals(SharpProof.Symbolic.ConditionQueryPayload? other) -> bool
-SharpProof.Symbolic.ConditionQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicConditionProofResult!
-SharpProof.Symbolic.ConditionQueryPayload.Value.init -> void
+SharpProof.Symbolic.ConditionQueryPayload.IsSolverBacked.get -> bool
+SharpProof.Symbolic.ConditionQueryPayload.Reason.get -> string!
+SharpProof.Symbolic.ConditionQueryPayload.Truth.get -> string!
 SharpProof.Symbolic.InvariantQuery
 SharpProof.Symbolic.InvariantQuery.Equals(SharpProof.Symbolic.InvariantQuery? other) -> bool
-SharpProof.Symbolic.InvariantQuery.InvariantQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.InvariantQuery.InvariantQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.MethodQuery
 SharpProof.Symbolic.MethodQuery.Equals(SharpProof.Symbolic.MethodQuery? other) -> bool
-SharpProof.Symbolic.MethodQuery.MethodQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.MethodQuery.MethodQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.ReachabilityQuery
 SharpProof.Symbolic.ReachabilityQuery.Equals(SharpProof.Symbolic.ReachabilityQuery? other) -> bool
-SharpProof.Symbolic.ReachabilityQuery.ReachabilityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.ReachabilityQuery.ReachabilityQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.RuntimeHazardQuery
 SharpProof.Symbolic.RuntimeHazardQuery.Equals(SharpProof.Symbolic.RuntimeHazardQuery? other) -> bool
-SharpProof.Symbolic.RuntimeHazardQuery.Options.get -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions!
-SharpProof.Symbolic.RuntimeHazardQuery.RuntimeHazardQuery(SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions! options) -> void
+SharpProof.Symbolic.RuntimeHazardQuery.Options.get -> SharpProof.Symbolic.SharpProofRuntimeHazardOptions!
+SharpProof.Symbolic.RuntimeHazardQuery.RuntimeHazardQuery(SharpProof.Symbolic.SharpProofTarget! target, SharpProof.Symbolic.SharpProofRuntimeHazardOptions! options) -> void
 SharpProof.Symbolic.RuntimeHazardQueryPayload
-SharpProof.Symbolic.RuntimeHazardQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! Value) -> void
 SharpProof.Symbolic.RuntimeHazardQueryPayload.Equals(SharpProof.Symbolic.RuntimeHazardQueryPayload? other) -> bool
-SharpProof.Symbolic.RuntimeHazardQueryPayload.RuntimeHazardQueryPayload(SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! Value) -> void
-SharpProof.Symbolic.RuntimeHazardQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!
-SharpProof.Symbolic.RuntimeHazardQueryPayload.Value.init -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Hazards.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard!>
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Smt.get -> SharpProof.Symbolic.SharpProofSmtMetadata!
+SharpProof.Symbolic.SharpProofAnalysisBudget
+SharpProof.Symbolic.SharpProofAnalysisBudget.<Clone>$() -> SharpProof.Symbolic.SharpProofAnalysisBudget!
+SharpProof.Symbolic.SharpProofAnalysisBudget.Deconstruct(out int MaxMergedIfElseFacts, out int MaxMergedSwitchFacts, out int MaxMergedTryFacts, out int MaxTryCompletionBranches, out int MaxFiniteForeachElementFacts, out int MaxScopedBlockCompletionStatements, out int MaxStructuralNullStateDepth, out int MaxMergedPathConditions, out int MaxMergeableFactsPerTargetPerState, out int MaxFactChoiceCombinationsPerTarget, out int MaxGuardFactsPerTargetPerState) -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.Equals(SharpProof.Symbolic.SharpProofAnalysisBudget? other) -> bool
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxFactChoiceCombinationsPerTarget.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxFactChoiceCombinationsPerTarget.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxFiniteForeachElementFacts.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxFiniteForeachElementFacts.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxGuardFactsPerTargetPerState.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxGuardFactsPerTargetPerState.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergeableFactsPerTargetPerState.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergeableFactsPerTargetPerState.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedIfElseFacts.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedIfElseFacts.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedPathConditions.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedPathConditions.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedSwitchFacts.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedSwitchFacts.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedTryFacts.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxMergedTryFacts.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxScopedBlockCompletionStatements.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxScopedBlockCompletionStatements.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxStructuralNullStateDepth.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxStructuralNullStateDepth.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxTryCompletionBranches.get -> int
+SharpProof.Symbolic.SharpProofAnalysisBudget.MaxTryCompletionBranches.init -> void
+SharpProof.Symbolic.SharpProofAnalysisBudget.SharpProofAnalysisBudget(int MaxMergedIfElseFacts = 16, int MaxMergedSwitchFacts = 32, int MaxMergedTryFacts = 16, int MaxTryCompletionBranches = 8, int MaxFiniteForeachElementFacts = 8, int MaxScopedBlockCompletionStatements = 32, int MaxStructuralNullStateDepth = 4, int MaxMergedPathConditions = 32, int MaxMergeableFactsPerTargetPerState = 4, int MaxFactChoiceCombinationsPerTarget = 64, int MaxGuardFactsPerTargetPerState = 6) -> void
+SharpProof.Symbolic.SharpProofAnalysisOptions
+SharpProof.Symbolic.SharpProofAnalysisOptions.<Clone>$() -> SharpProof.Symbolic.SharpProofAnalysisOptions!
+SharpProof.Symbolic.SharpProofAnalysisOptions.AnalysisBudget.get -> SharpProof.Symbolic.SharpProofAnalysisBudget!
+SharpProof.Symbolic.SharpProofAnalysisOptions.EnableSmt.get -> bool
+SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(SharpProof.Symbolic.SharpProofAnalysisOptions? other) -> bool
+SharpProof.Symbolic.SharpProofAnalysisOptions.ImpliedConditions.get -> System.Collections.Immutable.ImmutableArray<string!>
+SharpProof.Symbolic.SharpProofAnalysisOptions.SharpProofAnalysisOptions(bool enableSmt = false, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, SharpProof.Symbolic.SharpProofAnalysisBudget? analysisBudget = null) -> void
 SharpProof.Symbolic.SharpProofAnalysisSession
 SharpProof.Symbolic.SharpProofAnalysisSession.Analyze(SharpProof.Symbolic.SharpProofQuery! query, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SharpProofQueryResult!
 SharpProof.Symbolic.SharpProofAnalysisSession.Dispose() -> void
 SharpProof.Symbolic.SharpProofBudgetMetadata
 SharpProof.Symbolic.SharpProofBudgetMetadata.<Clone>$() -> SharpProof.Symbolic.SharpProofBudgetMetadata!
-SharpProof.Symbolic.SharpProofBudgetMetadata.Deconstruct(out SharpProof.Symbolic.SymbolicAnalysisLimits! Limits, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata.Deconstruct(out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
 SharpProof.Symbolic.SharpProofBudgetMetadata.Equals(SharpProof.Symbolic.SharpProofBudgetMetadata? other) -> bool
 SharpProof.Symbolic.SharpProofBudgetMetadata.IsExhausted.get -> bool
-SharpProof.Symbolic.SharpProofBudgetMetadata.Limits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-SharpProof.Symbolic.SharpProofBudgetMetadata.Limits.init -> void
-SharpProof.Symbolic.SharpProofBudgetMetadata.SharpProofBudgetMetadata(SharpProof.Symbolic.SymbolicAnalysisLimits! Limits, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata.SharpProofBudgetMetadata(System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
 SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!>
 SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.init -> void
+SharpProof.Symbolic.SharpProofError
+SharpProof.Symbolic.SharpProofError.<Clone>$() -> SharpProof.Symbolic.SharpProofError!
+SharpProof.Symbolic.SharpProofError.Category.get -> string!
+SharpProof.Symbolic.SharpProofError.Category.init -> void
+SharpProof.Symbolic.SharpProofError.Code.get -> string!
+SharpProof.Symbolic.SharpProofError.Code.init -> void
+SharpProof.Symbolic.SharpProofError.Deconstruct(out string! Code, out string! Category, out string! Message, out int RecommendedExitCode, out bool IsRetryable, out System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
+SharpProof.Symbolic.SharpProofError.Details.get -> System.Collections.Immutable.ImmutableDictionary<string!, string!>!
+SharpProof.Symbolic.SharpProofError.Details.init -> void
+SharpProof.Symbolic.SharpProofError.Equals(SharpProof.Symbolic.SharpProofError? other) -> bool
+SharpProof.Symbolic.SharpProofError.IsRetryable.get -> bool
+SharpProof.Symbolic.SharpProofError.IsRetryable.init -> void
+SharpProof.Symbolic.SharpProofError.Message.get -> string!
+SharpProof.Symbolic.SharpProofError.Message.init -> void
+SharpProof.Symbolic.SharpProofError.RecommendedExitCode.get -> int
+SharpProof.Symbolic.SharpProofError.RecommendedExitCode.init -> void
+SharpProof.Symbolic.SharpProofError.SharpProofError(string! Code, string! Category, string! Message, int RecommendedExitCode, bool IsRetryable, System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
+SharpProof.Symbolic.SharpProofEvidence
+SharpProof.Symbolic.SharpProofEvidence.<Clone>$() -> SharpProof.Symbolic.SharpProofEvidence!
+SharpProof.Symbolic.SharpProofEvidence.Deconstruct(out string! Status, out string! Reason) -> void
+SharpProof.Symbolic.SharpProofEvidence.Equals(SharpProof.Symbolic.SharpProofEvidence? other) -> bool
+SharpProof.Symbolic.SharpProofEvidence.Reason.get -> string!
+SharpProof.Symbolic.SharpProofEvidence.Reason.init -> void
+SharpProof.Symbolic.SharpProofEvidence.SharpProofEvidence(string! Status, string! Reason) -> void
+SharpProof.Symbolic.SharpProofEvidence.Status.get -> string!
+SharpProof.Symbolic.SharpProofEvidence.Status.init -> void
+SharpProof.Symbolic.SharpProofEvidenceSchema
+SharpProof.Symbolic.SharpProofHazard
+SharpProof.Symbolic.SharpProofHazard.<Clone>$() -> SharpProof.Symbolic.SharpProofHazard!
+SharpProof.Symbolic.SharpProofHazard.Deconstruct(out string! Kind, out string! Status, out string! Reason, out string! ExceptionType, out string! Operation, out SharpProof.Symbolic.SharpProofLocation! Location) -> void
+SharpProof.Symbolic.SharpProofHazard.Equals(SharpProof.Symbolic.SharpProofHazard? other) -> bool
+SharpProof.Symbolic.SharpProofHazard.ExceptionType.get -> string!
+SharpProof.Symbolic.SharpProofHazard.ExceptionType.init -> void
+SharpProof.Symbolic.SharpProofHazard.Kind.get -> string!
+SharpProof.Symbolic.SharpProofHazard.Kind.init -> void
+SharpProof.Symbolic.SharpProofHazard.Location.get -> SharpProof.Symbolic.SharpProofLocation!
+SharpProof.Symbolic.SharpProofHazard.Location.init -> void
+SharpProof.Symbolic.SharpProofHazard.Operation.get -> string!
+SharpProof.Symbolic.SharpProofHazard.Operation.init -> void
+SharpProof.Symbolic.SharpProofHazard.Reason.get -> string!
+SharpProof.Symbolic.SharpProofHazard.Reason.init -> void
+SharpProof.Symbolic.SharpProofHazard.SharpProofHazard(string! Kind, string! Status, string! Reason, string! ExceptionType, string! Operation, SharpProof.Symbolic.SharpProofLocation! Location) -> void
+SharpProof.Symbolic.SharpProofHazard.Status.get -> string!
+SharpProof.Symbolic.SharpProofHazard.Status.init -> void
 SharpProof.Symbolic.SharpProofLocation
 SharpProof.Symbolic.SharpProofLocation.<Clone>$() -> SharpProof.Symbolic.SharpProofLocation!
 SharpProof.Symbolic.SharpProofLocation.Column.get -> int?
@@ -599,12 +764,12 @@ SharpProof.Symbolic.SharpProofLocation.SpanEnd.init -> void
 SharpProof.Symbolic.SharpProofLocation.SpanStart.get -> int?
 SharpProof.Symbolic.SharpProofLocation.SpanStart.init -> void
 SharpProof.Symbolic.SharpProofQuery
-SharpProof.Symbolic.SharpProofQuery.Deconstruct(out SharpProof.Symbolic.SharpProofQueryKind Kind, out SharpProof.Symbolic.SymbolicQueryTarget! Target) -> void
+SharpProof.Symbolic.SharpProofQuery.Deconstruct(out SharpProof.Symbolic.SharpProofQueryKind Kind, out SharpProof.Symbolic.SharpProofTarget! Target) -> void
 SharpProof.Symbolic.SharpProofQuery.Kind.get -> SharpProof.Symbolic.SharpProofQueryKind
 SharpProof.Symbolic.SharpProofQuery.Kind.init -> void
 SharpProof.Symbolic.SharpProofQuery.SharpProofQuery(SharpProof.Symbolic.SharpProofQuery! original) -> void
-SharpProof.Symbolic.SharpProofQuery.SharpProofQuery(SharpProof.Symbolic.SharpProofQueryKind Kind, SharpProof.Symbolic.SymbolicQueryTarget! Target) -> void
-SharpProof.Symbolic.SharpProofQuery.Target.get -> SharpProof.Symbolic.SymbolicQueryTarget!
+SharpProof.Symbolic.SharpProofQuery.SharpProofQuery(SharpProof.Symbolic.SharpProofQueryKind Kind, SharpProof.Symbolic.SharpProofTarget! Target) -> void
+SharpProof.Symbolic.SharpProofQuery.Target.get -> SharpProof.Symbolic.SharpProofTarget!
 SharpProof.Symbolic.SharpProofQuery.Target.init -> void
 SharpProof.Symbolic.SharpProofQueryKind
 SharpProof.Symbolic.SharpProofQueryKind.Capabilities = 6 -> SharpProof.Symbolic.SharpProofQueryKind
@@ -622,11 +787,11 @@ SharpProof.Symbolic.SharpProofQueryResult
 SharpProof.Symbolic.SharpProofQueryResult.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryResult!
 SharpProof.Symbolic.SharpProofQueryResult.Budget.get -> SharpProof.Symbolic.SharpProofBudgetMetadata!
 SharpProof.Symbolic.SharpProofQueryResult.Budget.init -> void
-SharpProof.Symbolic.SharpProofQueryResult.Deconstruct(out SharpProof.Symbolic.SharpProofQueryStatus Status, out SharpProof.Symbolic.SharpProofQuery! Query, out SharpProof.Symbolic.SharpProofLocation! Location, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, out SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!> Evidence, out SharpProof.Symbolic.SharpProofQueryPayload? Payload, out SharpProof.Symbolic.SymbolicError? Error) -> void
+SharpProof.Symbolic.SharpProofQueryResult.Deconstruct(out SharpProof.Symbolic.SharpProofQueryStatus Status, out SharpProof.Symbolic.SharpProofQuery! Query, out SharpProof.Symbolic.SharpProofLocation! Location, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, out SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofEvidence!> Evidence, out SharpProof.Symbolic.SharpProofQueryPayload? Payload, out SharpProof.Symbolic.SharpProofError? Error) -> void
 SharpProof.Symbolic.SharpProofQueryResult.Equals(SharpProof.Symbolic.SharpProofQueryResult? other) -> bool
-SharpProof.Symbolic.SharpProofQueryResult.Error.get -> SharpProof.Symbolic.SymbolicError?
+SharpProof.Symbolic.SharpProofQueryResult.Error.get -> SharpProof.Symbolic.SharpProofError?
 SharpProof.Symbolic.SharpProofQueryResult.Error.init -> void
-SharpProof.Symbolic.SharpProofQueryResult.Evidence.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!>
+SharpProof.Symbolic.SharpProofQueryResult.Evidence.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofEvidence!>
 SharpProof.Symbolic.SharpProofQueryResult.Evidence.init -> void
 SharpProof.Symbolic.SharpProofQueryResult.IsSuccess.get -> bool
 SharpProof.Symbolic.SharpProofQueryResult.Location.get -> SharpProof.Symbolic.SharpProofLocation!
@@ -635,7 +800,7 @@ SharpProof.Symbolic.SharpProofQueryResult.Payload.get -> SharpProof.Symbolic.Sha
 SharpProof.Symbolic.SharpProofQueryResult.Payload.init -> void
 SharpProof.Symbolic.SharpProofQueryResult.Query.get -> SharpProof.Symbolic.SharpProofQuery!
 SharpProof.Symbolic.SharpProofQueryResult.Query.init -> void
-SharpProof.Symbolic.SharpProofQueryResult.SharpProofQueryResult(SharpProof.Symbolic.SharpProofQueryStatus Status, SharpProof.Symbolic.SharpProofQuery! Query, SharpProof.Symbolic.SharpProofLocation! Location, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!> Evidence, SharpProof.Symbolic.SharpProofQueryPayload? Payload, SharpProof.Symbolic.SymbolicError? Error) -> void
+SharpProof.Symbolic.SharpProofQueryResult.SharpProofQueryResult(SharpProof.Symbolic.SharpProofQueryStatus Status, SharpProof.Symbolic.SharpProofQuery! Query, SharpProof.Symbolic.SharpProofLocation! Location, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofEvidence!> Evidence, SharpProof.Symbolic.SharpProofQueryPayload? Payload, SharpProof.Symbolic.SharpProofError? Error) -> void
 SharpProof.Symbolic.SharpProofQueryResult.Status.get -> SharpProof.Symbolic.SharpProofQueryStatus
 SharpProof.Symbolic.SharpProofQueryResult.Status.init -> void
 SharpProof.Symbolic.SharpProofQueryResult.UnknownReasons.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!>
@@ -645,6 +810,48 @@ SharpProof.Symbolic.SharpProofQueryStatus.Canceled = 3 -> SharpProof.Symbolic.Sh
 SharpProof.Symbolic.SharpProofQueryStatus.Failed = 2 -> SharpProof.Symbolic.SharpProofQueryStatus
 SharpProof.Symbolic.SharpProofQueryStatus.Succeeded = 0 -> SharpProof.Symbolic.SharpProofQueryStatus
 SharpProof.Symbolic.SharpProofQueryStatus.Unknown = 1 -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.<Clone>$() -> SharpProof.Symbolic.SharpProofRuntimeHazardOptions!
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Deconstruct(out bool IncludeUnprovenCandidates, out System.Collections.Immutable.ImmutableArray<string!> Kinds) -> void
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Equals(SharpProof.Symbolic.SharpProofRuntimeHazardOptions? other) -> bool
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.IncludeUnprovenCandidates.get -> bool
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.IncludeUnprovenCandidates.init -> void
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Kinds.get -> System.Collections.Immutable.ImmutableArray<string!>
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Kinds.init -> void
+SharpProof.Symbolic.SharpProofRuntimeHazardOptions.SharpProofRuntimeHazardOptions(bool IncludeUnprovenCandidates = false, System.Collections.Immutable.ImmutableArray<string!> Kinds = default(System.Collections.Immutable.ImmutableArray<string!>)) -> void
+SharpProof.Symbolic.SharpProofSmtMetadata
+SharpProof.Symbolic.SharpProofSmtMetadata.<Clone>$() -> SharpProof.Symbolic.SharpProofSmtMetadata!
+SharpProof.Symbolic.SharpProofSmtMetadata.Deconstruct(out string! State, out string! LastFailureCode, out int ExecutedQueryCount) -> void
+SharpProof.Symbolic.SharpProofSmtMetadata.Equals(SharpProof.Symbolic.SharpProofSmtMetadata? other) -> bool
+SharpProof.Symbolic.SharpProofSmtMetadata.ExecutedQueryCount.get -> int
+SharpProof.Symbolic.SharpProofSmtMetadata.ExecutedQueryCount.init -> void
+SharpProof.Symbolic.SharpProofSmtMetadata.LastFailureCode.get -> string!
+SharpProof.Symbolic.SharpProofSmtMetadata.LastFailureCode.init -> void
+SharpProof.Symbolic.SharpProofSmtMetadata.SharpProofSmtMetadata(string! State, string! LastFailureCode, int ExecutedQueryCount) -> void
+SharpProof.Symbolic.SharpProofSmtMetadata.State.get -> string!
+SharpProof.Symbolic.SharpProofSmtMetadata.State.init -> void
+SharpProof.Symbolic.SharpProofTarget
+SharpProof.Symbolic.SharpProofTarget.<Clone>$() -> SharpProof.Symbolic.SharpProofTarget!
+SharpProof.Symbolic.SharpProofTarget.Column.get -> int?
+SharpProof.Symbolic.SharpProofTarget.EndColumn.get -> int?
+SharpProof.Symbolic.SharpProofTarget.EndLine.get -> int?
+SharpProof.Symbolic.SharpProofTarget.Equals(SharpProof.Symbolic.SharpProofTarget? other) -> bool
+SharpProof.Symbolic.SharpProofTarget.IncludeNestedCallables.get -> bool
+SharpProof.Symbolic.SharpProofTarget.Kind.get -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTarget.Line.get -> int?
+SharpProof.Symbolic.SharpProofTarget.Position.get -> int?
+SharpProof.Symbolic.SharpProofTarget.SpanEnd.get -> int?
+SharpProof.Symbolic.SharpProofTarget.SpanStart.get -> int?
+SharpProof.Symbolic.SharpProofTarget.StartColumn.get -> int?
+SharpProof.Symbolic.SharpProofTarget.StartLine.get -> int?
+SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.AllLines = 5 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.Line = 2 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.LineSpan = 4 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.Node = 6 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.Point = 0 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.Position = 1 -> SharpProof.Symbolic.SharpProofTargetKind
+SharpProof.Symbolic.SharpProofTargetKind.Span = 3 -> SharpProof.Symbolic.SharpProofTargetKind
 SharpProof.Symbolic.SharpProofTruncationReason
 SharpProof.Symbolic.SharpProofTruncationReason.<Clone>$() -> SharpProof.Symbolic.SharpProofTruncationReason!
 SharpProof.Symbolic.SharpProofTruncationReason.Code.get -> string!
@@ -662,11 +869,11 @@ SharpProof.Symbolic.SharpProofTruncationReason.SourceSpanStart.get -> int?
 SharpProof.Symbolic.SharpProofTruncationReason.SourceSpanStart.init -> void
 SharpProof.Symbolic.SharpProofUnknownReason
 SharpProof.Symbolic.SharpProofUnknownReason.<Clone>$() -> SharpProof.Symbolic.SharpProofUnknownReason!
-SharpProof.Symbolic.SharpProofUnknownReason.Category.get -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SharpProofUnknownReason.Category.get -> string!
 SharpProof.Symbolic.SharpProofUnknownReason.Category.init -> void
 SharpProof.Symbolic.SharpProofUnknownReason.Code.get -> string!
 SharpProof.Symbolic.SharpProofUnknownReason.Code.init -> void
-SharpProof.Symbolic.SharpProofUnknownReason.Deconstruct(out string! Code, out SharpProof.Symbolic.SymbolicUnknownReasonCategory Category, out string! Message, out bool IsRetryable, out bool IsConfigurationRelated) -> void
+SharpProof.Symbolic.SharpProofUnknownReason.Deconstruct(out string! Code, out string! Category, out string! Message, out bool IsRetryable, out bool IsConfigurationRelated) -> void
 SharpProof.Symbolic.SharpProofUnknownReason.Equals(SharpProof.Symbolic.SharpProofUnknownReason? other) -> bool
 SharpProof.Symbolic.SharpProofUnknownReason.IsConfigurationRelated.get -> bool
 SharpProof.Symbolic.SharpProofUnknownReason.IsConfigurationRelated.init -> void
@@ -674,16 +881,18 @@ SharpProof.Symbolic.SharpProofUnknownReason.IsRetryable.get -> bool
 SharpProof.Symbolic.SharpProofUnknownReason.IsRetryable.init -> void
 SharpProof.Symbolic.SharpProofUnknownReason.Message.get -> string!
 SharpProof.Symbolic.SharpProofUnknownReason.Message.init -> void
-SharpProof.Symbolic.SharpProofUnknownReason.SharpProofUnknownReason(string! Code, SharpProof.Symbolic.SymbolicUnknownReasonCategory Category, string! Message, bool IsRetryable, bool IsConfigurationRelated) -> void
+SharpProof.Symbolic.SharpProofUnknownReason.SharpProofUnknownReason(string! Code, string! Category, string! Message, bool IsRetryable, bool IsConfigurationRelated) -> void
 SharpProof.Symbolic.SourceLocationQuery
 SharpProof.Symbolic.SourceLocationQuery.Equals(SharpProof.Symbolic.SourceLocationQuery? other) -> bool
-SharpProof.Symbolic.SourceLocationQuery.SourceLocationQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.SourceLocationQuery.SourceLocationQuery(SharpProof.Symbolic.SharpProofTarget! target) -> void
 SharpProof.Symbolic.SourceQueryPayload
-SharpProof.Symbolic.SourceQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicQueryResult! Value) -> void
+SharpProof.Symbolic.SourceQueryPayload.AllConditionsHold.get -> bool
+SharpProof.Symbolic.SourceQueryPayload.ConditionProofCount.get -> int
 SharpProof.Symbolic.SourceQueryPayload.Equals(SharpProof.Symbolic.SourceQueryPayload? other) -> bool
-SharpProof.Symbolic.SourceQueryPayload.SourceQueryPayload(SharpProof.Symbolic.SymbolicQueryResult! Value) -> void
-SharpProof.Symbolic.SourceQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicQueryResult!
-SharpProof.Symbolic.SourceQueryPayload.Value.init -> void
+SharpProof.Symbolic.SourceQueryPayload.Invariant.get -> string!
+SharpProof.Symbolic.SourceQueryPayload.ProgramPointCount.get -> int
+SharpProof.Symbolic.SourceQueryPayload.Smt.get -> SharpProof.Symbolic.SharpProofSmtMetadata!
+SharpProof.Symbolic.SourceQueryPayload.UnknownProofCount.get -> int
 static SharpProof.Symbolic.CapabilityQuery.operator !=(SharpProof.Symbolic.CapabilityQuery? left, SharpProof.Symbolic.CapabilityQuery? right) -> bool
 static SharpProof.Symbolic.CapabilityQuery.operator ==(SharpProof.Symbolic.CapabilityQuery? left, SharpProof.Symbolic.CapabilityQuery? right) -> bool
 static SharpProof.Symbolic.CapabilityQueryPayload.operator !=(SharpProof.Symbolic.CapabilityQueryPayload? left, SharpProof.Symbolic.CapabilityQueryPayload? right) -> bool
@@ -706,24 +915,52 @@ static SharpProof.Symbolic.RuntimeHazardQuery.operator !=(SharpProof.Symbolic.Ru
 static SharpProof.Symbolic.RuntimeHazardQuery.operator ==(SharpProof.Symbolic.RuntimeHazardQuery? left, SharpProof.Symbolic.RuntimeHazardQuery? right) -> bool
 static SharpProof.Symbolic.RuntimeHazardQueryPayload.operator !=(SharpProof.Symbolic.RuntimeHazardQueryPayload? left, SharpProof.Symbolic.RuntimeHazardQueryPayload? right) -> bool
 static SharpProof.Symbolic.RuntimeHazardQueryPayload.operator ==(SharpProof.Symbolic.RuntimeHazardQueryPayload? left, SharpProof.Symbolic.RuntimeHazardQueryPayload? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisBudget.Default.get -> SharpProof.Symbolic.SharpProofAnalysisBudget!
+static SharpProof.Symbolic.SharpProofAnalysisBudget.operator !=(SharpProof.Symbolic.SharpProofAnalysisBudget? left, SharpProof.Symbolic.SharpProofAnalysisBudget? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisBudget.operator ==(SharpProof.Symbolic.SharpProofAnalysisBudget? left, SharpProof.Symbolic.SharpProofAnalysisBudget? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisOptions.Default.get -> SharpProof.Symbolic.SharpProofAnalysisOptions!
+static SharpProof.Symbolic.SharpProofAnalysisOptions.operator !=(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisOptions.operator ==(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisSession.FromFile(string! filePath, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
+static SharpProof.Symbolic.SharpProofAnalysisSession.FromText(string! sourceText, string? filePath = null, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
 static SharpProof.Symbolic.SharpProofBudgetMetadata.operator !=(SharpProof.Symbolic.SharpProofBudgetMetadata? left, SharpProof.Symbolic.SharpProofBudgetMetadata? right) -> bool
 static SharpProof.Symbolic.SharpProofBudgetMetadata.operator ==(SharpProof.Symbolic.SharpProofBudgetMetadata? left, SharpProof.Symbolic.SharpProofBudgetMetadata? right) -> bool
+static SharpProof.Symbolic.SharpProofError.operator !=(SharpProof.Symbolic.SharpProofError? left, SharpProof.Symbolic.SharpProofError? right) -> bool
+static SharpProof.Symbolic.SharpProofError.operator ==(SharpProof.Symbolic.SharpProofError? left, SharpProof.Symbolic.SharpProofError? right) -> bool
+static SharpProof.Symbolic.SharpProofEvidence.operator !=(SharpProof.Symbolic.SharpProofEvidence? left, SharpProof.Symbolic.SharpProofEvidence? right) -> bool
+static SharpProof.Symbolic.SharpProofEvidence.operator ==(SharpProof.Symbolic.SharpProofEvidence? left, SharpProof.Symbolic.SharpProofEvidence? right) -> bool
+static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaVersion) -> bool
+static SharpProof.Symbolic.SharpProofHazard.operator !=(SharpProof.Symbolic.SharpProofHazard? left, SharpProof.Symbolic.SharpProofHazard? right) -> bool
+static SharpProof.Symbolic.SharpProofHazard.operator ==(SharpProof.Symbolic.SharpProofHazard? left, SharpProof.Symbolic.SharpProofHazard? right) -> bool
 static SharpProof.Symbolic.SharpProofLocation.operator !=(SharpProof.Symbolic.SharpProofLocation? left, SharpProof.Symbolic.SharpProofLocation? right) -> bool
 static SharpProof.Symbolic.SharpProofLocation.operator ==(SharpProof.Symbolic.SharpProofLocation? left, SharpProof.Symbolic.SharpProofLocation? right) -> bool
-static SharpProof.Symbolic.SharpProofQuery.Capabilities(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.Complexity(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.Condition(SharpProof.Symbolic.SymbolicQueryTarget! target, string! conditionText) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.Invariant(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.Method(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Capabilities(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Complexity(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Condition(SharpProof.Symbolic.SharpProofTarget! target, string! conditionText) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Invariant(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Method(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
 static SharpProof.Symbolic.SharpProofQuery.operator !=(SharpProof.Symbolic.SharpProofQuery? left, SharpProof.Symbolic.SharpProofQuery? right) -> bool
 static SharpProof.Symbolic.SharpProofQuery.operator ==(SharpProof.Symbolic.SharpProofQuery? left, SharpProof.Symbolic.SharpProofQuery? right) -> bool
-static SharpProof.Symbolic.SharpProofQuery.Reachability(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.RuntimeHazards(SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions? options = null) -> SharpProof.Symbolic.SharpProofQuery!
-static SharpProof.Symbolic.SharpProofQuery.SourceLocation(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Reachability(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.RuntimeHazards(SharpProof.Symbolic.SharpProofTarget! target, SharpProof.Symbolic.SharpProofRuntimeHazardOptions? options = null) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.SourceLocation(SharpProof.Symbolic.SharpProofTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
 static SharpProof.Symbolic.SharpProofQueryPayload.operator !=(SharpProof.Symbolic.SharpProofQueryPayload? left, SharpProof.Symbolic.SharpProofQueryPayload? right) -> bool
 static SharpProof.Symbolic.SharpProofQueryPayload.operator ==(SharpProof.Symbolic.SharpProofQueryPayload? left, SharpProof.Symbolic.SharpProofQueryPayload? right) -> bool
 static SharpProof.Symbolic.SharpProofQueryResult.operator !=(SharpProof.Symbolic.SharpProofQueryResult? left, SharpProof.Symbolic.SharpProofQueryResult? right) -> bool
 static SharpProof.Symbolic.SharpProofQueryResult.operator ==(SharpProof.Symbolic.SharpProofQueryResult? left, SharpProof.Symbolic.SharpProofQueryResult? right) -> bool
+static SharpProof.Symbolic.SharpProofRuntimeHazardOptions.Default.get -> SharpProof.Symbolic.SharpProofRuntimeHazardOptions!
+static SharpProof.Symbolic.SharpProofRuntimeHazardOptions.operator !=(SharpProof.Symbolic.SharpProofRuntimeHazardOptions? left, SharpProof.Symbolic.SharpProofRuntimeHazardOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofRuntimeHazardOptions.operator ==(SharpProof.Symbolic.SharpProofRuntimeHazardOptions? left, SharpProof.Symbolic.SharpProofRuntimeHazardOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofSmtMetadata.operator !=(SharpProof.Symbolic.SharpProofSmtMetadata? left, SharpProof.Symbolic.SharpProofSmtMetadata? right) -> bool
+static SharpProof.Symbolic.SharpProofSmtMetadata.operator ==(SharpProof.Symbolic.SharpProofSmtMetadata? left, SharpProof.Symbolic.SharpProofSmtMetadata? right) -> bool
+static SharpProof.Symbolic.SharpProofTarget.AllLines() -> SharpProof.Symbolic.SharpProofTarget!
+static SharpProof.Symbolic.SharpProofTarget.AtPosition(int position) -> SharpProof.Symbolic.SharpProofTarget!
+static SharpProof.Symbolic.SharpProofTarget.LineNumber(int line) -> SharpProof.Symbolic.SharpProofTarget!
+static SharpProof.Symbolic.SharpProofTarget.LineSpan(int startLine, int startColumn, int endLine, int endColumn) -> SharpProof.Symbolic.SharpProofTarget!
+static SharpProof.Symbolic.SharpProofTarget.operator !=(SharpProof.Symbolic.SharpProofTarget? left, SharpProof.Symbolic.SharpProofTarget? right) -> bool
+static SharpProof.Symbolic.SharpProofTarget.operator ==(SharpProof.Symbolic.SharpProofTarget? left, SharpProof.Symbolic.SharpProofTarget? right) -> bool
+static SharpProof.Symbolic.SharpProofTarget.Point(int line, int column = 1) -> SharpProof.Symbolic.SharpProofTarget!
+static SharpProof.Symbolic.SharpProofTarget.Span(int start, int end) -> SharpProof.Symbolic.SharpProofTarget!
 static SharpProof.Symbolic.SharpProofTruncationReason.operator !=(SharpProof.Symbolic.SharpProofTruncationReason? left, SharpProof.Symbolic.SharpProofTruncationReason? right) -> bool
 static SharpProof.Symbolic.SharpProofTruncationReason.operator ==(SharpProof.Symbolic.SharpProofTruncationReason? left, SharpProof.Symbolic.SharpProofTruncationReason? right) -> bool
 static SharpProof.Symbolic.SharpProofUnknownReason.operator !=(SharpProof.Symbolic.SharpProofUnknownReason? left, SharpProof.Symbolic.SharpProofUnknownReason? right) -> bool
@@ -738,21 +975,3 @@ virtual SharpProof.Symbolic.SharpProofQuery.PrintMembers(System.Text.StringBuild
 virtual SharpProof.Symbolic.SharpProofQueryPayload.EqualityContract.get -> System.Type!
 virtual SharpProof.Symbolic.SharpProofQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
 virtual SharpProof.Symbolic.SharpProofQueryPayload.PrintMembers(System.Text.StringBuilder! builder) -> bool
-override SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(object? obj) -> bool
-override SharpProof.Symbolic.SharpProofAnalysisOptions.GetHashCode() -> int
-override SharpProof.Symbolic.SharpProofAnalysisOptions.ToString() -> string!
-SharpProof.Symbolic.SharpProofAnalysisOptions
-SharpProof.Symbolic.SharpProofAnalysisOptions.<Clone>$() -> SharpProof.Symbolic.SharpProofAnalysisOptions!
-SharpProof.Symbolic.SharpProofAnalysisOptions.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
-SharpProof.Symbolic.SharpProofAnalysisOptions.EnableSmt.get -> bool
-SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(SharpProof.Symbolic.SharpProofAnalysisOptions? other) -> bool
-SharpProof.Symbolic.SharpProofAnalysisOptions.ImpliedConditions.get -> System.Collections.Immutable.ImmutableArray<string!>
-SharpProof.Symbolic.SharpProofAnalysisOptions.SharpProofAnalysisOptions(bool enableSmt = false, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, SharpProof.Symbolic.SymbolicAnalysisLimits? analysisLimits = null) -> void
-static SharpProof.Symbolic.SharpProofAnalysisOptions.Default.get -> SharpProof.Symbolic.SharpProofAnalysisOptions!
-static SharpProof.Symbolic.SharpProofAnalysisOptions.operator !=(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
-static SharpProof.Symbolic.SharpProofAnalysisOptions.operator ==(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
-static SharpProof.Symbolic.SharpProofAnalysisSession.FromFile(string! filePath, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
-static SharpProof.Symbolic.SharpProofAnalysisSession.FromText(string! sourceText, string? filePath = null, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
-*REMOVED*SharpProof.Symbolic.SymbolicQueryService
-*REMOVED*SharpProof.Symbolic.SymbolicQueryService.SymbolicQueryService() -> void
-SharpProof.Symbolic.SymbolicProjectQueryContext.CreateAnalysisSession(SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis = null, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, bool includeExpressionProgramPoints = false, bool includeCurrentStatementCompletionFacts = false, SharpProof.Symbolic.SymbolicSourceQueryFilter? filter = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!

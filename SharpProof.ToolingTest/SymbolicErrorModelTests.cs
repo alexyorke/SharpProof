@@ -4,7 +4,7 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicErrorModelTests
+internal sealed class SymbolicErrorModelTests
 {
     [TestCaseSource(nameof(ExceptionClassifications))]
     public void SymbolicErrorClassifier_MapsStableFailureFamilies(

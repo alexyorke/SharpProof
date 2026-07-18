@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
 var expectation = args.SingleOrDefault() ?? "Required";
 if (expectation is not ("Required" or "Graceful"))
@@ -31,13 +30,12 @@ using var session = SharpProofAnalysisSession.FromText(
     new SharpProofAnalysisOptions(
         enableSmt: true,
         impliedConditions: new[] { "left < middle", "left < right" }));
-var response = session.Analyze(SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 10, column: 9)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
-var health = result.SmtDiagnostics.Health;
-var proofsHold = result.ConditionProofs.Count == 2 &&
-                 result.ConditionProofs.All(static proof => proof.HoldsOnAllReachablePoints);
-var unknownProofCount = result.ConditionProofs.Sum(static proof => proof.UnknownCount);
-var nativeAvailable = health.State == SmtAnalysisHealthState.Ready;
+var response = session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(line: 10, column: 9)));
+var result = (SourceQueryPayload)response.Payload!;
+var health = result.Smt;
+var proofsHold = result.ConditionProofCount == 2 && result.AllConditionsHold;
+var unknownProofCount = result.UnknownProofCount;
+var nativeAvailable = health.State == "Ready";
 
 Console.WriteLine(JsonSerializer.Serialize(new
 {
@@ -45,15 +43,15 @@ Console.WriteLine(JsonSerializer.Serialize(new
     processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
     expectation,
     nativeAvailable,
-    healthState = health.State.ToString(),
+    healthState = health.State,
     health.LastFailureCode,
-    result.SmtDiagnostics.ExecutedQueryCount,
-    proofCount = result.ConditionProofs.Count,
+    health.ExecutedQueryCount,
+    proofCount = result.ConditionProofCount,
     unknownProofCount,
     proofsHold
 }));
 
-if (result.SmtDiagnostics.ExecutedQueryCount == 0)
+if (health.ExecutedQueryCount == 0)
 {
     Console.Error.WriteLine("The package probe did not execute an SMT-backed query.");
     return 2;
@@ -72,7 +70,7 @@ if (expectation == "Required")
 
 if (nativeAvailable) return proofsHold ? 0 : 4;
 
-var stableFallback = health.State == SmtAnalysisHealthState.PermanentlyUnavailable &&
+var stableFallback = health.State == "PermanentlyUnavailable" &&
                      health.LastFailureCode is
                          "smt_native_library_missing" or
                          "smt_native_library_incompatible" or

@@ -14,8 +14,8 @@ const string source = """
                       """;
 
 using var session = SharpProofAnalysisSession.FromText(source, "Sample.cs");
-var response = session.Analyze(SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 8)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
+var response = session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(line: 8)));
+var result = (SourceQueryPayload)response.Payload!;
 
 Console.WriteLine($"Program points: {result.ProgramPointCount}");
-Console.WriteLine($"Invariant: {result.InvariantInfo.MergedText}");
+Console.WriteLine($"Invariant: {result.Invariant}");

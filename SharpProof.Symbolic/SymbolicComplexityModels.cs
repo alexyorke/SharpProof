@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-public enum SymbolicComplexityKind
+internal enum SymbolicComplexityKind
 {
     Constant,
     Linear,
@@ -11,7 +11,7 @@ public enum SymbolicComplexityKind
     RecursiveUnknown
 }
 
-public enum SymbolicComplexityUnknownReason
+internal enum SymbolicComplexityUnknownReason
 {
     None,
     UnsupportedTarget,
@@ -27,7 +27,7 @@ public enum SymbolicComplexityUnknownReason
     Unknown
 }
 
-public sealed class SymbolicComplexityInfo
+internal sealed class SymbolicComplexityInfo
 {
     public SymbolicComplexityInfo(
         string text,
@@ -54,7 +54,7 @@ public sealed class SymbolicComplexityInfo
     public bool IsRecursiveUnknown { get; }
 }
 
-public sealed class SymbolicComplexityDriverInfo
+internal sealed class SymbolicComplexityDriverInfo
 {
     public SymbolicComplexityDriverInfo(
         string kind,
@@ -85,7 +85,7 @@ public sealed class SymbolicComplexityDriverInfo
     public int SourceColumn { get; }
 }
 
-public sealed class SymbolicComplexityCalleeInfo
+internal sealed class SymbolicComplexityCalleeInfo
 {
     public SymbolicComplexityCalleeInfo(
         string methodDisplayName,
@@ -115,7 +115,7 @@ public sealed class SymbolicComplexityCalleeInfo
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 }
 
-public sealed class SymbolicComplexityResult : SymbolicMethodResult
+internal sealed class SymbolicComplexityResult : SymbolicMethodResult
 {
     public SymbolicComplexityResult(
         string filePath,

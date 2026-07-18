@@ -66,43 +66,11 @@ usage error instead of silently falling back to standalone mode.
 
 ## .NET API
 
-MSBuild registration and workspace lifetime belong to the host. Once a host
-has loaded a Roslyn `Project`, create the supported symbolic context from its
-compilation, document tree, and analyzer options:
+The public .NET API intentionally accepts source text or a source file through
+`SharpProofAnalysisSession`. Roslyn compilation, workspace, analyzer-option,
+and project-loading adapters are internal implementation details so raw Roslyn
+objects cannot leak into the supported API.
 
-```csharp
-using Microsoft.CodeAnalysis.MSBuild;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
-
-using var workspace = MSBuildWorkspace.Create();
-var project = await workspace.OpenProjectAsync(projectPath);
-var document = project.Documents.Single(document => document.FilePath == sourcePath);
-var compilation = (await project.GetCompilationAsync())!;
-var syntaxTree = (await document.GetSyntaxTreeAsync())!;
-
-var context = new SymbolicProjectQueryContext(
-    compilation,
-    syntaxTree,
-    project.AnalyzerOptions,
-    project.Name,
-    project.FilePath,
-    analyzerConfigPaths: project.AnalyzerConfigDocuments
-        .Select(document => document.FilePath!));
-
-using var smt = new SmtAnalysisService(context.Configuration.SmtOptions);
-using var session = context.CreateAnalysisSession(smt);
-var response = session.Analyze(
-    SharpProofQuery.Invariant(SymbolicQueryTarget.Line(42)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
-```
-
-`SymbolicProjectQueryContext` is part of `SharpProof.Symbolic`. It exposes the
-loaded source input, analyzer/additional-file paths, baseline/effect-summary
-presence, and `SymbolicProjectConfiguration`. The latter is also available
-directly through `SymbolicProjectConfiguration.FromAnalyzerOptions(...)`.
-
-Hosts that reference `SharpProof.Analyzer.dll` can wrap the same inputs in
-`SharpProofProjectAnalysisContext` and call
-`GetAnalyzerDiagnosticsAsync(...)` to obtain the build-equivalent SharpProof
-diagnostics that the CLI includes in `explain`.
+Use the CLI for project- and solution-aware analysis. Hosts that need an
+in-process project adapter should invoke the CLI JSON protocol until a focused,
+Roslyn-independent project request contract is added.

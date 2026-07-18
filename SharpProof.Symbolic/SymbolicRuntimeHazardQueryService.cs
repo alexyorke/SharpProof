@@ -356,7 +356,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     }
 }
 
-public sealed class SymbolicRuntimeHazardQueryOptions
+internal sealed class SymbolicRuntimeHazardQueryOptions
 {
     public static readonly SymbolicRuntimeHazardQueryOptions Default = new();
 
@@ -378,7 +378,7 @@ public sealed class SymbolicRuntimeHazardQueryOptions
     }
 }
 
-public sealed class SymbolicRuntimeHazardQueryResult
+internal sealed class SymbolicRuntimeHazardQueryResult
 {
     internal SymbolicRuntimeHazardQueryResult(
         string filePath,
@@ -426,7 +426,7 @@ public sealed class SymbolicRuntimeHazardQueryResult
 
 }
 
-public sealed class SymbolicRuntimeHazard
+internal sealed class SymbolicRuntimeHazard
 {
     internal SymbolicRuntimeHazard(
         string filePath,
@@ -609,7 +609,7 @@ public sealed class SymbolicRuntimeHazard
     }
 }
 
-public enum SymbolicRuntimeHazardKind
+internal enum SymbolicRuntimeHazardKind
 {
     DirectThrow,
     Rethrow,
@@ -630,7 +630,7 @@ public enum SymbolicRuntimeHazardKind
     InvalidCollectionCardinality
 }
 
-public enum SymbolicRuntimeHazardStatus
+internal enum SymbolicRuntimeHazardStatus
 {
     Proven,
     Unreachable,

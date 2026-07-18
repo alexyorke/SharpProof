@@ -11,7 +11,7 @@ namespace SharpProof.Test;
 
 [TestFixture]
 [Parallelizable(ParallelScope.Children)]
-public sealed class SymbolicSourceQueryLineTests
+internal sealed class SymbolicSourceQueryLineTests
 {
     [Test]
     public void SymbolicSourceCompilationProfile_AppliesEveryCompilerSetting()
@@ -134,7 +134,7 @@ public sealed class SymbolicSourceQueryLineTests
     public void SymbolicQueryService_RoutesFileTextSyntaxTreeAndNodeQueries()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -250,7 +250,7 @@ public class TestClass
     private static readonly StateFlowScenario[] StateFlowScenarios =
     {
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -265,7 +265,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState", "SwitchStateFacts.cs", "return value;",
             StateFlowQueryMode.Line, "ReturnStatement", ["kind=SymbolicRelationAtom", "facts=value == 1", "merged~value == 1"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -279,7 +279,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState", "ForeachStateFacts.cs", "return value;",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.foreach-entry.not-null", "provenance=ir.path.foreach-entry.length-positive", "facts=values != null", "merged~values.Length > 0"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -289,7 +289,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState", "PriorAssignmentStateFacts.cs", "return 10 / divisor;",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.prior-statement.assigned-value", "text=divisor == 5", "facts=divisor == 5"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -305,7 +305,7 @@ public class TestClass
         new(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -323,7 +323,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState", "CatchStateFacts.cs", "return value;",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.catch-entry.exception-not-null", "provenance^ir.relation", "facts=ex != null", "merged~value > 0"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -337,7 +337,7 @@ public class TestClass
         new(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -351,7 +351,7 @@ public class TestClass
         new(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -363,7 +363,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState", "UsingDeclarationStateFacts.cs", "return resource.GetHashCode();",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.using-entry.throw-guarded-not-null", "provenance=ir.path.using-entry.declaration-alias", "facts=value != null", "facts=resource == value"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -377,7 +377,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState", "ForLoopStateFacts.cs", "return values[index];",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.for-loop-invariant.lower-bound", "facts=index >= 0", "merged~index >= 0"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -392,7 +392,7 @@ public class TestClass
 }", "QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState", "WhileLoopStateFacts.cs", "return values[index];",
             StateFlowQueryMode.Line, "ReturnStatement", ["provenance=ir.path.while-loop-invariant.lower-bound", "facts=index >= 0"], [], null, null),
         new(@"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -442,7 +442,7 @@ public class TestClass
     public void SymbolicQueryService_QueryRuntimeHazards_UsesRequestApi()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -525,7 +525,7 @@ public class TestClass
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
-        Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.True);
+        Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.False);
         Assert.That(typeof(SymbolicProgramPointResult).GetConstructors(), Is.Empty);
         Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
     }
@@ -534,7 +534,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_ReturnsEveryProgramPointOnLine()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -630,7 +630,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_WithExpressionProgramPoints_IncludesExpressionNodesOnLine()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -669,7 +669,7 @@ public class TestClass
     public void QuerySyntaxTreeLinePoint_WithExpressionProgramPoints_SelectsNearestExpressionNode()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -700,7 +700,7 @@ public class TestClass
     public void QuerySyntaxTreeLinePoint_ExposesRequestedLocationForExactExpressionHit()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -754,7 +754,7 @@ public class TestClass
     public void QuerySyntaxTreeLinePoint_ExposesNearestFallbackWhenColumnMissesProgramPoint()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -783,7 +783,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -816,7 +816,7 @@ public class TestClass
     public void SymbolicQueryService_NodeProofsReuseCurrentStatementCompletionState()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -857,7 +857,7 @@ public class TestClass
     public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -906,7 +906,7 @@ public class TestClass
     public void QuerySyntaxTreeAtPosition_InstanceReferenceMethodIncludesNonNullThisEntryFact()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod() => 1;
 }";
@@ -936,7 +936,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_ConservativeMergeReportsUnknownForBranchFacts()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -976,7 +976,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_InvariantQuerySummarizesMustMaybeUnknownFactsAndBudget()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -1084,7 +1084,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_InvariantDiagnosticsBoundLargeEvidenceLists()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1107,7 +1107,7 @@ public class TestClass
     public void QuerySyntaxTreeSpan_ReturnsMergedInvariantQueryForSourceSpan()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1166,7 +1166,7 @@ public class TestClass
     public void QuerySyntaxTreeLineSpan_ConvertsLineColumnsToSourceSpan()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1206,7 +1206,7 @@ public class TestClass
     public void QuerySyntaxTreeLine_ClassifiesImpossibleReturnAsUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1238,7 +1238,7 @@ public class TestClass
     public void SymbolicLineQueryResult_Filter_RecomputesLineSummary()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1271,7 +1271,7 @@ public class TestClass
     public void QuerySourceLine_ReturnsEmptyProgramPointsForBlankLine()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
 
     public int TestMethod(int value) => value;
@@ -1305,7 +1305,7 @@ public class TestClass
     public void QuerySyntaxTreeAllLines_ReturnsFileLevelAggregateSummary()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1373,7 +1373,7 @@ public class TestClass
     public void SymbolicFileQueryResult_Filter_RecomputesAggregateSummary()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1432,7 +1432,7 @@ public class TestClass
     public void SymbolicSourceQueryFilter_CanFilterByMethodAndConditionMetadata()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int First(int value)
     {
@@ -1485,7 +1485,7 @@ public class TestClass
     public void SymbolicSourceQueryFilter_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int FirstValue(int value)
     {
@@ -1568,7 +1568,7 @@ public class TestClass
     public void SymbolicProgramPointResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1636,7 +1636,7 @@ public class TestClass
     public void SymbolicLineQueryResult_ToCompactResult_SeparatesObservedRawFactsFromConservativeMerge()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -1675,7 +1675,7 @@ public class TestClass
     public void SymbolicFileQueryResult_ToCompactResult_AppliesOutputBounds()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1721,7 +1721,7 @@ public class TestClass
     public void SymbolicSpanQueryResult_ToCompactResult_ExposesInvariantQueryAndBudgetMetadata()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1787,7 +1787,7 @@ public class TestClass
     public void SymbolicSpanQueryResult_ToInvariantQueryResult_EmitsBoundedQueryAnswer()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1855,7 +1855,7 @@ public class TestClass
     public void SymbolicSpanQueryResult_ToInvariantQueryResult_FiltersTargetSummaries()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1915,7 +1915,7 @@ public class TestClass
     public void SymbolicSpanQueryResult_ToCompactResult_FiltersPerPointTargetDetails()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2017,7 +2017,7 @@ public class TestClass
     public void SymbolicFileQueryResult_ToCompactResult_SummaryOnlyOmitsNestedResults()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2062,7 +2062,7 @@ public class TestClass
     public async Task SymbolicCli_CompactJson_EmitsPerPointMetadataWhenDetailsAreBounded()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -2683,7 +2683,7 @@ public class TestClass
     public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2735,7 +2735,7 @@ public class TestClass
     public async Task SymbolicCli_SummaryOnly_EmitsAggregateCompactJsonWithoutNestedResults()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2791,7 +2791,7 @@ public class TestClass
     public async Task SymbolicCli_SpanCompactJson_EmitsInvariantQueryAndBudgetMetadata()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2873,7 +2873,7 @@ public class TestClass
     public async Task SymbolicCli_LineColumnSpan_QueriesSpanWithoutAbsoluteOffsets()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2935,7 +2935,7 @@ public class TestClass
     public async Task SymbolicCli_InvariantTargetFilter_NarrowsInvariantJsonTargetSections()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2992,7 +2992,7 @@ public class TestClass
     public async Task SymbolicCli_InvariantTargetFilter_TextReportsMatchedAndUnmatchedTargets()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -3047,7 +3047,7 @@ public class TestClass
     public async Task SymbolicCli_InvariantJson_LineColumnSpanEmitsOnlyInvariantAnswer()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -3134,7 +3134,7 @@ public class TestClass
     public async Task SymbolicCli_LineExpressions_AllowsFilteringToExpressionProgramPoint()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -3197,7 +3197,7 @@ public class TestClass
     public async Task SymbolicCli_RicherFilters_NarrowExpressionProofResults()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int FirstValue(int value)
     {
@@ -3286,7 +3286,7 @@ public class TestClass
     public async Task SymbolicCli_FilterMetadataSwitches_NarrowAllLinesCompactJson()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int First(int value)
     {
@@ -3356,7 +3356,7 @@ public class TestClass
     public async Task SymbolicCli_TextOutput_EmitsInvariantStatusReasonAndProofSummary()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public static int TestMethod(int value)
     {
@@ -3449,7 +3449,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_CompactJsonEmitsBoundedMetadata()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public void First()
     {
@@ -3515,7 +3515,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_ExceptionTypeAndCategoryFiltersNarrowTextCompactAndFullJson()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public void First()
     {
@@ -3602,7 +3602,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_HazardStatusFilterNarrowsOutput()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int Unknown(int divisor)
     {
@@ -3670,7 +3670,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsOneAfterEmittingCompactJson()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -3709,7 +3709,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsZeroWhenFiltersRemoveAllHazards()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -3749,7 +3749,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazards_FailOnHazardUsesFullFilteredCountWhenSummaryOnly()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {

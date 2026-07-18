@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicSourceMap
+internal sealed class SymbolicSourceMap
 {
     public SymbolicSourceMap(
         string sourceUri,

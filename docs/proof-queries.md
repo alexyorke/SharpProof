@@ -78,9 +78,8 @@ Use `SharpProofAnalysisSession` as the public entrypoint:
 - `SharpProofQuery.RuntimeHazards(...)` for bounded hazard candidates
 - `SharpProofQuery.Capabilities(...)` and `Complexity(...)` for method summaries
 
-For a compilation loaded by a Roslyn workspace, use
-`SymbolicProjectQueryContext`. It creates a source input over the existing
-project compilation and decodes the same global SMT and bounded-analysis
+For compilations loaded by a Roslyn workspace, use the project-aware CLI. The
+Roslyn adapter is internal and decodes the same global SMT and bounded-analysis
 options used by the analyzer.
 
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
@@ -130,39 +129,8 @@ runtime implementation dependency; consumers should build against the
 
 ## Standalone Compilation Profiles
 
-File and source-text queries can intentionally match the compiler settings of
-the source they inspect. Create a `SymbolicSourceCompilationProfile` and attach
-it to `SymbolicSourceInput`; the same profile flows through invariant, proof,
-runtime-hazard, capability, and complexity queries:
-
-```csharp
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using SharpProof.Symbolic;
-
-var profile = new SymbolicSourceCompilationProfile(
-    languageVersion: LanguageVersion.CSharp12,
-    preprocessorSymbols: new[] { "FEATURE_X" },
-    nullableContext: NullableContextOptions.Enable,
-    allowUnsafe: true,
-    documentationMode: DocumentationMode.Diagnose,
-    platform: Platform.X64,
-    optimizationLevel: OptimizationLevel.Release,
-    assemblyName: "Example.Analysis");
-
-var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Example.cs");
-using var session = SharpProofAnalysisSession.FromText(source, "Example.cs");
-var response = session.Analyze(
-    SharpProofQuery.Invariant(SymbolicQueryTarget.AllLines()));
-var result = ((SourceQueryPayload)response.Payload!).Value;
-```
-
-Attach immutable source-origin metadata for an extracted editor snippet with
-`input.WithSourceMap(new SymbolicSourceMap(sourceUri, originalLine,
-originalColumn))`. Query coordinates remain local to the supplied text; the
-host can translate them with `input.SourceMap`.
-
-The CLI exposes the same settings:
+The CLI exposes standalone compiler settings without exposing Roslyn types in
+the public .NET API:
 
 ```powershell
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines --language-version 12 --define FEATURE_X --nullable enable --allow-unsafe --documentation-mode diagnose --platform x64 --optimization release --assembly-name Example.Analysis --json
@@ -180,10 +148,8 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 | Assembly identity name | `--assembly-name` | query-mode default |
 
 Profiles apply only when SharpProof creates a standalone compilation for file
-or text input. `FromSyntaxTree(...)` and `FromNode(...)` retain the caller's
-existing Roslyn parse and compilation options; SharpProof does not overwrite
-them. Metadata references remain controlled separately through
-`SymbolicQueryOptions` or repeated CLI `--reference` values.
+or text input. Metadata references are controlled through repeated CLI
+`--reference` values.
 
 ## Compatibility Baselines
 

@@ -6,7 +6,7 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 
-public sealed class SmtAnalysisService : IDisposable
+internal sealed class SmtAnalysisService : IDisposable
 {
     private const int PreNormalizationFormulaDepthLimit = 1024;
     private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =

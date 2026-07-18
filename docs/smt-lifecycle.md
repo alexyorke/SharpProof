@@ -48,7 +48,7 @@ query outcomes. They do not mark the solver service permanently unavailable.
 - `IsAvailable` and `IsPermanentlyUnavailable` convenience flags
 
 The same snapshot and the active `SmtSolverLifecycleOptions` are included in
-`SymbolicSmtDiagnostics` and in canonical CLI invariant and runtime-hazard
+`SharpProofSmtMetadata` and in canonical CLI invariant and runtime-hazard
 JSON. Typed results and CLI JSON therefore expose
 health without requiring direct access to the service instance.
 

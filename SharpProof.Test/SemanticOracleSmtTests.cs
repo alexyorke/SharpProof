@@ -14,13 +14,13 @@ namespace SharpProof.Test;
 [TestFixture]
 [Parallelizable(ParallelScope.Children)]
 [Category("SmtHeavy")]
-public class SemanticOracleSmtTests : SemanticOracleSmtTestBase
+internal class SemanticOracleSmtTests : SemanticOracleSmtTestBase
 {
     [Test]
     public void SymbolicSourceQueryService_QueryFile_RequestApiProvesImplication()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -169,7 +169,7 @@ public class TestClass
     public void CSharpConditionToFormula_ElementAccessInRange_TranslatesFromEndIndex()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -213,7 +213,7 @@ public class TestClass
     public void CSharpConditionToFormula_ElementAccessInRange_TranslatesMultidimensionalArrayBounds()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[,] values, int row, int column)
     {
@@ -257,7 +257,7 @@ public class TestClass
     public void CSharpConditionToFormula_ElementAccessInRange_TranslatesRangeEndpoints()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values)
     {
@@ -301,7 +301,7 @@ public class TestClass
     public void CSharpConditionToFormula_ElementAccessInRange_ProvesInvalidConstantRangeOutOfRange()
     {
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values)
     {
@@ -334,7 +334,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values, int start, int end)
     {
@@ -381,7 +381,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values, Range range)
     {
@@ -428,7 +428,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values)
     {
@@ -462,7 +462,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values)
     {
@@ -492,7 +492,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int[] values, Range other)
     {
@@ -532,7 +532,7 @@ public class TestClass
     {
         var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -565,7 +565,7 @@ public class TestClass
     {
         var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -598,7 +598,7 @@ public class TestClass
     {
         var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -748,7 +748,7 @@ public static class UnknownFallback
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -770,7 +770,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -792,7 +792,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -815,7 +815,7 @@ public class TestClass
         Assert.That(
             IsExpressionUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value)
     {
@@ -839,7 +839,7 @@ public class TestClass
         Assert.That(
             IsExpressionUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(Worker worker)
     {
@@ -852,7 +852,7 @@ public class TestClass
     }
 }
 
-public sealed class Worker
+internal sealed class Worker
 {
     public string Impure() => string.Empty;
 }",
@@ -866,7 +866,7 @@ public sealed class Worker
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -889,7 +889,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -914,7 +914,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -961,7 +961,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -985,7 +985,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -1012,7 +1012,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool keepGoing)
     {
@@ -1040,7 +1040,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool keepGoing)
     {
@@ -1066,7 +1066,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1089,7 +1089,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1112,7 +1112,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1135,7 +1135,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1159,7 +1159,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool keepGoing)
     {
@@ -1187,7 +1187,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool keepGoing)
     {
@@ -1213,7 +1213,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1240,7 +1240,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index, bool stop)
     {
@@ -1272,7 +1272,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1300,7 +1300,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(
                 @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int replacement)
     {
@@ -1328,7 +1328,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1352,7 +1352,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1377,7 +1377,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1402,7 +1402,7 @@ public class TestClass
     {
         var facts = SemanticOracleSmtTestBase.CollectCompletedLoopExitFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1427,7 +1427,7 @@ public class TestClass
     {
         var facts = SemanticOracleSmtTestBase.CollectCompletedLoopExitFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1449,7 +1449,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -1475,7 +1475,7 @@ public class TestClass
             @"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1501,7 +1501,7 @@ public class TestClass
             @"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1527,7 +1527,7 @@ public class TestClass
             @"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1553,7 +1553,7 @@ public class TestClass
             @"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1578,7 +1578,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1604,7 +1604,7 @@ public class TestClass
             @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1630,7 +1630,7 @@ public class TestClass
             @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1656,7 +1656,7 @@ public class TestClass
             @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string input)
     {
@@ -1686,7 +1686,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string prefix)
     {
@@ -1706,7 +1706,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1730,7 +1730,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -1757,7 +1757,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1782,7 +1782,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1841,7 +1841,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1868,7 +1868,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1901,7 +1901,7 @@ public class TestClass
     {
         var facts = CollectExpressionProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1956,7 +1956,7 @@ public class TestClass
     {
         var facts = CollectExpressionProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string first, string second)
     {
@@ -1976,7 +1976,7 @@ public class TestClass
     {
         var facts = CollectExpressionProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int? TestMethod(string value)
     {
@@ -1995,7 +1995,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_CollectsStatementGuardFacts()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -2025,7 +2025,7 @@ public class TestClass
     public void SymbolicInvariantService_AnalyzeAt_ExposesTypedPathConditions()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2060,7 +2060,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_ExposesProgramPointAnalysis()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2095,7 +2095,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySourceAtPosition_ProvesImplication()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2126,7 +2126,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesProgramPointReachability()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2158,7 +2158,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DoesNotCheckReachabilityByDefault()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2188,7 +2188,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_WithSmt_ClassifiesContradictoryProgramPointUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2220,7 +2220,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesMultipleConditionsInSingleProgramPointQuery()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -2267,7 +2267,7 @@ public class TestClass
     private static readonly SourceProofCase[] SingleProofCaseDataPart1 =
     {
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -2280,7 +2280,7 @@ public class TestClass
     }
 }", "GuardStyleSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -2293,7 +2293,7 @@ public class TestClass
     }
 }", "IfElseSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -2306,7 +2306,7 @@ public class TestClass
     }
 }", "LocalAliasSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -2319,7 +2319,7 @@ public class TestClass
     }
 }", "LocalAssignmentSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -2332,7 +2332,7 @@ public class TestClass
     }
 }", "MultiGuardSourcePredicateIndexFacts.cs", "return values[index];", 13, "values != null && index >= 0 && index < values.Length", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2345,7 +2345,7 @@ public class TestClass
     }
 }", "GuardStyleSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateExactValue", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2358,7 +2358,7 @@ public class TestClass
     }
 }", "LocalAliasSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2371,7 +2371,7 @@ public class TestClass
     }
 }", "LocalAssignmentSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2386,7 +2386,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text, Range range)
     {
@@ -2401,7 +2401,7 @@ public class TestClass
     }
 }", "AssignedRangeAsSpanResultLength.cs", "return view.Length;", 20, "view.Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -2414,7 +2414,7 @@ public class TestClass
     }
 }", "ForeachReceiverNonNull.cs", "return values.Length + value;", 13, "values != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachArrayLengthPositive", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -2479,7 +2479,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementFallbackSourcePredicateExactValue()
     {
         var source = SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2516,7 +2516,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodLocalAliasExactValue()
     {
         var source = SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
     {
@@ -2544,7 +2544,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ConditionProofsWithoutSmtRemainConservative()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2574,7 +2574,7 @@ public class TestClass
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesRangeGuardImplications()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -2632,7 +2632,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachNewEmptyArrayBodyUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2661,7 +2661,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachBodyAfterNullGuardUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -2692,7 +2692,7 @@ public class TestClass
     private static readonly SourceProofCase[] SingleProofCaseDataPart2 =
     {
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSingleElementForeachValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2705,7 +2705,7 @@ public class TestClass
     }
 }", "SingleElementForeachValue.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2718,7 +2718,7 @@ public class TestClass
     }
 }", "MultiElementForeachValue.cs", "return value;", 20, "value == 0", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFiniteForeachNonZeroValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2731,7 +2731,7 @@ public class TestClass
     }
 }", "FiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorAssignedFiniteForeachNonZeroValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2745,7 +2745,7 @@ public class TestClass
     }
 }", "PriorAssignedFiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotUseFiniteForeachFactsAfterUnknownReassignment", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] replacement)
     {
@@ -2760,7 +2760,7 @@ public class TestClass
     }
 }", "ReassignedFiniteForeachValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -2771,7 +2771,7 @@ public class TestClass
     }
 }", "LockReceiverNonNull.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -2783,7 +2783,7 @@ public class TestClass
     }
 }", "LockReceiverReassigned.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenFalse),
         new("SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact", @"
-public sealed class Box
+internal sealed class Box
 {
     public void Clear(ref Box value)
     {
@@ -2791,7 +2791,7 @@ public sealed class Box
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Box box)
     {
@@ -2802,7 +2802,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -2819,7 +2819,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchFilterCondition", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2836,7 +2836,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -2849,7 +2849,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -2862,7 +2862,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingExpressionThrowGuardedResourceNonNull", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -2873,7 +2873,7 @@ public class TestClass
     }
 }", "UsingExpressionThrowGuardedResourceNonNull.cs", "return value.GetHashCode();", 13, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedCoalesceAssignmentLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -2902,7 +2902,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullGuardedLockBodyUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -2936,7 +2936,7 @@ public class TestClass
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCompletedLockReceiverNonNull()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -2970,7 +2970,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ReassignedCompletedLockReceiverDoesNotKeepNonNullFact()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -3000,7 +3000,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -3031,7 +3031,7 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedReceiverNullBranchUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object value)
     {
@@ -3065,12 +3065,12 @@ public class TestClass
         const string source = @"
 using System.Threading.Tasks;
 
-public sealed class Service
+internal sealed class Service
 {
     public Task<int> GetAsync() => Task.FromResult(1);
 }
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod(Service service)
     {
@@ -3103,7 +3103,7 @@ public class TestClass
         const string source = @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod(Task<int> task)
     {
@@ -3137,7 +3137,7 @@ public class TestClass
         const string source = @"
 using System.Threading.Tasks;
 
-public sealed class Service
+internal sealed class Service
 {
     public Task<int> MutateAsync(ref Service value)
     {
@@ -3146,7 +3146,7 @@ public sealed class Service
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod(Service service)
     {
@@ -3173,7 +3173,7 @@ public class TestClass
         SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedElementAccessOutOfRangeBranchUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -3210,7 +3210,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -3252,7 +3252,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -3288,7 +3288,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -3323,7 +3323,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IDisposable value)
     {
@@ -3354,7 +3354,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3385,7 +3385,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesReverseForLoopMonotonicIndexBounds()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3416,7 +3416,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesWhileLoopMonotonicIndexBounds()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3449,7 +3449,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesReverseWhileLoopMonotonicIndexBounds()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3482,7 +3482,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_ProvesDoLoopPreEntryLowerBound()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3515,7 +3515,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DoesNotInferForLoopLowerBoundWhenUpdaterDecrements()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3544,7 +3544,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DoesNotInferWhileLoopLowerBoundWhenBodyDecrements()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3576,7 +3576,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseForLoopUpperBoundWhenUpdaterIncrements()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3605,7 +3605,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseWhileLoopUpperBoundWhenBodyIncrements()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -3637,7 +3637,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DropsStaleIfConditionAfterReassignment()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -3670,7 +3670,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_DropsStaleWhileConditionAfterReassignment()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -3720,7 +3720,7 @@ public class TestClass
     public void SymbolicSourceQueryService_ProveConditionAtSource_ReportsUnreachablePoint()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -3752,7 +3752,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_CollectsExpressionContextFacts()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string first, string second)
     {
@@ -3778,7 +3778,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -3814,7 +3814,7 @@ public class TestClass
         SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCoalesceAssignmentGuardedFallbackNullBranchUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value, string fallback)
     {
@@ -3850,7 +3850,7 @@ public class TestClass
     private static readonly SourceProofCase[] SingleProofCaseDataPart3 =
     {
         new("SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownNonNullCoalesceAssignmentLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3860,7 +3860,7 @@ public class TestClass
     }
 }", "KnownNonNullCoalesceAssignmentLength.cs", "return values.Length;", 16, "values.Length == 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3875,7 +3875,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(ValueTuple<int, int> pair)
     {
@@ -3891,7 +3891,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor, "TupleLocalDeconstructionAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor, "TupleLocalDeconstructionDeclaredNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementContent", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3905,7 +3905,7 @@ public class TestClass
     }
 }", "TupleStringLiteralElementContent.cs", "return 0;", 12, "pair.text == \"abc\"", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3914,7 +3914,7 @@ public class TestClass
     }
 }", "TupleStringLiteralElementLength.cs", "return pair.text.Length;", 16, "pair.text.Length == 3", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleArrayElementLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3923,7 +3923,7 @@ public class TestClass
     }
 }", "TupleArrayElementLength.cs", "return pair.values.Length;", 16, "pair.values.Length == 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3932,7 +3932,7 @@ public class TestClass
     }
 }", "TupleMultidimensionalArrayElementGetLength.cs", "return pair.values.GetLength(1);", 16, "pair.values.GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3940,7 +3940,7 @@ public class TestClass
     }
 }", "CastedMultidimensionalArrayGetLength.cs", "return ((int[,])new int[2, 3]).GetLength(1);", 16, "((int[,])new int[2, 3]).GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3950,7 +3950,7 @@ public class TestClass
     }
 }", "TupleDeconstructedArrayLength.cs", "return values.Length + text.Length;", 16, "values.Length == 2 && text.Length == 3", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -3968,7 +3968,7 @@ public class TestClass
     }
 }", "DivergentIfElseMergedImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -3988,7 +3988,7 @@ public class TestClass
     }
 }", "MutatedIfElseMergedImplication.cs", "return 10 / divisor;", 18, "divisor == 1", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesImplicitElseMergedImplication", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4010,7 +4010,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownHasValueNullableCoalesceAssignmentValue()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -4036,7 +4036,7 @@ public class TestClass
         SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullableCoalesceAssignmentNoValueBranchUnreachable()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? maybe)
     {
@@ -4068,7 +4068,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -4187,7 +4187,7 @@ public class TestClass
     public void SymbolicSourceQueryService_QuerySource_UsesArrayElementWriteFactAfterElementMutation()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -4326,7 +4326,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementAfterUnknownReassignment()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] replacement)
     {
@@ -4353,7 +4353,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementFromTargetSelfReference()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag, int input)
     {
@@ -4402,7 +4402,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -4444,7 +4444,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -4473,7 +4473,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4501,7 +4501,7 @@ public class TestClass
     public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotCollapseDivergentIfElseToSingleValue()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4587,7 +4587,7 @@ public class TestClass
     private static readonly SourceProofCase[] SingleProofCaseDataPart4 =
     {
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNullGuardNoValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -4600,7 +4600,7 @@ public class TestClass
     }
 }", "NullableNullGuardNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -4613,7 +4613,7 @@ public class TestClass
     }
 }", "NullableIsNotNullPatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFreshObjectAssignmentNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -4622,7 +4622,7 @@ public class TestClass
     }
 }", "FreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFreshObjectAssignmentNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4631,7 +4631,7 @@ public class TestClass
     }
 }", "ConditionalFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedFreshObjectAssignmentNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object input)
     {
@@ -4640,7 +4640,7 @@ public class TestClass
     }
 }", "CoalescedFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4649,7 +4649,7 @@ public class TestClass
     }
 }", "ConditionalArrayLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -4662,7 +4662,7 @@ public class TestClass
     }
 }", "NullableGreaterThanGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesRecursivePatternAliasMemberFact", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -4675,7 +4675,7 @@ public class TestClass
     }
 }", "RecursivePatternAliasMemberFact.cs", "return text.Length;", 20, "text != null && text.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact", ExtendedPropertyPatternSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(ExtendedPatternBox box)
     {
@@ -4688,7 +4688,7 @@ public class TestClass
     }
 }", "ExtendedPropertyPatternMemberFact.cs", "return box.Child.Value;", 20, "box.Child != null && box.Child.Value > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -4701,7 +4701,7 @@ public class TestClass
     }
 }", "NullableNotNullGuardHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementMergedImplication", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int mode)
     {
@@ -4723,7 +4723,7 @@ public class TestClass
     }
 }", "SwitchStatementMergedImplication.cs", "return 10 / divisor;", 24, "divisor != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotMergeSwitchStatementWithoutDefault", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int mode)
     {
@@ -4742,7 +4742,7 @@ public class TestClass
     }
 }", "SwitchStatementNoDefault.cs", "return 10 / divisor;", 21, "divisor != 0", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -4756,7 +4756,7 @@ public class TestClass
     }
 }", "SwitchStatementExitingSectionExclusion.cs", "return 10 / value;", 13, "value != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_SwitchExitExclusionSubstitutesPatternBindingInGuard", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -4772,7 +4772,7 @@ public class TestClass
     }
 }", "SwitchPatternBindingExitExclusion.cs", "return value;", 9, "value <= 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -4785,7 +4785,7 @@ public class TestClass
     }
 }", "ProveConditionFalse.cs", "return value;", 13, "value != 0", SymbolicTruthValue.ProvenFalse),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string value)
     {
@@ -4794,7 +4794,7 @@ public class TestClass
     }
 }", "CoalesceAssignmentNonNullLiteral.cs", "return value.Length;", 16, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4809,7 +4809,7 @@ public class TestClass
     }
 }", "MutatedImplicitElseMergedImplication.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -4824,7 +4824,7 @@ public class TestClass
     }
 }", "MutatedImplicitElseIdenticalFact.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text, int start, int length)
     {
@@ -4839,7 +4839,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text, int start)
     {
@@ -4854,7 +4854,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(ReadOnlySpan<int> values, int start, int length)
     {
@@ -4869,7 +4869,7 @@ public class TestClass
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -4884,7 +4884,7 @@ public class TestClass
     }
 }", "AssignedRangeElementAccessResultLength.cs", "return slice.Length;", 20, "slice.Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -4909,7 +4909,7 @@ public class TestClass
     }
 }", "ProveConditionEnum.cs", "return 1;", 13, "state != Mode.None", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchExpressionValueImplication", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int mode)
     {
@@ -4924,7 +4924,7 @@ public class TestClass
     }
 }", "SwitchExpressionValueImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int mode)
     {
@@ -4938,7 +4938,7 @@ public class TestClass
     }
 }", "SwitchExpressionNoFallback.cs", "return 10 / divisor;", 15, "divisor != 0", SymbolicTruthValue.Unknown),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -4951,7 +4951,7 @@ public class TestClass
     }
 }", "SwitchStatementSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -4964,7 +4964,7 @@ public class TestClass
     }
 }", "SwitchStatementPatternSourcePredicateRange.cs", "return value;", 13, "value > 0 && value < 10", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanPropertyImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
     {
@@ -4977,7 +4977,7 @@ public class TestClass
     }
 }", "SourceBooleanPropertyImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanGetterLocalAliasExactValue", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
     {
@@ -4990,7 +4990,7 @@ public class TestClass
     }
 }", "SourceBooleanGetterLocalAliasExactValue.cs", "return 10 / box.Divisor;", 13, "box.Divisor == 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications", SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
     {
@@ -5003,7 +5003,7 @@ public class TestClass
     }
 }", "InstanceSourceBooleanMethodImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesArrayRangeResultLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -5016,7 +5016,7 @@ public class TestClass
     }
 }", "ArrayRangeResultLength.cs", "return values[1..^1].Length;", 20, "values[1..^1].Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringRangeResultLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -5029,7 +5029,7 @@ public class TestClass
     }
 }", "StringRangeResultLength.cs", "return text[1..^1].Length;", 20, "text[1..^1].Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text, int start)
     {
@@ -5042,7 +5042,7 @@ public class TestClass
     }
 }", "StringSubstringOneArgumentResultLength.cs", "return text.Substring(start).Length;", 20, "text.Substring(start).Length == text.Length - start", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -5051,7 +5051,7 @@ public class TestClass
     }
 }", "ConditionalArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == 1 || values.Length == 2", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayFallbackLength", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] input)
     {
@@ -5065,7 +5065,7 @@ public class TestClass
     }
 }", "CoalescedArrayFallbackLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayLengthDisjunction", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] input)
     {
@@ -5074,7 +5074,7 @@ public class TestClass
     }
 }", "CoalescedArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == input.Length || values.Length == 1", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5083,7 +5083,7 @@ public class TestClass
     }
 }", "NullableLiteralAssignmentFacts.cs", "return value.Value;", 16, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -5096,7 +5096,7 @@ public class TestClass
     }
 }", "NullableEqualsConstantGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -5109,7 +5109,7 @@ public class TestClass
     }
 }", "NullableIsNullPatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRecursivePatternHasValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -5122,7 +5122,7 @@ public class TestClass
     }
 }", "NullableRecursivePatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotRecursivePatternNoValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -5135,7 +5135,7 @@ public class TestClass
     }
 }", "NullableNotRecursivePatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -5149,7 +5149,7 @@ public class TestClass
     }
 }", "GuardedConditionalNullableFacts.cs", "return value.Value;", 16, "value.HasValue", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullSourceResultNull", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod()
     {
@@ -5159,7 +5159,7 @@ public class TestClass
     }
 }", "AsExpressionNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesSourceNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -5173,7 +5173,7 @@ public class TestClass
     }
 }", "AsExpressionNonNullResultImpliesSourceNonNull.cs", "return text;", 20, "value != null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullableValueWhenPresent", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5188,7 +5188,7 @@ public class TestClass
     }
 }", "ConditionalAccessNullableValueWhenPresent.cs", "return length.Value;", 20, "length.Value == 3", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5202,7 +5202,7 @@ public class TestClass
     }
 }", "NullableDeclarationPatternBinding.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRelationalPattern", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5211,12 +5211,12 @@ public class TestClass
     }
 }", "NullableRelationalPattern.cs", "return maybe.GetValueOrDefault();", 16, "maybe is > 3 and < 10", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull", @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string Text;
 }
 
-public class TestClass
+internal class TestClass
 {
     public string TestMethod()
     {
@@ -5226,7 +5226,7 @@ public class TestClass
     }
 }", "ConditionalAccessReferenceNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value, string fallback)
     {
@@ -5235,12 +5235,12 @@ public class TestClass
     }
 }", "CoalesceNullResultImpliesOperandsNull.cs", "return result;", 16, "result != null || (value == null && fallback == null)", SymbolicTruthValue.ProvenTrue),
         new("SymbolicSourceQueryService_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown", @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string GetText() => null;
 }
 
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(Holder holder)
     {
@@ -5287,7 +5287,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesRuntimeTypePredicate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -5317,7 +5317,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -5347,7 +5347,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -5377,7 +5377,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -5407,7 +5407,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5433,7 +5433,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessHasValueImpliesReceiverNonNull()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -5465,7 +5465,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNonNull()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5491,7 +5491,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessArrayElement()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -5521,7 +5521,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNull()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5555,7 +5555,7 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalExpressionNullResultImpliesSelectedBranchNull()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(bool flag, string first, string second)
     {
@@ -5582,12 +5582,12 @@ public class TestClass
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessMemberNullFacts()
     {
         const string source = @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string Text;
 }
 
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(Holder holder)
     {
@@ -5614,12 +5614,12 @@ public class TestClass
     public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesConditionalAccessMemberNullContradiction()
     {
         const string source = @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string Text;
 }
 
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(Holder holder)
     {
@@ -5648,12 +5648,12 @@ public class TestClass
         SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentConditionalAccessNullImplication()
     {
         const string source = @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string Text;
 }
 
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string current, Holder holder)
     {
@@ -5681,7 +5681,7 @@ public class TestClass
     {
         var facts = CollectProgramPointFacts(
             @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -5908,7 +5908,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -5951,7 +5951,7 @@ public class TestClass
         Assert.That(
             IsStatementUnreachable(GeneratedRegexFactorySource + @"
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6037,7 +6037,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6071,7 +6071,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6095,7 +6095,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6296,7 +6296,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6320,7 +6320,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6344,7 +6344,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6368,7 +6368,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int upperBound)
     {
@@ -6392,7 +6392,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6416,7 +6416,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6438,7 +6438,7 @@ public class TestClass
     {
         Assert.That(
             IsStatementUnreachable("using System;" + SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6460,7 +6460,7 @@ public class TestClass
     {
         Assert.That(
             IsStatementUnreachable("using System;" + SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -6482,7 +6482,7 @@ public class TestClass
     {
         Assert.That(
             IsStatementUnreachable("using System;" + SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -6506,7 +6506,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6531,7 +6531,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int minimum)
     {
@@ -6554,7 +6554,7 @@ public class TestClass
     {
         Assert.That(
             IsStatementUnreachable("using System;" + SourcePredicateSource + @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
     {
@@ -6578,7 +6578,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6602,7 +6602,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int minimum)
     {
@@ -6626,7 +6626,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -6651,7 +6651,7 @@ public class TestClass
             IsStatementUnreachable(@"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {

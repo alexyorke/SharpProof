@@ -57,14 +57,14 @@ diagnostic, its properties include:
 Create an immutable override set and attach it to the analysis session:
 
 ```csharp
-var limits = SymbolicAnalysisLimits.Default.WithOverrides(
-    maxFiniteForeachElementFacts: 16,
-    maxMergedPathConditions: 64);
+var budget = new SharpProofAnalysisBudget(
+    MaxFiniteForeachElementFacts: 16,
+    MaxMergedPathConditions: 64);
 
 using var session = SharpProofAnalysisSession.FromText(
     sourceText,
     "Example.cs",
-    new SharpProofAnalysisOptions(analysisLimits: limits));
+    new SharpProofAnalysisOptions(analysisBudget: budget));
 var result = session.Analyze(SharpProofQuery.Invariant(target));
 
 if (result.Budget.IsExhausted)

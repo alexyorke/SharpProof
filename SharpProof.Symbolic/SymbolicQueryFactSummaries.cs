@@ -62,7 +62,7 @@ internal readonly struct SymbolicBoundedProjection<T>
     public bool IsTruncated => OmittedCount != 0;
 }
 
-public sealed class SymbolicConservativeUnknownDiagnostic
+internal sealed class SymbolicConservativeUnknownDiagnostic
 {
     public SymbolicConservativeUnknownDiagnostic(
         string target,
@@ -104,7 +104,7 @@ public sealed class SymbolicConservativeUnknownDiagnostic
     }
 }
 
-public sealed class SymbolicMergedPathFacts
+internal sealed class SymbolicMergedPathFacts
 {
     private SymbolicMergedPathFacts(
         IReadOnlyList<string> alwaysFacts,
@@ -274,7 +274,7 @@ public sealed class SymbolicMergedPathFacts
     }
 }
 
-public sealed class SymbolicSourceQueryFilter
+internal sealed class SymbolicSourceQueryFilter
 {
     public static readonly SymbolicSourceQueryFilter Empty = new();
 
@@ -505,7 +505,7 @@ public sealed class SymbolicSourceQueryFilter
     }
 }
 
-public sealed class SymbolicReachabilitySummary
+internal sealed class SymbolicReachabilitySummary
 {
     public SymbolicReachabilitySummary(
         int notCheckedCount,
@@ -561,7 +561,7 @@ public sealed class SymbolicReachabilitySummary
     }
 }
 
-public sealed class SymbolicProofOutcomeSummary
+internal sealed class SymbolicProofOutcomeSummary
 {
     public SymbolicProofOutcomeSummary(
         int totalCount,
@@ -626,7 +626,7 @@ public sealed class SymbolicProofOutcomeSummary
     }
 }
 
-public sealed class SymbolicProgramPointSummary
+internal sealed class SymbolicProgramPointSummary
 {
     public SymbolicProgramPointSummary(
         int programPointCount,
@@ -676,7 +676,7 @@ public sealed class SymbolicProgramPointSummary
     }
 }
 
-public sealed class SymbolicConditionProofSummary
+internal sealed class SymbolicConditionProofSummary
 {
     public SymbolicConditionProofSummary(
         string condition,
@@ -895,7 +895,7 @@ public sealed class SymbolicConditionProofSummary
     }
 }
 
-public sealed class SymbolicConditionProofReasonSummary
+internal sealed class SymbolicConditionProofReasonSummary
 {
     public SymbolicConditionProofReasonSummary(
         SymbolicTruthValue truthValue,
@@ -919,7 +919,7 @@ public sealed class SymbolicConditionProofReasonSummary
     }
 }
 
-public enum SymbolicConditionProofSummaryStatus
+internal enum SymbolicConditionProofSummaryStatus
 {
     None,
     UnreachableOnly,

@@ -12,7 +12,7 @@ namespace SharpProof.Test;
 
 [TestFixture]
 [Parallelizable(ParallelScope.Children)]
-public sealed class SymbolicRuntimeHazardQueryTests
+internal sealed class SymbolicRuntimeHazardQueryTests
 {
     public sealed record RuntimeHazardScenario(
         string Name,
@@ -36,7 +36,7 @@ public sealed class SymbolicRuntimeHazardQueryTests
 
 
         new("QuerySourceRuntimeHazardsLine_ClassifiesLiteralThrowNullAsNullReferenceException", @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -46,7 +46,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ClassifiesPathProvenThrowMaybeNullAsNullReferenceException", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod(Exception? error)
     {
@@ -59,7 +59,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ReportsTypedCoalesceThrowExpression", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public object TestMethod(object? value)
     {
@@ -68,7 +68,7 @@ public class TestClass
 }", "return value ?? throw new InvalidOperationException();", false, new[] { SymbolicRuntimeHazardKind.DirectThrow }, SymbolicRuntimeHazardKind.DirectThrow, SymbolicRuntimeHazardStatus.Proven, "System.InvalidOperationException", "direct_throw", null, null, null, null, SyntaxKind.ThrowExpression.ToString(), null),
 
         new("QuerySourceRuntimeHazardsLine_RemainderDivisorUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -81,7 +81,7 @@ public class TestClass
     }
 }", "return 10 / (value % 2);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_UnaryMinusDivisorUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -94,7 +94,7 @@ public class TestClass
     }
 }", "return 10 / -value;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ConditionalDivisorUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(bool flag)
     {
@@ -107,7 +107,7 @@ public class TestClass
     }
 }", "return 10 / (flag ? 0 : 1);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Proven, "System.DivideByZeroException", null, "ir.runtime-hazard.divide-by-zero", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCompoundDivideByZero", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -192,7 +192,7 @@ public class TestClass
     {
         var statement = "return value " + operation + " (int)raw;";
         var source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, double raw)
     {
@@ -225,7 +225,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDivideByZeroCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -261,7 +261,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart2 =
     {
         new("QuerySourceRuntimeHazardsLine_GuardedCompoundModuloByNonZeroIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -274,7 +274,7 @@ public class TestClass
     }
 }", "value %= divisor;", true, new[] { SymbolicRuntimeHazardKind.DivideByZero }, SymbolicRuntimeHazardKind.DivideByZero, SymbolicRuntimeHazardStatus.Unreachable, "System.DivideByZeroException", "definite_modulo_by_zero", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedNullDereference", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string? value)
     {
@@ -288,7 +288,7 @@ public class TestClass
 }", "return value.Length;", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, null, null, null, null, null, null),
 
         new("QuerySourceRuntimeHazardsLine_CoalescedReceiverNullDereferenceUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string? left, string? right)
     {
@@ -301,7 +301,7 @@ public class TestClass
     }
 }", "return (left ?? right).Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, "ir.runtime-hazard.null-dereference", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_StaticStringEqualsNullGuardUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string? value)
     {
@@ -315,7 +315,7 @@ public class TestClass
     }
 }", "return value.Length;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, "ir.runtime-hazard.null-dereference", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ObjectReferenceEqualsNullGuardUsesIrPrecondition", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string? value)
     {
@@ -330,7 +330,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesWithExpressionNullReceiverDereference", @"
 public record Person(string Name);
 
-public class TestClass
+internal class TestClass
 {
     public Person TestMethod(Person? person)
     {
@@ -345,7 +345,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_PrunesWithExpressionNullReceiverAfterNonNullGuard", @"
 public record Person(string Name);
 
-public class TestClass
+internal class TestClass
 {
     public Person TestMethod(Person? person)
     {
@@ -358,7 +358,7 @@ public class TestClass
     }
 }", "return person with { Name = \"safe\" };", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, "System.NullReferenceException", "definite_with_null", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesDeconstructionNullReceiverDereference", @"
-public sealed class Pair
+internal sealed class Pair
 {
     public void Deconstruct(out int left, out int right)
     {
@@ -367,7 +367,7 @@ public sealed class Pair
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Pair? pair)
     {
@@ -383,7 +383,7 @@ public class TestClass
     }
 }", "(left, right) = pair;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_deconstruction_null", null, null, null, null, SyntaxKind.SimpleAssignmentExpression.ToString(), null),
         new("QuerySourceRuntimeHazardsLine_PrunesDeconstructionNullReceiverAfterNonNullGuard", @"
-public sealed class Pair
+internal sealed class Pair
 {
     public void Deconstruct(out int left, out int right)
     {
@@ -392,7 +392,7 @@ public sealed class Pair
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Pair? pair)
     {
@@ -413,7 +413,7 @@ public class TestClass
     public void QueryNodeRuntimeHazards_DefaultExcludesNestedCallableHazards()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -442,7 +442,7 @@ public class TestClass
     public void QueryNodeRuntimeHazards_CanIncludeNestedCallableHazards()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -477,7 +477,7 @@ public class TestClass
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
-public class TestClass
+internal class TestClass
 {
     [return: NotNull]
     private static string? Read() => null;
@@ -507,7 +507,7 @@ public class TestClass
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
-public class TestClass
+internal class TestClass
 {
     [return: MaybeNull]
     private static string Read() => null;
@@ -551,7 +551,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart3 =
     {
         new("QuerySourceRuntimeHazardsLine_ProvesDeconstructionDeclarationNullReceiverDereference", @"
-public sealed class Pair
+internal sealed class Pair
 {
     public void Deconstruct(out int left, out int right)
     {
@@ -560,7 +560,7 @@ public sealed class Pair
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Pair? pair)
     {
@@ -574,7 +574,7 @@ public class TestClass
     }
 }", "var (left, right) = pair;", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_deconstruction_null", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesForeachNullSourceDereference", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string[] values)
     {
@@ -590,7 +590,7 @@ public class TestClass
     }
 }", "foreach (var value in values)", false, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", null, null, null, null, null, SyntaxKind.ForEachStatement.ToString(), null),
         new("QuerySourceRuntimeHazardsLine_ClassifiesForeachNullSourceAfterNonNullGuardAsUnreachableCandidate", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string[] values)
     {
@@ -608,7 +608,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesAwaitNullDereference", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod()
     {
@@ -619,7 +619,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ClassifiesAwaitNullDereferenceAfterNonNullGuardAsUnreachableCandidate", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod(Task<int> task)
     {
@@ -632,7 +632,7 @@ public class TestClass
     }
 }", "return await task;", true, new[] { SymbolicRuntimeHazardKind.NullDereference }, SymbolicRuntimeHazardKind.NullDereference, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_await_null", null, null, null, null, SyntaxKind.AwaitExpression.ToString(), null),
         new("QuerySourceRuntimeHazardsLine_ProvesLockNullSourceArgumentNull", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -648,7 +648,7 @@ public class TestClass
     }
 }", "lock (gate)", false, new[] { SymbolicRuntimeHazardKind.ArgumentNull }, SymbolicRuntimeHazardKind.ArgumentNull, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentNullException", "definite_lock_null", null, null, null, null, SyntaxKind.LockStatement.ToString(), null),
         new("QuerySourceRuntimeHazardsLine_ClassifiesLockNullSourceAfterNonNullGuardAsUnreachableCandidate", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -666,7 +666,7 @@ public class TestClass
 
 
         new("QuerySourceRuntimeHazardsLine_ProvesDynamicInvocationNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -680,7 +680,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DoesNotTreatExtensionDeconstructionNullSourceAsImplicitDereference()
     {
         const string source = @"
-public sealed class Pair
+internal sealed class Pair
 {
 }
 
@@ -693,7 +693,7 @@ public static class PairExtensions
     }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Pair? pair)
     {
@@ -727,7 +727,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_PrunesForeachNullSourceAfterNonNullGuard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string[] values)
     {
@@ -763,7 +763,7 @@ public class TestClass
         const string source = @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod(Task<int> task)
     {
@@ -794,7 +794,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_PrunesLockNullSourceAfterNonNullGuard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object gate)
     {
@@ -831,7 +831,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart4 =
     {
         new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicInvocationNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -839,7 +839,7 @@ public class TestClass
     }
 }", "return ((dynamic)null).Missing();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesDynamicDirectInvocationNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -848,7 +848,7 @@ public class TestClass
     }
 }", "return value();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicDirectInvocationNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -856,7 +856,7 @@ public class TestClass
     }
 }", "return ((dynamic)null)();", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesDynamicIndexerNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -865,7 +865,7 @@ public class TestClass
     }
 }", "return value[0];", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_index_null_binding", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesCastedDynamicIndexerNullBinding", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -873,7 +873,7 @@ public class TestClass
     }
 }", "return ((dynamic)null)[0];", false, new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }, SymbolicRuntimeHazardKind.DynamicNullBinding, SymbolicRuntimeHazardStatus.Proven, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_index_null_binding", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazards_NonNullDynamicReceiverPrunesNullBindingCandidate", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -885,7 +885,7 @@ public class TestClass
 
 
         new("QuerySourceRuntimeHazardsLine_ProvesNullableExplicitCastWithoutValue", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -906,7 +906,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDynamicNullBindingCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod(dynamic value)
     {
@@ -941,7 +941,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_SuppressesNullableValueAfterCoalesceFallbackAssignment()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? left)
     {
@@ -967,7 +967,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_GuardedNullableExplicitCastIsPruned()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int? value)
     {
@@ -1009,7 +1009,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedTaskAwait", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod()
     {
@@ -1020,7 +1020,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskResult", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1031,7 +1031,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskGetResult", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1042,7 +1042,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskResultProperty", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1053,7 +1053,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskAwait", @"
 using System.Threading.Tasks;
 
-public class TestClass
+internal class TestClass
 {
     public async Task<int> TestMethod()
     {
@@ -1062,7 +1062,7 @@ public class TestClass
     }
 }", "return value.Value;", false, new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }, SymbolicRuntimeHazardKind.NullableValueWithoutValue, SymbolicRuntimeHazardStatus.Proven, null, null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1071,7 +1071,7 @@ public class TestClass
     }
 }", "return (int)value;", false, new[] { SymbolicRuntimeHazardKind.UnboxNull }, SymbolicRuntimeHazardKind.UnboxNull, SymbolicRuntimeHazardStatus.Proven, "System.NullReferenceException", "definite_unbox_null", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesInvalidReferenceCast", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod()
     {
@@ -1081,7 +1081,7 @@ public class TestClass
 }", "return (string)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
 
         new("QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterAsCastNullAndSourceNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -1095,7 +1095,7 @@ public class TestClass
     }
 }", "return (string)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterInlineAsAssignmentNullAndSourceNonNull", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -1118,7 +1118,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownUnboxNullCastCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(object value)
     {
@@ -1152,7 +1152,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_SuppressesInvalidCastAfterAsCastNonNullGuard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -1181,7 +1181,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_SuppressesInvalidCastAfterInlineAsAssignmentNonNullGuard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -1210,7 +1210,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownInvalidCastAfterNegativeTypeTest()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -1246,7 +1246,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart6 =
     {
         new("QuerySourceRuntimeHazardsLine_ProvesInvalidUnboxCast", @"
-public class TestClass
+internal class TestClass
 {
     public long TestMethod()
     {
@@ -1255,7 +1255,7 @@ public class TestClass
     }
 }", "return (long)value;", false, new[] { SymbolicRuntimeHazardKind.InvalidCast }, SymbolicRuntimeHazardKind.InvalidCast, SymbolicRuntimeHazardStatus.Proven, "System.InvalidCastException", "definite_invalid_cast", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesBuiltInIndexOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -1268,7 +1268,7 @@ public class TestClass
     }
 }", "return values[0];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, "ir.runtime-hazard.index.out-of-range", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_NegativeFromEndIndexReportsConstructionFailure", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values)
     {
@@ -1276,7 +1276,7 @@ public class TestClass
     }
 }", "return values[^-1];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_index_construction_argument_out_of_range", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesArrayGetValueIndexOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod(int[] values)
     {
@@ -1284,7 +1284,7 @@ public class TestClass
     }
 }", "return values.GetValue(values.Length);", false, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", "definite_array_get_value_index_out_of_range", "ir.runtime-hazard.array-get-value.index-out-of-range", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_GuardedMultidimensionalArrayGetValueIndexOutOfRangeIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod(int[,] values, int row, int column)
     {
@@ -1297,7 +1297,7 @@ public class TestClass
     }
 }", "return values.GetValue(row, column);", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", "definite_array_get_value_index_out_of_range", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazards_AssignedModuloIndexUnderPositiveLengthGuardIsUnreachable", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int hash)
     {
@@ -1313,7 +1313,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_AssignedAbsModuloIndexUnderPositiveLengthGuardIsUnreachable", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int hash)
     {
@@ -1329,7 +1329,7 @@ public class TestClass
         new("QuerySourceRuntimeHazards_DirectAbsModuloIndexIsUnreachable", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int hash)
     {
@@ -1337,7 +1337,7 @@ public class TestClass
     }
 }", "return values[Math.Abs(hash % values.Length)];", true, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Unreachable, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesObjectErasedArrayCastAliasIndexOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -1350,7 +1350,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesAssignedSpanSliceIndexOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(ReadOnlySpan<int> values)
     {
@@ -1363,7 +1363,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleCast()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod()
     {
@@ -1394,7 +1394,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart7 =
     {
         new("QuerySourceRuntimeHazardsLine_ProvesBuiltInRangeOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value)
     {
@@ -1407,7 +1407,7 @@ public class TestClass
     }
 }", "return value[1..];", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesStringSubstringArgumentOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value)
     {
@@ -1415,7 +1415,7 @@ public class TestClass
     }
 }", "return value.Substring(value.Length + 1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_string_substring_out_of_range", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_StringRemoveZeroCountAtLengthIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value)
     {
@@ -1430,7 +1430,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesSpanSliceArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
     {
@@ -1440,7 +1440,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_OverflowProneSpanSliceGuardRemainsUnknown", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values, int start, int length)
     {
@@ -1455,7 +1455,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesSpanSliceUncheckedAddOverflowArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
     {
@@ -1472,7 +1472,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesArrayAsSpanArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public Span<int> TestMethod(int[] values)
     {
@@ -1482,7 +1482,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_OverflowProneStringAsSpanGuardRemainsUnknown", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public ReadOnlySpan<char> TestMethod(string value, int start, int length)
     {
@@ -1497,7 +1497,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesStringAsMemoryArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public ReadOnlyMemory<char> TestMethod(string value)
     {
@@ -1507,7 +1507,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_OverflowProneArrayAsMemoryGuardRemainsUnknown", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public Memory<int> TestMethod(int[] values, int start, int length)
     {
@@ -1525,7 +1525,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_GuardedStringSubstringArgumentOutOfRangeIsPruned()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value, int start)
     {
@@ -1564,7 +1564,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_StringRemoveStartAtLengthIsValid()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value)
     {
@@ -1609,7 +1609,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesArrayAsMemoryUncheckedAddOverflowArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public Memory<int> TestMethod(int[] values)
     {
@@ -1626,7 +1626,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesMemorySliceNegativeLengthArgumentOutOfRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public Memory<int> TestMethod(Memory<int> values)
     {
@@ -1634,7 +1634,7 @@ public class TestClass
     }
 }", "return values.Slice(0, -1);", false, new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }, SymbolicRuntimeHazardKind.ArgumentOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.ArgumentOutOfRangeException", "definite_slice_out_of_range", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_GuardedRangeAccessArgumentOutOfRangeStillPruned", @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value, int start, int end)
     {
@@ -1649,7 +1649,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesListIndexerArgumentOutOfRange", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(List<int> values)
     {
@@ -1664,7 +1664,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesReadOnlyListIndexerArgumentOutOfRange", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IReadOnlyList<int> values)
     {
@@ -1679,7 +1679,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesListIndexFromEndArgumentOutOfRange", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(List<int> values)
     {
@@ -1695,7 +1695,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_PrunesQueueDequeueAfterCountGuard", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Queue<int> values)
     {
@@ -1710,7 +1710,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesStackPopOnEmptyCollection", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Stack<int> values)
     {
@@ -1725,7 +1725,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_PrunesPriorityQueuePeekAfterCountGuard", @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(PriorityQueue<int, int> values)
     {
@@ -1743,7 +1743,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownStringSubstringArgumentOutOfRangeCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(string value, int start)
     {
@@ -1782,7 +1782,7 @@ public class TestClass
         const string source = @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(IReadOnlyList<int> values, int index)
     {
@@ -1822,7 +1822,7 @@ public class TestClass
         const string source = @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(List<int> values)
     {
@@ -1870,7 +1870,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesInvalidMathClampBounds", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1880,7 +1880,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesRegexNullInput", @"
 using System.Text.RegularExpressions;
 
-public class TestClass
+internal class TestClass
 {
     public bool TestMethod()
     {
@@ -1891,7 +1891,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_GuardedMathAbsOverflowIsPruned", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1906,7 +1906,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesShortMathAbsMinimumOverflow", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public short TestMethod()
     {
@@ -1915,7 +1915,7 @@ public class TestClass
 }", "return Math.Abs(short.MinValue);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", null, null, null, null, null, null, null),
 
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedDivisionOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1928,7 +1928,7 @@ public class TestClass
     }
 }", "return checked(value / -1);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.signed-division-overflow", null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_GuardedCheckedDivisionOverflowIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -1941,7 +1941,7 @@ public class TestClass
     }
 }", "return checked(value / divisor);", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedDivisionOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -1964,7 +1964,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedIntegralOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -1998,7 +1998,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart10 =
     {
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedRemainderOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2011,7 +2011,7 @@ public class TestClass
     }
 }", "return checked(value % -1);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedUncheckedRemainderOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -2024,7 +2024,7 @@ public class TestClass
     }
 }", "return unchecked(value % divisor);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongRemainderOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public long TestMethod(long value)
     {
@@ -2037,7 +2037,7 @@ public class TestClass
     }
 }", "return checked(value % -1L);", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_GuardedCheckedRemainderOverflowIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -2050,7 +2050,7 @@ public class TestClass
     }
 }", "return checked(value % divisor);", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundAssignmentOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2066,7 +2066,7 @@ public class TestClass
     }
 }", "value += 1;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundDivisionOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -2082,7 +2082,7 @@ public class TestClass
     }
 }", "value /= divisor;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundRemainderOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -2098,7 +2098,7 @@ public class TestClass
     }
 }", "value %= divisor;", false, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_GuardedCheckedCompoundAssignmentOverflowIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int delta)
     {
@@ -2114,7 +2114,7 @@ public class TestClass
     }
 }", "value += delta;", true, new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }, SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_checked_integral_overflow", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeArrayLength", @"
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int length)
     {
@@ -2129,7 +2129,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeStackAllocLength", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int length)
     {
@@ -2150,7 +2150,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedDivisionOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int divisor)
     {
@@ -2182,7 +2182,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_UIntDivisionDoesNotCreateImpossibleCheckedOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public uint TestMethod(uint value, uint divisor)
     {
@@ -2210,7 +2210,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedCompoundAssignmentOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value, int delta)
     {
@@ -2249,7 +2249,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownNegativeArrayLengthCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int length)
     {
@@ -2283,7 +2283,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_GuardedStackAllocLengthIsPruned", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int length)
     {
@@ -2297,7 +2297,7 @@ public class TestClass
     }
 }", "Span<int> span = stackalloc int[length];", true, new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }, SymbolicRuntimeHazardKind.NegativeStackAllocLength, SymbolicRuntimeHazardStatus.Unreachable, null, "definite_negative_stackalloc_length", null, null, null, null, null, null),
         new("QuerySourceRuntimeHazards_ArrayCreationNormalCompletionPrunesNegativeLengthBranch", @"
-public class TestClass
+internal class TestClass
 {
     public int[] TestMethod(int length)
     {
@@ -2311,7 +2311,7 @@ public class TestClass
     }
 }", "return new int[length + 0];", true, new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }, SymbolicRuntimeHazardKind.NegativeArrayLength, SymbolicRuntimeHazardStatus.Unreachable, null, null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazards_MultidimensionalArrayNegativeLength_ProvesOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int[,] TestMethod()
     {
@@ -2320,7 +2320,7 @@ public class TestClass
     }
 }", "return new int[1, length];", false, new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }, SymbolicRuntimeHazardKind.NegativeArrayLength, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazards_AssignedMultidimensionalArrayDimensionLengthProvesIndexOutOfRange", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int rows, int columns)
     {
@@ -2329,7 +2329,7 @@ public class TestClass
     }
 }", "return values[rows, 0];", false, new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }, SymbolicRuntimeHazardKind.IndexOutOfRange, SymbolicRuntimeHazardStatus.Proven, "System.IndexOutOfRangeException", null, null, null, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedBytePreIncrementOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public byte TestMethod(byte value)
     {
@@ -2342,7 +2342,7 @@ public class TestClass
     }
 }", "return checked(++value);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.increment-overflow", null, null, null, null, "++value"),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongPostDecrementOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public long TestMethod(long value)
     {
@@ -2355,7 +2355,7 @@ public class TestClass
     }
 }", "return checked(value--);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_integral_overflow", "ir.runtime-hazard.checked-integral.decrement-overflow", null, null, null, null, "value--"),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedExplicitNumericConversionOverflow", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(long value)
     {
@@ -2368,7 +2368,7 @@ public class TestClass
     }
 }", "return checked((int)value);", false, Array.Empty<SymbolicRuntimeHazardKind>(), SymbolicRuntimeHazardKind.CheckedIntegralOverflow, SymbolicRuntimeHazardStatus.Proven, "System.OverflowException", "definite_checked_numeric_conversion_overflow", "ir.runtime-hazard.checked-conversion.overflow", null, null, null, null, "(int)value"),
         new("QuerySourceRuntimeHazardsLine_ProvesArrayCovarianceStoreMismatch", @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -2379,7 +2379,7 @@ public class TestClass
         new("KnownLimitation_ArrayCovarianceStoreAcrossMergedIdentities_RemainsUnknown", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod(bool useStrings)
     {
@@ -2393,7 +2393,7 @@ public class TestClass
     }
 }", "values[0] = new object();", true, new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }, SymbolicRuntimeHazardKind.ArrayTypeMismatch, SymbolicRuntimeHazardStatus.Unknown, "System.ArrayTypeMismatchException", null, null, SymbolicProofStatus.Unknown, null, null, null, null),
         new("QuerySourceRuntimeHazardsLine_ProvesGuardedSwitchExpressionNoMatch", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2416,7 +2416,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int length)
     {
@@ -2455,7 +2455,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedPostIncrementOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public short TestMethod(short value)
     {
@@ -2488,7 +2488,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnreachableCheckedPreIncrementOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2532,7 +2532,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedExplicitNumericConversionOverflowCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(long value)
     {
@@ -2566,7 +2566,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleArrayCovarianceStore()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -2590,7 +2590,7 @@ public class TestClass
     private static readonly RuntimeHazardScenario[] RuntimeHazardScenariosPart12 =
     {
         new("QuerySourceRuntimeHazardsLine_GuardedSwitchExpressionNoMatchIsPruned", @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2609,7 +2609,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_GuardConditionMakesArgumentOutOfRangeGuardUnreachable", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod(int value)
     {
@@ -2622,7 +2622,7 @@ public class TestClass
         new("QuerySourceRuntimeHazardsLine_ArgumentOutOfRangeGuardsProveArrayIndexInRange", @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int[] values, int index)
     {
@@ -2636,7 +2636,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownSwitchExpressionNoMatchCandidate()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -2676,7 +2676,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod(bool flag)
     {
@@ -2708,7 +2708,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazardsJson_EmitsProvenHazard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2760,7 +2760,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazardsCompactJson_EmitsTriggerPrecondition()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -2808,7 +2808,7 @@ public class TestClass
     public async Task SymbolicCli_RuntimeHazardsJson_EmitsDynamicNullBindingHazard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -2863,7 +2863,7 @@ public class TestClass
         var source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -2896,7 +2896,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod(int value)
     {
@@ -3199,7 +3199,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -3234,7 +3234,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public void TestMethod()
     {
@@ -3262,7 +3262,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesGuardedDivideByZero()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int divisor)
     {
@@ -3309,12 +3309,12 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_MemberReceiverNullDereferenceUsesIrPrecondition()
     {
         const string source = @"
-public sealed class Holder
+internal sealed class Holder
 {
     public string? Value { get; set; }
 }
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Holder holder)
     {
@@ -3348,7 +3348,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesDynamicMemberNullBinding()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -3380,7 +3380,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicMemberNullBinding()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -3409,7 +3409,7 @@ public class TestClass
     public void KnownLimitation_DynamicBinderMissingMemberOnNonNullReceiver_HasNoBinderHazard()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public object TestMethod()
     {
@@ -3438,7 +3438,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesNullableValueWithoutValue()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3464,7 +3464,7 @@ public class TestClass
     public void QuerySourceRuntimeHazards_ProvesNullableValueAfterConditionalAccessNullReceiverAssignment()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(string text)
     {
@@ -3502,7 +3502,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterNegativeTypeAndNullTests()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public string TestMethod(object value)
     {
@@ -3540,7 +3540,7 @@ public class TestClass
         const string source = @"
 using System.Collections.Generic;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(Queue<int> values)
     {
@@ -3574,7 +3574,7 @@ public class TestClass
     public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
     {
         const string source = @"
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int value)
     {
@@ -3609,7 +3609,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod()
     {
@@ -3636,7 +3636,7 @@ public class TestClass
         const string source = @"
 using System;
 
-public class TestClass
+internal class TestClass
 {
     public int TestMethod(int index)
     {

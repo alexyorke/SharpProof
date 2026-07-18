@@ -45,16 +45,17 @@ try
     using var analysisSession = SharpProofAnalysisSession.Create(inputContext.SourceInput, queryOptions);
     var query = options.RuntimeHazards
         ? SharpProofQuery.RuntimeHazards(
-            options.CreateRuntimeHazardTarget(),
-            options.CreateRuntimeHazardOptions())
+            SharpProofTarget.FromSymbolicTarget(options.CreateRuntimeHazardTarget()),
+            SharpProofRuntimeHazardOptions.FromLegacy(options.CreateRuntimeHazardOptions()))
         : options.Complexity
-            ? SharpProofQuery.Complexity(options.CreateComplexityTarget())
+            ? SharpProofQuery.Complexity(SharpProofTarget.FromSymbolicTarget(options.CreateComplexityTarget()))
             : options.Capabilities
-                ? SharpProofQuery.Capabilities(options.CreateCapabilityTarget())
-                : SharpProofQuery.SourceLocation(options.CreateQueryTarget());
+                ? SharpProofQuery.Capabilities(
+                    SharpProofTarget.FromSymbolicTarget(options.CreateCapabilityTarget()))
+                : SharpProofQuery.SourceLocation(SharpProofTarget.FromSymbolicTarget(options.CreateQueryTarget()));
     var analysisResult = analysisSession.Analyze(query);
     if (!analysisResult.IsSuccess)
-        throw new SymbolicQueryException(analysisResult.Error ?? new SymbolicError(
+        throw new SymbolicQueryException(analysisResult.Error?.ToSymbolicError() ?? new SymbolicError(
             SymbolicErrorCodes.InternalFailure,
             SymbolicErrorCategory.Internal,
             "The analysis session failed without error details.",
@@ -62,11 +63,11 @@ try
 
     object result = analysisResult.Payload switch
     {
-        SourceQueryPayload source => source.Value,
-        RuntimeHazardQueryPayload hazards => hazards.Value,
-        CapabilityQueryPayload capability => capability.Value,
-        ComplexityQueryPayload complexity => complexity.Value,
-        ConditionQueryPayload condition => condition.Value,
+        SourceQueryPayload source => source.LegacyValue,
+        RuntimeHazardQueryPayload hazards => hazards.LegacyValue,
+        CapabilityQueryPayload capability => capability.LegacyValue,
+        ComplexityQueryPayload complexity => complexity.LegacyValue,
+        ConditionQueryPayload condition => condition.LegacyValue,
         _ => throw new InvalidOperationException("The analysis session returned no typed payload.")
     };
 

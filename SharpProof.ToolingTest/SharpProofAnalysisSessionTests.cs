@@ -26,7 +26,7 @@ public sealed class SharpProofAnalysisSessionTests
             Source,
             "SessionTarget.cs",
             new SharpProofAnalysisOptions(enableSmt: true));
-        var point = SymbolicQueryTarget.Point(8, 9);
+        var point = SharpProofTarget.Point(8, 9);
 
         var results = new[]
         {
@@ -59,7 +59,7 @@ public sealed class SharpProofAnalysisSessionTests
     public async Task Session_CachesEquivalentQueriesAcrossConcurrentCallers()
     {
         using var session = SharpProofAnalysisSession.FromText(Source, "CachedSession.cs");
-        var query = SharpProofQuery.Invariant(SymbolicQueryTarget.Point(8, 9));
+        var query = SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9));
 
         var results = await Task.WhenAll(Enumerable.Range(0, 12)
             .Select(_ => Task.Run(() => session.Analyze(query))));
@@ -71,7 +71,7 @@ public sealed class SharpProofAnalysisSessionTests
     public void Session_ReturnsTypedFailureAndRejectsQueriesAfterDisposal()
     {
         var session = SharpProofAnalysisSession.FromText(Source, "FailedSession.cs");
-        var failure = session.Analyze(SharpProofQuery.Invariant(SymbolicQueryTarget.Point(99, 1)));
+        var failure = session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(99, 1)));
 
         Assert.Multiple(() =>
         {
@@ -82,14 +82,14 @@ public sealed class SharpProofAnalysisSessionTests
 
         session.Dispose();
         Assert.Throws<ObjectDisposedException>(() =>
-            session.Analyze(SharpProofQuery.Invariant(SymbolicQueryTarget.Point(8, 9))));
+            session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9))));
     }
 
     [Test]
     public void Session_ReturnsCancellationWithoutPoisoningTheQueryCache()
     {
         using var session = SharpProofAnalysisSession.FromText(Source, "CanceledSession.cs");
-        var query = SharpProofQuery.Invariant(SymbolicQueryTarget.Point(8, 9));
+        var query = SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 

@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("SharpProof.Testing")]
 [assembly: InternalsVisibleTo("SharpProof.CodeFixes")]
 [assembly: InternalsVisibleTo("SharpProof.Fuzz.Core")]
+[assembly: InternalsVisibleTo("SharpProof.SymbolicCli")]

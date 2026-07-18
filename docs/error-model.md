@@ -21,13 +21,13 @@ matching exception or console text.
 | `SPQ3000` | `Cancellation` | The query was canceled | 130 |
 | `SPQ9000` | `Internal` | An unexpected non-fatal failure escaped the query boundary | 70 |
 
-`SymbolicErrorCodes` and `SymbolicErrorExitCodes` expose these values in the
-public library. `SymbolicError` also carries a human-readable message,
+`SharpProofError` exposes these values on failed public query results. It also
+carries a human-readable message,
 `IsRetryable`, and bounded string details such as `path` and `exceptionType`.
 Details do not include a stack trace.
 
 Native solver failures that bounded analysis already converts into
-`SymbolicSmtDiagnostics` or a conservative unknown remain normal query
+`SharpProofSmtMetadata` or a conservative unknown remain normal query
 results. `SPQ2000`, `SPQ2001`, and `SPQ2100` apply when a failure escapes the
 query boundary and no typed result can be returned.
 
@@ -86,24 +86,18 @@ successful, unknown, failed, and canceled queries:
 ```csharp
 using var session = SharpProofAnalysisSession.FromText(sourceText, "virtual/Buffer.cs");
 var outcome = session.Analyze(
-    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 42)));
+    SharpProofQuery.Invariant(SharpProofTarget.Point(line: 42)));
 
 if (!outcome.IsSuccess)
 {
-    SymbolicError error = outcome.Error!;
+    SharpProofError error = outcome.Error!;
     Console.Error.WriteLine($"{error.Code}: {error.Message}");
     return error.RecommendedExitCode;
 }
 
-var result = ((SourceQueryPayload)outcome.Payload!).Value;
+var result = (SourceQueryPayload)outcome.Payload!;
 ```
 
-All query kinds classify non-fatal failures through
-`SymbolicErrorClassifier`, and retain cancellation as `SPQ3000` instead of
-throwing it. Call `SymbolicErrorClassifier.FromException(...)` directly when a
-host needs to normalize an exception from its own workspace or transport
-boundary. `SymbolicQueryException` carries an already-classified
-`SymbolicError` through intermediate layers without losing its code.
-
-`SymbolicErrorEnvelope` is the public schema object used by the CLI and is safe
-to serialize with lower-camel property names and string enums.
+All query kinds classify non-fatal failures internally and retain cancellation
+as `SPQ3000` instead of throwing it. The CLI preserves its versioned,
+lower-camel error envelope at the process boundary.

@@ -11,7 +11,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicProgramPointResult
+internal sealed class SymbolicProgramPointResult
 {
     internal SymbolicProgramPointResult(
         string filePath,
@@ -196,7 +196,7 @@ public sealed class SymbolicProgramPointResult
     }
 }
 
-public sealed class SymbolicInvariantResult
+internal sealed class SymbolicInvariantResult
 {
     private SymbolicInvariantResult(
         IReadOnlyList<SymbolicInvariantCondition> conditions,
@@ -273,7 +273,7 @@ public sealed class SymbolicInvariantResult
     }
 }
 
-public sealed class SymbolicInvariantCondition
+internal sealed class SymbolicInvariantCondition
 {
     private SymbolicInvariantCondition(
         int index,
@@ -414,14 +414,14 @@ internal static class TextFactTargetExtraction
     }
 }
 
-public enum SymbolicInvariantMergeKind
+internal enum SymbolicInvariantMergeKind
 {
     Conjunction,
     DistinctFactUnion,
     ConservativeFactMerge
 }
 
-public sealed class SymbolicConditionProofResult
+internal sealed class SymbolicConditionProofResult
 {
     internal SymbolicConditionProofResult(
         string condition,
@@ -672,7 +672,7 @@ public sealed class SymbolicConditionProofResult
 
 }
 
-public enum SymbolicTruthValue
+internal enum SymbolicTruthValue
 {
     Unknown,
     ProvenTrue,

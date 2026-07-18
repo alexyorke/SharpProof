@@ -45,8 +45,8 @@ internal sealed record SymbolicCliExplainReport(
         var requestedTarget = options.Position.HasValue
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
-        var invariant = RequirePayload<SourceQueryPayload>(
-            session.Analyze(SharpProofQuery.Invariant(requestedTarget))).Value;
+        var invariant = RequirePayload<SourceQueryPayload>(session.Analyze(
+            SharpProofQuery.Invariant(SharpProofTarget.FromSymbolicTarget(requestedTarget)))).LegacyValue;
         if (invariant.ProgramPoints.Count != 1)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
@@ -59,13 +59,15 @@ internal sealed record SymbolicCliExplainReport(
         var point = invariant.ProgramPoints[0];
         var hazardResult = RequirePayload<RuntimeHazardQueryPayload>(session.Analyze(
             SharpProofQuery.RuntimeHazards(
-                SymbolicQueryTarget.Point(point.Line, point.Column),
-                options.CreateRuntimeHazardOptions()))).Value;
+                SharpProofTarget.Point(point.Line, point.Column),
+                SharpProofRuntimeHazardOptions.FromLegacy(options.CreateRuntimeHazardOptions())))).LegacyValue;
         var hazards = hazardResult.Hazards.Take(options.ReportMaxHazards).ToArray();
         var capabilities = RequirePayload<CapabilityQueryPayload>(
-            session.Analyze(SharpProofQuery.Capabilities(requestedTarget))).Value;
+            session.Analyze(SharpProofQuery.Capabilities(
+                SharpProofTarget.FromSymbolicTarget(requestedTarget)))).LegacyValue;
         var complexity = RequirePayload<ComplexityQueryPayload>(
-            session.Analyze(SharpProofQuery.Complexity(requestedTarget))).Value;
+            session.Analyze(SharpProofQuery.Complexity(
+                SharpProofTarget.FromSymbolicTarget(requestedTarget)))).LegacyValue;
         var diagnostics = await SymbolicCliExplainDiagnostics.CreateAsync(
             options,
             inputContext.ProjectContext,
@@ -94,7 +96,7 @@ internal sealed record SymbolicCliExplainReport(
         where TPayload : SharpProofQueryPayload
     {
         if (!result.IsSuccess)
-            throw new SymbolicQueryException(result.Error ?? new SymbolicError(
+            throw new SymbolicQueryException(result.Error?.ToSymbolicError() ?? new SymbolicError(
                 SymbolicErrorCodes.InternalFailure,
                 SymbolicErrorCategory.Internal,
                 "The analysis session failed without error details.",

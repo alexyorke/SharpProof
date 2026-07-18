@@ -2,7 +2,7 @@ using SharpProof.ProofCore.Purity;
 
 namespace SharpProof.Symbolic.Smt;
 
-public enum SmtAnalysisHealthState
+internal enum SmtAnalysisHealthState
 {
     Disabled,
     Ready,
@@ -11,13 +11,13 @@ public enum SmtAnalysisHealthState
     Disposed
 }
 
-public enum SmtSolverContextRecycleScope
+internal enum SmtSolverContextRecycleScope
 {
     CurrentThread,
     AllThreadsOnNextUse
 }
 
-public sealed class SmtSolverLifecycleOptions
+internal sealed class SmtSolverLifecycleOptions
 {
     public static readonly SmtSolverLifecycleOptions Default = new();
 
@@ -43,7 +43,7 @@ public sealed class SmtSolverLifecycleOptions
     public bool DisposeCurrentThreadContextOnServiceDispose { get; }
 }
 
-public sealed class SmtAnalysisHealth
+internal sealed class SmtAnalysisHealth
 {
     internal SmtAnalysisHealth(
         SmtAnalysisHealthState state,
@@ -82,7 +82,7 @@ public sealed class SmtAnalysisHealth
     public long ContextGeneration { get; }
 }
 
-public sealed class SmtSolverContextRecycleResult
+internal sealed class SmtSolverContextRecycleResult
 {
     internal SmtSolverContextRecycleResult(
         SmtSolverContextRecycleScope scope,

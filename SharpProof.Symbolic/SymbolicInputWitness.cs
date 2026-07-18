@@ -3,7 +3,7 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic;
 
-public enum SymbolicWitnessStatus
+internal enum SymbolicWitnessStatus
 {
     None,
     Exact,
@@ -11,7 +11,7 @@ public enum SymbolicWitnessStatus
     Unsupported
 }
 
-public enum SymbolicInputRole
+internal enum SymbolicInputRole
 {
     Unknown,
     Parameter,
@@ -21,7 +21,7 @@ public enum SymbolicInputRole
     Derived
 }
 
-public enum SymbolicInputValueKind
+internal enum SymbolicInputValueKind
 {
     Unknown,
     Boolean,
@@ -30,7 +30,7 @@ public enum SymbolicInputValueKind
     String
 }
 
-public enum SymbolicInputDomainKind
+internal enum SymbolicInputDomainKind
 {
     Unknown,
     Boolean,
@@ -41,14 +41,14 @@ public enum SymbolicInputDomainKind
     Index
 }
 
-public enum SymbolicNullness
+internal enum SymbolicNullness
 {
     Unknown,
     Null,
     NotNull
 }
 
-public enum SymbolicDomainPredicateKind
+internal enum SymbolicDomainPredicateKind
 {
     Equality,
     Inequality,
@@ -67,7 +67,7 @@ public enum SymbolicDomainPredicateKind
     Unsupported
 }
 
-public sealed class SymbolicIntegerRange
+internal sealed class SymbolicIntegerRange
 {
     internal SymbolicIntegerRange(
         long? minimum,
@@ -103,7 +103,7 @@ public sealed class SymbolicIntegerRange
     public long? ExactValue => IsExact ? Minimum : null;
 }
 
-public sealed class SymbolicDomainPredicate
+internal sealed class SymbolicDomainPredicate
 {
     internal SymbolicDomainPredicate(
         SymbolicDomainPredicateKind kind,
@@ -134,7 +134,7 @@ public sealed class SymbolicDomainPredicate
     public string Reason { get; }
 }
 
-public sealed class SymbolicSatisfyingAssignment
+internal sealed class SymbolicSatisfyingAssignment
 {
     internal SymbolicSatisfyingAssignment(
         string symbolicName,
@@ -185,7 +185,7 @@ public sealed class SymbolicSatisfyingAssignment
     public string Reason { get; }
 }
 
-public sealed class SymbolicInputDomain
+internal sealed class SymbolicInputDomain
 {
     internal SymbolicInputDomain(
         string name,
@@ -272,7 +272,7 @@ public sealed class SymbolicInputDomain
     public int AlternativeCount { get; }
 }
 
-public sealed class SymbolicInputDomainSummary
+internal sealed class SymbolicInputDomainSummary
 {
     internal SymbolicInputDomainSummary(
         SymbolicWitnessStatus status,
@@ -307,7 +307,7 @@ public sealed class SymbolicInputDomainSummary
         Domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported);
 }
 
-public sealed class SymbolicInputWitness
+internal sealed class SymbolicInputWitness
 {
     internal SymbolicInputWitness(
         SymbolicWitnessStatus status,

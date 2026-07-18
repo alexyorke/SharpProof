@@ -601,8 +601,8 @@ using SharpProof.Symbolic;
 
 using var session = SharpProofAnalysisSession.FromText(sourceText, "Example.cs");
 var response = session.Analyze(
-    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 42)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
+    SharpProofQuery.Invariant(SharpProofTarget.Point(line: 42)));
+var result = (SourceQueryPayload)response.Payload!;
 ```
 
 The package includes XML documentation, nullable API annotations, portable

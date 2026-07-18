@@ -5,7 +5,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicProjectConfiguration
+internal sealed class SymbolicProjectConfiguration
 {
     private SymbolicProjectConfiguration(
         SmtAnalysisOptions smtOptions,
@@ -143,7 +143,7 @@ public sealed class SymbolicProjectConfiguration
     }
 }
 
-public sealed class SymbolicProjectQueryContext
+internal sealed class SymbolicProjectQueryContext
 {
     private readonly ImmutableArray<string> _analyzerConfigPaths;
     private readonly ImmutableArray<string> _additionalFilePaths;

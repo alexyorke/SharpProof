@@ -3,14 +3,14 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
-public enum SymbolicProofBackend
+internal enum SymbolicProofBackend
 {
     None,
     Syntactic,
     Smt
 }
 
-public enum SymbolicProofStatus
+internal enum SymbolicProofStatus
 {
     Unknown,
     Reachable,
@@ -19,7 +19,7 @@ public enum SymbolicProofStatus
     ProvenFalse
 }
 
-public enum SymbolicProofStage
+internal enum SymbolicProofStage
 {
     None,
     Lowering,
@@ -30,14 +30,14 @@ public enum SymbolicProofStage
     ResultMapping
 }
 
-public enum SymbolicProofSupport
+internal enum SymbolicProofSupport
 {
     Exact,
     Approximate,
     Unsupported
 }
 
-public enum SymbolicUnknownReason
+internal enum SymbolicUnknownReason
 {
     None,
     UnsupportedIrEncoding,
@@ -52,7 +52,7 @@ public enum SymbolicUnknownReason
     Unknown
 }
 
-public sealed class SymbolicBudgetInfo
+internal sealed class SymbolicBudgetInfo
 {
     public SymbolicBudgetInfo(
         int maxPathConditions,
@@ -105,7 +105,7 @@ public sealed class SymbolicBudgetInfo
     public SymbolicCacheInfo? Cache { get; }
 }
 
-public sealed class SymbolicCacheInfo
+internal sealed class SymbolicCacheInfo
 {
     public SymbolicCacheInfo(long hits, long misses, int entries, long evictions)
     {
@@ -124,7 +124,7 @@ public sealed class SymbolicCacheInfo
     public long Evictions { get; }
 }
 
-public sealed class SymbolicProofInfo
+internal sealed class SymbolicProofInfo
 {
     public SymbolicProofInfo(
         SymbolicProofStatus status,
@@ -210,7 +210,7 @@ public sealed class SymbolicProofInfo
     public string DisplayKind { get; }
 }
 
-public sealed class SymbolicFactInfo
+internal sealed class SymbolicFactInfo
 {
     public SymbolicFactInfo(
         string kind,
@@ -343,7 +343,7 @@ public sealed class SymbolicFactInfo
     }
 }
 
-public sealed class SymbolicInvariantInfo
+internal sealed class SymbolicInvariantInfo
 {
     public SymbolicInvariantInfo(
         string mergedText,

@@ -64,14 +64,13 @@ Supported source shapes:
 
 - `SharpProofAnalysisSession.FromFile(...)`
 - `SharpProofAnalysisSession.FromText(...)`
-- project-loaded sessions created by `SymbolicProjectQueryContext`
+- project-loaded CLI sessions (the project/Roslyn adapter is internal)
 
 Supported target shapes:
 
-- `SymbolicQueryTarget.Point(...)`
-- `SymbolicQueryTarget.Position(...)`
-- `SymbolicQueryTarget.Line(...)`
-- `SymbolicQueryTarget.Node(...)`
+- `SharpProofTarget.Point(...)`
+- `SharpProofTarget.AtPosition(...)`
+- `SharpProofTarget.LineNumber(...)`
 
 Capability queries resolve the containing method-like body and return:
 

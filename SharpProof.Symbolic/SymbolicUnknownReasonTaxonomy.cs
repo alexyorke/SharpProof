@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-public enum SymbolicUnknownReasonSource
+internal enum SymbolicUnknownReasonSource
 {
     Proof,
     Capability,
@@ -10,7 +10,7 @@ public enum SymbolicUnknownReasonSource
     Ensures
 }
 
-public enum SymbolicUnknownReasonCategory
+internal enum SymbolicUnknownReasonCategory
 {
     None,
     UnsupportedSyntax,
@@ -30,7 +30,7 @@ public enum SymbolicUnknownReasonCategory
     Unknown
 }
 
-public sealed class SymbolicUnknownReasonInfo
+internal sealed class SymbolicUnknownReasonInfo
 {
     internal SymbolicUnknownReasonInfo(
         SymbolicUnknownReasonSource source,

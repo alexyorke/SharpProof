@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -42,6 +43,21 @@ public sealed class RepositoryArchitectureTests
 
         Assert.That(violations, Is.Empty,
             "Production source must be owned by a project and shared through a ProjectReference.");
+    }
+
+    [Test]
+    public void SymbolicAssembly_DoesNotExportLegacySymbolicDtoTypes()
+    {
+        var exported = typeof(SharpProofAnalysisSession).Assembly
+            .GetExportedTypes()
+            .Where(static type => type.Name.StartsWith("Symbolic", StringComparison.Ordinal) ||
+                                  type.Namespace == "SharpProof.Symbolic.Smt")
+            .Select(static type => type.FullName)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(exported, Is.Empty,
+            "The supported .NET boundary is SharpProofAnalysisSession/query/result; legacy DTOs and raw SMT types stay internal.");
     }
 
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)

@@ -24,9 +24,9 @@ The descriptor is exposed through:
 
 - `SymbolicProofInfo.UnknownReasonInfo`
 - `SymbolicCapabilitySite.UnknownReasonInfo` and
-  `SymbolicCapabilityResult.UnknownReasonDetails`
+  `SharpProofQueryResult.UnknownReasons` for capability queries
 - `SymbolicComplexityCalleeInfo.UnknownReasonInfo` and
-  `SymbolicComplexityResult.UnknownReasonDetails`
+  `SharpProofQueryResult.UnknownReasons` for complexity queries
 - `SymbolicRuntimeHazard.UnknownReasonInfo`
 - capability, complexity, runtime-hazard, and canonical CLI JSON results
 

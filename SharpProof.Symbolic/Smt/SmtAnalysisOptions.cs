@@ -1,13 +1,13 @@
 namespace SharpProof.Symbolic.Smt;
 
-public enum SmtAnalysisMode
+internal enum SmtAnalysisMode
 {
     Off,
     Bounded,
     Deep
 }
 
-public sealed class SmtAnalysisOptions
+internal sealed class SmtAnalysisOptions
 {
     public static readonly SmtAnalysisOptions Default = ForMode(SmtAnalysisMode.Bounded);
 

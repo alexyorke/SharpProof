@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-public abstract class SymbolicMethodResult
+internal abstract class SymbolicMethodResult
 {
     protected SymbolicMethodResult(
         string? filePath,

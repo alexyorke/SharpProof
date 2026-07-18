@@ -14,28 +14,14 @@ These are different claims:
 
 ## Query Surfaces
 
-The full public result graph exposes witnesses at every requested scope:
-
-- `SymbolicProgramPointResult.ReachabilityWitness` describes one input model
-  that reaches a program point. `InputDomainSummary` is its domain view.
-- `SymbolicQueryResult` exposes `ReachabilityWitnesses` plus a conservatively
-  merged `InputDomainSummary` for point, line, span, and file scopes.
-- `SymbolicConditionProofResult.Witness` demonstrates the reported implication
-  outcome when a model is available. For an unknown implication,
-  `CounterexampleWitness` exposes a model satisfying the path and the negated
-  condition when the solver found one.
-- `SymbolicRuntimeHazard.TriggerWitness` is computed from `path && trigger`, so
-  its assignment reaches the candidate and satisfies the hazard condition.
-  `SymbolicRuntimeHazardQueryResult` exposes all trigger witnesses and their
-  merged domain summary.
-
-The CLI's `--json` output serializes these same public DTOs, including model
-assignments and input domains when available.
+`SharpProofQueryResult.Evidence` exposes bounded status/reason summaries without
+leaking solver assignments or internal symbolic state into the .NET API. The
+CLI's compatibility JSON retains detailed assignments and input domains at the
+external process boundary.
 
 ## Status And Precision
 
-`SymbolicWitnessStatus` is present on witnesses, assignments, domains, and
-individual domain predicates:
+Evidence status values are:
 
 - `Exact` means the value or supported constraint is represented exactly by
   the current bounded model.
@@ -102,17 +88,11 @@ using var session = SharpProofAnalysisSession.FromText(
     "Example.cs",
     new SharpProofAnalysisOptions(enableSmt: true));
 var response = session.Analyze(
-    SharpProofQuery.Reachability(SymbolicQueryTarget.Line(42)));
-var result = ((SourceQueryPayload)response.Payload!).Value;
+    SharpProofQuery.Reachability(SharpProofTarget.LineNumber(42)));
+var result = (SourceQueryPayload)response.Payload!;
 
-foreach (var witness in result.ReachabilityWitnesses)
-{
-    foreach (var assignment in witness.Assignments)
-        Console.WriteLine($"{assignment.SourceName} = {assignment.Value}");
-}
-
-foreach (var domain in result.InputDomainSummary.Domains)
-    Console.WriteLine($"{domain.Name}: {domain.Status} ({domain.Reason})");
+foreach (var evidence in response.Evidence)
+    Console.WriteLine($"{evidence.Status}: {evidence.Reason}");
 ```
 
 For a divide-by-zero candidate, inspect

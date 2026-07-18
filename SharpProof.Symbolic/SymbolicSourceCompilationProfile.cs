@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicSourceCompilationProfile
+internal sealed class SymbolicSourceCompilationProfile
 {
     public static readonly SymbolicSourceCompilationProfile Default = new();
 

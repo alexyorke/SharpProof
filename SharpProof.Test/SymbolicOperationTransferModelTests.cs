@@ -14,7 +14,7 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicOperationTransferModelTests
+internal sealed class SymbolicOperationTransferModelTests
 {
     [Test]
     public void UnsupportedCurrentAssignmentExpression_UsesConservativeCompletionFallback()

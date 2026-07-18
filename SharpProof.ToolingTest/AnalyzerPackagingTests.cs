@@ -1885,6 +1885,10 @@ namespace TestNamespace {
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicErrors.cs"));
+        var apiSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SharpProofAnalysisApi.cs"));
 
         AssertSymbolicCliSourceContains(
             ("SymbolicCliOptions.cs", "--error-json"),
@@ -1894,8 +1898,9 @@ namespace TestNamespace {
         Assert.That(errorSource, Does.Contain("public const string InvalidRequest = \"SPQ1000\""));
         Assert.That(errorSource, Does.Contain("public const string NativeSolverUnavailable = \"SPQ2000\""));
         Assert.That(errorSource, Does.Contain("public const string Canceled = \"SPQ3000\""));
-        Assert.That(errorSource, Does.Contain("public sealed class SymbolicOperationResult<T>"));
-        Assert.That(errorSource, Does.Contain("public sealed class SymbolicErrorEnvelope"));
+        Assert.That(errorSource, Does.Contain("internal sealed class SymbolicOperationResult<T>"));
+        Assert.That(errorSource, Does.Contain("internal sealed class SymbolicErrorEnvelope"));
+        Assert.That(apiSource, Does.Contain("public sealed record SharpProofError("));
     }
 
     [Test]
@@ -2273,7 +2278,7 @@ namespace TestNamespace {
         Assert.That(script, Does.Contain("$loadFailureIds -contains $_.ruleId"));
         Assert.That(script, Does.Contain("SP0004"));
         Assert.That(script, Does.Contain("analyzer-diagnostics.sarif"));
-        Assert.That(symbolicProbe, Does.Contain("SmtAnalysisHealthState.PermanentlyUnavailable"));
+        Assert.That(symbolicProbe, Does.Contain("health.State == \"PermanentlyUnavailable\""));
         Assert.That(symbolicProbe, Does.Contain("smt_native_library_missing"));
         Assert.That(symbolicProbe, Does.Contain("proofsHold"));
     }

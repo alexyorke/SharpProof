@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-public enum SymbolicCapabilityUnknownReason
+internal enum SymbolicCapabilityUnknownReason
 {
     None,
     UnsupportedTarget,
@@ -14,7 +14,7 @@ public enum SymbolicCapabilityUnknownReason
     Unknown
 }
 
-public sealed class SymbolicCapabilitySite
+internal sealed class SymbolicCapabilitySite
 {
     public SymbolicCapabilitySite(
         SymbolicCapability capabilities,
@@ -76,7 +76,7 @@ public sealed class SymbolicCapabilitySite
     public int SourceColumn { get; }
 }
 
-public sealed class SymbolicCapabilityResult : SymbolicMethodResult
+internal sealed class SymbolicCapabilityResult : SymbolicMethodResult
 {
     public SymbolicCapabilityResult(
         string filePath,
