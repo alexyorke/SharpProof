@@ -520,6 +520,7 @@ public class TestClass
     public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
     {
         var assembly = typeof(SymbolicQueryService).Assembly;
+        Assert.That(typeof(SymbolicQueryService).IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicQueryExecutor")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);

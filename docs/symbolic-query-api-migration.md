@@ -1,59 +1,42 @@
 # Symbolic query preview API migration
 
-The preview .NET query API now uses one `SymbolicQueryContext` for the source,
-target, and common options shared by every operation. The five operation-specific
-request wrappers were removed.
+The preview .NET API now uses one session, one discriminated query model, and
+one result envelope. `SymbolicQueryService` and `SymbolicQueryContext` are no
+longer public.
 
-Use these replacements:
+Create a session for the compilation or source lifetime, then analyze typed
+queries:
 
 ```csharp
-var context = new SymbolicQueryContext(source, target, options);
+using var session = SharpProofAnalysisSession.FromText(
+    sourceText,
+    "Example.cs",
+    new SharpProofAnalysisOptions(enableSmt: true));
 
-var query = service.Query(context);
-var proof = service.Prove(context, conditionText);
-var hazards = service.QueryRuntimeHazards(context, hazardOptions);
-var complexity = service.QueryComplexity(context);
-var capabilities = service.QueryCapabilities(context);
+var invariant = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(42, 1)));
+var proof = session.Analyze(
+    SharpProofQuery.Condition(SymbolicQueryTarget.Point(42, 1), "value >= 0"));
+var hazards = session.Analyze(
+    SharpProofQuery.RuntimeHazards(SymbolicQueryTarget.Line(42)));
+var capabilities = session.Analyze(
+    SharpProofQuery.Capabilities(SymbolicQueryTarget.Line(42)));
+var complexity = session.Analyze(
+    SharpProofQuery.Complexity(SymbolicQueryTarget.Line(42)));
 ```
 
-The corresponding `Try*` methods accept the same context and operation-specific
-arguments. `SymbolicQueryOptions` remains the place for references, SMT ownership,
-analysis limits, implied conditions, expression-point selection, and filters.
+`SharpProofQueryResult` supplies common status, source location, structured
+unknown reasons, budget/truncation metadata, evidence, and a typed payload.
+Use `SourceQueryPayload`, `ConditionQueryPayload`,
+`RuntimeHazardQueryPayload`, `CapabilityQueryPayload`, or
+`ComplexityQueryPayload` to access domain details. Failed and canceled queries
+carry a stable `SymbolicError` and no payload.
 
-Query operations now return one `SymbolicQueryResult` for point, line, span, and
-file scopes. Inspect `result.Scope.Kind` and `result.Scope` for typed scope metadata,
-then consume `result.ProgramPoints`, whose entries are `SymbolicProgramPointResult`.
-The former `SymbolicSourceQueryResult` name and the public line/span/file result
-DTOs were removed; they were artifacts of the internal source-query engine.
+Equivalent queries share a session-scoped, thread-safe result cache. Canceled
+queries are not cached, and disposing the session releases its owned SMT
+service and cached results.
 
-Capability and complexity results now inherit their shared method scope from
-`SymbolicMethodResult`. Code that accepts either result can use that base type to
-read `FilePath`, method identity, declaration kind, span, and line/column bounds.
-The properties retain their names and values, so CLI and JSON projections are
-unchanged.
-
-Capability results now use the canonical
-`SharpProof.Attributes.SharpProofCapability` flags. The duplicate preview
-`SharpProof.Symbolic.SymbolicCapability` enum was removed. Member names and
-numeric values are identical, so serialized CLI values remain unchanged; .NET
-callers should reference the attributes package and update the enum type name.
-
-Compact and invariant projection DTOs were removed from
-`SharpProof.Symbolic.dll` and moved into the Symbolic CLI adapter. This retires
-the `SymbolicCompact*`, `ISymbolicCompactResult`, `SymbolicInvariantQueryResult`,
-and `ToCompactResult`/`ToInvariantQueryResult` preview surface. Library callers
-should consume `SymbolicQueryResult`, `SymbolicProgramPointResult`,
-`SymbolicCapabilityResult`, `SymbolicComplexityResult`, and
-`SymbolicRuntimeHazardQueryResult` directly. Processes that need the
-machine-readable schema should invoke the CLI with `--json`, which serializes
-the canonical result graph directly.
-
-The canonical query schema is now the sole invariant JSON result schema; the
-former compact and invariant-only envelopes and duplicate focus/query-summary
-fields were removed.
-
-The standalone JSON request envelope now uses schema version 2 with a single
-`arguments` string array. The former nested source, target, query, output, and
-gate objects were unreleased compatibility DTOs that duplicated the CLI
-grammar. Pass each canonical CLI token as one array entry; nested request
-selectors are rejected.
+The CLI now consumes this API internally while retaining its command names,
+exit codes, text, JSON, SARIF, Markdown, and evidence schemas. The canonical
+domain payload types remain available during the preview migration; raw Roslyn
+source inputs and service-specific execution APIs are compatibility internals.

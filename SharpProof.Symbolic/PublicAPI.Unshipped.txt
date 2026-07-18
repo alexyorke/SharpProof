@@ -378,16 +378,6 @@ SharpProof.Symbolic.SymbolicQueryContext.Options.get -> SharpProof.Symbolic.Symb
 SharpProof.Symbolic.SymbolicQueryContext.Source.get -> SharpProof.Symbolic.SymbolicSourceInput!
 SharpProof.Symbolic.SymbolicQueryContext.SymbolicQueryContext(SharpProof.Symbolic.SymbolicSourceInput! source, SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicQueryOptions? options = null) -> void
 SharpProof.Symbolic.SymbolicQueryContext.Target.get -> SharpProof.Symbolic.SymbolicQueryTarget!
-SharpProof.Symbolic.SymbolicQueryService.Prove(SharpProof.Symbolic.SymbolicQueryContext! context, string! conditionText, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicConditionProofResult!
-SharpProof.Symbolic.SymbolicQueryService.Query(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicQueryResult!
-SharpProof.Symbolic.SymbolicQueryService.QueryCapabilities(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicCapabilityResult!
-SharpProof.Symbolic.SymbolicQueryService.QueryComplexity(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicComplexityResult!
-SharpProof.Symbolic.SymbolicQueryService.QueryRuntimeHazards(SharpProof.Symbolic.SymbolicQueryContext! context, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions? hazardOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!
-SharpProof.Symbolic.SymbolicQueryService.TryProve(SharpProof.Symbolic.SymbolicQueryContext! context, string! conditionText, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicConditionProofResult!>!
-SharpProof.Symbolic.SymbolicQueryService.TryQuery(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicQueryResult!>!
-SharpProof.Symbolic.SymbolicQueryService.TryQueryCapabilities(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicCapabilityResult!>!
-SharpProof.Symbolic.SymbolicQueryService.TryQueryComplexity(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicComplexityResult!>!
-SharpProof.Symbolic.SymbolicQueryService.TryQueryRuntimeHazards(SharpProof.Symbolic.SymbolicQueryContext! context, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions? hazardOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!>!
 SharpProof.Symbolic.SymbolicQueryResult.Scope.get -> SharpProof.Symbolic.SymbolicQueryScope!
 SharpProof.Symbolic.SymbolicQueryScope
 SharpProof.Symbolic.SymbolicQueryScope.Column.get -> int?
@@ -443,3 +433,326 @@ static SharpProof.Symbolic.SymbolicReachabilitySummary.FromProgramPoints(System.
 SharpProof.Symbolic.SymbolicProgramPointResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
 SharpProof.Symbolic.SymbolicProgramPointResult.ReachabilityWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
 SharpProof.Symbolic.SymbolicProgramPointResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+abstract SharpProof.Symbolic.SharpProofQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+abstract SharpProof.Symbolic.SharpProofQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override sealed SharpProof.Symbolic.CapabilityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+override sealed SharpProof.Symbolic.ComplexityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.ComplexityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+override sealed SharpProof.Symbolic.ConditionQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.ConditionQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+override sealed SharpProof.Symbolic.InvariantQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.MethodQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.ReachabilityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.RuntimeHazardQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.RuntimeHazardQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+override sealed SharpProof.Symbolic.SourceLocationQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+override sealed SharpProof.Symbolic.SourceQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+override SharpProof.Symbolic.CapabilityQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.CapabilityQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.CapabilityQuery.GetHashCode() -> int
+override SharpProof.Symbolic.CapabilityQuery.ToString() -> string!
+override SharpProof.Symbolic.CapabilityQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override SharpProof.Symbolic.CapabilityQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.CapabilityQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.CapabilityQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.ComplexityQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.ComplexityQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.ComplexityQuery.GetHashCode() -> int
+override SharpProof.Symbolic.ComplexityQuery.ToString() -> string!
+override SharpProof.Symbolic.ComplexityQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override SharpProof.Symbolic.ComplexityQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.ComplexityQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.ComplexityQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.ConditionQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.ConditionQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.ConditionQuery.GetHashCode() -> int
+override SharpProof.Symbolic.ConditionQuery.ToString() -> string!
+override SharpProof.Symbolic.ConditionQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override SharpProof.Symbolic.ConditionQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.ConditionQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.ConditionQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.InvariantQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.InvariantQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.InvariantQuery.GetHashCode() -> int
+override SharpProof.Symbolic.InvariantQuery.ToString() -> string!
+override SharpProof.Symbolic.MethodQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.MethodQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.MethodQuery.GetHashCode() -> int
+override SharpProof.Symbolic.MethodQuery.ToString() -> string!
+override SharpProof.Symbolic.ReachabilityQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.ReachabilityQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.ReachabilityQuery.GetHashCode() -> int
+override SharpProof.Symbolic.ReachabilityQuery.ToString() -> string!
+override SharpProof.Symbolic.RuntimeHazardQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.RuntimeHazardQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.RuntimeHazardQuery.GetHashCode() -> int
+override SharpProof.Symbolic.RuntimeHazardQuery.ToString() -> string!
+override SharpProof.Symbolic.RuntimeHazardQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override SharpProof.Symbolic.RuntimeHazardQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.RuntimeHazardQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.RuntimeHazardQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.SharpProofBudgetMetadata.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofBudgetMetadata.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofBudgetMetadata.ToString() -> string!
+override SharpProof.Symbolic.SharpProofLocation.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofLocation.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofLocation.ToString() -> string!
+override SharpProof.Symbolic.SharpProofQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofQuery.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofQuery.ToString() -> string!
+override SharpProof.Symbolic.SharpProofQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofQueryPayload.ToString() -> string!
+override SharpProof.Symbolic.SharpProofQueryResult.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofQueryResult.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofQueryResult.ToString() -> string!
+override SharpProof.Symbolic.SharpProofTruncationReason.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofTruncationReason.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofTruncationReason.ToString() -> string!
+override SharpProof.Symbolic.SharpProofUnknownReason.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofUnknownReason.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofUnknownReason.ToString() -> string!
+override SharpProof.Symbolic.SourceLocationQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
+override SharpProof.Symbolic.SourceLocationQuery.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SourceLocationQuery.GetHashCode() -> int
+override SharpProof.Symbolic.SourceLocationQuery.ToString() -> string!
+override SharpProof.Symbolic.SourceQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
+override SharpProof.Symbolic.SourceQueryPayload.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SourceQueryPayload.GetHashCode() -> int
+override SharpProof.Symbolic.SourceQueryPayload.ToString() -> string!
+SharpProof.Symbolic.CapabilityQuery
+SharpProof.Symbolic.CapabilityQuery.CapabilityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.CapabilityQuery.Equals(SharpProof.Symbolic.CapabilityQuery? other) -> bool
+SharpProof.Symbolic.CapabilityQueryPayload
+SharpProof.Symbolic.CapabilityQueryPayload.CapabilityQueryPayload(SharpProof.Symbolic.SymbolicCapabilityResult! Value) -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicCapabilityResult! Value) -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.CapabilityQueryPayload? other) -> bool
+SharpProof.Symbolic.CapabilityQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicCapabilityResult!
+SharpProof.Symbolic.CapabilityQueryPayload.Value.init -> void
+SharpProof.Symbolic.ComplexityQuery
+SharpProof.Symbolic.ComplexityQuery.ComplexityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.ComplexityQuery.Equals(SharpProof.Symbolic.ComplexityQuery? other) -> bool
+SharpProof.Symbolic.ComplexityQueryPayload
+SharpProof.Symbolic.ComplexityQueryPayload.ComplexityQueryPayload(SharpProof.Symbolic.SymbolicComplexityResult! Value) -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicComplexityResult! Value) -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Equals(SharpProof.Symbolic.ComplexityQueryPayload? other) -> bool
+SharpProof.Symbolic.ComplexityQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicComplexityResult!
+SharpProof.Symbolic.ComplexityQueryPayload.Value.init -> void
+SharpProof.Symbolic.ConditionQuery
+SharpProof.Symbolic.ConditionQuery.ConditionQuery(SharpProof.Symbolic.SymbolicQueryTarget! target, string! conditionText) -> void
+SharpProof.Symbolic.ConditionQuery.ConditionText.get -> string!
+SharpProof.Symbolic.ConditionQuery.Equals(SharpProof.Symbolic.ConditionQuery? other) -> bool
+SharpProof.Symbolic.ConditionQueryPayload
+SharpProof.Symbolic.ConditionQueryPayload.ConditionQueryPayload(SharpProof.Symbolic.SymbolicConditionProofResult! Value) -> void
+SharpProof.Symbolic.ConditionQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicConditionProofResult! Value) -> void
+SharpProof.Symbolic.ConditionQueryPayload.Equals(SharpProof.Symbolic.ConditionQueryPayload? other) -> bool
+SharpProof.Symbolic.ConditionQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicConditionProofResult!
+SharpProof.Symbolic.ConditionQueryPayload.Value.init -> void
+SharpProof.Symbolic.InvariantQuery
+SharpProof.Symbolic.InvariantQuery.Equals(SharpProof.Symbolic.InvariantQuery? other) -> bool
+SharpProof.Symbolic.InvariantQuery.InvariantQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.MethodQuery
+SharpProof.Symbolic.MethodQuery.Equals(SharpProof.Symbolic.MethodQuery? other) -> bool
+SharpProof.Symbolic.MethodQuery.MethodQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.ReachabilityQuery
+SharpProof.Symbolic.ReachabilityQuery.Equals(SharpProof.Symbolic.ReachabilityQuery? other) -> bool
+SharpProof.Symbolic.ReachabilityQuery.ReachabilityQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.RuntimeHazardQuery
+SharpProof.Symbolic.RuntimeHazardQuery.Equals(SharpProof.Symbolic.RuntimeHazardQuery? other) -> bool
+SharpProof.Symbolic.RuntimeHazardQuery.Options.get -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions!
+SharpProof.Symbolic.RuntimeHazardQuery.RuntimeHazardQuery(SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions! options) -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! Value) -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Equals(SharpProof.Symbolic.RuntimeHazardQueryPayload? other) -> bool
+SharpProof.Symbolic.RuntimeHazardQueryPayload.RuntimeHazardQueryPayload(SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! Value) -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Value.init -> void
+SharpProof.Symbolic.SharpProofAnalysisSession
+SharpProof.Symbolic.SharpProofAnalysisSession.Analyze(SharpProof.Symbolic.SharpProofQuery! query, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SharpProofQueryResult!
+SharpProof.Symbolic.SharpProofAnalysisSession.Dispose() -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata
+SharpProof.Symbolic.SharpProofBudgetMetadata.<Clone>$() -> SharpProof.Symbolic.SharpProofBudgetMetadata!
+SharpProof.Symbolic.SharpProofBudgetMetadata.Deconstruct(out SharpProof.Symbolic.SymbolicAnalysisLimits! Limits, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata.Equals(SharpProof.Symbolic.SharpProofBudgetMetadata? other) -> bool
+SharpProof.Symbolic.SharpProofBudgetMetadata.IsExhausted.get -> bool
+SharpProof.Symbolic.SharpProofBudgetMetadata.Limits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+SharpProof.Symbolic.SharpProofBudgetMetadata.Limits.init -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata.SharpProofBudgetMetadata(SharpProof.Symbolic.SymbolicAnalysisLimits! Limits, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!> Truncations) -> void
+SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason!>
+SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.init -> void
+SharpProof.Symbolic.SharpProofLocation
+SharpProof.Symbolic.SharpProofLocation.<Clone>$() -> SharpProof.Symbolic.SharpProofLocation!
+SharpProof.Symbolic.SharpProofLocation.Column.get -> int?
+SharpProof.Symbolic.SharpProofLocation.Column.init -> void
+SharpProof.Symbolic.SharpProofLocation.Deconstruct(out string! FilePath, out int? Line, out int? Column, out int? Position, out int? SpanStart, out int? SpanEnd) -> void
+SharpProof.Symbolic.SharpProofLocation.Equals(SharpProof.Symbolic.SharpProofLocation? other) -> bool
+SharpProof.Symbolic.SharpProofLocation.FilePath.get -> string!
+SharpProof.Symbolic.SharpProofLocation.FilePath.init -> void
+SharpProof.Symbolic.SharpProofLocation.Line.get -> int?
+SharpProof.Symbolic.SharpProofLocation.Line.init -> void
+SharpProof.Symbolic.SharpProofLocation.Position.get -> int?
+SharpProof.Symbolic.SharpProofLocation.Position.init -> void
+SharpProof.Symbolic.SharpProofLocation.SharpProofLocation(string! FilePath, int? Line, int? Column, int? Position, int? SpanStart, int? SpanEnd) -> void
+SharpProof.Symbolic.SharpProofLocation.SpanEnd.get -> int?
+SharpProof.Symbolic.SharpProofLocation.SpanEnd.init -> void
+SharpProof.Symbolic.SharpProofLocation.SpanStart.get -> int?
+SharpProof.Symbolic.SharpProofLocation.SpanStart.init -> void
+SharpProof.Symbolic.SharpProofQuery
+SharpProof.Symbolic.SharpProofQuery.Deconstruct(out SharpProof.Symbolic.SharpProofQueryKind Kind, out SharpProof.Symbolic.SymbolicQueryTarget! Target) -> void
+SharpProof.Symbolic.SharpProofQuery.Kind.get -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQuery.Kind.init -> void
+SharpProof.Symbolic.SharpProofQuery.SharpProofQuery(SharpProof.Symbolic.SharpProofQuery! original) -> void
+SharpProof.Symbolic.SharpProofQuery.SharpProofQuery(SharpProof.Symbolic.SharpProofQueryKind Kind, SharpProof.Symbolic.SymbolicQueryTarget! Target) -> void
+SharpProof.Symbolic.SharpProofQuery.Target.get -> SharpProof.Symbolic.SymbolicQueryTarget!
+SharpProof.Symbolic.SharpProofQuery.Target.init -> void
+SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Capabilities = 6 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Complexity = 7 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Condition = 4 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Invariant = 2 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Method = 1 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.Reachability = 3 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.RuntimeHazards = 5 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryKind.SourceLocation = 0 -> SharpProof.Symbolic.SharpProofQueryKind
+SharpProof.Symbolic.SharpProofQueryPayload
+SharpProof.Symbolic.SharpProofQueryPayload.SharpProofQueryPayload() -> void
+SharpProof.Symbolic.SharpProofQueryPayload.SharpProofQueryPayload(SharpProof.Symbolic.SharpProofQueryPayload! original) -> void
+SharpProof.Symbolic.SharpProofQueryResult
+SharpProof.Symbolic.SharpProofQueryResult.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryResult!
+SharpProof.Symbolic.SharpProofQueryResult.Budget.get -> SharpProof.Symbolic.SharpProofBudgetMetadata!
+SharpProof.Symbolic.SharpProofQueryResult.Budget.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.Deconstruct(out SharpProof.Symbolic.SharpProofQueryStatus Status, out SharpProof.Symbolic.SharpProofQuery! Query, out SharpProof.Symbolic.SharpProofLocation! Location, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, out SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!> Evidence, out SharpProof.Symbolic.SharpProofQueryPayload? Payload, out SharpProof.Symbolic.SymbolicError? Error) -> void
+SharpProof.Symbolic.SharpProofQueryResult.Equals(SharpProof.Symbolic.SharpProofQueryResult? other) -> bool
+SharpProof.Symbolic.SharpProofQueryResult.Error.get -> SharpProof.Symbolic.SymbolicError?
+SharpProof.Symbolic.SharpProofQueryResult.Error.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.Evidence.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!>
+SharpProof.Symbolic.SharpProofQueryResult.Evidence.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.IsSuccess.get -> bool
+SharpProof.Symbolic.SharpProofQueryResult.Location.get -> SharpProof.Symbolic.SharpProofLocation!
+SharpProof.Symbolic.SharpProofQueryResult.Location.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.Payload.get -> SharpProof.Symbolic.SharpProofQueryPayload?
+SharpProof.Symbolic.SharpProofQueryResult.Payload.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.Query.get -> SharpProof.Symbolic.SharpProofQuery!
+SharpProof.Symbolic.SharpProofQueryResult.Query.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.SharpProofQueryResult(SharpProof.Symbolic.SharpProofQueryStatus Status, SharpProof.Symbolic.SharpProofQuery! Query, SharpProof.Symbolic.SharpProofLocation! Location, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!> UnknownReasons, SharpProof.Symbolic.SharpProofBudgetMetadata! Budget, System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SymbolicInputWitness!> Evidence, SharpProof.Symbolic.SharpProofQueryPayload? Payload, SharpProof.Symbolic.SymbolicError? Error) -> void
+SharpProof.Symbolic.SharpProofQueryResult.Status.get -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofQueryResult.Status.init -> void
+SharpProof.Symbolic.SharpProofQueryResult.UnknownReasons.get -> System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason!>
+SharpProof.Symbolic.SharpProofQueryResult.UnknownReasons.init -> void
+SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofQueryStatus.Canceled = 3 -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofQueryStatus.Failed = 2 -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofQueryStatus.Succeeded = 0 -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofQueryStatus.Unknown = 1 -> SharpProof.Symbolic.SharpProofQueryStatus
+SharpProof.Symbolic.SharpProofTruncationReason
+SharpProof.Symbolic.SharpProofTruncationReason.<Clone>$() -> SharpProof.Symbolic.SharpProofTruncationReason!
+SharpProof.Symbolic.SharpProofTruncationReason.Code.get -> string!
+SharpProof.Symbolic.SharpProofTruncationReason.Code.init -> void
+SharpProof.Symbolic.SharpProofTruncationReason.Deconstruct(out string! Code, out int Limit, out int Observed, out string! Provenance, out int? SourceSpanStart) -> void
+SharpProof.Symbolic.SharpProofTruncationReason.Equals(SharpProof.Symbolic.SharpProofTruncationReason? other) -> bool
+SharpProof.Symbolic.SharpProofTruncationReason.Limit.get -> int
+SharpProof.Symbolic.SharpProofTruncationReason.Limit.init -> void
+SharpProof.Symbolic.SharpProofTruncationReason.Observed.get -> int
+SharpProof.Symbolic.SharpProofTruncationReason.Observed.init -> void
+SharpProof.Symbolic.SharpProofTruncationReason.Provenance.get -> string!
+SharpProof.Symbolic.SharpProofTruncationReason.Provenance.init -> void
+SharpProof.Symbolic.SharpProofTruncationReason.SharpProofTruncationReason(string! Code, int Limit, int Observed, string! Provenance, int? SourceSpanStart) -> void
+SharpProof.Symbolic.SharpProofTruncationReason.SourceSpanStart.get -> int?
+SharpProof.Symbolic.SharpProofTruncationReason.SourceSpanStart.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason
+SharpProof.Symbolic.SharpProofUnknownReason.<Clone>$() -> SharpProof.Symbolic.SharpProofUnknownReason!
+SharpProof.Symbolic.SharpProofUnknownReason.Category.get -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SharpProofUnknownReason.Category.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason.Code.get -> string!
+SharpProof.Symbolic.SharpProofUnknownReason.Code.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason.Deconstruct(out string! Code, out SharpProof.Symbolic.SymbolicUnknownReasonCategory Category, out string! Message, out bool IsRetryable, out bool IsConfigurationRelated) -> void
+SharpProof.Symbolic.SharpProofUnknownReason.Equals(SharpProof.Symbolic.SharpProofUnknownReason? other) -> bool
+SharpProof.Symbolic.SharpProofUnknownReason.IsConfigurationRelated.get -> bool
+SharpProof.Symbolic.SharpProofUnknownReason.IsConfigurationRelated.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason.IsRetryable.get -> bool
+SharpProof.Symbolic.SharpProofUnknownReason.IsRetryable.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason.Message.get -> string!
+SharpProof.Symbolic.SharpProofUnknownReason.Message.init -> void
+SharpProof.Symbolic.SharpProofUnknownReason.SharpProofUnknownReason(string! Code, SharpProof.Symbolic.SymbolicUnknownReasonCategory Category, string! Message, bool IsRetryable, bool IsConfigurationRelated) -> void
+SharpProof.Symbolic.SourceLocationQuery
+SharpProof.Symbolic.SourceLocationQuery.Equals(SharpProof.Symbolic.SourceLocationQuery? other) -> bool
+SharpProof.Symbolic.SourceLocationQuery.SourceLocationQuery(SharpProof.Symbolic.SymbolicQueryTarget! target) -> void
+SharpProof.Symbolic.SourceQueryPayload
+SharpProof.Symbolic.SourceQueryPayload.Deconstruct(out SharpProof.Symbolic.SymbolicQueryResult! Value) -> void
+SharpProof.Symbolic.SourceQueryPayload.Equals(SharpProof.Symbolic.SourceQueryPayload? other) -> bool
+SharpProof.Symbolic.SourceQueryPayload.SourceQueryPayload(SharpProof.Symbolic.SymbolicQueryResult! Value) -> void
+SharpProof.Symbolic.SourceQueryPayload.Value.get -> SharpProof.Symbolic.SymbolicQueryResult!
+SharpProof.Symbolic.SourceQueryPayload.Value.init -> void
+static SharpProof.Symbolic.CapabilityQuery.operator !=(SharpProof.Symbolic.CapabilityQuery? left, SharpProof.Symbolic.CapabilityQuery? right) -> bool
+static SharpProof.Symbolic.CapabilityQuery.operator ==(SharpProof.Symbolic.CapabilityQuery? left, SharpProof.Symbolic.CapabilityQuery? right) -> bool
+static SharpProof.Symbolic.CapabilityQueryPayload.operator !=(SharpProof.Symbolic.CapabilityQueryPayload? left, SharpProof.Symbolic.CapabilityQueryPayload? right) -> bool
+static SharpProof.Symbolic.CapabilityQueryPayload.operator ==(SharpProof.Symbolic.CapabilityQueryPayload? left, SharpProof.Symbolic.CapabilityQueryPayload? right) -> bool
+static SharpProof.Symbolic.ComplexityQuery.operator !=(SharpProof.Symbolic.ComplexityQuery? left, SharpProof.Symbolic.ComplexityQuery? right) -> bool
+static SharpProof.Symbolic.ComplexityQuery.operator ==(SharpProof.Symbolic.ComplexityQuery? left, SharpProof.Symbolic.ComplexityQuery? right) -> bool
+static SharpProof.Symbolic.ComplexityQueryPayload.operator !=(SharpProof.Symbolic.ComplexityQueryPayload? left, SharpProof.Symbolic.ComplexityQueryPayload? right) -> bool
+static SharpProof.Symbolic.ComplexityQueryPayload.operator ==(SharpProof.Symbolic.ComplexityQueryPayload? left, SharpProof.Symbolic.ComplexityQueryPayload? right) -> bool
+static SharpProof.Symbolic.ConditionQuery.operator !=(SharpProof.Symbolic.ConditionQuery? left, SharpProof.Symbolic.ConditionQuery? right) -> bool
+static SharpProof.Symbolic.ConditionQuery.operator ==(SharpProof.Symbolic.ConditionQuery? left, SharpProof.Symbolic.ConditionQuery? right) -> bool
+static SharpProof.Symbolic.ConditionQueryPayload.operator !=(SharpProof.Symbolic.ConditionQueryPayload? left, SharpProof.Symbolic.ConditionQueryPayload? right) -> bool
+static SharpProof.Symbolic.ConditionQueryPayload.operator ==(SharpProof.Symbolic.ConditionQueryPayload? left, SharpProof.Symbolic.ConditionQueryPayload? right) -> bool
+static SharpProof.Symbolic.InvariantQuery.operator !=(SharpProof.Symbolic.InvariantQuery? left, SharpProof.Symbolic.InvariantQuery? right) -> bool
+static SharpProof.Symbolic.InvariantQuery.operator ==(SharpProof.Symbolic.InvariantQuery? left, SharpProof.Symbolic.InvariantQuery? right) -> bool
+static SharpProof.Symbolic.MethodQuery.operator !=(SharpProof.Symbolic.MethodQuery? left, SharpProof.Symbolic.MethodQuery? right) -> bool
+static SharpProof.Symbolic.MethodQuery.operator ==(SharpProof.Symbolic.MethodQuery? left, SharpProof.Symbolic.MethodQuery? right) -> bool
+static SharpProof.Symbolic.ReachabilityQuery.operator !=(SharpProof.Symbolic.ReachabilityQuery? left, SharpProof.Symbolic.ReachabilityQuery? right) -> bool
+static SharpProof.Symbolic.ReachabilityQuery.operator ==(SharpProof.Symbolic.ReachabilityQuery? left, SharpProof.Symbolic.ReachabilityQuery? right) -> bool
+static SharpProof.Symbolic.RuntimeHazardQuery.operator !=(SharpProof.Symbolic.RuntimeHazardQuery? left, SharpProof.Symbolic.RuntimeHazardQuery? right) -> bool
+static SharpProof.Symbolic.RuntimeHazardQuery.operator ==(SharpProof.Symbolic.RuntimeHazardQuery? left, SharpProof.Symbolic.RuntimeHazardQuery? right) -> bool
+static SharpProof.Symbolic.RuntimeHazardQueryPayload.operator !=(SharpProof.Symbolic.RuntimeHazardQueryPayload? left, SharpProof.Symbolic.RuntimeHazardQueryPayload? right) -> bool
+static SharpProof.Symbolic.RuntimeHazardQueryPayload.operator ==(SharpProof.Symbolic.RuntimeHazardQueryPayload? left, SharpProof.Symbolic.RuntimeHazardQueryPayload? right) -> bool
+static SharpProof.Symbolic.SharpProofBudgetMetadata.operator !=(SharpProof.Symbolic.SharpProofBudgetMetadata? left, SharpProof.Symbolic.SharpProofBudgetMetadata? right) -> bool
+static SharpProof.Symbolic.SharpProofBudgetMetadata.operator ==(SharpProof.Symbolic.SharpProofBudgetMetadata? left, SharpProof.Symbolic.SharpProofBudgetMetadata? right) -> bool
+static SharpProof.Symbolic.SharpProofLocation.operator !=(SharpProof.Symbolic.SharpProofLocation? left, SharpProof.Symbolic.SharpProofLocation? right) -> bool
+static SharpProof.Symbolic.SharpProofLocation.operator ==(SharpProof.Symbolic.SharpProofLocation? left, SharpProof.Symbolic.SharpProofLocation? right) -> bool
+static SharpProof.Symbolic.SharpProofQuery.Capabilities(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Complexity(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Condition(SharpProof.Symbolic.SymbolicQueryTarget! target, string! conditionText) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Invariant(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.Method(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.operator !=(SharpProof.Symbolic.SharpProofQuery? left, SharpProof.Symbolic.SharpProofQuery? right) -> bool
+static SharpProof.Symbolic.SharpProofQuery.operator ==(SharpProof.Symbolic.SharpProofQuery? left, SharpProof.Symbolic.SharpProofQuery? right) -> bool
+static SharpProof.Symbolic.SharpProofQuery.Reachability(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.RuntimeHazards(SharpProof.Symbolic.SymbolicQueryTarget! target, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions? options = null) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQuery.SourceLocation(SharpProof.Symbolic.SymbolicQueryTarget! target) -> SharpProof.Symbolic.SharpProofQuery!
+static SharpProof.Symbolic.SharpProofQueryPayload.operator !=(SharpProof.Symbolic.SharpProofQueryPayload? left, SharpProof.Symbolic.SharpProofQueryPayload? right) -> bool
+static SharpProof.Symbolic.SharpProofQueryPayload.operator ==(SharpProof.Symbolic.SharpProofQueryPayload? left, SharpProof.Symbolic.SharpProofQueryPayload? right) -> bool
+static SharpProof.Symbolic.SharpProofQueryResult.operator !=(SharpProof.Symbolic.SharpProofQueryResult? left, SharpProof.Symbolic.SharpProofQueryResult? right) -> bool
+static SharpProof.Symbolic.SharpProofQueryResult.operator ==(SharpProof.Symbolic.SharpProofQueryResult? left, SharpProof.Symbolic.SharpProofQueryResult? right) -> bool
+static SharpProof.Symbolic.SharpProofTruncationReason.operator !=(SharpProof.Symbolic.SharpProofTruncationReason? left, SharpProof.Symbolic.SharpProofTruncationReason? right) -> bool
+static SharpProof.Symbolic.SharpProofTruncationReason.operator ==(SharpProof.Symbolic.SharpProofTruncationReason? left, SharpProof.Symbolic.SharpProofTruncationReason? right) -> bool
+static SharpProof.Symbolic.SharpProofUnknownReason.operator !=(SharpProof.Symbolic.SharpProofUnknownReason? left, SharpProof.Symbolic.SharpProofUnknownReason? right) -> bool
+static SharpProof.Symbolic.SharpProofUnknownReason.operator ==(SharpProof.Symbolic.SharpProofUnknownReason? left, SharpProof.Symbolic.SharpProofUnknownReason? right) -> bool
+static SharpProof.Symbolic.SourceLocationQuery.operator !=(SharpProof.Symbolic.SourceLocationQuery? left, SharpProof.Symbolic.SourceLocationQuery? right) -> bool
+static SharpProof.Symbolic.SourceLocationQuery.operator ==(SharpProof.Symbolic.SourceLocationQuery? left, SharpProof.Symbolic.SourceLocationQuery? right) -> bool
+static SharpProof.Symbolic.SourceQueryPayload.operator !=(SharpProof.Symbolic.SourceQueryPayload? left, SharpProof.Symbolic.SourceQueryPayload? right) -> bool
+static SharpProof.Symbolic.SourceQueryPayload.operator ==(SharpProof.Symbolic.SourceQueryPayload? left, SharpProof.Symbolic.SourceQueryPayload? right) -> bool
+virtual SharpProof.Symbolic.SharpProofQuery.EqualityContract.get -> System.Type!
+virtual SharpProof.Symbolic.SharpProofQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
+virtual SharpProof.Symbolic.SharpProofQuery.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual SharpProof.Symbolic.SharpProofQueryPayload.EqualityContract.get -> System.Type!
+virtual SharpProof.Symbolic.SharpProofQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
+virtual SharpProof.Symbolic.SharpProofQueryPayload.PrintMembers(System.Text.StringBuilder! builder) -> bool
+override SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(object? obj) -> bool
+override SharpProof.Symbolic.SharpProofAnalysisOptions.GetHashCode() -> int
+override SharpProof.Symbolic.SharpProofAnalysisOptions.ToString() -> string!
+SharpProof.Symbolic.SharpProofAnalysisOptions
+SharpProof.Symbolic.SharpProofAnalysisOptions.<Clone>$() -> SharpProof.Symbolic.SharpProofAnalysisOptions!
+SharpProof.Symbolic.SharpProofAnalysisOptions.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+SharpProof.Symbolic.SharpProofAnalysisOptions.EnableSmt.get -> bool
+SharpProof.Symbolic.SharpProofAnalysisOptions.Equals(SharpProof.Symbolic.SharpProofAnalysisOptions? other) -> bool
+SharpProof.Symbolic.SharpProofAnalysisOptions.ImpliedConditions.get -> System.Collections.Immutable.ImmutableArray<string!>
+SharpProof.Symbolic.SharpProofAnalysisOptions.SharpProofAnalysisOptions(bool enableSmt = false, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, SharpProof.Symbolic.SymbolicAnalysisLimits? analysisLimits = null) -> void
+static SharpProof.Symbolic.SharpProofAnalysisOptions.Default.get -> SharpProof.Symbolic.SharpProofAnalysisOptions!
+static SharpProof.Symbolic.SharpProofAnalysisOptions.operator !=(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisOptions.operator ==(SharpProof.Symbolic.SharpProofAnalysisOptions? left, SharpProof.Symbolic.SharpProofAnalysisOptions? right) -> bool
+static SharpProof.Symbolic.SharpProofAnalysisSession.FromFile(string! filePath, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
+static SharpProof.Symbolic.SharpProofAnalysisSession.FromText(string! sourceText, string? filePath = null, SharpProof.Symbolic.SharpProofAnalysisOptions? options = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!
+*REMOVED*SharpProof.Symbolic.SymbolicQueryService
+*REMOVED*SharpProof.Symbolic.SymbolicQueryService.SymbolicQueryService() -> void
+SharpProof.Symbolic.SymbolicProjectQueryContext.CreateAnalysisSession(SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis = null, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, bool includeExpressionProgramPoints = false, bool includeCurrentStatementCompletionFacts = false, SharpProof.Symbolic.SymbolicSourceQueryFilter? filter = null) -> SharpProof.Symbolic.SharpProofAnalysisSession!

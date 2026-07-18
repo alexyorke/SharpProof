@@ -39,31 +39,36 @@ try
         return 0;
     }
 
-    object result;
-    if (options.RuntimeHazards)
-        result = new SymbolicQueryService().QueryRuntimeHazards(
-            new SymbolicQueryContext(
-                inputContext.SourceInput,
-                options.CreateRuntimeHazardTarget(),
-                options.CreateQueryOptions(smtAnalysis, false)),
-            options.CreateRuntimeHazardOptions());
-    else if (options.Complexity)
-        result = new SymbolicQueryService().QueryComplexity(
-            new SymbolicQueryContext(
-                inputContext.SourceInput,
-                options.CreateComplexityTarget(),
-                options.CreateQueryOptions(smtAnalysis, false)));
-    else if (options.Capabilities)
-        result = new SymbolicQueryService().QueryCapabilities(
-            new SymbolicQueryContext(
-                inputContext.SourceInput,
-                options.CreateCapabilityTarget(),
-                options.CreateQueryOptions(smtAnalysis, false)));
-    else
-        result = new SymbolicQueryService().Query(new SymbolicQueryContext(
-            inputContext.SourceInput,
-            options.CreateQueryTarget(),
-            options.CreateQueryOptions(smtAnalysis, true)));
+    var queryOptions = options.CreateQueryOptions(smtAnalysis, !options.RuntimeHazards &&
+                                                               !options.Complexity &&
+                                                               !options.Capabilities);
+    using var analysisSession = SharpProofAnalysisSession.Create(inputContext.SourceInput, queryOptions);
+    var query = options.RuntimeHazards
+        ? SharpProofQuery.RuntimeHazards(
+            options.CreateRuntimeHazardTarget(),
+            options.CreateRuntimeHazardOptions())
+        : options.Complexity
+            ? SharpProofQuery.Complexity(options.CreateComplexityTarget())
+            : options.Capabilities
+                ? SharpProofQuery.Capabilities(options.CreateCapabilityTarget())
+                : SharpProofQuery.SourceLocation(options.CreateQueryTarget());
+    var analysisResult = analysisSession.Analyze(query);
+    if (!analysisResult.IsSuccess)
+        throw new SymbolicQueryException(analysisResult.Error ?? new SymbolicError(
+            SymbolicErrorCodes.InternalFailure,
+            SymbolicErrorCategory.Internal,
+            "The analysis session failed without error details.",
+            SymbolicErrorExitCodes.InternalFailure));
+
+    object result = analysisResult.Payload switch
+    {
+        SourceQueryPayload source => source.Value,
+        RuntimeHazardQueryPayload hazards => hazards.Value,
+        CapabilityQueryPayload capability => capability.Value,
+        ComplexityQueryPayload complexity => complexity.Value,
+        ConditionQueryPayload condition => condition.Value,
+        _ => throw new InvalidOperationException("The analysis session returned no typed payload.")
+    };
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);

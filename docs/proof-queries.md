@@ -71,12 +71,12 @@ Install the supported public library package:
 dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
 ```
 
-Use `SymbolicQueryService` as the public entrypoint:
+Use `SharpProofAnalysisSession` as the public entrypoint:
 
-- `Query(...)` for invariants, reachability, and implication checks
-- `QueryRuntimeHazards(...)` for bounded runtime-hazard candidates
-- `QueryCapabilities(...)` for method capability summaries
-- `QueryComplexity(...)` for conservative method complexity
+- `SharpProofQuery.Invariant(...)` and `Reachability(...)` for source proofs
+- `SharpProofQuery.Condition(...)` for an SMT-backed condition
+- `SharpProofQuery.RuntimeHazards(...)` for bounded hazard candidates
+- `SharpProofQuery.Capabilities(...)` and `Complexity(...)` for method summaries
 
 For a compilation loaded by a Roslyn workspace, use
 `SymbolicProjectQueryContext`. It creates a source input over the existing
@@ -151,8 +151,10 @@ var profile = new SymbolicSourceCompilationProfile(
     assemblyName: "Example.Analysis");
 
 var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Example.cs");
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(input, SymbolicQueryTarget.AllLines()));
+using var session = SharpProofAnalysisSession.FromText(source, "Example.cs");
+var response = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.AllLines()));
+var result = ((SourceQueryPayload)response.Payload!).Value;
 ```
 
 Attach immutable source-origin metadata for an extracted editor snippet with

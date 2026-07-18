@@ -12,8 +12,8 @@ real wall-clock performance, allocation cost, cache effects, or JIT behavior.
 
 ## Result Shape
 
-`SymbolicQueryService.QueryComplexity(...)` returns a
-`SymbolicComplexityResult` with:
+`SharpProofAnalysisSession.Analyze(SharpProofQuery.Complexity(...))` returns a
+`SharpProofQueryResult` whose `ComplexityQueryPayload.Value` has:
 
 - a normalized `Complexity` summary such as `O(1)`, `O(n)`, `O(n * m)`,
   `O(n^2)`, `O(Unknown)`, or `O(RecursiveUnknown)`
@@ -50,12 +50,11 @@ operations do not get guessed. They stay conservative.
 
 ## Library API
 
-Use `SymbolicQueryService.QueryComplexity(...)` with:
+Use `SharpProofQuery.Complexity(...)` with a session created from:
 
-- `SymbolicSourceInput.FromFile(...)`
-- `SymbolicSourceInput.FromText(...)`
-- `SymbolicSourceInput.FromSyntaxTree(...)`
-- `SymbolicSourceInput.FromNode(...)`
+- `SharpProofAnalysisSession.FromFile(...)`
+- `SharpProofAnalysisSession.FromText(...)`
+- `SymbolicProjectQueryContext.CreateAnalysisSession(...)`
 
 Supported target shapes:
 

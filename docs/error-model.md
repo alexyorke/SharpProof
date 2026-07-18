@@ -80,15 +80,13 @@ gates](ci-exit-gates.md).
 
 ## .NET API
 
-Existing methods such as `Query(...)`, `QueryRuntimeHazards(...)`,
-`QueryCapabilities(...)`, and `QueryComplexity(...)` retain their throwing
-behavior. Additive `Try*` methods return `SymbolicOperationResult<T>`:
+`SharpProofAnalysisSession.Analyze(...)` returns one typed result envelope for
+successful, unknown, failed, and canceled queries:
 
 ```csharp
-var outcome = new SymbolicQueryService().TryQuery(
-    new SymbolicQueryContext(
-        SymbolicSourceInput.FromText(sourceText, "virtual/Buffer.cs"),
-        SymbolicQueryTarget.Point(line: 42)));
+using var session = SharpProofAnalysisSession.FromText(sourceText, "virtual/Buffer.cs");
+var outcome = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 42)));
 
 if (!outcome.IsSuccess)
 {
@@ -97,12 +95,10 @@ if (!outcome.IsSuccess)
     return error.RecommendedExitCode;
 }
 
-SymbolicQueryResult result = outcome.Value!;
+var result = ((SourceQueryPayload)outcome.Payload!).Value;
 ```
 
-The supported methods are `TryQuery`, `TryProve`,
-`TryQueryRuntimeHazards`, `TryQueryCapabilities`, and `TryQueryComplexity`.
-They catch non-fatal exceptions, classify them through
+All query kinds classify non-fatal failures through
 `SymbolicErrorClassifier`, and retain cancellation as `SPQ3000` instead of
 throwing it. Call `SymbolicErrorClassifier.FromException(...)` directly when a
 host needs to normalize an exception from its own workspace or transport

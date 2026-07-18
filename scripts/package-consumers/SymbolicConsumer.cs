@@ -25,15 +25,15 @@ const string source = """
                       }
                       """;
 
-using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(
-        SymbolicSourceInput.FromText(source, "NativeSmtProbe.cs"),
-        SymbolicQueryTarget.Point(line: 10, column: 9),
-        new SymbolicQueryOptions(
-            smtAnalysis: smt,
-            impliedConditions: new[] { "left < middle", "left < right" })));
-var health = smt.Health;
+using var session = SharpProofAnalysisSession.FromText(
+    source,
+    "NativeSmtProbe.cs",
+    new SharpProofAnalysisOptions(
+        enableSmt: true,
+        impliedConditions: new[] { "left < middle", "left < right" }));
+var response = session.Analyze(SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 10, column: 9)));
+var result = ((SourceQueryPayload)response.Payload!).Value;
+var health = result.SmtDiagnostics.Health;
 var proofsHold = result.ConditionProofs.Count == 2 &&
                  result.ConditionProofs.All(static proof => proof.HoldsOnAllReachablePoints);
 var unknownProofCount = result.ConditionProofs.Sum(static proof => proof.UnknownCount);

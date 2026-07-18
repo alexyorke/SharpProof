@@ -32,6 +32,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Public `SymbolicQueryService` is a thin coordinator; source compilation,
   dispatch, execution, and result projection live in the internal
   `SymbolicQueryExecutor`.
+- [x] `SharpProofAnalysisSession`, discriminated `SharpProofQuery` records, and
+  `SharpProofQueryResult` now form the primary public API. CLI, explain modes,
+  samples, documentation, and package consumers use it; the former query
+  service is internal and its preview removal is recorded in the API snapshot.
 
 ## Current evidence
 
@@ -39,7 +43,8 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,135 passing tests and two documented skips.
+- Six lanes: 6,140 passing tests and two documented skips.
+- Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
 
@@ -59,5 +64,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Replace the service-specific public query surface with the session/query/result
-model, retaining a compatibility adapter until CLI and samples migrate.
+Project the new typed payloads without exposing legacy DTO graphs, then make
+raw Roslyn source/context types internal and shrink the public API snapshot.

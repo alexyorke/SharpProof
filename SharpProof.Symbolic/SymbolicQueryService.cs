@@ -4,7 +4,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicQueryService
+internal sealed class SymbolicQueryService
 {
     private readonly SymbolicQueryExecutor _executor;
 

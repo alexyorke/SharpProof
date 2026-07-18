@@ -91,11 +91,10 @@ var context = new SymbolicProjectQueryContext(
         .Select(document => document.FilePath!));
 
 using var smt = new SmtAnalysisService(context.Configuration.SmtOptions);
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(
-        context.SourceInput,
-        SymbolicQueryTarget.Line(42),
-        context.CreateQueryOptions(smt)));
+using var session = context.CreateAnalysisSession(smt);
+var response = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.Line(42)));
+var result = ((SourceQueryPayload)response.Payload!).Value;
 ```
 
 `SymbolicProjectQueryContext` is part of `SharpProof.Symbolic`. It exposes the

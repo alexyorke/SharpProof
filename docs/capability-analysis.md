@@ -58,14 +58,13 @@ unknown external behavior do not count as success.
 ## Library API
 
 `SharpProof.Symbolic` exposes capability queries through
-`SymbolicQueryService.QueryCapabilities(...)`.
+`SharpProofAnalysisSession.Analyze(SharpProofQuery.Capabilities(...))`.
 
 Supported source shapes:
 
-- `SymbolicSourceInput.FromFile(...)`
-- `SymbolicSourceInput.FromText(...)`
-- `SymbolicSourceInput.FromSyntaxTree(...)`
-- `SymbolicSourceInput.FromNode(...)`
+- `SharpProofAnalysisSession.FromFile(...)`
+- `SharpProofAnalysisSession.FromText(...)`
+- project-loaded sessions created by `SymbolicProjectQueryContext`
 
 Supported target shapes:
 

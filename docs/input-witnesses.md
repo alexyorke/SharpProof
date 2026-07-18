@@ -97,14 +97,13 @@ a single path contract.
 
 ```csharp
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
-
-using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
-var options = new SymbolicQueryOptions(references, smt);
-var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
-    SymbolicSourceInput.FromText(source, "Example.cs"),
-    SymbolicQueryTarget.Line(42),
-    options));
+using var session = SharpProofAnalysisSession.FromText(
+    source,
+    "Example.cs",
+    new SharpProofAnalysisOptions(enableSmt: true));
+var response = session.Analyze(
+    SharpProofQuery.Reachability(SymbolicQueryTarget.Line(42)));
+var result = ((SourceQueryPayload)response.Payload!).Value;
 
 foreach (var witness in result.ReachabilityWitnesses)
 {

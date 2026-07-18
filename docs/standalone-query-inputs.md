@@ -102,30 +102,21 @@ query error model](error-model.md).
 
 ## .NET API
 
-The public API accepts the same in-memory source and compiler profile directly:
+The public API accepts in-memory source, SMT enablement, implied conditions,
+and bounded-analysis limits directly:
 
 ```csharp
-var profile = new SymbolicSourceCompilationProfile(
-    preprocessorSymbols: new[] { "FEATURE" },
-    nullableContext: NullableContextOptions.Enable);
-var input = SymbolicSourceInput
-    .FromTextWithProfile(sourceText, profile, "virtual/Buffer.cs")
-    .WithSourceMap(new SymbolicSourceMap(
-        "file:///workspace/Original.cs",
-        originalStartLine: 80,
-        originalStartColumn: 5));
-
-var options = new SymbolicQueryOptions(
-    references: references,
-    smtAnalysis: smt,
-    impliedConditions: new[] { "value >= 0" });
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(
-        input,
-        SymbolicQueryTarget.Point(line: 2, column: 11),
-        options));
+using var session = SharpProofAnalysisSession.FromText(
+    sourceText,
+    "virtual/Buffer.cs",
+    new SharpProofAnalysisOptions(
+        enableSmt: true,
+        impliedConditions: new[] { "value >= 0" }));
+var response = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 2, column: 11)));
+var result = ((SourceQueryPayload)response.Payload!).Value;
 ```
 
-`SymbolicSourceInput.SourceMap` retains the immutable origin metadata for the
-host. As with CLI requests, it does not mutate Roslyn spans or result
-coordinates.
+The CLI remains the public surface for standalone compilation profiles and
+source-map metadata. Session query coordinates remain local to the supplied
+source text.

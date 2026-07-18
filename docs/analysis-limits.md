@@ -54,22 +54,22 @@ diagnostic, its properties include:
 
 ## .NET API
 
-Create an immutable override set and attach it to query options:
+Create an immutable override set and attach it to the analysis session:
 
 ```csharp
 var limits = SymbolicAnalysisLimits.Default.WithOverrides(
     maxFiniteForeachElementFacts: 16,
     maxMergedPathConditions: 64);
 
-var options = new SymbolicQueryOptions()
-    .WithAnalysisLimits(limits);
+using var session = SharpProofAnalysisSession.FromText(
+    sourceText,
+    "Example.cs",
+    new SharpProofAnalysisOptions(analysisLimits: limits));
+var result = session.Analyze(SharpProofQuery.Invariant(target));
 
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(source, target, options));
-
-if (result.AnalysisTruncation.IsTruncated)
+if (result.Budget.IsExhausted)
 {
-    foreach (var item in result.AnalysisTruncation.Events)
+    foreach (var item in result.Budget.Truncations)
         Console.WriteLine($"{item.Code}: {item.Observed} > {item.Limit}");
 }
 ```

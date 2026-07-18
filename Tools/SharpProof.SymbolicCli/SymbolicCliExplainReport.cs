@@ -39,13 +39,14 @@ internal sealed record SymbolicCliExplainReport(
         ArgumentNullException.ThrowIfNull(inputContext);
         ArgumentNullException.ThrowIfNull(smtAnalysis);
 
-        var service = new SymbolicQueryService();
         var source = inputContext.SourceInput;
         var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
+        using var session = SharpProofAnalysisSession.Create(source, queryOptions);
         var requestedTarget = options.Position.HasValue
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
-        var invariant = service.Query(new SymbolicQueryContext(source, requestedTarget, queryOptions));
+        var invariant = RequirePayload<SourceQueryPayload>(
+            session.Analyze(SharpProofQuery.Invariant(requestedTarget))).Value;
         if (invariant.ProgramPoints.Count != 1)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
@@ -56,17 +57,15 @@ internal sealed record SymbolicCliExplainReport(
                 invariant.ScopeKind);
 
         var point = invariant.ProgramPoints[0];
-        var hazardResult = service.QueryRuntimeHazards(
-            new SymbolicQueryContext(
-                source,
+        var hazardResult = RequirePayload<RuntimeHazardQueryPayload>(session.Analyze(
+            SharpProofQuery.RuntimeHazards(
                 SymbolicQueryTarget.Point(point.Line, point.Column),
-                queryOptions),
-            options.CreateRuntimeHazardOptions());
+                options.CreateRuntimeHazardOptions()))).Value;
         var hazards = hazardResult.Hazards.Take(options.ReportMaxHazards).ToArray();
-        var capabilities = service.QueryCapabilities(
-            new SymbolicQueryContext(source, requestedTarget, queryOptions));
-        var complexity = service.QueryComplexity(
-            new SymbolicQueryContext(source, requestedTarget, queryOptions));
+        var capabilities = RequirePayload<CapabilityQueryPayload>(
+            session.Analyze(SharpProofQuery.Capabilities(requestedTarget))).Value;
+        var complexity = RequirePayload<ComplexityQueryPayload>(
+            session.Analyze(SharpProofQuery.Complexity(requestedTarget))).Value;
         var diagnostics = await SymbolicCliExplainDiagnostics.CreateAsync(
             options,
             inputContext.ProjectContext,
@@ -89,6 +88,20 @@ internal sealed record SymbolicCliExplainReport(
                 diagnostics.IsTruncated,
                 project?.IsTruncated == true,
                 invariant.AnalysisTruncation.IsTruncated || hazardResult.AnalysisTruncation.IsTruncated));
+    }
+
+    private static TPayload RequirePayload<TPayload>(SharpProofQueryResult result)
+        where TPayload : SharpProofQueryPayload
+    {
+        if (!result.IsSuccess)
+            throw new SymbolicQueryException(result.Error ?? new SymbolicError(
+                SymbolicErrorCodes.InternalFailure,
+                SymbolicErrorCategory.Internal,
+                "The analysis session failed without error details.",
+                SymbolicErrorExitCodes.InternalFailure));
+
+        return result.Payload as TPayload ?? throw new InvalidOperationException(
+            $"Expected analysis payload {typeof(TPayload).Name}.");
     }
 
     internal IReadOnlyDictionary<string, object?> ToSarif()

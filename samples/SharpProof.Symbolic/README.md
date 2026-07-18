@@ -1,7 +1,7 @@
 # SharpProof.Symbolic package sample
 
 This console sample queries the invariant at a source location through the
-supported `SymbolicQueryService` API.
+supported `SharpProofAnalysisSession` API.
 
 The preview package is not published to NuGet.org yet. From the repository root,
 build the local feed, restore this sample from that feed, and run it:

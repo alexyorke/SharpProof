@@ -154,10 +154,10 @@ dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
 ```csharp
 using SharpProof.Symbolic;
 
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryContext(
-        SymbolicSourceInput.FromText(sourceText, "Example.cs"),
-        SymbolicQueryTarget.Point(line: 42)));
+using var session = SharpProofAnalysisSession.FromText(sourceText, "Example.cs");
+var response = session.Analyze(
+    SharpProofQuery.Invariant(SymbolicQueryTarget.Point(line: 42)));
+var result = ((SourceQueryPayload)response.Payload!).Value;
 ```
 
 The package includes XML documentation, nullable API annotations, portable
