@@ -111,12 +111,20 @@ Tests are excluded from the metric and must not be deleted.
   validated partial selection; inferred production mappings conservatively
   require the full suite, so missing lexical references cannot under-test a
   semantic change.
+- [x] Removed the handwritten BCL impurity member catalog for random-number,
+  mutable-string, array-mutation, threading, XML, diagnostics, I/O, and assembly
+  loading APIs. Generated purity summaries, configured and namespace policy,
+  metadata analysis, and conservative BCL fallback now own these decisions.
+  Diagnostics remain present and conservative; as an intentional unreleased
+  API break, evidence sources and categories may now describe the inferred path
+  instead of the deleted semantic-rule name.
 
 ## Current evidence
 
-- Maintained production: 105,716 lines (99,804 C#, 5,032 scripts, and 880
-  specifications); net reduction: 1,910 lines; remaining reduction: 18,090.
-  This tranche removed 351 maintained lines without deleting tests.
+- Maintained production: 105,413 lines (99,501 C#, 5,032 scripts, and 880
+  specifications); net reduction: 2,213 lines; remaining reduction: 17,787.
+  This tranche removed 303 maintained nonblank lines (394 physical source
+  lines) without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 

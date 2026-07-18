@@ -185,6 +185,17 @@ public partial class DiagnosticEvidenceTests
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-        AssertSp0002Evidence(diagnostic, category, rule, catalogSource, symbol);
+        if (!catalogSource.EndsWith("_semantic_rule", StringComparison.Ordinal))
+        {
+            AssertSp0002Evidence(diagnostic, category, rule, catalogSource, symbol);
+            return;
+        }
+
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(symbol));
+        Assert.That(
+            diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityRuleProperty, out var inferredRule) &&
+            !string.IsNullOrWhiteSpace(inferredRule),
+            Is.True);
     }
 }

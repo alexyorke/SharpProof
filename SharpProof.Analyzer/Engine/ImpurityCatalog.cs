@@ -138,22 +138,6 @@ internal static partial class ImpurityCatalog
             staticTypeGetTypeSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
             return "known_impure";
 
-        if (IsRandomSemanticImpure(symbol)) return "random_semantic_rule";
-
-        if (IsStringBuilderSemanticImpure(symbol)) return "string_builder_semantic_rule";
-
-        if (IsArrayMutationSemanticImpure(symbol)) return "array_mutation_semantic_rule";
-
-        if (IsThreadingSemanticImpure(symbol)) return "threading_semantic_rule";
-
-        if (IsXmlLinqSemanticImpure(symbol)) return "xml_linq_semantic_rule";
-
-        if (IsDiagnosticsTracingSemanticImpure(symbol)) return "diagnostics_tracing_semantic_rule";
-
-        if (IsIoStreamTextSemanticImpure(symbol)) return "io_stream_text_semantic_rule";
-
-        if (IsAssemblyLoadContextSemanticImpure(symbol)) return "assembly_load_context_semantic_rule";
-
         if (TryGetConfiguredKnownImpureMember(symbol, out _)) return "config_known_impure";
 
         var signature = symbol.OriginalDefinition.ToDisplayString();
