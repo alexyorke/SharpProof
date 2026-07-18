@@ -1557,8 +1557,7 @@ internal class TestClass
     {
         Assert.That(SharpProofEvidenceSchema.CurrentVersion, Is.EqualTo(2));
         Assert.That(SharpProofEvidenceSchema.CompatibilityPolicy, Is.EqualTo("exact-v2"));
-        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(
-            SharpProofEvidenceSchema.LegacyUnversionedVersion), Is.False);
+        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(0), Is.False);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion), Is.True);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(-1), Is.False);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion + 1), Is.False);

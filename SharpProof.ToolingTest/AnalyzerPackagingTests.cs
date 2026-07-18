@@ -1935,12 +1935,12 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("--complexity"));
         Assert.That(source, Does.Contain("--capabilities"));
         Assert.That(source, Does.Contain("explain"));
-        Assert.That(source, Does.Contain("SharpProofAnalysisSession.Create("));
-        Assert.That(source, Does.Contain("analysisSession.Analyze(query)"));
-        Assert.That(source, Does.Contain("SharpProofQuery.RuntimeHazards("));
-        Assert.That(source, Does.Contain("SharpProofQuery.Complexity("));
-        Assert.That(source, Does.Contain("SharpProofQuery.Capabilities("));
-        Assert.That(source, Does.Contain("SharpProofQuery.SourceLocation("));
+        Assert.That(source, Does.Contain("new SymbolicQueryExecutor()"));
+        Assert.That(source, Does.Contain("executor.QueryRuntimeHazards("));
+        Assert.That(source, Does.Contain("executor.QueryComplexity("));
+        Assert.That(source, Does.Contain("executor.QueryCapabilities("));
+        Assert.That(source, Does.Contain("executor.Query("));
+        Assert.That(source, Does.Not.Contain("LegacyValue"));
         Assert.That(source, Does.Contain("options.CreateRuntimeHazardOptions()"));
         Assert.That(source, Does.Contain("inputContext.SourceInput"));
         Assert.That(source, Does.Contain("options.CreateQueryTarget()"));

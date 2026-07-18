@@ -477,7 +477,7 @@ public static class SharpProofBaseline
 
             var isCurrent = ProofEvidenceSchemaContract.IsReadCompatible(version);
             var isLegacyV1 = version == LegacyEvidenceSchemaVersion;
-            var isLegacyUnversioned = version == ProofEvidenceSchemaContract.LegacyUnversionedVersion;
+            var isLegacyUnversioned = version == 0;
             if (!isCurrent && !isLegacyV1 && !isLegacyUnversioned)
                 throw new NotSupportedException(
                     $"Unsupported {surfaceName} {versionPropertyName} '{version}'; migration supports legacy " +

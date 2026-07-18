@@ -2,7 +2,6 @@ namespace SharpProof.Schema;
 
 internal static class ProofEvidenceSchemaContract
 {
-    internal const int LegacyUnversionedVersion = 0;
     internal const int CurrentVersion = 2;
     internal const int MinimumReadCompatibleVersion = CurrentVersion;
     internal const string CompatibilityPolicy = "exact-v2";

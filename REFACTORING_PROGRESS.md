@@ -39,8 +39,14 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] The preview compatibility cutoff is complete: legacy `Symbolic*` query,
   result, evidence, error, budget, project-context, and raw SMT types are
   internal. Focused immutable `SharpProof*` targets, payloads, evidence,
-  errors, budgets, and solver metadata form the exported surface; CLI adapters
-  preserve the established external schemas and bytes.
+  errors, budgets, and solver metadata form the exported surface; the internal
+  CLI host preserves the established external schemas and bytes.
+- [x] Compatibility adapters were removed from the new API boundary. Payloads
+  no longer retain raw symbolic results through `LegacyValue`; compact metadata
+  now carries location, unknown reasons, truncation, and evidence directly.
+  `FromLegacy`, `ToLegacy`, target-conversion, and error-conversion helpers were
+  deleted. The internal CLI host calls the internal executor directly, keeping
+  its established output without translating through the public API.
 - [x] Source-query and runtime-hazard target dispatch are isolated from
   `SymbolicQueryExecutor`; the executor now owns API coordination while the
   dispatchers own source-kind validation, target routing, and node/syntax-tree

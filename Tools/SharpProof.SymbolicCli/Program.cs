@@ -42,34 +42,19 @@ try
     var queryOptions = options.CreateQueryOptions(smtAnalysis, !options.RuntimeHazards &&
                                                                !options.Complexity &&
                                                                !options.Capabilities);
-    using var analysisSession = SharpProofAnalysisSession.Create(inputContext.SourceInput, queryOptions);
-    var query = options.RuntimeHazards
-        ? SharpProofQuery.RuntimeHazards(
-            SharpProofTarget.FromSymbolicTarget(options.CreateRuntimeHazardTarget()),
-            SharpProofRuntimeHazardOptions.FromLegacy(options.CreateRuntimeHazardOptions()))
+    var executor = new SymbolicQueryExecutor();
+    object result = options.RuntimeHazards
+        ? executor.QueryRuntimeHazards(
+            new SymbolicQueryContext(inputContext.SourceInput, options.CreateRuntimeHazardTarget(), queryOptions),
+            options.CreateRuntimeHazardOptions())
         : options.Complexity
-            ? SharpProofQuery.Complexity(SharpProofTarget.FromSymbolicTarget(options.CreateComplexityTarget()))
+            ? executor.QueryComplexity(
+                new SymbolicQueryContext(inputContext.SourceInput, options.CreateComplexityTarget(), queryOptions))
             : options.Capabilities
-                ? SharpProofQuery.Capabilities(
-                    SharpProofTarget.FromSymbolicTarget(options.CreateCapabilityTarget()))
-                : SharpProofQuery.SourceLocation(SharpProofTarget.FromSymbolicTarget(options.CreateQueryTarget()));
-    var analysisResult = analysisSession.Analyze(query);
-    if (!analysisResult.IsSuccess)
-        throw new SymbolicQueryException(analysisResult.Error?.ToSymbolicError() ?? new SymbolicError(
-            SymbolicErrorCodes.InternalFailure,
-            SymbolicErrorCategory.Internal,
-            "The analysis session failed without error details.",
-            SymbolicErrorExitCodes.InternalFailure));
-
-    object result = analysisResult.Payload switch
-    {
-        SourceQueryPayload source => source.LegacyValue,
-        RuntimeHazardQueryPayload hazards => hazards.LegacyValue,
-        CapabilityQueryPayload capability => capability.LegacyValue,
-        ComplexityQueryPayload complexity => complexity.LegacyValue,
-        ConditionQueryPayload condition => condition.LegacyValue,
-        _ => throw new InvalidOperationException("The analysis session returned no typed payload.")
-    };
+                ? executor.QueryCapabilities(
+                    new SymbolicQueryContext(inputContext.SourceInput, options.CreateCapabilityTarget(), queryOptions))
+                : executor.Query(
+                    new SymbolicQueryContext(inputContext.SourceInput, options.CreateQueryTarget(), queryOptions));
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);

@@ -4,7 +4,6 @@ namespace SharpProof.Symbolic;
 
 public static class SharpProofEvidenceSchema
 {
-    public const int LegacyUnversionedVersion = ProofEvidenceSchemaContract.LegacyUnversionedVersion;
     public const int CurrentVersion = ProofEvidenceSchemaContract.CurrentVersion;
     public const int MinimumReadCompatibleVersion = ProofEvidenceSchemaContract.MinimumReadCompatibleVersion;
     public const string CompatibilityPolicy = ProofEvidenceSchemaContract.CompatibilityPolicy;

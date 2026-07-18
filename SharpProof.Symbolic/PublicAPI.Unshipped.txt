@@ -499,7 +499,6 @@ const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "exact-
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 2 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticVersionPropertyName = "sharpproof.evidence.schema_version" -> string!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.LegacyUnversionedVersion = 0 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 2 -> int
 override sealed SharpProof.Symbolic.CapabilityQuery.Equals(SharpProof.Symbolic.SharpProofQuery? other) -> bool
 override sealed SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
@@ -975,3 +974,10 @@ virtual SharpProof.Symbolic.SharpProofQuery.PrintMembers(System.Text.StringBuild
 virtual SharpProof.Symbolic.SharpProofQueryPayload.EqualityContract.get -> System.Type!
 virtual SharpProof.Symbolic.SharpProofQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
 virtual SharpProof.Symbolic.SharpProofQueryPayload.PrintMembers(System.Text.StringBuilder! builder) -> bool
+SharpProof.Symbolic.CapabilityQueryPayload.UnknownCount.get -> int
+SharpProof.Symbolic.ComplexityQueryPayload.IsRecursiveUnknown.get -> bool
+SharpProof.Symbolic.ComplexityQueryPayload.IsUnknown.get -> bool
+SharpProof.Symbolic.ComplexityQueryPayload.Kind.get -> string!
+SharpProof.Symbolic.ComplexityQueryPayload.UnknownCount.get -> int
+SharpProof.Symbolic.SourceQueryPayload.ConservativeUnknownCount.get -> int
+SharpProof.Symbolic.SourceQueryPayload.ReachabilityUnknownCount.get -> int
