@@ -91,11 +91,14 @@ Tests are excluded from the metric and must not be deleted.
   rules after independent PathCore and analyzer string-suite characterization.
   Generic fixed-point inference now owns both classifications and their call
   families are deleted.
+- [x] Removed char-scalar projection and guarded string-scan wrapper rules after
+  runtime Char-helper and analyzer string-suite parity. Their shared manual
+  identity/display parser was unreachable and is deleted with the rules.
 
 ## Current evidence
 
-- Maintained production: 106,162 lines; net reduction: 1,464 lines; remaining
-  reduction: 18,536. The first fifteen deletion slices removed 2,381 production
+- Maintained production: 106,041 lines; net reduction: 1,585 lines; remaining
+  reduction: 18,415. The first sixteen deletion slices removed 2,521 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -110,6 +113,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Characterize the char-scalar projection and guarded string-scan wrapper rules
-independently against their runtime catalog slices and analyzer consumers;
-delete only rules reproduced by fixed-point inference.
+Characterize the string-hash wrapper rule independently against the runtime
+GetHashCode catalog slice and analyzer consumers; delete its call family only
+if generic fixed-point inference preserves exact output.

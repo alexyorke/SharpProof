@@ -7,8 +7,6 @@ internal static class EffectSummarySemanticWrapperRules
         new(HasPureSpanBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
         new(HasPureTypeIdentityWrapperPattern, "none"),
-        new(HasPureCharScalarProjectionWrapperPattern, "none"),
-        new(HasPureGuardedStringCharScanWrapperPattern, "none"),
         new(HasPureStringHashWrapperPattern, "none"),
         new(HasPureCharReplaceStringWrapperPattern, "internal_only"),
         new(HasPureStringSubstringWrapperPattern, "internal_only"),
@@ -196,40 +194,6 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Calls.All(IsStringArrayConcatWrapperCall);
     }
 
-    internal static bool HasPureCharScalarProjectionWrapperPattern(MethodEffectSummary summary)
-    {
-        if (!IsCharScalarProjectionIdentity(summary.Identity) ||
-            summary.Fields.Length != 0 ||
-            !CallsOnly(summary, "calls_method") ||
-            !RootsAreSemanticallyPureWrapperCompatible(summary))
-            return false;
-
-        var callSites = EnumerateCallSites(summary).ToArray();
-        return callSites.Length != 0 &&
-               callSites.All(static callSite =>
-                   !callSite.UsesDynamicDispatch &&
-                   IsCharScalarProjectionCall(callSite.DisplayName));
-    }
-
-    internal static bool HasPureGuardedStringCharScanWrapperPattern(MethodEffectSummary summary)
-    {
-        if (!HasReturnType(summary.Identity, "named:System.Boolean") ||
-            summary.Fields.Length != 0 ||
-            !CallsOnly(summary, "calls_method") ||
-            !RootsAreSemanticallyPureWrapperCompatible(summary))
-            return false;
-
-        var callSites = EnumerateCallSites(summary).ToArray();
-        return callSites.Any(static callSite => IsStringLengthCall(callSite.DisplayName)) &&
-               callSites.Any(static callSite => IsStringGetCharsCall(callSite.DisplayName)) &&
-               callSites.Any(static callSite => IsCharScalarProjectionCall(callSite.DisplayName)) &&
-               callSites.All(static callSite =>
-                   !callSite.UsesDynamicDispatch &&
-                   (IsStringLengthCall(callSite.DisplayName) ||
-                    IsStringGetCharsCall(callSite.DisplayName) ||
-                    IsCharScalarProjectionCall(callSite.DisplayName)));
-    }
-
     internal static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
     {
         return HasReturnType(summary.Identity, "named:System.String") &&
@@ -264,110 +228,6 @@ internal static class EffectSummarySemanticWrapperRules
         return summary.RootCandidates.All(static root =>
             string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
             string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
-    }
-
-    internal static bool IsCharScalarProjectionCall(string displayName)
-    {
-        return IsCharScalarProjectionSymbol(displayName) ||
-               IsCharScalarTableProjectionCall(displayName) ||
-               IsScalarValueHelperCall(displayName, "System.Globalization.CharUnicodeInfo") ||
-               IsScalarValueHelperCall(displayName, "System.Globalization.TextInfo");
-    }
-
-    internal static bool IsCharScalarTableProjectionCall(string displayName)
-    {
-        return string.Equals(
-                   displayName,
-                   "System.ReadOnlySpan`1<byte>.get_Item(int)->ref !0",
-                   StringComparison.Ordinal) ||
-               ((displayName.StartsWith("char.get_", StringComparison.Ordinal) ||
-                 displayName.StartsWith("System.Char.get_", StringComparison.Ordinal)) &&
-                displayName.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal));
-    }
-
-    internal static bool IsStringLengthCall(string displayName)
-    {
-        return string.Equals(displayName, "string.get_Length()->int", StringComparison.Ordinal) ||
-               string.Equals(displayName, "System.String.get_Length()->int", StringComparison.Ordinal);
-    }
-
-    internal static bool IsStringGetCharsCall(string displayName)
-    {
-        return string.Equals(displayName, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-               string.Equals(displayName, "System.String.get_Chars(int)->char", StringComparison.Ordinal);
-    }
-
-    internal static bool IsCharScalarProjectionSymbol(string displayName)
-    {
-        return (IsScalarValueHelperCall(displayName, "char") ||
-                IsScalarValueHelperCall(displayName, "System.Char")) &&
-               HasOnlyCharScalarArguments(displayName);
-    }
-
-    internal static bool IsCharScalarProjectionIdentity(StructuralMethodIdentity identity)
-    {
-        if (!string.Equals(identity.ContainingMetadataType, "System.Char", StringComparison.Ordinal) ||
-            !IsScalarStructuralReturnType(identity.ReturnType))
-            return false;
-
-        return identity.Parameters.All(static parameter =>
-            parameter.Type is "named:System.Char" or "named:System.Int32" or "named:System.UInt32");
-    }
-
-    internal static bool IsScalarStructuralReturnType(string returnType)
-    {
-        return returnType is
-            "named:System.Boolean" or
-            "named:System.Byte" or
-            "named:System.Char" or
-            "named:System.Double" or
-            "named:System.Int32" or
-            "named:System.UInt32" or
-            "named:System.Globalization.UnicodeCategory";
-    }
-
-    internal static bool IsScalarValueHelperCall(string displayName, string declaringType)
-    {
-        var openParenIndex = displayName.IndexOf('(');
-        if (openParenIndex <= declaringType.Length ||
-            !displayName.StartsWith(declaringType + ".", StringComparison.Ordinal))
-            return false;
-
-        var returnSeparatorIndex = displayName.LastIndexOf(")->", StringComparison.Ordinal);
-        return returnSeparatorIndex >= 0 &&
-               IsScalarValueReturnType(displayName.Substring(returnSeparatorIndex + 3));
-    }
-
-    internal static bool IsScalarValueReturnType(string returnType)
-    {
-        return string.Equals(returnType, "bool", StringComparison.Ordinal) ||
-               string.Equals(returnType, "byte", StringComparison.Ordinal) ||
-               string.Equals(returnType, "char", StringComparison.Ordinal) ||
-               string.Equals(returnType, "double", StringComparison.Ordinal) ||
-               string.Equals(returnType, "int", StringComparison.Ordinal) ||
-               string.Equals(returnType, "uint", StringComparison.Ordinal) ||
-               string.Equals(returnType, "System.Globalization.UnicodeCategory", StringComparison.Ordinal);
-    }
-
-    internal static bool HasOnlyCharScalarArguments(string displayName)
-    {
-        var openParenIndex = displayName.IndexOf('(');
-        var returnSeparatorIndex = displayName.LastIndexOf(")->", StringComparison.Ordinal);
-        if (openParenIndex < 0 || returnSeparatorIndex < openParenIndex) return false;
-
-        var argumentList = displayName.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
-        if (argumentList.Length == 0) return true;
-
-        foreach (var argument in argumentList.Split(','))
-        {
-            var trimmedArgument = argument.Trim();
-            if (!string.Equals(trimmedArgument, "char", StringComparison.Ordinal) &&
-                !string.Equals(trimmedArgument, "int", StringComparison.Ordinal) &&
-                !string.Equals(trimmedArgument, "uint", StringComparison.Ordinal))
-                return false;
-        }
-
-        return true;
     }
 
     internal static bool RootsAreArrayBackedByRefLikeViewWrapperCompatible(MethodEffectSummary summary)
