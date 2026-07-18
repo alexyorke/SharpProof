@@ -197,6 +197,9 @@ This is the active source of truth for the comprehensive refactor. Read
   source-map state, while `SymbolicQueryTarget` owns target validation and
   query-scope representation. Both model families were removed from
   `SymbolicQueryApi`, reducing it to execution and result projection.
+- [x] `SymbolicQueryResult` now owns query aggregation, filtering, scope
+  projection, line grouping, and truncation/evidence preservation in its own
+  file. `SymbolicQueryApi` is now a 235-line executor-only coordinator.
 
 ## Current evidence
 
@@ -225,6 +228,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Continue decomposing `SymbolicQueryApi`: move source input, target/scope, and
-result aggregation/projection into responsibility-owned files while preserving
-the single executor and exact query behavior.
+Audit `SymbolicSourceQueryService` responsibilities and extract its next
+coherent target-resolution, execution, aggregation, or projection component,
+deleting the service-owned implementation after parity.
