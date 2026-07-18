@@ -219,16 +219,16 @@ public sealed record SharpProofRuntimeHazardOptions(
 public abstract record SharpProofQuery(SharpProofQueryKind Kind, SharpProofTarget Target)
 {
     public static SharpProofQuery SourceLocation(SharpProofTarget target) =>
-        new SourceLocationQuery(target);
+        Simple(SharpProofQueryKind.SourceLocation, target);
 
     public static SharpProofQuery Method(SharpProofTarget target) =>
-        new MethodQuery(target);
+        Simple(SharpProofQueryKind.Method, target);
 
     public static SharpProofQuery Invariant(SharpProofTarget target) =>
-        new InvariantQuery(target);
+        Simple(SharpProofQueryKind.Invariant, target);
 
     public static SharpProofQuery Reachability(SharpProofTarget target) =>
-        new ReachabilityQuery(target);
+        Simple(SharpProofQueryKind.Reachability, target);
 
     public static SharpProofQuery Condition(SharpProofTarget target, string conditionText) =>
         new ConditionQuery(target, conditionText);
@@ -239,84 +239,34 @@ public abstract record SharpProofQuery(SharpProofQueryKind Kind, SharpProofTarge
         new RuntimeHazardQuery(target, options ?? SharpProofRuntimeHazardOptions.Default);
 
     public static SharpProofQuery Capabilities(SharpProofTarget target) =>
-        new CapabilityQuery(target);
+        Simple(SharpProofQueryKind.Capabilities, target);
 
     public static SharpProofQuery Complexity(SharpProofTarget target) =>
-        new ComplexityQuery(target);
-}
+        Simple(SharpProofQueryKind.Complexity, target);
 
-public sealed record SourceLocationQuery : SharpProofQuery
-{
-    public SourceLocationQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.SourceLocation, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-    }
-}
+    private static SharpProofQuery Simple(SharpProofQueryKind kind, SharpProofTarget target) =>
+        new SimpleQuery(kind, target ?? throw new ArgumentNullException(nameof(target)));
 
-public sealed record MethodQuery : SharpProofQuery
-{
-    public MethodQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.Method, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-    }
-}
+    private sealed record SimpleQuery(SharpProofQueryKind QueryKind, SharpProofTarget QueryTarget)
+        : SharpProofQuery(QueryKind, QueryTarget);
 
-public sealed record InvariantQuery : SharpProofQuery
-{
-    public InvariantQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.Invariant, target ?? throw new ArgumentNullException(nameof(target)))
+    internal sealed record ConditionQuery : SharpProofQuery
     {
-    }
-}
+        internal ConditionQuery(SharpProofTarget target, string conditionText)
+            : base(SharpProofQueryKind.Condition, target ?? throw new ArgumentNullException(nameof(target)))
+        {
+            if (string.IsNullOrWhiteSpace(conditionText))
+                throw new ArgumentException("Condition text is required.", nameof(conditionText));
+            ConditionText = conditionText;
+        }
 
-public sealed record ReachabilityQuery : SharpProofQuery
-{
-    public ReachabilityQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.Reachability, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-    }
-}
-
-public sealed record ConditionQuery : SharpProofQuery
-{
-    public ConditionQuery(SharpProofTarget target, string conditionText)
-        : base(SharpProofQueryKind.Condition, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-        ConditionText = conditionText;
+        internal string ConditionText { get; }
     }
 
-    public string ConditionText { get; }
-}
-
-public sealed record RuntimeHazardQuery : SharpProofQuery
-{
-    public RuntimeHazardQuery(
-        SharpProofTarget target,
-        SharpProofRuntimeHazardOptions options)
-        : base(SharpProofQueryKind.RuntimeHazards, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-        Options = options ?? throw new ArgumentNullException(nameof(options));
-    }
-
-    public SharpProofRuntimeHazardOptions Options { get; }
-}
-
-public sealed record CapabilityQuery : SharpProofQuery
-{
-    public CapabilityQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.Capabilities, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-    }
-}
-
-public sealed record ComplexityQuery : SharpProofQuery
-{
-    public ComplexityQuery(SharpProofTarget target)
-        : base(SharpProofQueryKind.Complexity, target ?? throw new ArgumentNullException(nameof(target)))
-    {
-    }
+    internal sealed record RuntimeHazardQuery(SharpProofTarget QueryTarget, SharpProofRuntimeHazardOptions Options)
+        : SharpProofQuery(
+            SharpProofQueryKind.RuntimeHazards,
+            QueryTarget ?? throw new ArgumentNullException(nameof(QueryTarget)));
 }
 
 public sealed record SharpProofLocation(
@@ -688,17 +638,17 @@ public sealed class SharpProofAnalysisSession : IDisposable
             var context = new SymbolicQueryContext(_source, query.Target, _options);
             return query switch
             {
-                ConditionQuery condition => FromPayload(
+                SharpProofQuery.ConditionQuery condition => FromPayload(
                     query,
                     new ConditionQueryPayload(_executor.Prove(context, condition.ConditionText, cancellationToken))),
-                RuntimeHazardQuery hazards => FromPayload(
+                SharpProofQuery.RuntimeHazardQuery hazards => FromPayload(
                     query,
                     new RuntimeHazardQueryPayload(
                         _executor.QueryRuntimeHazards(context, hazards.Options.ToEngineOptions(), cancellationToken))),
-                CapabilityQuery => FromPayload(
+                { Kind: SharpProofQueryKind.Capabilities } => FromPayload(
                     query,
                     new CapabilityQueryPayload(_executor.QueryCapabilities(context, cancellationToken))),
-                ComplexityQuery => FromPayload(
+                { Kind: SharpProofQueryKind.Complexity } => FromPayload(
                     query,
                     new ComplexityQueryPayload(_executor.QueryComplexity(context, cancellationToken))),
                 _ => FromPayload(

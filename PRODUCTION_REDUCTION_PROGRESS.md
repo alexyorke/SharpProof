@@ -65,11 +65,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Collapsed three runtime-hazard syntax-tree routes into one target-based
   dispatcher path. Removed unreachable source-proof and line-analysis helpers,
   the unused typed hazard wrapper, and a redundant project-session adapter.
+- [x] Internalized the concrete public query records behind the existing
+  `SharpProofQuery` factories. The session now dispatches simple requests by
+  query kind, and the intentional breaking API snapshot no longer exposes eight
+  constructor-heavy request implementation types.
 
 ## Current evidence
 
-- Maintained production: 106,795 lines; net reduction: 831 lines; remaining
-  reduction: 19,169. The first nine deletion slices removed 1,131 production
+- Maintained production: 106,750 lines; net reduction: 876 lines; remaining
+  reduction: 19,124. The first ten deletion slices removed 1,208 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -84,6 +88,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Inventory source-query test seams and remaining executor wrappers, then move
-retained compilation conveniences to `SharpProof.Testing` and delete the
-superseded production entry points in the same tranche.
+Replace the syntax-first runtime-hazard candidate adapters with one
+operation-first lowering registry, preserving source evidence and conservative
+unsupported outcomes while deleting the superseded adapter family.
