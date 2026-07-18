@@ -188,4 +188,24 @@ public sealed class ScriptProcessOwnershipTests
         Assert.That(impactScript, Does.Contain("StartsWith($repoPrefix"));
         Assert.That(impactScript, Does.Contain("Path is outside the repository root"));
     }
+
+    [Test]
+    public void ConfigurationReferenceGenerationUsesCompiledRegistry()
+    {
+        var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
+        var script = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Generate-ConfigurationReference.ps1"));
+        var command = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Tools",
+            "SharpProof.SymbolicCli",
+            "ConfigurationReferenceCommand.cs"));
+
+        Assert.That(script, Does.Contain("Invoke-SharpProofDotnet.ps1"));
+        Assert.That(script, Does.Contain("--generate-configuration-reference"));
+        Assert.That(script, Does.Not.Contain("Get-BalancedArguments"));
+        Assert.That(command, Does.Contain("AnalyzerConfigurationOptionRegistry.All"));
+    }
 }

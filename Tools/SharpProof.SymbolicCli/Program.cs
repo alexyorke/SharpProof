@@ -1,5 +1,8 @@
 using SharpProof.Tools.Shared;
 
+if (ConfigurationReferenceCommand.TryRun(args, out var configurationReferenceExitCode))
+    return configurationReferenceExitCode;
+
 return await ToolCommandHost.RunAsync(
     () => RunAsync(args),
     static exception => !SymbolicErrorClassifier.IsFatal(exception),
