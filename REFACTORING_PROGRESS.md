@@ -96,6 +96,10 @@ This is the active source of truth for the comprehensive refactor. Read
   `SymbolicConditionProofEngine`. `SymbolicSourceQueryService` retains only its
   internal facade and source-result aggregation; the superseded proof
   implementation was deleted.
+- [x] Source-node indexing, expression-context selection, line/span candidate
+  discovery, nearest-program-point ranking, and containment metadata live in
+  `SymbolicSourceTargetSelector`. Source queries and condition proofs share it;
+  the service-owned selector and cache were deleted.
 
 ## Current evidence
 
@@ -124,6 +128,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Separate source target selection and line/position candidate resolution from
-`SymbolicSourceQueryService`, leaving it as a thin source-query coordinator and
-deleting the superseded selection implementation.
+Inventory diagnostic descriptor ownership and replace the monolithic
+declaration/supported-diagnostics surfaces with one typed catalog consumed by
+the analyzer coordinator, configuration, and documentation checks.

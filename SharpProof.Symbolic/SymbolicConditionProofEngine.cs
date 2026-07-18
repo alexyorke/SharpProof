@@ -54,7 +54,7 @@ internal sealed class SymbolicConditionProofEngine
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
-        var node = SymbolicSourceQueryService.FindQueryNode(root, position);
+        var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
         var query = _programPointAnalyzer.Analyze(
             semanticModel, position, node, null, cancellationToken);
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
