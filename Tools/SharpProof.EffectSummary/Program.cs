@@ -1,9 +1,6 @@
-try
-{
-    return EffectSummaryCli.Run(args);
-}
-catch (ArgumentException exception)
-{
-    Console.Error.WriteLine(exception.Message);
-    return 2;
-}
+using SharpProof.Tools.Shared;
+
+return ToolCommandHost.Run(
+    () => EffectSummaryCli.Run(args),
+    argumentErrorExitCode: 2,
+    Console.Error);

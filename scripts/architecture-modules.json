@@ -49,7 +49,7 @@
       "name": "EffectSummary",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.EffectSummary/" ],
-      "allowedProjectReferences": [ "Contracts" ]
+      "allowedProjectReferences": [ "Contracts", "ToolingCore" ]
     },
     {
       "name": "SymbolicCli",
@@ -67,7 +67,7 @@
       "name": "FuzzCore",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.Fuzz.Core/" ],
-      "allowedProjectReferences": [ "Analyzer", "Attributes" ]
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "ToolingCore" ]
     },
     {
       "name": "FuzzCli",

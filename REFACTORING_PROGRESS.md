@@ -174,6 +174,10 @@ This is the active source of truth for the comprehensive refactor. Read
   symbol filtering, fixed-point purity classification, fallback inventory, and
   document projection. The CLI-owned document-construction helper was deleted,
   leaving the CLI responsible for command-mode orchestration.
+- [x] `ToolCommandHost` provides the lightweight sync/async argument-error
+  boundary for command tools. EffectSummary and Fuzz now use it with their
+  existing exit codes and usage streams; duplicate top-level catch blocks were
+  deleted and the architecture dependency allowlist records both edges.
 
 ## Current evidence
 
@@ -202,6 +206,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Standardize top-level argument-error/help execution for the lightweight command
-tools through a small tooling-core host abstraction, without changing each
-tool's exit codes or output streams.
+Migrate Baseline and CorpusReport argument-error execution to
+`ToolCommandHost`, deleting their duplicate top-level catch blocks while
+preserving exact usage text, exit codes, and output streams.
