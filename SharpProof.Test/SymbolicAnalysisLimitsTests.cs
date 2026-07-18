@@ -275,7 +275,7 @@ public sealed class SymbolicAnalysisLimitsTests
         var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
         var options = new SymbolicQueryOptions().WithAnalysisLimits(limits);
 
-        var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
+        var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
             SharpProofTarget.AllLines(),
             options));
@@ -311,7 +311,7 @@ public sealed class SymbolicAnalysisLimitsTests
         var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
         var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis).WithAnalysisLimits(limits);
 
-        var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicQueryContext(
+        var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
             SharpProofTarget.AllLines(),
             options),
@@ -493,7 +493,7 @@ public sealed class SymbolicAnalysisLimitsTests
             foreach (var item in cases)
             {
                 var options = new SymbolicQueryOptions().WithAnalysisLimits(item.Limits);
-                var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
+                var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
                     SymbolicSourceInput.FromText(item.Source, "Sample.cs"),
                     SharpProofTarget.AllLines(),
                     options));

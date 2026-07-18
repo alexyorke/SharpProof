@@ -14,14 +14,8 @@ internal sealed class SymbolicQueryExecutor
     private readonly SymbolicSourceQueryDispatcher _sourceQueryDispatcher;
 
     internal SymbolicQueryExecutor()
-        : this(new SymbolicInvariantService())
     {
-    }
-
-    internal SymbolicQueryExecutor(SymbolicInvariantService invariantService)
-    {
-        if (invariantService == null) throw new ArgumentNullException(nameof(invariantService));
-
+        var invariantService = new SymbolicInvariantService();
         var sourceQueryService = new SymbolicSourceQueryService(invariantService);
         _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(invariantService, sourceQueryService);
         _conditionProofDispatcher = new SymbolicConditionProofDispatcher(sourceQueryService);

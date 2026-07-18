@@ -469,7 +469,7 @@ public sealed class TestClass
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
 
-        return new SymbolicQueryService().QueryCapabilities(
+        return new SymbolicQueryExecutor().QueryCapabilities(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "CapabilityTests.cs"),
                 SharpProofTarget.AtPosition(position)));
@@ -478,7 +478,7 @@ public sealed class TestClass
     [Test]
     public void QueryCapabilities_AllLinesTarget_ThrowsNotSupportedException()
     {
-        var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryCapabilities(
+        var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryCapabilities(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "CapabilityTests.cs"),
                 SharpProofTarget.AllLines())));

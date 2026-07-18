@@ -571,7 +571,7 @@ public sealed class SymbolicComplexityTests
             .OfType<LocalFunctionStatementSyntax>()
             .Single(node => node.Identifier.ValueText == "Local");
 
-        var result = new SymbolicQueryService().QueryComplexity(
+        var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(localFunction, semanticModel),
                 SharpProofTarget.Node()));
@@ -608,7 +608,7 @@ public sealed class SymbolicComplexityTests
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var property = syntaxTree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();
 
-        var result = new SymbolicQueryService().QueryComplexity(
+        var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(property, semanticModel),
                 SharpProofTarget.Node()));
@@ -646,7 +646,7 @@ public sealed class SymbolicComplexityTests
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var indexer = syntaxTree.GetRoot().DescendantNodes().OfType<IndexerDeclarationSyntax>().Single();
 
-        var result = new SymbolicQueryService().QueryComplexity(
+        var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(indexer, semanticModel),
                 SharpProofTarget.Node()));
@@ -702,7 +702,7 @@ public sealed class SymbolicComplexityTests
         var target = useLineTarget
             ? SharpProofTarget.LineNumber(GetLineNumber(source, position))
             : SharpProofTarget.AtPosition(position);
-        return new SymbolicQueryService().QueryComplexity(
+        return new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "SymbolicComplexityTests.cs"),
                 target));
@@ -721,7 +721,7 @@ public sealed class SymbolicComplexityTests
     [Test]
     public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException()
     {
-        var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryComplexity(
+        var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "SymbolicComplexityTests.cs"),
                 SharpProofTarget.AllLines())));

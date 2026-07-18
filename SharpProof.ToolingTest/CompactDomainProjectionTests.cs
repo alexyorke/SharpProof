@@ -19,7 +19,7 @@ public sealed class CompactDomainProjectionTests
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         var input = SymbolicSourceInput.FromText(source, "ScopeFixture.cs");
         var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences());
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
         var targets = new[]
         {
             (Target: SharpProofTarget.AllLines(), Kind: "file"),
@@ -75,7 +75,7 @@ public sealed class CompactDomainProjectionTests
         var options = new SymbolicQueryOptions(
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis);
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
 
         var invariant = service.Query(new SymbolicQueryContext(
             input,

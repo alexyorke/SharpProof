@@ -45,7 +45,7 @@ internal sealed class SymbolicMethodAnalysisInput
         new(Source, SharpProofTarget.Node(), options);
 
     internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtNode(
-        SymbolicQueryService queryService,
+        SymbolicQueryExecutor queryExecutor,
         SyntaxNode node,
         string condition,
         SmtAnalysisService smtAnalysis,
@@ -53,7 +53,7 @@ internal sealed class SymbolicMethodAnalysisInput
         CancellationToken cancellationToken)
     {
         ValidateNode(node);
-        return queryService.TryProveAtSyntaxNode(
+        return queryExecutor.TryProveAtSyntaxNode(
             SemanticModel,
             node,
             condition,
@@ -63,7 +63,7 @@ internal sealed class SymbolicMethodAnalysisInput
     }
 
     internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtNode(
-        SymbolicQueryService queryService,
+        SymbolicQueryExecutor queryExecutor,
         SyntaxNode node,
         string condition,
         SymbolicCondition symbolicCondition,
@@ -73,7 +73,7 @@ internal sealed class SymbolicMethodAnalysisInput
         CancellationToken cancellationToken)
     {
         ValidateNode(node);
-        return queryService.TryProveAtSyntaxNode(
+        return queryExecutor.TryProveAtSyntaxNode(
             SemanticModel,
             node,
             condition,

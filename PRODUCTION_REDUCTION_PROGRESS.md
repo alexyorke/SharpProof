@@ -52,11 +52,14 @@ Tests are excluded from the metric and must not be deleted.
   path and migrated wrapper-specific tests to it. Removed seven service-specific
   classification entry points, a conversion-only lowering adapter, and four
   unreachable helpers across ProofCore, Symbolic, CLI, and EffectSummary.
+- [x] Deleted the 170-line `SymbolicQueryService` pass-through. Analyzer, CLI,
+  session, and retained tests now use the same `SymbolicQueryExecutor`; the
+  architecture test verifies that the legacy facade type is absent.
 
 ## Current evidence
 
-- Maintained production: 107,354 lines; net reduction: 272 lines; remaining
-  reduction: 19,728. The first five deletion slices removed 549 production
+- Maintained production: 107,198 lines; net reduction: 428 lines; remaining
+  reduction: 19,572. The first six deletion slices removed 705 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -71,6 +74,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Consolidate the next service-specific Symbolic query facade into the session
-and discriminated query pipeline; migrate retained tests before deleting the
-superseded entry point.
+Migrate the next test-only Symbolic source or invariant entry points to the
+executor/session pipeline, preserving differential coverage before deleting
+the superseded facade methods.

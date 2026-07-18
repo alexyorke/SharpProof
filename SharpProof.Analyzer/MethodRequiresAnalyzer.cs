@@ -82,7 +82,7 @@ internal static class MethodRequiresAnalyzer
                 context.CancellationToken);
             if (contracts.Length == 0) continue;
 
-            var queryService = new SymbolicQueryService();
+            var queryExecutor = new SymbolicQueryExecutor();
             var source = SymbolicSourceInput.FromSyntaxTree(callSite.Syntax.SyntaxTree, context.Compilation);
             var options = new SymbolicQueryOptions(smtAnalysis: purityService.SmtAnalysis)
                 .WithAnalysisLimits(purityService.AnalysisLimits);
@@ -127,7 +127,7 @@ internal static class MethodRequiresAnalyzer
                     continue;
                 }
 
-                var proofOutcome = queryService.TryProve(
+                var proofOutcome = queryExecutor.TryProve(
                     new SymbolicQueryContext(
                         source,
                         SharpProofTarget.Point(line, column),

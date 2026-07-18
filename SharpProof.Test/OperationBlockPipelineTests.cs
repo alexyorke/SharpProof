@@ -187,7 +187,7 @@ public sealed class OperationBlockPipelineTests
 
         using (var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default))
         {
-            var failedProof = state.QueryService.TryProveAtSyntaxNode(
+            var failedProof = state.QueryExecutor.TryProveAtSyntaxNode(
                 semanticModel,
                 declaration,
                 " ",

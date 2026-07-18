@@ -102,7 +102,7 @@ internal sealed class SymbolicSourceQueryLineTests
         var options = new SymbolicQueryOptions(
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis);
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
 
         var invariants = service.Query(new SymbolicQueryContext(
             input,
@@ -155,7 +155,7 @@ internal class TestClass
             new[] { syntaxTree },
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
         var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences());
 
         var textLine = service.Query(new SymbolicQueryContext(
@@ -423,7 +423,7 @@ internal class TestClass
             var tree = CSharpSyntaxTree.ParseText(scenario.Source, new CSharpParseOptions(LanguageVersion.Preview), scenario.FileName);
             var compilation = CSharpCompilation.Create(Path.GetFileNameWithoutExtension(scenario.FileName), [tree], AnalyzerTestHost.GetTrustedPlatformReferences(), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var node = tree.GetRoot().DescendantNodes().Single(candidate => candidate.Kind().ToString() == scenario.Target);
-            point = new SymbolicQueryService().Query(new SymbolicQueryContext(SymbolicSourceInput.FromNode(node, compilation.GetSemanticModel(tree)), SharpProofTarget.Node())).ProgramPoints.Single();
+            point = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(SymbolicSourceInput.FromNode(node, compilation.GetSemanticModel(tree)), SharpProofTarget.Node())).ProgramPoints.Single();
         }
         bool Matches(string expectation) => expectation switch
         {
@@ -450,7 +450,7 @@ internal class TestClass
     }
 }";
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
         var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences(), smtAnalysis);
         var hazardOptions = new SymbolicRuntimeHazardQueryOptions(
             kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero });
@@ -491,7 +491,7 @@ internal class TestClass
     [Test]
     public void SymbolicQueryService_QueryRuntimeHazards_RequiresSmtAnalysis()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().QueryRuntimeHazards(
+        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().QueryRuntimeHazards(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "HazardInput.cs"),
                 SharpProofTarget.AllLines(),
@@ -504,7 +504,7 @@ internal class TestClass
     public void SymbolicQueryService_Prove_RequiresPointTarget()
     {
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().Prove(
+        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "ProofInput.cs"),
                 SharpProofTarget.LineNumber(1),
@@ -519,9 +519,9 @@ internal class TestClass
     [Test]
     public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
     {
-        var assembly = typeof(SymbolicQueryService).Assembly;
-        Assert.That(typeof(SymbolicQueryService).IsPublic, Is.False);
-        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicQueryExecutor")!.IsPublic, Is.False);
+        var assembly = typeof(SymbolicQueryExecutor).Assembly;
+        Assert.That(typeof(SymbolicQueryExecutor).IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicQueryService"), Is.Null);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
@@ -840,7 +840,7 @@ internal class TestClass
             .Single();
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
+        var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromNode(assignment, semanticModel),
             SharpProofTarget.Node(),
             new SymbolicQueryOptions(

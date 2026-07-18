@@ -32,7 +32,7 @@ public sealed class SymbolicQueryWitnessTests
         var options = new SymbolicQueryOptions(
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             smtAnalysis);
-        var service = new SymbolicQueryService();
+        var service = new SymbolicQueryExecutor();
 
         var point = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
@@ -118,7 +118,7 @@ public sealed class SymbolicQueryWitnessTests
                               }
                               """;
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicQueryContext(
+        var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "HazardWitness.cs"),
             SharpProofTarget.AllLines(),
             new SymbolicQueryOptions(

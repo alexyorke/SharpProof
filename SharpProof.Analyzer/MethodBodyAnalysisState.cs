@@ -25,7 +25,7 @@ internal sealed class MethodBodyAnalysisState
 
     internal MethodAnalysisSnapshot Snapshot { get; }
 
-    internal SymbolicQueryService QueryService { get; } = new();
+    internal SymbolicQueryExecutor QueryExecutor { get; } = new();
 
     internal SymbolicOperationResult<SymbolicCapabilityResult> GetCapabilityOutcome(
         CancellationToken cancellationToken)
@@ -33,7 +33,7 @@ internal sealed class MethodBodyAnalysisState
         return GetNodeQueryOutcome(
             "capability",
             cancellationToken,
-            static (queryService, input, token) => queryService.TryQueryCapabilities(
+            static (queryExecutor, input, token) => queryExecutor.TryQueryCapabilities(
                 input.CreateNodeQuery(),
                 token));
     }
@@ -44,7 +44,7 @@ internal sealed class MethodBodyAnalysisState
         return GetNodeQueryOutcome(
             "complexity",
             cancellationToken,
-            static (queryService, input, token) => queryService.TryQueryComplexity(
+            static (queryExecutor, input, token) => queryExecutor.TryQueryComplexity(
                 input.CreateNodeQuery(),
                 token));
     }
@@ -52,13 +52,13 @@ internal sealed class MethodBodyAnalysisState
     private SymbolicOperationResult<TResult> GetNodeQueryOutcome<TResult>(
         string queryKey,
         CancellationToken cancellationToken,
-        Func<SymbolicQueryService, SymbolicMethodAnalysisInput, CancellationToken,
+        Func<SymbolicQueryExecutor, SymbolicMethodAnalysisInput, CancellationToken,
             SymbolicOperationResult<TResult>> query)
         where TResult : class
     {
         return GetOrCreateSymbolicQueryResult(
             queryKey,
-            () => query(QueryService, Snapshot.Input, cancellationToken));
+            () => query(QueryExecutor, Snapshot.Input, cancellationToken));
     }
 
     internal T GetOrCreateSymbolicQueryResult<T>(
