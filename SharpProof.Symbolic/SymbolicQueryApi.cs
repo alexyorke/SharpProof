@@ -16,9 +16,18 @@ internal sealed class SymbolicQueryExecutor
     internal SymbolicQueryExecutor()
     {
         var invariantService = new SymbolicInvariantService();
-        var sourceQueryService = new SymbolicSourceQueryService(invariantService);
-        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(invariantService, sourceQueryService);
-        _conditionProofDispatcher = new SymbolicConditionProofDispatcher(sourceQueryService);
+        var programPointAnalyzer = new SymbolicProgramPointAnalyzer(invariantService);
+        var conditionProofEngine = new SymbolicConditionProofEngine(programPointAnalyzer);
+        var programPointExecutor = new SymbolicSourceProgramPointExecutor(
+            programPointAnalyzer,
+            conditionProofEngine);
+        var rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(programPointExecutor);
+        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(
+            invariantService,
+            programPointExecutor,
+            rangeQueryExecutor,
+            conditionProofEngine);
+        _conditionProofDispatcher = new SymbolicConditionProofDispatcher(conditionProofEngine);
         _runtimeHazardDispatcher = new SymbolicRuntimeHazardQueryDispatcher(
             new SymbolicRuntimeHazardQueryService(invariantService));
         _complexityService = new SymbolicComplexityService();

@@ -447,7 +447,7 @@ public class TestClass
     private static string Impure() => string.Empty;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,
@@ -479,7 +479,7 @@ public class TestClass
     private static int Impure() => 1;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,
@@ -516,7 +516,7 @@ public class TestClass
     private static int Impure() => 1;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,
@@ -556,7 +556,7 @@ public class TestClass
     private static int Impure() => 1;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,
@@ -595,7 +595,7 @@ public class TestClass
     private static int Impure() => 1;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,
@@ -632,7 +632,7 @@ public class TestClass
     private static int Impure() => 1;
 }";
         var marker = FindLineColumn(source, "Impure()");
-        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        var query = new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathFactExpressionReachabilityTests.cs",
             marker.Position,

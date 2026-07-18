@@ -17,7 +17,7 @@ namespace SharpProof.Test;
 internal class SemanticOracleSmtTests : SemanticOracleSmtTestBase
 {
     [Test]
-    public void SymbolicSourceQueryService_QueryFile_RequestApiProvesImplication()
+    public void SymbolicQueryExecutor_QueryFile_RequestApiProvesImplication()
     {
         const string source = @"
 internal class TestClass
@@ -39,7 +39,7 @@ internal class TestClass
 
         try
         {
-            var result = new SymbolicSourceQueryService().QueryFile(
+            var result = new SymbolicQueryExecutor().QueryFile(
                 filePath,
                 FindLine(source, "return value;"),
                 16,
@@ -1992,7 +1992,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsStatementGuardFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsStatementGuardFacts()
     {
         const string source = @"
 internal class TestClass
@@ -2007,7 +2007,7 @@ internal class TestClass
         return values[index];
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceStatementFacts.cs",
             FindLine(source, "return values[index];"),
@@ -2057,7 +2057,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_ExposesProgramPointAnalysis()
+    public void SymbolicQueryExecutor_AnalyzeSource_ExposesProgramPointAnalysis()
     {
         const string source = @"
 internal class TestClass
@@ -2072,7 +2072,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "AnalyzeSourceProgramPoint.cs",
             FindLine(source, "return value;"),
@@ -2092,7 +2092,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySourceAtPosition_ProvesImplication()
+    public void SymbolicQueryExecutor_QuerySourceAtPosition_ProvesImplication()
     {
         const string source = @"
 internal class TestClass
@@ -2108,7 +2108,7 @@ internal class TestClass
     }
 }";
         var position = source.IndexOf("return value;", StringComparison.Ordinal);
-        var result = new SymbolicSourceQueryService().QuerySourceAtPosition(
+        var result = new SymbolicQueryExecutor().QuerySourceAtPosition(
             source,
             "QuerySourceAtPosition.cs",
             position,
@@ -2123,7 +2123,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesProgramPointReachability()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesProgramPointReachability()
     {
         const string source = @"
 internal class TestClass
@@ -2141,7 +2141,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "AnalyzeSourceReachability.cs",
             FindLine(source, "return value;"),
@@ -2155,7 +2155,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DoesNotCheckReachabilityByDefault()
+    public void SymbolicQueryExecutor_QuerySource_DoesNotCheckReachabilityByDefault()
     {
         const string source = @"
 internal class TestClass
@@ -2170,7 +2170,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceReachabilityDefault.cs",
             FindLine(source, "return value;"),
@@ -2185,7 +2185,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_WithSmt_ClassifiesContradictoryProgramPointUnreachable()
+    public void SymbolicQueryExecutor_QuerySource_WithSmt_ClassifiesContradictoryProgramPointUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -2203,7 +2203,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceReachabilitySmt.cs",
             FindLine(source, "return value;"),
@@ -2217,7 +2217,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesMultipleConditionsInSingleProgramPointQuery()
+    public void SymbolicQueryExecutor_QuerySource_ProvesMultipleConditionsInSingleProgramPointQuery()
     {
         const string source = @"
 internal class TestClass
@@ -2232,7 +2232,7 @@ internal class TestClass
         return values[index];
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceMultipleProofs.cs",
             FindLine(source, "return values[index];"),
@@ -2266,7 +2266,7 @@ internal class TestClass
 
     private static readonly SourceProofCase[] SingleProofCaseDataPart1 =
     {
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -2279,7 +2279,7 @@ internal class TestClass
         return 0;
     }
 }", "GuardStyleSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -2292,7 +2292,7 @@ internal class TestClass
         return 0;
     }
 }", "IfElseSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesLocalAliasSourcePredicateImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -2305,7 +2305,7 @@ internal class TestClass
         return 0;
     }
 }", "LocalAliasSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -2318,7 +2318,7 @@ internal class TestClass
         return 0;
     }
 }", "LocalAssignmentSourcePredicateImplications.cs", "return value.Length;", 13, "value != null && value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -2331,7 +2331,7 @@ internal class TestClass
         return 0;
     }
 }", "MultiGuardSourcePredicateIndexFacts.cs", "return values[index];", 13, "values != null && index >= 0 && index < values.Length", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int divisor)
@@ -2344,7 +2344,7 @@ internal class TestClass
         return 0;
     }
 }", "GuardStyleSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAliasSourcePredicateExactValue", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesLocalAliasSourcePredicateExactValue", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int divisor)
@@ -2357,7 +2357,7 @@ internal class TestClass
         return 0;
     }
 }", "LocalAliasSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int divisor)
@@ -2370,7 +2370,7 @@ internal class TestClass
         return 0;
     }
 }", "LocalAssignmentSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int value)
@@ -2383,7 +2383,7 @@ internal class TestClass
         return 0;
     }
 }", "ReassignedIntegerLocalSourcePredicate.cs", "return value;", 13, "value > -1", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength", @"
 using System;
 
 internal class TestClass
@@ -2400,7 +2400,7 @@ internal class TestClass
         return 0;
     }
 }", "AssignedRangeAsSpanResultLength.cs", "return view.Length;", 20, "view.Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesForeachReceiverNonNull", @"
 internal class TestClass
 {
     public int TestMethod(int[] values)
@@ -2413,7 +2413,7 @@ internal class TestClass
         return 0;
     }
 }", "ForeachReceiverNonNull.cs", "return values.Length + value;", 13, "values != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachArrayLengthPositive", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesForeachArrayLengthPositive", @"
 internal class TestClass
 {
     public int TestMethod(int[] values)
@@ -2460,9 +2460,9 @@ internal class TestClass
     }
 
     [TestCaseSource(nameof(SingleProofCases))]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_SingleProofCases(SourceProofCase testCase)
+    public void SymbolicQueryExecutor_ProveConditionAtSource_SingleProofCases(SourceProofCase testCase)
     {
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             testCase.Source,
             testCase.FilePath,
             FindLine(testCase.Source, testCase.LineText),
@@ -2476,7 +2476,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementFallbackSourcePredicateExactValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchStatementFallbackSourcePredicateExactValue()
     {
         var source = SourcePredicateSource + @"
 internal class TestClass
@@ -2491,7 +2491,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "SwitchStatementFallbackSourcePredicateExactValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -2513,7 +2513,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodLocalAliasExactValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodLocalAliasExactValue()
     {
         var source = SourcePredicateSource + @"
 internal class TestClass
@@ -2528,7 +2528,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "InstanceSourceBooleanMethodLocalAliasExactValue.cs",
             FindLine(source, "return 10 / box.Divisor;"),
@@ -2541,7 +2541,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ConditionProofsWithoutSmtRemainConservative()
+    public void SymbolicQueryExecutor_QuerySource_ConditionProofsWithoutSmtRemainConservative()
     {
         const string source = @"
 internal class TestClass
@@ -2556,7 +2556,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceProofsWithoutSmt.cs",
             FindLine(source, "return value;"),
@@ -2571,7 +2571,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesRangeGuardImplications()
+    public void SymbolicQueryExecutor_ProveConditionAtSource_ProvesRangeGuardImplications()
     {
         const string source = @"
 internal class TestClass
@@ -2586,7 +2586,7 @@ internal class TestClass
         return values[index];
     }
 }";
-        var service = new SymbolicSourceQueryService();
+        var service = new SymbolicQueryExecutor();
         var nonNegative = service.ProveConditionAtSource(
             source,
             "ProveConditionRangeGuard.cs",
@@ -2629,7 +2629,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachNewEmptyArrayBodyUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesForeachNewEmptyArrayBodyUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -2644,7 +2644,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ForeachNewEmptyArrayUnreachable.cs",
             FindLine(source, "return value;"),
@@ -2658,7 +2658,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachBodyAfterNullGuardUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesForeachBodyAfterNullGuardUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -2676,7 +2676,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ForeachReceiverContradiction.cs",
             FindLine(source, "return values.Length + value;"),
@@ -2691,7 +2691,7 @@ internal class TestClass
 
     private static readonly SourceProofCase[] SingleProofCaseDataPart2 =
     {
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSingleElementForeachValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSingleElementForeachValue", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -2704,7 +2704,7 @@ internal class TestClass
         return 0;
     }
 }", "SingleElementForeachValue.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -2717,7 +2717,7 @@ internal class TestClass
         return 0;
     }
 }", "MultiElementForeachValue.cs", "return value;", 20, "value == 0", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFiniteForeachNonZeroValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesFiniteForeachNonZeroValue", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -2730,7 +2730,7 @@ internal class TestClass
         return 0;
     }
 }", "FiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorAssignedFiniteForeachNonZeroValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesPriorAssignedFiniteForeachNonZeroValue", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -2744,7 +2744,7 @@ internal class TestClass
         return 0;
     }
 }", "PriorAssignedFiniteForeachNonZeroValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotUseFiniteForeachFactsAfterUnknownReassignment", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotUseFiniteForeachFactsAfterUnknownReassignment", @"
 internal class TestClass
 {
     public int TestMethod(int[] replacement)
@@ -2759,7 +2759,7 @@ internal class TestClass
         return 0;
     }
 }", "ReassignedFiniteForeachValue.cs", "return value;", 20, "value != 0", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesLockReceiverNonNull", @"
 internal class TestClass
 {
     public int TestMethod(object gate)
@@ -2770,7 +2770,7 @@ internal class TestClass
         }
     }
 }", "LockReceiverNonNull.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact", @"
 internal class TestClass
 {
     public int TestMethod(object gate)
@@ -2782,7 +2782,7 @@ internal class TestClass
         }
     }
 }", "LockReceiverReassigned.cs", "return gate.GetHashCode();", 13, "gate != null", SymbolicTruthValue.ProvenFalse),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact", @"
 internal sealed class Box
 {
     public void Clear(ref Box value)
@@ -2799,7 +2799,7 @@ internal class TestClass
         return box.GetHashCode();
     }
 }", "RefMutatedCompletedReceiver.cs", "return box.GetHashCode();", 16, "box != null", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull", @"
 using System;
 
 internal class TestClass
@@ -2816,7 +2816,7 @@ internal class TestClass
         }
     }
 }", "CatchExceptionVariableNonNull.cs", "return ex.Message.Length;", 13, "ex != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchFilterCondition", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCatchFilterCondition", @"
 using System;
 
 internal class TestClass
@@ -2833,7 +2833,7 @@ internal class TestClass
         }
     }
 }", "CatchFilterCondition.cs", "return 10 / value;", 13, "value > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias", @"
 using System;
 
 internal class TestClass
@@ -2846,7 +2846,7 @@ internal class TestClass
         }
     }
 }", "UsingDeclarationResourceAlias.cs", "return resource == value ? 1 : 0;", 13, "resource == value", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull", @"
 using System;
 
 internal class TestClass
@@ -2859,7 +2859,7 @@ internal class TestClass
         }
     }
 }", "UsingDeclarationThrowGuardedResourceNonNull.cs", "return resource.GetHashCode();", 13, "resource != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingExpressionThrowGuardedResourceNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesUsingExpressionThrowGuardedResourceNonNull", @"
 using System;
 
 internal class TestClass
@@ -2872,7 +2872,7 @@ internal class TestClass
         }
     }
 }", "UsingExpressionThrowGuardedResourceNonNull.cs", "return value.GetHashCode();", 13, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedCoalesceAssignmentLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullDominatedCoalesceAssignmentLength", @"
 internal class TestClass
 {
     public int TestMethod(int[] values)
@@ -2899,7 +2899,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullGuardedLockBodyUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesNullGuardedLockBodyUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -2917,7 +2917,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "NullGuardedLockBodyUnreachable.cs",
             FindLine(source, "return 1;"),
@@ -2933,7 +2933,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCompletedLockReceiverNonNull()
+    public void SymbolicQueryExecutor_ProveConditionAtSource_ProvesCompletedLockReceiverNonNull()
     {
         const string source = @"
 internal class TestClass
@@ -2952,7 +2952,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CompletedLockReceiverNonNull.cs",
             FindLine(source, "return 1;"),
@@ -2967,7 +2967,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ReassignedCompletedLockReceiverDoesNotKeepNonNullFact()
+        SymbolicQueryExecutor_ProveConditionAtSource_ReassignedCompletedLockReceiverDoesNotKeepNonNullFact()
     {
         const string source = @"
 internal class TestClass
@@ -2982,7 +2982,7 @@ internal class TestClass
         return gate.GetHashCode();
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ReassignedCompletedLockReceiver.cs",
             FindLine(source, "return gate.GetHashCode();"),
@@ -2995,7 +2995,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesThrowExpressionGuardedNullBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesThrowExpressionGuardedNullBranchUnreachable()
     {
         const string source = @"
 using System;
@@ -3014,7 +3014,7 @@ internal class TestClass
         return value.Length;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ThrowExpressionGuardedNullBranch.cs",
             FindLine(source, "return 1;"),
@@ -3028,7 +3028,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedReceiverNullBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesCompletedReceiverNullBranchUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -3045,7 +3045,7 @@ internal class TestClass
         return hash;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CompletedReceiverNullBranch.cs",
             FindLine(source, "return 1;"),
@@ -3060,7 +3060,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitedReceiverNullBranchUnreachable()
+        SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitedReceiverNullBranchUnreachable()
     {
         const string source = @"
 using System.Threading.Tasks;
@@ -3084,7 +3084,7 @@ internal class TestClass
         return value;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CompletedAwaitedReceiverNullBranch.cs",
             FindLine(source, "return 1;"),
@@ -3098,7 +3098,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitableNullBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitableNullBranchUnreachable()
     {
         const string source = @"
 using System.Threading.Tasks;
@@ -3117,7 +3117,7 @@ internal class TestClass
         return value;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CompletedAwaitableNullBranch.cs",
             FindLine(source, "return 1;"),
@@ -3132,7 +3132,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedAwaitedReceiverDoesNotKeepNonNullFact()
+        SymbolicQueryExecutor_ProveConditionAtSource_RefMutatedCompletedAwaitedReceiverDoesNotKeepNonNullFact()
     {
         const string source = @"
 using System.Threading.Tasks;
@@ -3154,7 +3154,7 @@ internal class TestClass
         return service == null ? 1 : 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "RefMutatedCompletedAwaitedReceiver.cs",
             FindLine(source, "return service == null ? 1 : 0;"),
@@ -3170,7 +3170,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedElementAccessOutOfRangeBranchUnreachable()
+        SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesCompletedElementAccessOutOfRangeBranchUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -3187,7 +3187,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CompletedElementAccessOutOfRangeBranch.cs",
             FindLine(source, "return 1;"),
@@ -3205,7 +3205,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesContradictoryCatchFilterBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesContradictoryCatchFilterBranchUnreachable()
     {
         const string source = @"
 using System;
@@ -3229,7 +3229,7 @@ internal class TestClass
         }
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ContradictoryCatchFilterBranch.cs",
             FindLine(source, "return value;"),
@@ -3247,7 +3247,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesUsingDeclarationNullBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesUsingDeclarationNullBranchUnreachable()
     {
         const string source = @"
 using System;
@@ -3267,7 +3267,7 @@ internal class TestClass
         }
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "UsingDeclarationNullBranchUnreachable.cs",
             FindLine(source, "return 1;"),
@@ -3283,7 +3283,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesUsingExpressionNullBranchUnreachable()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesUsingExpressionNullBranchUnreachable()
     {
         const string source = @"
 using System;
@@ -3303,7 +3303,7 @@ internal class TestClass
         }
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "UsingExpressionNullBranchUnreachable.cs",
             FindLine(source, "return 1;"),
@@ -3318,7 +3318,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_AnalyzeSource_WithSmt_ReassignedUsingExpressionResourceKeepsNullBranchReachable()
+        SymbolicQueryExecutor_AnalyzeSource_WithSmt_ReassignedUsingExpressionResourceKeepsNullBranchReachable()
     {
         const string source = @"
 using System;
@@ -3339,7 +3339,7 @@ internal class TestClass
         }
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ReassignedUsingExpressionResourceKeepsNullBranchReachable.cs",
             FindLine(source, "return 1;"),
@@ -3351,7 +3351,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
+    public void SymbolicQueryExecutor_QuerySource_ProvesForLoopMonotonicIndexBounds()
     {
         const string source = @"
 internal class TestClass
@@ -3367,7 +3367,7 @@ internal class TestClass
         return sum;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ForLoopMonotonicIndexBounds.cs",
             FindLine(source, "sum += values[index];"),
@@ -3382,7 +3382,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesReverseForLoopMonotonicIndexBounds()
+    public void SymbolicQueryExecutor_QuerySource_ProvesReverseForLoopMonotonicIndexBounds()
     {
         const string source = @"
 internal class TestClass
@@ -3398,7 +3398,7 @@ internal class TestClass
         return sum;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ReverseForLoopMonotonicIndexBounds.cs",
             FindLine(source, "sum += values[index];"),
@@ -3413,7 +3413,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesWhileLoopMonotonicIndexBounds()
+    public void SymbolicQueryExecutor_QuerySource_ProvesWhileLoopMonotonicIndexBounds()
     {
         const string source = @"
 internal class TestClass
@@ -3431,7 +3431,7 @@ internal class TestClass
         return sum;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "WhileLoopMonotonicIndexBounds.cs",
             FindLine(source, "sum += values[index];"),
@@ -3446,7 +3446,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesReverseWhileLoopMonotonicIndexBounds()
+    public void SymbolicQueryExecutor_QuerySource_ProvesReverseWhileLoopMonotonicIndexBounds()
     {
         const string source = @"
 internal class TestClass
@@ -3464,7 +3464,7 @@ internal class TestClass
         return sum;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ReverseWhileLoopMonotonicIndexBounds.cs",
             FindLine(source, "sum += values[index];"),
@@ -3479,7 +3479,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesDoLoopPreEntryLowerBound()
+    public void SymbolicQueryExecutor_QuerySource_ProvesDoLoopPreEntryLowerBound()
     {
         const string source = @"
 internal class TestClass
@@ -3498,7 +3498,7 @@ internal class TestClass
         return sum;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "DoLoopPreEntryLowerBound.cs",
             FindLine(source, "sum += index;"),
@@ -3512,7 +3512,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DoesNotInferForLoopLowerBoundWhenUpdaterDecrements()
+    public void SymbolicQueryExecutor_QuerySource_DoesNotInferForLoopLowerBoundWhenUpdaterDecrements()
     {
         const string source = @"
 internal class TestClass
@@ -3527,7 +3527,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ForLoopDecrementNoLowerBound.cs",
             FindLine(source, "return values[index];"),
@@ -3541,7 +3541,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DoesNotInferWhileLoopLowerBoundWhenBodyDecrements()
+    public void SymbolicQueryExecutor_QuerySource_DoesNotInferWhileLoopLowerBoundWhenBodyDecrements()
     {
         const string source = @"
 internal class TestClass
@@ -3559,7 +3559,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "WhileLoopDecrementNoLowerBound.cs",
             FindLine(source, "var current = values[index];"),
@@ -3573,7 +3573,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseForLoopUpperBoundWhenUpdaterIncrements()
+    public void SymbolicQueryExecutor_QuerySource_DoesNotInferReverseForLoopUpperBoundWhenUpdaterIncrements()
     {
         const string source = @"
 internal class TestClass
@@ -3588,7 +3588,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ReverseForLoopIncrementNoUpperBound.cs",
             FindLine(source, "return values[index];"),
@@ -3602,7 +3602,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseWhileLoopUpperBoundWhenBodyIncrements()
+    public void SymbolicQueryExecutor_QuerySource_DoesNotInferReverseWhileLoopUpperBoundWhenBodyIncrements()
     {
         const string source = @"
 internal class TestClass
@@ -3620,7 +3620,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "ReverseWhileLoopIncrementNoUpperBound.cs",
             FindLine(source, "var current = values[index];"),
@@ -3634,7 +3634,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DropsStaleIfConditionAfterReassignment()
+    public void SymbolicQueryExecutor_QuerySource_DropsStaleIfConditionAfterReassignment()
     {
         const string source = @"
 internal class TestClass
@@ -3650,7 +3650,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "StaleIfConditionAfterReassignment.cs",
             FindLine(source, "return values[index];"),
@@ -3667,7 +3667,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_DropsStaleWhileConditionAfterReassignment()
+    public void SymbolicQueryExecutor_QuerySource_DropsStaleWhileConditionAfterReassignment()
     {
         const string source = @"
 internal class TestClass
@@ -3683,7 +3683,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "StaleWhileConditionAfterReassignment.cs",
             FindLine(source, "return values[index];"),
@@ -3717,7 +3717,7 @@ internal class TestClass
 
 
     [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ReportsUnreachablePoint()
+    public void SymbolicQueryExecutor_ProveConditionAtSource_ReportsUnreachablePoint()
     {
         const string source = @"
 internal class TestClass
@@ -3735,7 +3735,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ProveConditionUnreachable.cs",
             FindLine(source, "return value;"),
@@ -3749,7 +3749,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsExpressionContextFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsExpressionContextFacts()
     {
         const string source = @"
 internal class TestClass
@@ -3760,7 +3760,7 @@ internal class TestClass
     }
 }";
         var line = FindLine(source, "return first ?? second;");
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceExpressionFacts.cs",
             line,
@@ -3773,7 +3773,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsCoalesceThrowAssignmentFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsCoalesceThrowAssignmentFacts()
     {
         const string source = @"
 using System;
@@ -3791,7 +3791,7 @@ internal class TestClass
         return safe.Length;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceCoalesceThrowFacts.cs",
             FindLine(source, "if (safe == null)"),
@@ -3811,7 +3811,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCoalesceAssignmentGuardedFallbackNullBranchUnreachable()
+        SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesCoalesceAssignmentGuardedFallbackNullBranchUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -3832,7 +3832,7 @@ internal class TestClass
         return value.Length;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "CoalesceAssignmentGuardedFallback.cs",
             FindLine(source, "return 1;"),
@@ -3849,7 +3849,7 @@ internal class TestClass
 
     private static readonly SourceProofCase[] SingleProofCaseDataPart3 =
     {
-        new("SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownNonNullCoalesceAssignmentLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_PreservesKnownNonNullCoalesceAssignmentLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3859,7 +3859,7 @@ internal class TestClass
         return values.Length;
     }
 }", "KnownNonNullCoalesceAssignmentLength.cs", "return values.Length;", 16, "values.Length == 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3869,10 +3869,10 @@ internal class TestClass
         return maybe.Value;
     }
 }", "NullDominatedNullableCoalesceAssignmentValue.cs", "return maybe.Value;", 16, "maybe.Value == 5", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor, "InlineFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor, "PriorFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue", SemanticOracleTestSources.TupleElementNonZeroDivisor, "TupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor, "InlineFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue", SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor, "PriorFiniteArrayElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue", SemanticOracleTestSources.TupleElementNonZeroDivisor, "TupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact", @"
 using System;
 
 internal class TestClass
@@ -3887,10 +3887,10 @@ internal class TestClass
         return 0;
     }
 }", "ValueTuplePositionalPatternElementFact.cs", "return pair.Item1;", 20, "pair.Item1 > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue", SemanticOracleTestSources.NamedTupleElementNonZeroDivisor, "NamedTupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor, "TupleLocalDeconstructionAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor, "TupleLocalDeconstructionDeclaredNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementContent", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue", SemanticOracleTestSources.NamedTupleElementNonZeroDivisor, "NamedTupleElementAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleLocalDeconstructionAssignedNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor, "TupleLocalDeconstructionAssignedNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleLocalDeconstructionDeclaredNonZeroValue", SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor, "TupleLocalDeconstructionDeclaredNonZeroValue.cs", "return 10 / divisor;", 20, "divisor != 0", SymbolicTruthValue.ProvenTrue),
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleStringLiteralElementContent", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3904,7 +3904,7 @@ internal class TestClass
         return 0;
     }
 }", "TupleStringLiteralElementContent.cs", "return 0;", 12, "pair.text == \"abc\"", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleStringLiteralElementLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3913,7 +3913,7 @@ internal class TestClass
         return pair.text.Length;
     }
 }", "TupleStringLiteralElementLength.cs", "return pair.text.Length;", 16, "pair.text.Length == 3", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleArrayElementLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleArrayElementLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3922,7 +3922,7 @@ internal class TestClass
         return pair.values.Length;
     }
 }", "TupleArrayElementLength.cs", "return pair.values.Length;", 16, "pair.values.Length == 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3931,7 +3931,7 @@ internal class TestClass
         return pair.values.GetLength(1);
     }
 }", "TupleMultidimensionalArrayElementGetLength.cs", "return pair.values.GetLength(1);", 16, "pair.values.GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3939,7 +3939,7 @@ internal class TestClass
         return ((int[,])new int[2, 3]).GetLength(1);
     }
 }", "CastedMultidimensionalArrayGetLength.cs", "return ((int[,])new int[2, 3]).GetLength(1);", 16, "((int[,])new int[2, 3]).GetLength(1) == 3", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -3949,7 +3949,7 @@ internal class TestClass
         return values.Length + text.Length;
     }
 }", "TupleDeconstructedArrayLength.cs", "return values.Length + text.Length;", 16, "values.Length == 2 && text.Length == 3", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -3967,7 +3967,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "DivergentIfElseMergedImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -3987,7 +3987,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "MutatedIfElseMergedImplication.cs", "return 10 / divisor;", 18, "divisor == 1", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesImplicitElseMergedImplication", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesImplicitElseMergedImplication", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -4007,7 +4007,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownHasValueNullableCoalesceAssignmentValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_PreservesKnownHasValueNullableCoalesceAssignmentValue()
     {
         const string source = @"
 internal class TestClass
@@ -4019,7 +4019,7 @@ internal class TestClass
         return maybe.Value;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "KnownHasValueNullableCoalesceAssignmentValue.cs",
             FindLine(source, "return maybe.Value;"),
@@ -4033,7 +4033,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullableCoalesceAssignmentNoValueBranchUnreachable()
+        SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesNullableCoalesceAssignmentNoValueBranchUnreachable()
     {
         const string source = @"
 internal class TestClass
@@ -4049,7 +4049,7 @@ internal class TestClass
         return maybe.Value;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "NullableCoalesceAssignmentNoValueBranch.cs",
             FindLine(source, "return 0;"),
@@ -4063,7 +4063,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsConditionalThrowAssignmentFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsConditionalThrowAssignmentFacts()
     {
         const string source = @"
 using System;
@@ -4081,7 +4081,7 @@ internal class TestClass
         return safe.Length;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceConditionalThrowFacts.cs",
             FindLine(source, "if (safe == null)"),
@@ -4095,10 +4095,10 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsPatternVariableBindingFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsPatternVariableBindingFacts()
     {
         const string source = SemanticOracleTestSources.RelationalPatternBoundNonZeroDivisor;
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourcePatternBindingFacts.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4111,10 +4111,10 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsPropertyPatternVariableBindingFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsPropertyPatternVariableBindingFacts()
     {
         const string source = SemanticOracleTestSources.PropertyPatternBoundNonZeroLength;
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourcePropertyPatternBindingFacts.cs",
             FindLine(source, "return 10 / length;"),
@@ -4127,10 +4127,10 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsListPatternElementBindingFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsListPatternElementBindingFacts()
     {
         const string source = SemanticOracleTestSources.ListPatternFirstElementNonZeroDivisor;
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceListPatternElementBindingFacts.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4146,10 +4146,10 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_CollectsTrailingListPatternElementBindingFacts()
+    public void SymbolicQueryExecutor_QuerySource_CollectsTrailingListPatternElementBindingFacts()
     {
         const string source = SemanticOracleTestSources.ListPatternTrailingElementNonZeroDivisor;
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceTrailingListPatternElementBindingFacts.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4165,10 +4165,10 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_ProvesArrayElementReadFromListPatternFacts()
+    public void SymbolicQueryExecutor_QuerySource_ProvesArrayElementReadFromListPatternFacts()
     {
         const string source = SemanticOracleTestSources.ArrayElementReadFromListPatternNonZeroDivisor;
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceArrayElementReadFromListPatternFacts.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4184,7 +4184,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_QuerySource_UsesArrayElementWriteFactAfterElementMutation()
+    public void SymbolicQueryExecutor_QuerySource_UsesArrayElementWriteFactAfterElementMutation()
     {
         const string source = @"
 internal class TestClass
@@ -4201,7 +4201,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var result = new SymbolicSourceQueryService().QuerySource(
+        var result = new SymbolicQueryExecutor().QuerySource(
             source,
             "QuerySourceArrayElementWriteThenRead.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4272,10 +4272,10 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayFromEndElementAssignedNonZeroValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesInlineFiniteArrayFromEndElementAssignedNonZeroValue()
     {
         const string source = SemanticOracleTestSources.InlineFiniteArrayFromEndElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "InlineFiniteArrayFromEndElementAssignedNonZeroValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4289,10 +4289,10 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayFromEndElementAssignedNonZeroValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesPriorFiniteArrayFromEndElementAssignedNonZeroValue()
     {
         const string source = SemanticOracleTestSources.PriorFiniteArrayFromEndElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PriorFiniteArrayFromEndElementAssignedNonZeroValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4306,10 +4306,10 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFiniteArrayElementAssignedNonZeroValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalFiniteArrayElementAssignedNonZeroValue()
     {
         const string source = SemanticOracleTestSources.ConditionalFiniteArrayElementNonZeroDivisor;
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ConditionalFiniteArrayElementAssignedNonZeroValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4323,7 +4323,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementAfterUnknownReassignment()
+        SymbolicQueryExecutor_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementAfterUnknownReassignment()
     {
         const string source = @"
 internal class TestClass
@@ -4336,7 +4336,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ReassignedFiniteArrayElementAssignedValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4350,7 +4350,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementFromTargetSelfReference()
+        SymbolicQueryExecutor_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementFromTargetSelfReference()
     {
         const string source = @"
 internal class TestClass
@@ -4363,7 +4363,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "SelfReferencingFiniteArrayElementAssignedValue.cs",
             FindLine(source, "return 10 / divisor;"),
@@ -4498,7 +4498,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotCollapseDivergentIfElseToSingleValue()
+    public void SymbolicQueryExecutor_ProveConditionAtSource_DoesNotCollapseDivergentIfElseToSingleValue()
     {
         const string source = @"
 internal class TestClass
@@ -4518,7 +4518,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }";
-        var service = new SymbolicSourceQueryService();
+        var service = new SymbolicQueryExecutor();
         var divisorIsOne = service.ProveConditionAtSource(
             source,
             "DivergentIfElseSingleValue.cs",
@@ -4586,7 +4586,7 @@ internal class TestClass
 
     private static readonly SourceProofCase[] SingleProofCaseDataPart4 =
     {
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNullGuardNoValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableNullGuardNoValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -4599,7 +4599,7 @@ internal class TestClass
         return value.Value;
     }
 }", "NullableNullGuardNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -4612,7 +4612,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableIsNotNullPatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesFreshObjectAssignmentNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesFreshObjectAssignmentNonNull", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -4621,7 +4621,7 @@ internal class TestClass
         return value.GetHashCode();
     }
 }", "FreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFreshObjectAssignmentNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalFreshObjectAssignmentNonNull", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -4630,7 +4630,7 @@ internal class TestClass
         return value.GetHashCode();
     }
 }", "ConditionalFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedFreshObjectAssignmentNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalescedFreshObjectAssignmentNonNull", @"
 internal class TestClass
 {
     public int TestMethod(object input)
@@ -4639,7 +4639,7 @@ internal class TestClass
         return value.GetHashCode();
     }
 }", "CoalescedFreshObjectAssignmentNonNull.cs", "return value.GetHashCode();", 16, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalArrayLength", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -4648,7 +4648,7 @@ internal class TestClass
         return values.Length;
     }
 }", "ConditionalArrayLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -4661,7 +4661,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableGreaterThanGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesRecursivePatternAliasMemberFact", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesRecursivePatternAliasMemberFact", @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -4674,7 +4674,7 @@ internal class TestClass
         return 0;
     }
 }", "RecursivePatternAliasMemberFact.cs", "return text.Length;", 20, "text != null && text.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact", ExtendedPropertyPatternSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact", ExtendedPropertyPatternSource + @"
 internal class TestClass
 {
     public int TestMethod(ExtendedPatternBox box)
@@ -4687,7 +4687,7 @@ internal class TestClass
         return 0;
     }
 }", "ExtendedPropertyPatternMemberFact.cs", "return box.Child.Value;", 20, "box.Child != null && box.Child.Value > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -4700,7 +4700,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableNotNullGuardHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementMergedImplication", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchStatementMergedImplication", @"
 internal class TestClass
 {
     public int TestMethod(int mode)
@@ -4722,7 +4722,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "SwitchStatementMergedImplication.cs", "return 10 / divisor;", 24, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotMergeSwitchStatementWithoutDefault", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotMergeSwitchStatementWithoutDefault", @"
 internal class TestClass
 {
     public int TestMethod(int mode)
@@ -4741,7 +4741,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "SwitchStatementNoDefault.cs", "return 10 / divisor;", 21, "divisor != 0", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion", @"
 internal class TestClass
 {
     public int TestMethod(int value)
@@ -4755,7 +4755,7 @@ internal class TestClass
         return 10 / value;
     }
 }", "SwitchStatementExitingSectionExclusion.cs", "return 10 / value;", 13, "value != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_SwitchExitExclusionSubstitutesPatternBindingInGuard", @"
+        new("SymbolicQueryExecutor_SwitchExitExclusionSubstitutesPatternBindingInGuard", @"
 internal class TestClass
 {
     public int TestMethod(int value)
@@ -4771,7 +4771,7 @@ internal class TestClass
         return value;
     }
 }", "SwitchPatternBindingExitExclusion.cs", "return value;", 9, "value <= 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionFalse", @"
 internal class TestClass
 {
     public int TestMethod(int value)
@@ -4784,7 +4784,7 @@ internal class TestClass
         return 1;
     }
 }", "ProveConditionFalse.cs", "return value;", 13, "value != 0", SymbolicTruthValue.ProvenFalse),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral", @"
 internal class TestClass
 {
     public int TestMethod(string value)
@@ -4793,7 +4793,7 @@ internal class TestClass
         return value.Length;
     }
 }", "CoalesceAssignmentNonNullLiteral.cs", "return value.Length;", 16, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -4808,7 +4808,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "MutatedImplicitElseMergedImplication.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -4823,7 +4823,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "MutatedImplicitElseIdenticalFact.cs", "return 10 / divisor;", 15, "divisor == 1", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength", @"
 internal class TestClass
 {
     public int TestMethod(string text, int start, int length)
@@ -4836,7 +4836,7 @@ internal class TestClass
         return 0;
     }
 }", "StringSubstringTwoArgumentResultLength.cs", "return text.Substring(start, length).Length;", 20, "text.Substring(start, length).Length == length", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength", @"
 using System;
 
 internal class TestClass
@@ -4851,7 +4851,7 @@ internal class TestClass
         return 0;
     }
 }", "StringAsSpanOneArgumentResultLength.cs", "return text.AsSpan(start).Length;", 20, "text.AsSpan(start).Length == text.Length - start", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength", @"
 using System;
 
 internal class TestClass
@@ -4866,7 +4866,7 @@ internal class TestClass
         return 0;
     }
 }", "ReadOnlySpanSliceTwoArgumentResultLength.cs", "return values.Slice(start, length).Length;", 20, "values.Slice(start, length).Length == length", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength", @"
 using System;
 
 internal class TestClass
@@ -4883,7 +4883,7 @@ internal class TestClass
         return 0;
     }
 }", "AssignedRangeElementAccessResultLength.cs", "return slice.Length;", 20, "slice.Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesWhileNormalExitImplication", @"
 internal class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -4896,7 +4896,7 @@ internal class TestClass
         return index;
     }
 }", "ProveConditionWhileExit.cs", "return index;", 13, "index >= values.Length", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesEnumImplication", SemanticOracleTestSources.ModeEnum + @"public class TestClass
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesEnumImplication", SemanticOracleTestSources.ModeEnum + @"public class TestClass
 {
     public int TestMethod(Mode state)
     {
@@ -4908,7 +4908,7 @@ internal class TestClass
         return 0;
     }
 }", "ProveConditionEnum.cs", "return 1;", 13, "state != Mode.None", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchExpressionValueImplication", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchExpressionValueImplication", @"
 internal class TestClass
 {
     public int TestMethod(int mode)
@@ -4923,7 +4923,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "SwitchExpressionValueImplication.cs", "return 10 / divisor;", 16, "divisor != 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback", @"
 internal class TestClass
 {
     public int TestMethod(int mode)
@@ -4937,7 +4937,7 @@ internal class TestClass
         return 10 / divisor;
     }
 }", "SwitchExpressionNoFallback.cs", "return 10 / divisor;", 15, "divisor != 0", SymbolicTruthValue.Unknown),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int divisor)
@@ -4950,7 +4950,7 @@ internal class TestClass
         return 0;
     }
 }", "SwitchStatementSourcePredicateExactValue.cs", "return 10 / divisor;", 13, "divisor == 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(int value)
@@ -4963,7 +4963,7 @@ internal class TestClass
         return 0;
     }
 }", "SwitchStatementPatternSourcePredicateRange.cs", "return value;", 13, "value > 0 && value < 10", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanPropertyImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSourceBooleanPropertyImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
@@ -4976,7 +4976,7 @@ internal class TestClass
         return 0;
     }
 }", "SourceBooleanPropertyImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesSourceBooleanGetterLocalAliasExactValue", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesSourceBooleanGetterLocalAliasExactValue", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
@@ -4989,7 +4989,7 @@ internal class TestClass
         return 0;
     }
 }", "SourceBooleanGetterLocalAliasExactValue.cs", "return 10 / box.Divisor;", 13, "box.Divisor == 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications", SourcePredicateSource + @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications", SourcePredicateSource + @"
 internal class TestClass
 {
     public int TestMethod(SourcePredicateBox box)
@@ -5002,7 +5002,7 @@ internal class TestClass
         return 0;
     }
 }", "InstanceSourceBooleanMethodImplications.cs", "return box.Value.Length;", 13, "box.Value != null && box.Value.Length > 0", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesArrayRangeResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesArrayRangeResultLength", @"
 internal class TestClass
 {
     public int TestMethod(int[] values)
@@ -5015,7 +5015,7 @@ internal class TestClass
         return 0;
     }
 }", "ArrayRangeResultLength.cs", "return values[1..^1].Length;", 20, "values[1..^1].Length == values.Length - 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringRangeResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesStringRangeResultLength", @"
 internal class TestClass
 {
     public int TestMethod(string text)
@@ -5028,7 +5028,7 @@ internal class TestClass
         return 0;
     }
 }", "StringRangeResultLength.cs", "return text[1..^1].Length;", 20, "text[1..^1].Length == text.Length - 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength", @"
 internal class TestClass
 {
     public int TestMethod(string text, int start)
@@ -5041,7 +5041,7 @@ internal class TestClass
         return 0;
     }
 }", "StringSubstringOneArgumentResultLength.cs", "return text.Substring(start).Length;", 20, "text.Substring(start).Length == text.Length - start", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -5050,7 +5050,7 @@ internal class TestClass
         return values.Length;
     }
 }", "ConditionalArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == 1 || values.Length == 2", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayFallbackLength", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalescedArrayFallbackLength", @"
 internal class TestClass
 {
     public int TestMethod(int[] input)
@@ -5064,7 +5064,7 @@ internal class TestClass
         return values.Length;
     }
 }", "CoalescedArrayFallbackLength.cs", "return values.Length;", 16, "values.Length == 1", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalescedArrayLengthDisjunction", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalescedArrayLengthDisjunction", @"
 internal class TestClass
 {
     public int TestMethod(int[] input)
@@ -5073,7 +5073,7 @@ internal class TestClass
         return values.Length;
     }
 }", "CoalescedArrayLengthDisjunction.cs", "return values.Length;", 16, "values.Length == input.Length || values.Length == 1", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -5082,7 +5082,7 @@ internal class TestClass
         return value.Value;
     }
 }", "NullableLiteralAssignmentFacts.cs", "return value.Value;", 16, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -5095,7 +5095,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableEqualsConstantGuardValue.cs", "return value.Value;", 20, "value.HasValue && value.Value == 5", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -5108,7 +5108,7 @@ internal class TestClass
         return value.Value;
     }
 }", "NullableIsNullPatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRecursivePatternHasValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableRecursivePatternHasValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -5121,7 +5121,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableRecursivePatternHasValue.cs", "return value.Value;", 20, "value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotRecursivePatternNoValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableNotRecursivePatternNoValue", @"
 internal class TestClass
 {
     public int TestMethod(int? value)
@@ -5134,7 +5134,7 @@ internal class TestClass
         return value.Value;
     }
 }", "NullableNotRecursivePatternNoValue.cs", "return 0;", 20, "!value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue", @"
 internal class TestClass
 {
     public int TestMethod(bool flag)
@@ -5148,7 +5148,7 @@ internal class TestClass
         return 0;
     }
 }", "GuardedConditionalNullableFacts.cs", "return value.Value;", 16, "value.HasValue", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullSourceResultNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesAsExpressionNullSourceResultNull", @"
 internal class TestClass
 {
     public string TestMethod()
@@ -5158,7 +5158,7 @@ internal class TestClass
         return text;
     }
 }", "AsExpressionNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesSourceNonNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesSourceNonNull", @"
 internal class TestClass
 {
     public string TestMethod(object value)
@@ -5172,7 +5172,7 @@ internal class TestClass
         return string.Empty;
     }
 }", "AsExpressionNonNullResultImpliesSourceNonNull.cs", "return text;", 20, "value != null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullableValueWhenPresent", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalAccessNullableValueWhenPresent", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -5187,7 +5187,7 @@ internal class TestClass
         return 0;
     }
 }", "ConditionalAccessNullableValueWhenPresent.cs", "return length.Value;", 20, "length.Value == 3", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -5201,7 +5201,7 @@ internal class TestClass
         return 0;
     }
 }", "NullableDeclarationPatternBinding.cs", "return value;", 20, "value == 5", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRelationalPattern", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableRelationalPattern", @"
 internal class TestClass
 {
     public int TestMethod()
@@ -5210,7 +5210,7 @@ internal class TestClass
         return maybe.GetValueOrDefault();
     }
 }", "NullableRelationalPattern.cs", "return maybe.GetValueOrDefault();", 16, "maybe is > 3 and < 10", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull", @"
 internal sealed class Holder
 {
     public string Text;
@@ -5225,7 +5225,7 @@ internal class TestClass
         return text;
     }
 }", "ConditionalAccessReferenceNullSourceResultNull.cs", "return text;", 16, "text == null", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull", @"
 internal class TestClass
 {
     public string TestMethod(string value, string fallback)
@@ -5234,7 +5234,7 @@ internal class TestClass
         return result;
     }
 }", "CoalesceNullResultImpliesOperandsNull.cs", "return result;", 16, "result != null || (value == null && fallback == null)", SymbolicTruthValue.ProvenTrue),
-        new("SymbolicSourceQueryService_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown", @"
+        new("SymbolicQueryExecutor_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown", @"
 internal sealed class Holder
 {
     public string GetText() => null;
@@ -5284,7 +5284,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesRuntimeTypePredicate()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesRuntimeTypePredicate()
     {
         const string source = @"
 internal class TestClass
@@ -5300,7 +5300,7 @@ internal class TestClass
         return string.Empty;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "AsExpressionNonNullResultImpliesRuntimeTypePredicate.cs",
             FindLine(source, "return text;"),
@@ -5314,7 +5314,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesAsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
     {
         const string source = @"
 internal class TestClass
@@ -5330,7 +5330,7 @@ internal class TestClass
         return text;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "AsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate.cs",
             FindLine(source, "return string.Empty;"),
@@ -5344,7 +5344,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesInlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate()
     {
         const string source = @"
 internal class TestClass
@@ -5360,7 +5360,7 @@ internal class TestClass
         return string.Empty;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "InlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate.cs",
             FindLine(source, "return text;"),
@@ -5374,7 +5374,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesInlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
     {
         const string source = @"
 internal class TestClass
@@ -5390,7 +5390,7 @@ internal class TestClass
         return text;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "InlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate.cs",
             FindLine(source, "return string.Empty;"),
@@ -5404,7 +5404,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
     {
         const string source = @"
 internal class TestClass
@@ -5416,7 +5416,7 @@ internal class TestClass
         return length.GetValueOrDefault();
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ConditionalAccessNullSourceNullableResultHasNoValue.cs",
             FindLine(source, "return length.GetValueOrDefault();"),
@@ -5430,7 +5430,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessHasValueImpliesReceiverNonNull()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalAccessHasValueImpliesReceiverNonNull()
     {
         const string source = @"
 internal class TestClass
@@ -5446,7 +5446,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ConditionalAccessHasValueImpliesReceiverNonNull.cs",
             FindLine(source, "return length.Value;"),
@@ -5462,7 +5462,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNonNull()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNonNull()
     {
         const string source = @"
 internal class TestClass
@@ -5474,7 +5474,7 @@ internal class TestClass
         return length;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "NullableCoalesceFromConditionalAccessWhenReceiverNonNull.cs",
             FindLine(source, "return length;"),
@@ -5488,7 +5488,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessArrayElement()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessArrayElement()
     {
         const string source = @"
 internal class TestClass
@@ -5504,7 +5504,7 @@ internal class TestClass
         return 0;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "NullableCoalesceFromConditionalAccessArrayElement.cs",
             FindLine(source, "return item;"),
@@ -5518,7 +5518,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNull()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNull()
     {
         const string source = @"
 internal class TestClass
@@ -5530,7 +5530,7 @@ internal class TestClass
         return length;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "NullableCoalesceFromConditionalAccessWhenReceiverNull.cs",
             FindLine(source, "return length;"),
@@ -5552,7 +5552,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalExpressionNullResultImpliesSelectedBranchNull()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalExpressionNullResultImpliesSelectedBranchNull()
     {
         const string source = @"
 internal class TestClass
@@ -5564,7 +5564,7 @@ internal class TestClass
     }
 }";
         var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ConditionalExpressionNullResultImpliesSelectedBranchNull.cs",
             FindLine(source, "return result;"),
@@ -5579,7 +5579,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessMemberNullFacts()
+    public void SymbolicQueryExecutor_ProveConditionAtSource_ProvesConditionalAccessMemberNullFacts()
     {
         const string source = @"
 internal sealed class Holder
@@ -5596,7 +5596,7 @@ internal class TestClass
     }
 }";
         var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ConditionalAccessMemberNullFacts.cs",
             FindLine(source, "return text;"),
@@ -5611,7 +5611,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesConditionalAccessMemberNullContradiction()
+    public void SymbolicQueryExecutor_AnalyzeSource_WithSmt_ClassifiesConditionalAccessMemberNullContradiction()
     {
         const string source = @"
 internal sealed class Holder
@@ -5632,7 +5632,7 @@ internal class TestClass
         return text;
     }
 }";
-        var result = new SymbolicSourceQueryService().AnalyzeSource(
+        var result = new SymbolicQueryExecutor().AnalyzeSource(
             source,
             "ConditionalAccessMemberNullContradiction.cs",
             FindLine(source, "return text;"),
@@ -5645,7 +5645,7 @@ internal class TestClass
 
     [Test]
     public void
-        SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentConditionalAccessNullImplication()
+        SymbolicQueryExecutor_ProveConditionAtSource_ProvesCoalesceAssignmentConditionalAccessNullImplication()
     {
         const string source = @"
 internal sealed class Holder
@@ -5662,7 +5662,7 @@ internal class TestClass
         return target;
     }
 }";
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "CoalesceAssignmentConditionalAccessNullImplication.cs",
             FindLine(source, "return target;"),

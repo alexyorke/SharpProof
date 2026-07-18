@@ -55,11 +55,14 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Deleted the 170-line `SymbolicQueryService` pass-through. Analyzer, CLI,
   session, and retained tests now use the same `SymbolicQueryExecutor`; the
   architecture test verifies that the legacy facade type is absent.
+- [x] Deleted the 243-line `SymbolicSourceQueryService` facade. Query dispatchers
+  now own the program-point, range, and proof components directly; retained
+  source-query tests use executor-based helpers in `SharpProof.Testing`.
 
 ## Current evidence
 
-- Maintained production: 107,198 lines; net reduction: 428 lines; remaining
-  reduction: 19,572. The first six deletion slices removed 705 production
+- Maintained production: 107,018 lines; net reduction: 608 lines; remaining
+  reduction: 19,392. The first seven deletion slices removed 885 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -74,6 +77,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Migrate the next test-only Symbolic source or invariant entry points to the
-executor/session pipeline, preserving differential coverage before deleting
-the superseded facade methods.
+Migrate test-only `SymbolicInvariantService` entry points and formatting
+projections to executor-owned snapshots or focused projection components;
+delete each superseded method with its adapter.

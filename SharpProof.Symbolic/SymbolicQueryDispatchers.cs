@@ -8,11 +8,12 @@ namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicConditionProofDispatcher
 {
-    private readonly SymbolicSourceQueryService _service;
+    private readonly SymbolicConditionProofEngine _conditionProofEngine;
 
-    internal SymbolicConditionProofDispatcher(SymbolicSourceQueryService service)
+    internal SymbolicConditionProofDispatcher(SymbolicConditionProofEngine conditionProofEngine)
     {
-        _service = service ?? throw new ArgumentNullException(nameof(service));
+        _conditionProofEngine = conditionProofEngine ??
+                                throw new ArgumentNullException(nameof(conditionProofEngine));
     }
 
     internal SymbolicConditionProofResult Prove(
@@ -31,7 +32,7 @@ internal sealed class SymbolicConditionProofDispatcher
             request.Options,
             SymbolicSourceCompilationKind.Query,
             "Condition proof source kind is not supported.",
-            (syntaxTree, compilation, target, token) => _service.ProveConditionAtSyntaxTree(
+            (syntaxTree, compilation, target, token) => _conditionProofEngine.ProveAtSyntaxTree(
                 syntaxTree,
                 compilation,
                 target.Line!.Value,
@@ -52,7 +53,7 @@ internal sealed class SymbolicConditionProofDispatcher
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken)
     {
-        return _service.ProveConditionAtSyntaxNode(
+        return _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,
@@ -71,7 +72,7 @@ internal sealed class SymbolicConditionProofDispatcher
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken)
     {
-        return _service.ProveConditionAtSyntaxNode(
+        return _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,
@@ -85,15 +86,22 @@ internal sealed class SymbolicConditionProofDispatcher
 
 internal sealed class SymbolicSourceQueryDispatcher
 {
+    private readonly SymbolicConditionProofEngine _conditionProofEngine;
     private readonly SymbolicInvariantService _invariantService;
-    private readonly SymbolicSourceQueryService _sourceQueryService;
+    private readonly SymbolicSourceProgramPointExecutor _programPointExecutor;
+    private readonly SymbolicSourceRangeQueryExecutor _rangeQueryExecutor;
 
     internal SymbolicSourceQueryDispatcher(
         SymbolicInvariantService invariantService,
-        SymbolicSourceQueryService sourceQueryService)
+        SymbolicSourceProgramPointExecutor programPointExecutor,
+        SymbolicSourceRangeQueryExecutor rangeQueryExecutor,
+        SymbolicConditionProofEngine conditionProofEngine)
     {
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
-        _sourceQueryService = sourceQueryService ?? throw new ArgumentNullException(nameof(sourceQueryService));
+        _programPointExecutor = programPointExecutor ?? throw new ArgumentNullException(nameof(programPointExecutor));
+        _rangeQueryExecutor = rangeQueryExecutor ?? throw new ArgumentNullException(nameof(rangeQueryExecutor));
+        _conditionProofEngine = conditionProofEngine ??
+                                throw new ArgumentNullException(nameof(conditionProofEngine));
     }
 
     internal SymbolicQueryResult Query(
@@ -135,31 +143,58 @@ internal sealed class SymbolicSourceQueryDispatcher
     {
         return target.Kind switch
         {
-            SharpProofTargetKind.Point => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLinePoint(
+            SharpProofTargetKind.Point => SymbolicQueryResult.From(_rangeQueryExecutor.QueryLinePoint(
                 syntaxTree, compilation, target.Line!.Value, target.Column ?? 1, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts)),
-            SharpProofTargetKind.Position => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAtPosition(
-                syntaxTree, compilation, target.Position!.Value, cancellationToken,
-                options.SmtAnalysis, options.ImpliedConditions)),
-            SharpProofTargetKind.Line => _sourceQueryService.QuerySyntaxTreeLine(
+            SharpProofTargetKind.Position => SymbolicQueryResult.From(QueryPosition(
+                syntaxTree, compilation, target.Position!.Value, options, cancellationToken)),
+            SharpProofTargetKind.Line => _rangeQueryExecutor.QueryLine(
                 syntaxTree, compilation, target.Line!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SharpProofTargetKind.Span => _sourceQueryService.QuerySyntaxTreeSpan(
+            SharpProofTargetKind.Span => _rangeQueryExecutor.QuerySpan(
                 syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SharpProofTargetKind.LineSpan => _sourceQueryService.QuerySyntaxTreeLineSpan(
+            SharpProofTargetKind.LineSpan => _rangeQueryExecutor.QueryLineSpan(
                 syntaxTree, compilation, target.StartLine!.Value, target.StartColumn!.Value,
                 target.EndLine!.Value, target.EndColumn!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SharpProofTargetKind.AllLines => _sourceQueryService.QuerySyntaxTreeAllLines(
+            SharpProofTargetKind.AllLines => _rangeQueryExecutor.QueryAllLines(
                 syntaxTree, compilation, cancellationToken, options.SmtAnalysis, options.ImpliedConditions,
                 options.IncludeExpressionProgramPoints, options.IncludeCurrentStatementCompletionFacts),
             _ => throw new NotSupportedException("Target kind is not supported for syntax tree queries.")
         };
+    }
+
+    private SymbolicProgramPointResult QueryPosition(
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int position,
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
+    {
+        var query = _programPointExecutor.AnalyzeAtPosition(
+            syntaxTree,
+            compilation,
+            position,
+            options.SmtAnalysis,
+            cancellationToken);
+        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+            syntaxTree,
+            position,
+            cancellationToken,
+            true);
+        return _programPointExecutor.Project(
+            syntaxTree,
+            query,
+            lineColumn.Line,
+            lineColumn.Column,
+            options.ImpliedConditions,
+            options.SmtAnalysis,
+            cancellationToken);
     }
 
     private SymbolicQueryResult QueryNode(
@@ -203,7 +238,7 @@ internal sealed class SymbolicSourceQueryDispatcher
 
         return conditionTexts
             .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => _sourceQueryService.ProveConditionAtAnalysis(
+            .Select(condition => _conditionProofEngine.ProveAtAnalysis(
                 semanticModel, node, analysis, condition,
                 smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
                 cancellationToken))

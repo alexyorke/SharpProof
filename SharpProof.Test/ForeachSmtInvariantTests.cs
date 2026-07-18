@@ -12,7 +12,7 @@ namespace SharpProof.Test;
 public sealed class ForeachSmtInvariantTests
 {
     [Test]
-    public void SymbolicSourceQueryService_ProvesFiniteForeachReferenceElementNonNull()
+    public void SymbolicQueryExecutor_ProvesFiniteForeachReferenceElementNonNull()
     {
         const string source = @"
 public class TestClass
@@ -28,7 +28,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "FiniteForeachReferenceElementNonNull.cs",
             FindLine(source, "return value.Length;"),
@@ -41,7 +41,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_DoesNotProveFiniteForeachReferenceElementNonNullWhenNullIsPossible()
+    public void SymbolicQueryExecutor_DoesNotProveFiniteForeachReferenceElementNonNullWhenNullIsPossible()
     {
         const string source = @"
 public class TestClass
@@ -57,7 +57,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "FiniteForeachReferenceElementMaybeNull.cs",
             FindLine(source, "return value == null ? 0 : value.Length;"),
@@ -70,7 +70,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesPriorAssignedFiniteForeachReferenceElementNonNull()
+    public void SymbolicQueryExecutor_ProvesPriorAssignedFiniteForeachReferenceElementNonNull()
     {
         const string source = @"
 public class TestClass
@@ -87,7 +87,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PriorAssignedFiniteForeachReferenceElementNonNull.cs",
             FindLine(source, "return value.GetHashCode();"),
@@ -100,7 +100,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesPriorAssignedFiniteForeachArrayElementAtomsNonZero()
+    public void SymbolicQueryExecutor_ProvesPriorAssignedFiniteForeachArrayElementAtomsNonZero()
     {
         const string source = @"
 public class TestClass
@@ -118,7 +118,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PriorAssignedFiniteForeachArrayElementAtomsNonZero.cs",
             FindLine(source, "return value;"),
@@ -131,7 +131,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesPriorAssignedFiniteForeachTupleElementAtomsNonZero()
+    public void SymbolicQueryExecutor_ProvesPriorAssignedFiniteForeachTupleElementAtomsNonZero()
     {
         const string source = @"
 public class TestClass
@@ -149,7 +149,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PriorAssignedFiniteForeachTupleElementAtomsNonZero.cs",
             FindLine(source, "return value;"),
@@ -162,7 +162,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_DoesNotReevaluatePriorAssignedForeachCapturedLocalAfterMutation()
+    public void SymbolicQueryExecutor_DoesNotReevaluatePriorAssignedForeachCapturedLocalAfterMutation()
     {
         const string source = @"
 public class TestClass
@@ -181,7 +181,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PriorAssignedFiniteForeachCapturedLocalAfterMutation.cs",
             FindLine(source, "return value;"),
@@ -194,7 +194,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesCompletedForeachReceiverNonNull()
+    public void SymbolicQueryExecutor_ProvesCompletedForeachReceiverNonNull()
     {
         const string source = @"
 public class TestClass
@@ -209,7 +209,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "CompletedForeachReceiverNonNull.cs",
             FindLine(source, "return values.Length;"),
@@ -222,7 +222,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_DoesNotProveCompletedForeachReceiverNonNullWhenBodyReassignsReceiver()
+    public void SymbolicQueryExecutor_DoesNotProveCompletedForeachReceiverNonNullWhenBodyReassignsReceiver()
     {
         const string source = @"
 public class TestClass
@@ -238,7 +238,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "CompletedForeachReceiverMaybeNull.cs",
             FindLine(source, "return values == null ? 0 : values.Length;"),
@@ -251,7 +251,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesForeachCoalesceThrowReceiverNonNullInBody()
+    public void SymbolicQueryExecutor_ProvesForeachCoalesceThrowReceiverNonNullInBody()
     {
         const string source = @"
 public class TestClass
@@ -267,7 +267,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ForeachCoalesceThrowReceiverNonNull.cs",
             FindLine(source, "return values.Length;"),
@@ -280,7 +280,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesForeachConditionalThrowReceiverGuardInBody()
+    public void SymbolicQueryExecutor_ProvesForeachConditionalThrowReceiverGuardInBody()
     {
         const string source = @"
 public class TestClass
@@ -296,7 +296,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ForeachConditionalThrowReceiverGuard.cs",
             FindLine(source, "return enabled ? values.Length : 0;"),
@@ -309,7 +309,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ForeachCoalesceThrowReceiverFactYieldsToBodyMutation()
+    public void SymbolicQueryExecutor_ForeachCoalesceThrowReceiverFactYieldsToBodyMutation()
     {
         const string source = @"
 public class TestClass
@@ -326,7 +326,7 @@ public class TestClass
     }
 }";
 
-        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+        var proof = new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "ForeachCoalesceThrowReceiverMutation.cs",
             FindLine(source, "return values == null ? 0 : values.Length;"),

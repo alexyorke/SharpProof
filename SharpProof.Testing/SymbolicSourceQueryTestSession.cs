@@ -8,7 +8,7 @@ namespace SharpProof.Test;
 internal sealed class SymbolicSourceQueryTestSession : IDisposable
 {
     private readonly Compilation _compilation;
-    private readonly SymbolicSourceQueryService _service = new();
+    private readonly SymbolicQueryExecutor _service = new();
     private readonly SmtAnalysisService _smtAnalysis;
     private readonly SyntaxTree _syntaxTree;
 

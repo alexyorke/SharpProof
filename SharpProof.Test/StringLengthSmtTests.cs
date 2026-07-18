@@ -11,7 +11,7 @@ namespace SharpProof.Test;
 public sealed class StringLengthSmtTests
 {
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringRemoveStartResultLength()
+    public void SymbolicQueryExecutor_ProvesStringRemoveStartResultLength()
     {
         const string source = @"
 public class TestClass
@@ -34,7 +34,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringRemoveRangeResultLength()
+    public void SymbolicQueryExecutor_ProvesStringRemoveRangeResultLength()
     {
         const string source = @"
 public class TestClass
@@ -57,7 +57,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringInsertResultLength()
+    public void SymbolicQueryExecutor_ProvesStringInsertResultLength()
     {
         const string source = @"
 public class TestClass
@@ -80,7 +80,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringPadResultLengths()
+    public void SymbolicQueryExecutor_ProvesStringPadResultLengths()
     {
         const string source = @"
 public class TestClass
@@ -127,7 +127,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesSpanSliceStartResultLength()
+    public void SymbolicQueryExecutor_ProvesSpanSliceStartResultLength()
     {
         const string source = @"
 public class TestClass
@@ -150,7 +150,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesReadOnlySpanSliceRangeResultLength()
+    public void SymbolicQueryExecutor_ProvesReadOnlySpanSliceRangeResultLength()
     {
         const string source = @"
 public class TestClass
@@ -173,7 +173,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesMemorySliceStartResultLength()
+    public void SymbolicQueryExecutor_ProvesMemorySliceStartResultLength()
     {
         const string source = @"
 public class TestClass
@@ -196,7 +196,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesReadOnlyMemorySliceRangeResultLength()
+    public void SymbolicQueryExecutor_ProvesReadOnlyMemorySliceRangeResultLength()
     {
         const string source = @"
 public class TestClass
@@ -219,7 +219,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringAsSpanAndAsMemoryResultLengths()
+    public void SymbolicQueryExecutor_ProvesStringAsSpanAndAsMemoryResultLengths()
     {
         const string source = @"
 using System;
@@ -272,7 +272,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesAssignedSpanLengthSnapshot()
+    public void SymbolicQueryExecutor_ProvesAssignedSpanLengthSnapshot()
     {
         const string source = @"
 public class TestClass
@@ -291,7 +291,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesAssignedReadOnlySpanSliceLengthSnapshot()
+    public void SymbolicQueryExecutor_ProvesAssignedReadOnlySpanSliceLengthSnapshot()
     {
         const string source = @"
 public class TestClass
@@ -315,7 +315,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesAssignedMemorySliceLengthSnapshots()
+    public void SymbolicQueryExecutor_ProvesAssignedMemorySliceLengthSnapshots()
     {
         const string source = @"
 public class TestClass
@@ -354,7 +354,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_UnsupportedSliceStartRemainsUnknown()
+    public void SymbolicQueryExecutor_UnsupportedSliceStartRemainsUnknown()
     {
         const string source = @"
 public class TestClass
@@ -382,7 +382,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringLiteralLengthConstant()
+    public void SymbolicQueryExecutor_ProvesStringLiteralLengthConstant()
     {
         const string source = @"
 public class TestClass
@@ -405,7 +405,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringRepeatCreationResultLength()
+    public void SymbolicQueryExecutor_ProvesStringRepeatCreationResultLength()
     {
         const string source = @"
 public class TestClass
@@ -428,7 +428,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringCharArrayCreationResultLengths()
+    public void SymbolicQueryExecutor_ProvesStringCharArrayCreationResultLengths()
     {
         const string source = @"
 using System;
@@ -481,7 +481,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringConcatResultLengths()
+    public void SymbolicQueryExecutor_ProvesStringConcatResultLengths()
     {
         const string source = @"
 public class TestClass
@@ -518,7 +518,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringInterpolationResultLengthWhenPartsAreStrings()
+    public void SymbolicQueryExecutor_ProvesStringInterpolationResultLengthWhenPartsAreStrings()
     {
         const string source = @"
 public class TestClass
@@ -541,7 +541,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesStringInterpolationLengthWithNameofConstant()
+    public void SymbolicQueryExecutor_ProvesStringInterpolationLengthWithNameofConstant()
     {
         const string source = @"
 public class TestClass
@@ -564,7 +564,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
+    public void SymbolicQueryExecutor_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
     {
         const string source = @"
 public class TestClass
@@ -601,7 +601,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
+    public void SymbolicQueryExecutor_UnsupportedStringTransformLengthsRemainUnknown()
     {
         const string source = @"
 public class TestClass
@@ -653,7 +653,7 @@ public class TestClass
 
     private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
     {
-        return new SymbolicSourceQueryService().ProveConditionAtSource(
+        return new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "StringLengthSmtTests.cs",
             SemanticOracleSmtTests.FindLine(source, sourceLine),

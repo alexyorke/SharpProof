@@ -11,7 +11,7 @@ namespace SharpProof.Test;
 public sealed class PathSensitiveSmtInvariantTests
 {
     [Test]
-    public void SymbolicSourceQueryService_ProvesRelationalPatternSnapshotAfterSourceReassignment()
+    public void SymbolicQueryExecutor_ProvesRelationalPatternSnapshotAfterSourceReassignment()
     {
         const string source = @"
 public class TestClass
@@ -38,7 +38,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesListSliceLengthSnapshotAfterSourceReassignment()
+    public void SymbolicQueryExecutor_ProvesListSliceLengthSnapshotAfterSourceReassignment()
     {
         const string source = @"
 public class TestClass
@@ -66,7 +66,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesCharListPatternElementFact()
+    public void SymbolicQueryExecutor_ProvesCharListPatternElementFact()
     {
         const string source = @"
 public class TestClass
@@ -90,7 +90,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesCharTuplePatternElementFact()
+    public void SymbolicQueryExecutor_ProvesCharTuplePatternElementFact()
     {
         const string source = @"
 public class TestClass
@@ -114,7 +114,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadFixedLengthLowerBound()
+    public void SymbolicQueryExecutor_ProvesCollectionExpressionSpreadFixedLengthLowerBound()
     {
         const string source = @"
 public class TestClass
@@ -133,7 +133,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_CollectionExpressionSpreadLowerBoundSurvivesSourceReassignment()
+    public void SymbolicQueryExecutor_CollectionExpressionSpreadLowerBoundSurvivesSourceReassignment()
     {
         const string source = @"
 public class TestClass
@@ -153,7 +153,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_CollectionExpressionSpreadFixedLengthIsNotExact()
+    public void SymbolicQueryExecutor_CollectionExpressionSpreadFixedLengthIsNotExact()
     {
         const string source = @"
 public class TestClass
@@ -172,7 +172,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesNullPatternSnapshotAfterSourceReassignment()
+    public void SymbolicQueryExecutor_ProvesNullPatternSnapshotAfterSourceReassignment()
     {
         const string source = @"
 public class TestClass
@@ -197,7 +197,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesTupleDeconstructionSnapshotAfterSourceReassignment()
+    public void SymbolicQueryExecutor_ProvesTupleDeconstructionSnapshotAfterSourceReassignment()
     {
         const string source = @"
 public class TestClass
@@ -220,7 +220,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesSwitchStatementPropertyPatternStructuralFact()
+    public void SymbolicQueryExecutor_ProvesSwitchStatementPropertyPatternStructuralFact()
     {
         const string source = @"
 public sealed class Box
@@ -251,7 +251,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesSwitchExpressionPropertyPatternStructuralFact()
+    public void SymbolicQueryExecutor_ProvesSwitchExpressionPropertyPatternStructuralFact()
     {
         const string source = @"
 public sealed class Box
@@ -280,7 +280,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesSwitchStatementPositionalPatternPartialStructuralFact()
+    public void SymbolicQueryExecutor_ProvesSwitchStatementPositionalPatternPartialStructuralFact()
     {
         const string source = @"
 public class TestClass
@@ -304,7 +304,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesSwitchExpressionListElementPartialStructuralFact()
+    public void SymbolicQueryExecutor_ProvesSwitchExpressionListElementPartialStructuralFact()
     {
         const string source = @"
 public sealed class Entry
@@ -333,7 +333,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_SwitchStatementDefaultExcludesTranslatedGuardedCase()
+    public void SymbolicQueryExecutor_SwitchStatementDefaultExcludesTranslatedGuardedCase()
     {
         const string source = @"
 public class TestClass
@@ -357,7 +357,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_SwitchStatementCharDefaultExcludesPriorCase()
+    public void SymbolicQueryExecutor_SwitchStatementCharDefaultExcludesPriorCase()
     {
         const string source = @"
 public class TestClass
@@ -382,7 +382,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_SwitchStatementFallbackUnknownGuardDoesNotExcludeCase()
+    public void SymbolicQueryExecutor_SwitchStatementFallbackUnknownGuardDoesNotExcludeCase()
     {
         const string source = @"
 public class TestClass
@@ -411,7 +411,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_SwitchExpressionFallbackUnknownGuardDoesNotExcludeArm()
+    public void SymbolicQueryExecutor_SwitchExpressionFallbackUnknownGuardDoesNotExcludeArm()
     {
         const string source = @"
 public class TestClass
@@ -559,7 +559,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesOneSidedReassignedLocalFactAfterJoin()
+    public void SymbolicQueryExecutor_ProvesOneSidedReassignedLocalFactAfterJoin()
     {
         const string source = @"
 public class TestClass
@@ -588,7 +588,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesOneSidedReassignedArrayLengthFactAfterJoin()
+    public void SymbolicQueryExecutor_ProvesOneSidedReassignedArrayLengthFactAfterJoin()
     {
         const string source = @"
 public class TestClass
@@ -645,7 +645,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesBranchDiscriminatorAssignmentRelationAfterJoin()
+    public void SymbolicQueryExecutor_ProvesBranchDiscriminatorAssignmentRelationAfterJoin()
     {
         const string source = @"
 public class TestClass
@@ -679,7 +679,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ProvesExhaustiveBooleanSwitchExpressionAssignmentRelationAfterJoin()
+    public void SymbolicQueryExecutor_ProvesExhaustiveBooleanSwitchExpressionAssignmentRelationAfterJoin()
     {
         const string source = @"
 public class TestClass
@@ -709,7 +709,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_ExcludesThrowingSwitchExpressionArmAfterNormalAssignmentCompletion()
+    public void SymbolicQueryExecutor_ExcludesThrowingSwitchExpressionArmAfterNormalAssignmentCompletion()
     {
         const string source = @"
 public class TestClass
@@ -733,7 +733,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryService_DoesNotTreatEnumSwitchWithoutDefaultAsExhaustive()
+    public void SymbolicQueryExecutor_DoesNotTreatEnumSwitchWithoutDefaultAsExhaustive()
     {
         const string source = @"
 public enum Choice
@@ -888,7 +888,7 @@ public class TestClass
     private static SymbolicProgramPointResult AnalyzeAtPosition(string source, int position)
     {
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+        return new SymbolicQueryExecutor().AnalyzeSourceAtPosition(
             source,
             "PathSensitiveSmtInvariantTests.cs",
             position,
@@ -902,7 +902,7 @@ public class TestClass
         string condition)
     {
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SymbolicSourceQueryService().ProveConditionAtSource(
+        return new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "PathSensitiveSmtInvariantTests.cs",
             marker.Line,

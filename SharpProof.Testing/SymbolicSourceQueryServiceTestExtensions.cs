@@ -6,8 +6,198 @@ namespace SharpProof.Test;
 
 internal static class SymbolicSourceQueryServiceTestExtensions
 {
+    internal static SymbolicProgramPointResult QuerySyntaxTree(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int line,
+        int column = 1,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.Point(line, column),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
+            cancellationToken).ProgramPoints.Single();
+    }
+
+    internal static SymbolicQueryResult QuerySyntaxTreeLine(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int line,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.LineNumber(line),
+                new SymbolicQueryOptions(
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: impliedConditions,
+                    includeExpressionProgramPoints: includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+            cancellationToken);
+    }
+
+    internal static SymbolicProgramPointResult QuerySyntaxTreeLinePoint(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int line,
+        int column,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.Point(line, column),
+                new SymbolicQueryOptions(
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: impliedConditions,
+                    includeExpressionProgramPoints: includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+            cancellationToken).ProgramPoints.Single();
+    }
+
+    internal static SymbolicQueryResult QuerySyntaxTreeSpan(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int spanStart,
+        int spanEnd,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.Span(spanStart, spanEnd),
+                new SymbolicQueryOptions(
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: impliedConditions,
+                    includeExpressionProgramPoints: includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+            cancellationToken);
+    }
+
+    internal static SymbolicQueryResult QuerySyntaxTreeLineSpan(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int startLine,
+        int startColumn,
+        int endLine,
+        int endColumn,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.LineSpan(startLine, startColumn, endLine, endColumn),
+                new SymbolicQueryOptions(
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: impliedConditions,
+                    includeExpressionProgramPoints: includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+            cancellationToken);
+    }
+
+    internal static SymbolicQueryResult QuerySyntaxTreeAllLines(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.AllLines(),
+                new SymbolicQueryOptions(
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: impliedConditions,
+                    includeExpressionProgramPoints: includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+            cancellationToken);
+    }
+
+    internal static SymbolicProgramPointResult QuerySyntaxTreeAtPosition(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int position,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null)
+    {
+        return executor.Query(new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.AtPosition(position),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
+            cancellationToken).ProgramPoints.Single();
+    }
+
+    internal static SymbolicConditionProofResult ProveConditionAtSource(
+        this SymbolicQueryExecutor executor,
+        string sourceText,
+        string filePath,
+        int line,
+        int column,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        IEnumerable<MetadataReference>? references = null,
+        CancellationToken cancellationToken = default,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
+    {
+        var source = compilationProfile == null
+            ? SymbolicSourceInput.FromText(sourceText, filePath)
+            : SymbolicSourceInput.FromTextWithProfile(sourceText, compilationProfile, filePath);
+        return executor.Prove(
+            new SymbolicQueryContext(
+                source,
+                SharpProofTarget.Point(line, column),
+                new SymbolicQueryOptions(references, smtAnalysis)),
+            conditionText,
+            cancellationToken);
+    }
+
+    internal static SymbolicConditionProofResult ProveConditionAtSyntaxTree(
+        this SymbolicQueryExecutor executor,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        int line,
+        int column,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        return executor.Prove(
+            new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTarget.Point(line, column),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
+            conditionText,
+            cancellationToken);
+    }
+
     internal static SymbolicProgramPointResult QueryFile(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string filePath,
         int line,
         int column = 1,
@@ -30,7 +220,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     }
 
     internal static SymbolicProgramPointResult QuerySource(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string sourceText,
         string filePath,
         int line,
@@ -54,7 +244,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     }
 
     internal static SymbolicProgramPointResult QuerySourceAtPosition(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string sourceText,
         string filePath,
         int position,
@@ -76,7 +266,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     }
 
     internal static SymbolicQueryResult QuerySourceLine(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string sourceText,
         string filePath,
         int line,
@@ -106,7 +296,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     }
 
     internal static SymbolicProgramPointResult AnalyzeSource(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string sourceText,
         string filePath,
         int line,
@@ -128,7 +318,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     }
 
     internal static SymbolicProgramPointResult AnalyzeSourceAtPosition(
-        this SymbolicSourceQueryService service,
+        this SymbolicQueryExecutor service,
         string sourceText,
         string filePath,
         int position,

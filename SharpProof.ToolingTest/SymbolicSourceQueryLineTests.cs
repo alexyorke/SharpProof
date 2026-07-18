@@ -522,7 +522,7 @@ internal class TestClass
         var assembly = typeof(SymbolicQueryExecutor).Assembly;
         Assert.That(typeof(SymbolicQueryExecutor).IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicQueryService"), Is.Null);
-        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService"), Is.Null);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
         Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.False);
@@ -881,7 +881,7 @@ internal class TestClass
         var position = FindPosition(source, "return value;");
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
             position,
@@ -920,7 +920,7 @@ internal class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
             FindPosition(source, "1;"));
@@ -1133,7 +1133,7 @@ internal class TestClass
         var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
             spanStart,
@@ -1277,7 +1277,7 @@ internal class TestClass
     public int TestMethod(int value) => value;
 }";
 
-        var result = new SymbolicSourceQueryService().QuerySourceLine(
+        var result = new SymbolicQueryExecutor().QuerySourceLine(
             source,
             "BlankLineQuery.cs",
             FindBlankLine(source),
@@ -1324,7 +1324,7 @@ internal class TestClass
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
             smtAnalysis: smtAnalysis,
@@ -1392,7 +1392,7 @@ internal class TestClass
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
             smtAnalysis: smtAnalysis,
@@ -1456,7 +1456,7 @@ internal class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(syntaxTree, compilation);
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(syntaxTree, compilation);
         var filtered = result.Filter(new SymbolicSourceQueryFilter(
             methodNames: new[] { "First" },
             requirePathConditions: true,
@@ -1519,7 +1519,7 @@ internal class TestClass
         var firstReturnLine = FindLine(source, "return value + 1;");
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
             smtAnalysis: smtAnalysis,
@@ -1591,7 +1591,7 @@ internal class TestClass
         var position = FindPosition(source, "return value;");
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
             position,
@@ -1694,7 +1694,7 @@ internal class TestClass
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
             smtAnalysis: smtAnalysis,
@@ -1751,7 +1751,7 @@ internal class TestClass
                 22,
                 222));
 
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
             spanStart,
@@ -1812,7 +1812,7 @@ internal class TestClass
         var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
             spanStart,
@@ -1881,7 +1881,7 @@ internal class TestClass
         var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
             spanStart,
@@ -1944,7 +1944,7 @@ internal class TestClass
         var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
             spanStart,
@@ -2035,7 +2035,7 @@ internal class TestClass
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+        var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
             smtAnalysis: smtAnalysis,
