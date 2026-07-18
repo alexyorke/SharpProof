@@ -7,7 +7,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicQueryService
+internal sealed class SymbolicQueryExecutor
 {
     private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicComplexityService _complexityService;
@@ -15,12 +15,12 @@ public sealed class SymbolicQueryService
     private readonly SymbolicRuntimeHazardQueryService _runtimeHazardQueryService;
     private readonly SymbolicSourceQueryService _sourceQueryService;
 
-    public SymbolicQueryService()
+    internal SymbolicQueryExecutor()
         : this(new SymbolicInvariantService())
     {
     }
 
-    internal SymbolicQueryService(SymbolicInvariantService invariantService)
+    internal SymbolicQueryExecutor(SymbolicInvariantService invariantService)
     {
         if (invariantService == null) throw new ArgumentNullException(nameof(invariantService));
 

@@ -29,6 +29,9 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] `SymbolicQueryService` routes all public query families through one
   validated internal request, including common context validation, analysis
   limits, target requirements, and SMT requirements.
+- [x] Public `SymbolicQueryService` is a thin coordinator; source compilation,
+  dispatch, execution, and result projection live in the internal
+  `SymbolicQueryExecutor`.
 
 ## Current evidence
 
@@ -56,5 +59,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract source dispatch and result projection from `SymbolicQueryService` so
-the public service becomes a thin request coordinator.
+Replace the service-specific public query surface with the session/query/result
+model, retaining a compatibility adapter until CLI and samples migrate.
