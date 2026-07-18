@@ -5,8 +5,6 @@ internal static class EffectSummarySemanticWrapperRules
         new(HasPureReadOnlyCharSpanSearchWrapperPattern, "none"),
         new(HasPureArrayBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
         new(HasPureSpanBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
-        new(HasPureStringFromReadOnlyCharSpanWrapperPattern, "none"),
-        new(HasPureStringSliceNormalizationWrapperPattern, "none"),
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
         new(HasPureTypeIdentityWrapperPattern, "none"),
         new(HasPureCharScalarProjectionWrapperPattern, "none"),
@@ -107,29 +105,6 @@ internal static class EffectSummarySemanticWrapperRules
                HasOnlyByRefLikeViewProjectionFieldReads(summary) &&
                summary.Calls.Any(IsByRefLikeViewConstructionCall) &&
                summary.Calls.All(IsSpanBackedByRefLikeViewWrapperCall);
-    }
-
-    internal static bool HasPureStringFromReadOnlyCharSpanWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
-               summary.Calls.Any(static call =>
-                   string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
-               summary.Calls.All(IsStringFromReadOnlyCharSpanWrapperCall);
-    }
-
-    internal static bool HasPureStringSliceNormalizationWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
-               summary.Calls.Any(static call =>
-                   string.Equals(call, "string.Substring(int, int)->string", StringComparison.Ordinal)) &&
-               summary.Calls.Any(static call =>
-                   call.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)",
-                       StringComparison.Ordinal)) &&
-               summary.Calls.All(IsStringSliceNormalizationWrapperCall);
     }
 
     internal static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
@@ -513,12 +488,6 @@ internal static class EffectSummarySemanticWrapperRules
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Empty()"),
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Item(int)"),
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Length()"),
-        Prefix(SemanticCallFamily.StringToReadOnlyCharSpan, "System.MemoryExtensions.AsSpan(string"),
-        Prefix(SemanticCallFamily.StringToReadOnlyCharSpan, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>"),
-        Exact(SemanticCallFamily.StringFromReadOnlyCharSpan, "object.ToString()->string"),
-        Exact(SemanticCallFamily.StringFromReadOnlyCharSpan, "string.get_Length()->int"),
-        Prefix(SemanticCallFamily.StringSliceNormalization, "System.IO.PathInternal.NormalizeDirectorySeparators(string)"),
-        Exact(SemanticCallFamily.StringSliceNormalization, "string.Substring(int, int)->string"),
         Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.IO.PathInternal.IsDirectorySeparator(char)"),
         Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Span`1<char>..ctor("),
         Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Text.ValueStringBuilder..ctor(System.Span`1<char>)"),
@@ -591,9 +560,6 @@ internal static class EffectSummarySemanticWrapperRules
     private enum SemanticCallFamily
     {
         ReadOnlyCharSpanSearch = 1 << 0,
-        StringToReadOnlyCharSpan = 1 << 1,
-        StringFromReadOnlyCharSpan = 1 << 2,
-        StringSliceNormalization = 1 << 3,
         StackLocalCharBuilder = 1 << 4,
         ImmutableStringRewrite = 1 << 5,
         InvariantTextInfo = 1 << 6,
@@ -632,19 +598,6 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.ReadOnlyCharSpanSearch);
-
-    internal static bool IsStringToReadOnlyCharSpanWrapperCall(string callSymbol) =>
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringToReadOnlyCharSpan);
-
-    internal static bool IsStringFromReadOnlyCharSpanWrapperCall(string callSymbol) =>
-        IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-        IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringFromReadOnlyCharSpan);
-
-    internal static bool IsStringSliceNormalizationWrapperCall(string callSymbol) =>
-        IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-        IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.StringSliceNormalization);
 
     internal static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.StackLocalCharBuilder);

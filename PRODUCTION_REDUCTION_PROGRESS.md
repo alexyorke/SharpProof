@@ -83,11 +83,15 @@ Tests are excluded from the metric and must not be deleted.
   lowerers. Removed the legacy syntax candidate factory; the renamed 31-line
   source factory owns only multi-descriptor throw/rethrow projection, with one
   explicit Roslyn member-operation gap retained at enumeration.
+- [x] Removed the manual string-from-ReadOnlySpan and Path string-slice
+  normalization wrapper rules. Generic fixed-point inference reproduces their
+  runtime and analyzer classifications; the fresh-copy and span-search rules
+  were independently shown to remain necessary and were retained.
 
 ## Current evidence
 
-- Maintained production: 106,249 lines; net reduction: 1,377 lines; remaining
-  reduction: 18,623. The first thirteen deletion slices removed 2,284 production
+- Maintained production: 106,207 lines; net reduction: 1,419 lines; remaining
+  reduction: 18,581. The first fourteen deletion slices removed 2,331 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -102,6 +106,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Characterize EffectSummary semantic-wrapper rules independently and remove the
-first rule families whose outputs are already reproduced by generic fixed-point
-inference, preserving the structural rules still required by runtime slices.
+Characterize the stack-local char-builder and immutable-string-rewrite wrapper
+rules independently against PathCore, the full analyzer string suite, and their
+generated catalog consumers; delete only rules reproduced by fixed-point inference.
