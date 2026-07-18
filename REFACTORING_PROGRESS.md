@@ -41,6 +41,10 @@ This is the active source of truth for the comprehensive refactor. Read
   internal. Focused immutable `SharpProof*` targets, payloads, evidence,
   errors, budgets, and solver metadata form the exported surface; CLI adapters
   preserve the established external schemas and bytes.
+- [x] Source-query and runtime-hazard target dispatch are isolated from
+  `SymbolicQueryExecutor`; the executor now owns API coordination while the
+  dispatchers own source-kind validation, target routing, and node/syntax-tree
+  execution. The superseded executor branches were deleted.
 
 ## Current evidence
 
@@ -69,6 +73,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Decompose query/proof/source services into target resolution, execution,
-aggregation, and projection components, deleting duplicate orchestration as
-each responsibility moves.
+Separate condition-proof target resolution and execution from
+`SymbolicQueryExecutor`, then split source-query aggregation from result
+projection while deleting the superseded orchestration.

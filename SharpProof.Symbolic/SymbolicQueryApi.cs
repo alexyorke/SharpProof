@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
@@ -11,8 +9,8 @@ internal sealed class SymbolicQueryExecutor
 {
     private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicComplexityService _complexityService;
-    private readonly SymbolicInvariantService _invariantService;
-    private readonly SymbolicRuntimeHazardQueryService _runtimeHazardQueryService;
+    private readonly SymbolicRuntimeHazardQueryDispatcher _runtimeHazardDispatcher;
+    private readonly SymbolicSourceQueryDispatcher _sourceQueryDispatcher;
     private readonly SymbolicSourceQueryService _sourceQueryService;
 
     internal SymbolicQueryExecutor()
@@ -24,9 +22,10 @@ internal sealed class SymbolicQueryExecutor
     {
         if (invariantService == null) throw new ArgumentNullException(nameof(invariantService));
 
-        _invariantService = invariantService;
         _sourceQueryService = new SymbolicSourceQueryService(invariantService);
-        _runtimeHazardQueryService = new SymbolicRuntimeHazardQueryService(invariantService);
+        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(invariantService, _sourceQueryService);
+        _runtimeHazardDispatcher = new SymbolicRuntimeHazardQueryDispatcher(
+            new SymbolicRuntimeHazardQueryService(invariantService));
         _complexityService = new SymbolicComplexityService();
         _capabilityService = new SymbolicCapabilityService();
     }
@@ -37,7 +36,7 @@ internal sealed class SymbolicQueryExecutor
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
         {
-            var result = QueryCore(request, token);
+            var result = _sourceQueryDispatcher.Query(request, token);
             return request.Options.Filter == null || request.Options.Filter.IsEmpty
                 ? result
                 : result.Filter(request.Options.Filter);
@@ -179,27 +178,7 @@ internal sealed class SymbolicQueryExecutor
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
         {
             var smtAnalysis = request.RequireSmt("Runtime hazard queries require SMT analysis.");
-            if (!SupportsRuntimeHazardTarget(request.Target.Kind) &&
-                request.Source.Kind != SymbolicSourceInputKind.Node)
-                throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-
-            return SymbolicSourceInputDispatcher.Execute(
-                request.Source,
-                request.Target,
-                request.Options,
-                SymbolicSourceCompilationKind.RuntimeHazards,
-                "Runtime hazard source kind is not supported.",
-                (syntaxTree, compilation, dispatchedTarget, queryToken) => QuerySyntaxTreeRuntimeHazards(
-                    syntaxTree, compilation, dispatchedTarget, request.Options, hazardOptions, queryToken),
-                (node, semanticModel, dispatchedTarget, queryToken) =>
-                    _runtimeHazardQueryService.QueryNodeRuntimeHazards(
-                        node,
-                        semanticModel,
-                        smtAnalysis,
-                        queryToken,
-                        hazardOptions,
-                        dispatchedTarget.IncludeNestedCallables),
-                token);
+            return _runtimeHazardDispatcher.Query(request, smtAnalysis, hazardOptions, token);
         });
     }
 
@@ -274,246 +253,6 @@ internal sealed class SymbolicQueryExecutor
         return operation(request, cancellationToken);
     }
 
-    private SymbolicQueryResult QueryCore(
-        ValidatedSymbolicQueryRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (!SupportsScopedQueryTarget(request.Target.Kind) &&
-            request.Source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
-            throw new NotSupportedException(request.Source.Kind == SymbolicSourceInputKind.File
-                ? "Target kind is not supported for file queries."
-                : "Target kind is not supported for source queries.");
-
-        return SymbolicSourceInputDispatcher.Execute(
-            request.Source,
-            request.Target,
-            request.Options,
-            SymbolicSourceCompilationKind.Query,
-            "Source kind is not supported.",
-            (syntaxTree, compilation, queryTarget, token) =>
-                QuerySyntaxTree(syntaxTree, compilation, queryTarget, request.Options, token),
-            (node, semanticModel, queryTarget, token) =>
-                QueryNode(node, semanticModel, queryTarget, request.Options, token),
-            cancellationToken);
-    }
-
-    private static bool SupportsScopedQueryTarget(SymbolicQueryTargetKind kind)
-    {
-        return kind is SymbolicQueryTargetKind.Point or SymbolicQueryTargetKind.Position or
-            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.LineSpan or
-            SymbolicQueryTargetKind.AllLines;
-    }
-
-    private SymbolicQueryResult QuerySyntaxTree(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Point:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLinePoint(
-                    syntaxTree,
-                    compilation,
-                    target.LineNumber!.Value,
-                    target.ColumnNumber ?? 1,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts));
-            case SymbolicQueryTargetKind.Position:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAtPosition(
-                    syntaxTree,
-                    compilation,
-                    target.PositionOffset!.Value,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions));
-            case SymbolicQueryTargetKind.Line:
-                return _sourceQueryService.QuerySyntaxTreeLine(
-                    syntaxTree,
-                    compilation,
-                    target.LineNumber!.Value,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
-            case SymbolicQueryTargetKind.Span:
-                return _sourceQueryService.QuerySyntaxTreeSpan(
-                    syntaxTree,
-                    compilation,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
-            case SymbolicQueryTargetKind.LineSpan:
-                return _sourceQueryService.QuerySyntaxTreeLineSpan(
-                    syntaxTree,
-                    compilation,
-                    target.StartLine!.Value,
-                    target.StartColumn!.Value,
-                    target.EndLine!.Value,
-                    target.EndColumn!.Value,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
-            case SymbolicQueryTargetKind.AllLines:
-                return _sourceQueryService.QuerySyntaxTreeAllLines(
-                    syntaxTree,
-                    compilation,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
-            default:
-                throw new NotSupportedException("Target kind is not supported for syntax tree queries.");
-        }
-    }
-
-    private SymbolicQueryResult QueryNode(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
-        if (target.Kind != SymbolicQueryTargetKind.Node)
-            throw new NotSupportedException("Node sources require a node target.");
-
-        var analysis = node is ForStatementSyntax forStatement
-            ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, options.SmtAnalysis,
-                cancellationToken)
-            : _invariantService.AnalyzeAt(
-                node,
-                semanticModel,
-                options.SmtAnalysis,
-                cancellationToken,
-                options.IncludeCurrentStatementCompletionFacts);
-        var linePosition = SymbolicSourceLocation.GetLineAndColumn(
-            node.SyntaxTree,
-            node.SpanStart,
-            cancellationToken,
-            true);
-        var span = SymbolicSourceLocation.GetNodeSourceSpan(node.SyntaxTree, node.Span, cancellationToken);
-        var proofs = CreateNodeProofs(
-            semanticModel,
-            node,
-            analysis,
-            options.ImpliedConditions,
-            options.SmtAnalysis,
-            cancellationToken);
-        var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(analysis.PathConditions);
-        var invariant = SymbolicInvariantResult.FromFormulas(
-            analysis.PathConditions,
-            mergedInvariantText);
-        return SymbolicQueryResult.From(new SymbolicProgramPointResult(
-            node.SyntaxTree.FilePath,
-            linePosition.Line,
-            linePosition.Column,
-            node.SpanStart,
-            node.SpanStart,
-            node.Kind().ToString(),
-            analysis.Facts,
-            analysis.Reachability,
-            analysis.ReachabilityReason,
-            proofs,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
-            mergedInvariantText,
-            invariant,
-            node.Span.End,
-            span.StartLine,
-            span.StartColumn,
-            span.EndLine,
-            span.EndColumn,
-            SymbolicProgramPointMetadata.GetContainingMethodName(node),
-            SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()),
-            symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState),
-            reachabilityWitness: SymbolicInputWitnessFactory.CreateReachability(
-                analysis.ReachabilityProof?.PathCheck.Witness,
-                analysis.PathConditions,
-                semanticModel,
-                node.SpanStart,
-                analysis.Reachability,
-                analysis.ReachabilityReason)));
-    }
-
-    private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        SymbolicProgramPointAnalysis analysis,
-        IEnumerable<string> conditionTexts,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
-
-        return conditionTexts
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => _sourceQueryService.ProveConditionAtAnalysis(
-                semanticModel,
-                node,
-                analysis,
-                condition,
-                smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
-                cancellationToken))
-            .ToArray();
-    }
-
-    private static bool SupportsRuntimeHazardTarget(SymbolicQueryTargetKind kind)
-    {
-        return kind is SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Point or
-            SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.AllLines;
-    }
-
-    private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        SymbolicRuntimeHazardQueryOptions hazardOptions,
-        CancellationToken cancellationToken)
-    {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Line:
-            case SymbolicQueryTargetKind.Point:
-                return _runtimeHazardQueryService.QuerySyntaxTreeRuntimeHazardsLine(
-                    syntaxTree,
-                    compilation,
-                    target.LineNumber!.Value,
-                    options.SmtAnalysis!,
-                    cancellationToken,
-                    hazardOptions);
-            case SymbolicQueryTargetKind.Span:
-                return _runtimeHazardQueryService.QuerySyntaxTreeRuntimeHazardsSpan(
-                    syntaxTree,
-                    compilation,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    options.SmtAnalysis!,
-                    cancellationToken,
-                    hazardOptions);
-            case SymbolicQueryTargetKind.AllLines:
-                return _runtimeHazardQueryService.QuerySyntaxTreeRuntimeHazards(
-                    syntaxTree,
-                    compilation,
-                    options.SmtAnalysis!,
-                    cancellationToken,
-                    hazardOptions);
-            default:
-                throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-        }
-    }
 }
 
 internal sealed class SymbolicQueryContext
