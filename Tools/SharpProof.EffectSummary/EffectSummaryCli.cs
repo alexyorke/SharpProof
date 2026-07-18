@@ -31,7 +31,7 @@ internal static class EffectSummaryCli
 
         if (!string.IsNullOrWhiteSpace(options.ShardOutputPath)) return RunSharded(options);
 
-        WriteDocument(BuildDocument(options), options.OutputPath);
+        EffectSummaryOutputWriter.WriteDocument(BuildDocument(options), options.OutputPath);
         return 0;
     }
 
@@ -68,8 +68,8 @@ internal static class EffectSummaryCli
                     $"Artifact spec '{artifactSpecPath}' maps more than one artifact to output '{outputPath}'.");
         }
 
-        WriteManifestIfChanged(options.InputManifestPath!, inputs);
-        WriteManifestIfChanged(options.OutputManifestPath!, outputs);
+        EffectSummaryOutputWriter.WriteManifestIfChanged(options.InputManifestPath!, inputs);
+        EffectSummaryOutputWriter.WriteManifestIfChanged(options.OutputManifestPath!, outputs);
         return 0;
     }
 
@@ -94,26 +94,6 @@ internal static class EffectSummaryCli
             ? artifactSpecDirectory
             : Path.GetFullPath(outputRoot);
         return Path.GetFullPath(Path.Combine(baseDirectory, artifactOutputPath));
-    }
-
-    private static void WriteManifestIfChanged(string manifestPath, IEnumerable<string> paths)
-    {
-        var normalizedPath = Path.GetFullPath(manifestPath);
-        var content = string.Join(
-                          "\n",
-                          paths
-                              .Select(Path.GetFullPath)
-                              .Distinct(OperatingSystem.IsWindows()
-                                  ? StringComparer.OrdinalIgnoreCase
-                                  : StringComparer.Ordinal)
-                              .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)) +
-                      "\n";
-        if (File.Exists(normalizedPath) &&
-            string.Equals(File.ReadAllText(normalizedPath), content, StringComparison.Ordinal))
-            return;
-
-        Directory.CreateDirectory(Path.GetDirectoryName(normalizedPath)!);
-        File.WriteAllText(normalizedPath, content, new UTF8Encoding(false));
     }
 
     private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
@@ -148,7 +128,7 @@ internal static class EffectSummaryCli
 
             completedOutputPaths.Remove(outputPath);
             var effectSummary = BuildDocument(options, externalGeneratedPurityEntries: resolvedPurityEntries);
-            WriteDocument(effectSummary, options.OutputPath);
+            EffectSummaryOutputWriter.WriteDocument(effectSummary, options.OutputPath);
             if (effectSummary.GeneratedPurityCatalog != null)
                 resolvedPurityEntries = EffectSummaryCatalogReporting.MergeGeneratedPurityEntries(
                     resolvedPurityEntries.Values.Concat(effectSummary.GeneratedPurityCatalog.Entries));
@@ -259,7 +239,7 @@ internal static class EffectSummaryCli
             if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 
             completedOutputPaths.Remove(outputPath);
-            WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
+            EffectSummaryOutputWriter.WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
                 EffectSummaryProgressStore.SaveSharded(
@@ -352,26 +332,6 @@ internal static class EffectSummaryCli
         return options.AllRuntimeAssemblies
             ? RuntimeAssemblyResolver.ResolveSystemRuntimeAssemblies(options.Framework)
             : new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) };
-    }
-
-    private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
-    {
-        var jsonOptions = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            WriteIndented = true
-        };
-
-        var json = JsonSerializer.Serialize(document, jsonOptions);
-        if (string.IsNullOrWhiteSpace(outputPath))
-        {
-            Console.WriteLine(json);
-        }
-        else
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
-            File.WriteAllText(outputPath, json);
-        }
     }
 
     private static void PrintHelp()

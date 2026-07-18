@@ -160,6 +160,9 @@ This is the active source of truth for the comprehensive refactor. Read
   artifact-spec and sharded checkpoint validation, atomic persistence, and tool
   identity. The CLI's progress adapters and duplicated JSON helpers were
   deleted; resume behavior and fingerprint mismatch failures remain exact.
+- [x] `EffectSummaryOutputWriter` now owns external JSON serialization,
+  stdout/file selection, directory creation, and stable dependency-manifest
+  bytes. The CLI-owned output and manifest forwarding helpers were deleted.
 
 ## Current evidence
 
@@ -188,6 +191,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract EffectSummary input/dependency resolution or output/report writing from
+Extract EffectSummary input and dependency-path resolution from
 `EffectSummaryCli`, deleting the corresponding CLI-owned helpers while
-preserving paths, manifests, JSON bytes, and command failures.
+preserving assembly selection, normalized paths, and command failures.
