@@ -193,6 +193,10 @@ This is the active source of truth for the comprehensive refactor. Read
   request boundary, and `SymbolicQueryOptions` owns normalized references,
   limits, implied conditions, and SMT dependencies in its own file. These
   request concerns were removed from the aggregate query API file.
+- [x] `SymbolicSourceInput` now owns source/file/tree/node construction and
+  source-map state, while `SymbolicQueryTarget` owns target validation and
+  query-scope representation. Both model families were removed from
+  `SymbolicQueryApi`, reducing it to execution and result projection.
 
 ## Current evidence
 
