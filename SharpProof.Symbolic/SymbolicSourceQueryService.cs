@@ -9,8 +9,8 @@ namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicSourceQueryService
 {
-    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer;
     private readonly SymbolicConditionProofEngine _conditionProofEngine;
+    private readonly SymbolicSourceProgramPointExecutor _programPointExecutor;
 
     public SymbolicSourceQueryService()
         : this(new SymbolicInvariantService())
@@ -19,9 +19,12 @@ internal sealed class SymbolicSourceQueryService
 
     public SymbolicSourceQueryService(SymbolicInvariantService invariantService)
     {
-        _programPointAnalyzer = new SymbolicProgramPointAnalyzer(
+        var programPointAnalyzer = new SymbolicProgramPointAnalyzer(
             invariantService ?? throw new ArgumentNullException(nameof(invariantService)));
-        _conditionProofEngine = new SymbolicConditionProofEngine(_programPointAnalyzer);
+        _conditionProofEngine = new SymbolicConditionProofEngine(programPointAnalyzer);
+        _programPointExecutor = new SymbolicSourceProgramPointExecutor(
+            programPointAnalyzer,
+            _conditionProofEngine);
     }
 
     public SymbolicProgramPointResult QuerySyntaxTree(
@@ -35,14 +38,14 @@ internal sealed class SymbolicSourceQueryService
     {
         ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
-        var query = AnalyzeProgramPoint(
+        var query = _programPointExecutor.AnalyzeAtLine(
             syntaxTree,
             compilation,
             line,
             column,
             smtAnalysis,
             cancellationToken);
-        return ProjectSourceQueryResult(
+        return _programPointExecutor.Project(
             syntaxTree,
             query,
             line,
@@ -71,7 +74,7 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken,
             includeExpressionProgramPoints);
         var results = nodes
-            .Select(node => AnalyzeAndProjectNode(
+            .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
                     syntaxTree,
                     semanticModel,
                     node,
@@ -113,7 +116,7 @@ internal sealed class SymbolicSourceQueryService
 
         var node = SymbolicSourceTargetSelector.SelectNearest(nodes, position);
         var requestedPositionDistance = SymbolicSourceTargetSelector.GetDistance(node, position);
-        return AnalyzeAndProjectNode(
+        return _programPointExecutor.AnalyzeAndProjectNode(
             syntaxTree,
             semanticModel,
             node,
@@ -149,7 +152,7 @@ internal sealed class SymbolicSourceQueryService
             includeExpressionProgramPoints,
             cancellationToken);
         var results = nodes
-            .Select(node => AnalyzeAndProjectNode(
+            .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
                     syntaxTree,
                     semanticModel,
                     node,
@@ -255,7 +258,7 @@ internal sealed class SymbolicSourceQueryService
     {
         ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
-        var query = AnalyzeProgramPointAtPosition(
+        var query = _programPointExecutor.AnalyzeAtPosition(
             syntaxTree,
             compilation,
             position,
@@ -266,7 +269,7 @@ internal sealed class SymbolicSourceQueryService
             position,
             cancellationToken,
             true);
-        return ProjectSourceQueryResult(
+        return _programPointExecutor.Project(
             syntaxTree,
             query,
             lineColumn.Line,
@@ -356,116 +359,6 @@ internal sealed class SymbolicSourceQueryService
     {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
-    }
-
-    private SymbolicProgramPointQueryContext AnalyzeProgramPoint(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int line,
-        int column,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
-        var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
-    }
-
-    private SymbolicProgramPointQueryContext AnalyzeProgramPointAtPosition(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int position,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        var text = syntaxTree.GetText(cancellationToken);
-        if (position < 0 || position > text.Length)
-            throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
-    }
-
-    private SymbolicProgramPointResult AnalyzeAndProjectNode(
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        IEnumerable<string>? impliedConditions,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
-        var query = _programPointAnalyzer.Analyze(
-            semanticModel,
-            node.SpanStart,
-            node,
-            smtAnalysis,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts);
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            query.Position,
-            cancellationToken,
-            true);
-        return ProjectSourceQueryResult(
-            syntaxTree,
-            query,
-            lineColumn.Line,
-            lineColumn.Column,
-            impliedConditions,
-            smtAnalysis,
-            cancellationToken,
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition);
-    }
-
-    private SymbolicProgramPointResult ProjectSourceQueryResult(
-        SyntaxTree syntaxTree,
-        SymbolicProgramPointQueryContext query,
-        int line,
-        int column,
-        IEnumerable<string>? impliedConditions,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
-        var conditionProofs = _conditionProofEngine.ProveAll(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            impliedConditions,
-            smtAnalysis,
-            cancellationToken);
-        return SymbolicProgramPointProjector.Project(
-            syntaxTree,
-            query,
-            line,
-            column,
-            conditionProofs,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
-            cancellationToken,
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition);
     }
 
 }

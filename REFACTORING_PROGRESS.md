@@ -200,6 +200,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] `SymbolicQueryResult` now owns query aggregation, filtering, scope
   projection, line grouping, and truncation/evidence preservation in its own
   file. `SymbolicQueryApi` is now a 235-line executor-only coordinator.
+- [x] `SymbolicSourceProgramPointExecutor` now owns point selection analysis,
+  position validation, condition-proof aggregation, and program-point
+  projection. The source query service's four private execution/projection
+  implementations were deleted.
 
 ## Current evidence
 
@@ -228,6 +232,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit `SymbolicSourceQueryService` responsibilities and extract its next
-coherent target-resolution, execution, aggregation, or projection component,
-deleting the service-owned implementation after parity.
+Extract line/span/all-lines target execution from `SymbolicSourceQueryService`
+behind a focused range-query component, deleting the service-owned loops and
+selection orchestration while preserving exact scopes and ordering.
