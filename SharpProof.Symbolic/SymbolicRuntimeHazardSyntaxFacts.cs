@@ -376,46 +376,6 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                IsReferenceType(operandType);
     }
 
-    internal static bool TryGetConversionOperation(
-        CastExpressionSyntax castExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IConversionOperation conversionOperation)
-    {
-        if (semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation operation)
-        {
-            conversionOperation = operation;
-            return true;
-        }
-
-        conversionOperation = null!;
-        return false;
-    }
-
-    internal static bool TryGetBuiltInNonIdentityConversion(
-        CastExpressionSyntax castExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IConversionOperation conversionOperation,
-        out ITypeSymbol targetType)
-    {
-        targetType = null!;
-        if (!TryGetConversionOperation(
-                castExpression,
-                semanticModel,
-                cancellationToken,
-                out conversionOperation) ||
-            conversionOperation.Conversion.IsUserDefined ||
-            conversionOperation.Conversion.IsIdentity ||
-            conversionOperation.Type is not { TypeKind: not TypeKind.Dynamic } resolvedTargetType)
-            return false;
-
-        targetType = resolvedTargetType;
-        return true;
-    }
-
-
-
     internal static bool IsReferenceType(ITypeSymbol? typeSymbol)
     {
         return SymbolicTypeFacts.IsReferenceType(typeSymbol);

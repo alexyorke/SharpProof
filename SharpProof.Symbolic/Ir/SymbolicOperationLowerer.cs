@@ -159,6 +159,211 @@ internal static partial class SymbolicOperationLowerer
         return true;
     }
 
+    internal static bool TryLowerNullableValueAccessHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        if (operation.Syntax is not MemberAccessExpressionSyntax memberAccess ||
+            !SymbolicTypeFacts.IsNullableValueAccess(
+                memberAccess,
+                context.SemanticModel,
+                context.CancellationToken))
+            return NoHazard(out hazard);
+
+        if (SymbolicRuntimeHazardSyntaxFacts.HasLaterLoopAssignmentOfMissingNullableValue(
+                memberAccess.Expression,
+                memberAccess,
+                context.SemanticModel,
+                context.CancellationToken))
+        {
+            hazard = LowerLoopCarriedNullableValueHazard(memberAccess);
+            return true;
+        }
+
+        return TryLowerNullableValueHazard(
+            memberAccess.Expression,
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteNullableValueWithoutValue,
+            context,
+            out hazard);
+    }
+
+    internal static bool TryLowerDynamicNullBindingHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                operation.Syntax,
+                SymbolicRuntimeHazardSyntaxFacts.UnwrapDynamicExpression,
+                out _,
+                out var receiver,
+                out var category,
+                out _) ||
+            !SymbolicRuntimeHazardSyntaxFacts.IsDynamicExpression(
+                receiver,
+                context.SemanticModel,
+                context.CancellationToken))
+            return NoHazard(out hazard);
+
+        return TryLowerReferenceNullHazard(
+            receiver,
+            SymbolicRuntimeHazardKind.DynamicNullBinding,
+            SymbolicExceptionPreconditionKind.DynamicNullBinding,
+            SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
+            category,
+            "ir.runtime-hazard.dynamic-null-binding",
+            context,
+            suppressDefinitelyNotNull: false,
+            out hazard);
+    }
+
+    internal static bool TryLowerNullDereferenceHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        return TryLowerNullDereferenceHazardCore(operation.Syntax, context, out hazard);
+    }
+
+    internal static bool TryLowerMemberAccessNullDereferenceHazard(
+        MemberAccessExpressionSyntax memberAccess,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        return TryLowerNullDereferenceHazardCore(memberAccess, context, out hazard);
+    }
+
+    private static bool TryLowerNullDereferenceHazardCore(
+        SyntaxNode site,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        ExpressionSyntax? receiver = null;
+        var category = ExceptionCategories.DefiniteNullDereference;
+        switch (site)
+        {
+            case MemberAccessExpressionSyntax memberAccess:
+                receiver = memberAccess.Expression;
+                break;
+            case ElementAccessExpressionSyntax elementAccess:
+                receiver = elementAccess.Expression;
+                break;
+            case ForEachStatementSyntax forEachStatement:
+                receiver = forEachStatement.Expression;
+                break;
+            case ForEachVariableStatementSyntax forEachVariableStatement:
+                receiver = forEachVariableStatement.Expression;
+                break;
+            case AwaitExpressionSyntax awaitExpression:
+                receiver = awaitExpression.Expression;
+                category = ExceptionCategories.DefiniteAwaitNull;
+                break;
+            case WithExpressionSyntax withExpression:
+                receiver = withExpression.Expression;
+                category = ExceptionCategories.DefiniteWithNull;
+                break;
+            case InvocationExpressionSyntax { Expression: not MemberAccessExpressionSyntax } invocation:
+                receiver = invocation.Expression;
+                break;
+            case AssignmentExpressionSyntax assignment
+                when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                     SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(assignment.Left) is
+                         TupleExpressionSyntax or DeclarationExpressionSyntax &&
+                     context.SemanticModel.GetDeconstructionInfo(assignment).Method is
+                         IMethodSymbol { IsStatic: false }:
+                receiver = assignment.Right;
+                category = ExceptionCategories.DefiniteDeconstructionNull;
+                break;
+        }
+
+        if (receiver == null ||
+            SymbolicRuntimeHazardSyntaxFacts.IsDynamicExpression(
+                receiver,
+                context.SemanticModel,
+                context.CancellationToken) ||
+            !SymbolicTypeFacts.IsReferenceType(CSharpSyntaxFacts.GetExpressionType(
+                receiver,
+                context.SemanticModel,
+                context.CancellationToken)))
+            return NoHazard(out hazard);
+
+        return TryLowerReferenceNullHazard(
+            receiver,
+            SymbolicRuntimeHazardKind.NullDereference,
+            SymbolicExceptionPreconditionKind.NullDereference,
+            ExceptionTypes.NullReferenceException,
+            category,
+            "ir.runtime-hazard.null-dereference",
+            context,
+            suppressDefinitelyNotNull: true,
+            out hazard);
+    }
+
+    internal static bool TryLowerArgumentNullHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        ExpressionSyntax? argument = null;
+        var category = string.Empty;
+        switch (operation)
+        {
+            case ILockOperation { Syntax: LockStatementSyntax lockStatement }:
+                argument = lockStatement.Expression;
+                category = ExceptionCategories.DefiniteLockNull;
+                break;
+            case IInvocationOperation invocation
+                when TryGetRegexRequiredInputExpression(invocation, out var regexInput):
+                argument = regexInput;
+                category = ExceptionCategories.DefiniteRegexNullInput;
+                break;
+        }
+
+        if (argument == null ||
+            SymbolicRuntimeHazardSyntaxFacts.IsDynamicExpression(
+                argument,
+                context.SemanticModel,
+                context.CancellationToken) ||
+            !SymbolicTypeFacts.IsReferenceType(CSharpSyntaxFacts.GetExpressionType(
+                argument,
+                context.SemanticModel,
+                context.CancellationToken)))
+            return NoHazard(out hazard);
+
+        return TryLowerReferenceNullHazard(
+            argument,
+            SymbolicRuntimeHazardKind.ArgumentNull,
+            SymbolicExceptionPreconditionKind.ArgumentNull,
+            ExceptionTypes.ArgumentNullException,
+            category,
+            "ir.runtime-hazard.argument-null",
+            context,
+            suppressDefinitelyNotNull: false,
+            out hazard);
+    }
+
+    private static bool TryGetRegexRequiredInputExpression(
+        IInvocationOperation operation,
+        out ExpressionSyntax inputExpression)
+    {
+        inputExpression = null!;
+        if (operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
+            !string.Equals(
+                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
+                "System.Text.RegularExpressions.Regex",
+                StringComparison.Ordinal))
+            return false;
+
+        for (var index = 0; index < operation.TargetMethod.Parameters.Length; index++)
+            if (string.Equals(operation.TargetMethod.Parameters[index].Name, "input", StringComparison.Ordinal) &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, index, out inputExpression))
+                return true;
+
+        return false;
+    }
+
     internal static SymbolicHazardOperation LowerLoopCarriedNullableValueHazard(SyntaxNode site)
     {
         return CreateHazard(
@@ -504,13 +709,77 @@ internal static partial class SymbolicOperationLowerer
         return true;
     }
 
-    internal static bool TryLowerInvalidCastHazard(
-        CastExpressionSyntax castExpression,
-        ITypeSymbol targetType,
-        bool isUnboxing,
+    internal static bool TryLowerNullableValueCastHazard(
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (!TryGetBuiltInNonIdentityCast(operation, out var castExpression, out var targetType) ||
+            !SymbolicRuntimeHazardSyntaxFacts.IsNullableValueCastShape(
+                castExpression,
+                targetType,
+                context.SemanticModel,
+                context.CancellationToken))
+            return NoHazard(out hazard);
+
+        return TryLowerNullableValueHazard(
+            castExpression.Expression,
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteNullableValueWithoutValue,
+            context,
+            out hazard);
+    }
+
+    internal static bool TryLowerUnboxNullCastHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        if (operation is not IConversionOperation { Conversion.IsUserDefined: false } conversion ||
+            operation.Syntax is not CastExpressionSyntax castExpression ||
+            !SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
+                castExpression,
+                conversion.Type,
+                context.SemanticModel,
+                context.CancellationToken))
+            return NoHazard(out hazard);
+
+        return TryLowerReferenceNullHazard(
+            castExpression.Expression,
+            SymbolicRuntimeHazardKind.UnboxNull,
+            SymbolicExceptionPreconditionKind.UnboxNull,
+            ExceptionTypes.NullReferenceException,
+            ExceptionCategories.DefiniteUnboxNull,
+            "ir.runtime-hazard.unbox-null",
+            context,
+            suppressDefinitelyNotNull: false,
+            out hazard);
+    }
+
+    internal static bool TryLowerInvalidCastHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        if (!TryGetBuiltInNonIdentityCast(operation, out var castExpression, out var targetType))
+            return NoHazard(out hazard);
+
+        var isUnboxing = SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
+            castExpression,
+            targetType,
+            context.SemanticModel,
+            context.CancellationToken);
+        if (!isUnboxing)
+        {
+            var operandType = CSharpSyntaxFacts.GetExpressionType(
+                castExpression.Expression,
+                context.SemanticModel,
+                context.CancellationToken);
+            if (!SymbolicTypeFacts.IsReferenceType(targetType) ||
+                !SymbolicTypeFacts.IsReferenceType(operandType))
+                return NoHazard(out hazard);
+        }
+
         var operand = castExpression.Expression;
         var operandLowering = SymbolicSemanticPipeline.LowerTerm(operand, context);
         if (operandLowering is { IsExact: true, Value: SymbolicNullTerm })
@@ -577,6 +846,25 @@ internal static partial class SymbolicOperationLowerer
             preserveUnsupportedSubject: provenance.StartsWith(
                 "ir.runtime-hazard.invalid-cast.exact-mismatch",
                 StringComparison.Ordinal));
+        return true;
+    }
+
+    private static bool TryGetBuiltInNonIdentityCast(
+        IOperation operation,
+        out CastExpressionSyntax castExpression,
+        out ITypeSymbol targetType)
+    {
+        castExpression = null!;
+        targetType = null!;
+        if (operation is not IConversionOperation conversion ||
+            operation.Syntax is not CastExpressionSyntax resolvedCast ||
+            conversion.Conversion.IsUserDefined ||
+            conversion.Conversion.IsIdentity ||
+            conversion.Type is not { TypeKind: not TypeKind.Dynamic } resolvedTargetType)
+            return false;
+
+        castExpression = resolvedCast;
+        targetType = resolvedTargetType;
         return true;
     }
 

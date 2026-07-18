@@ -78,11 +78,16 @@ Tests are excluded from the metric and must not be deleted.
   slicing, collection cardinality, and array-store mismatch discovery behind
   the same operation registry. Direct lowerer tests now exercise `IOperation`
   requests instead of compatibility-shaped metadata parameter lists.
+- [x] Moved cast, nullable-value, null receiver, dynamic-binding, lock, regex,
+  await, with-expression, foreach, and deconstruction hazards into operation
+  lowerers. Removed the legacy syntax candidate factory; the renamed 31-line
+  source factory owns only multi-descriptor throw/rethrow projection, with one
+  explicit Roslyn member-operation gap retained at enumeration.
 
 ## Current evidence
 
-- Maintained production: 106,444 lines; net reduction: 1,182 lines; remaining
-  reduction: 18,818. The first twelve deletion slices removed 1,715 production
+- Maintained production: 106,249 lines; net reduction: 1,377 lines; remaining
+  reduction: 18,623. The first thirteen deletion slices removed 2,284 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -97,6 +102,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Move cast, nullable-value, null receiver, and dynamic-binding hazard discovery
-behind operation-owned lowerers, consolidating their common reference
-precondition path while preserving source categories and evidence spans.
+Characterize EffectSummary semantic-wrapper rules independently and remove the
+first rule families whose outputs are already reproduced by generic fixed-point
+inference, preserving the structural rules still required by runtime slices.
