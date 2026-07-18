@@ -48,11 +48,15 @@ Tests are excluded from the metric and must not be deleted.
   analyzer behavior solely for test inspection. The retained audit tests now
   own their expected documentation contract and continue exercising the real
   configuration and precedence paths.
+- [x] Made `PurityProofQuery` the only ProofCore hazard-classification request
+  path and migrated wrapper-specific tests to it. Removed seven service-specific
+  classification entry points, a conversion-only lowering adapter, and four
+  unreachable helpers across ProofCore, Symbolic, CLI, and EffectSummary.
 
 ## Current evidence
 
-- Maintained production: 107,537 lines; net reduction: 89 lines; remaining
-  reduction: 19,911. The first four deletion slices removed 366 production
+- Maintained production: 107,354 lines; net reduction: 272 lines; remaining
+  reduction: 19,728. The first five deletion slices removed 549 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -67,6 +71,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Remove the next complete duplicate semantic owner or test-only production seam;
-migrate retained tests to the canonical owner before deleting the superseded
-path.
+Consolidate the next service-specific Symbolic query facade into the session
+and discriminated query pipeline; migrate retained tests before deleting the
+superseded entry point.

@@ -1941,9 +1941,10 @@ internal class ProofCoreZ3SmokeTests
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
         var sIsNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, s, new SmtNullConstant());
 
-        var result = search.ClassifyNullDereference(
-            new[] { sIsNotNull },
-            sIsNull,
+        var result = search.Classify(
+            new PurityProofQuery(
+                new[] { sIsNotNull },
+                new PurityHazard(PurityHazardKind.NullDereference, sIsNull)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));

@@ -655,22 +655,6 @@ internal static class EffectSummarySemanticWrapperRules
     internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.InvariantTextInfo);
 
-    internal static bool CallSitesMatch(
-        IReadOnlyList<CallSiteSummary> actual,
-        params (string DisplayName, bool UsesDynamicDispatch)[] expected)
-    {
-        if (actual.Count != expected.Length) return false;
-
-        foreach (var expectedCallSite in expected)
-            if (actual.Count(callSite =>
-                    callSite.UsesDynamicDispatch == expectedCallSite.UsesDynamicDispatch &&
-                    string.Equals(callSite.DisplayName, expectedCallSite.DisplayName,
-                        StringComparison.Ordinal)) != 1)
-                return false;
-
-        return true;
-    }
-
     internal static bool IsTypeIdentityWrapperMethod(string symbol)
     {
         return symbol is

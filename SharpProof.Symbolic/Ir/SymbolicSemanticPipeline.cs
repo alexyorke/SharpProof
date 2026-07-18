@@ -542,19 +542,6 @@ internal static class SymbolicSemanticPipeline
             "pattern");
     }
 
-    internal static SymbolicLoweringResult<SymbolicTerm> LowerConversion(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        if (expression is not CastExpressionSyntax and not CheckedExpressionSyntax)
-            return Unsupported<SymbolicTerm>(expression, "conversion");
-
-        return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerTerm(expression, context),
-            expression,
-            "conversion");
-    }
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerReferenceTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context)

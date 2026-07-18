@@ -155,9 +155,10 @@ internal class ProofCorePurityProofTests
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
 
-        var result = search.ClassifyNullDereference(
-            new[] { sIsNull },
-            sIsNull,
+        var result = search.Classify(
+            new PurityProofQuery(
+                new[] { sIsNull },
+                new PurityHazard(PurityHazardKind.NullDereference, sIsNull)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
@@ -172,9 +173,10 @@ internal class ProofCorePurityProofTests
         var divisorNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, divisor, new SmtIntegerConstant(0));
         var divisorIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, divisor, new SmtIntegerConstant(0));
 
-        var result = search.ClassifyDivideByZero(
-            new[] { divisorNotZero },
-            divisorIsZero,
+        var result = search.Classify(
+            new PurityProofQuery(
+                new[] { divisorNotZero },
+                new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
@@ -191,9 +193,10 @@ internal class ProofCorePurityProofTests
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
 
-        var result = search.ClassifyImpureCallReachability(
-            new[] { xIsNonNegative },
-            xIsNonNegative,
+        var result = search.Classify(
+            new PurityProofQuery(
+                new[] { xIsNonNegative },
+                new PurityHazard(PurityHazardKind.ImpureCallReachability, xIsNonNegative)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
@@ -229,7 +232,11 @@ internal class ProofCorePurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyStaticCacheRead(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
+        var result = search.Classify(
+            new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.StaticCacheRead, new SmtBooleanConstant(true))),
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("safe_static_cache_read"));
@@ -240,7 +247,11 @@ internal class ProofCorePurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyFreshOwnedObjectWrite(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
+        var result = search.Classify(
+            new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.FreshOwnedObjectWrite, new SmtBooleanConstant(true))),
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_object_write"));
@@ -251,7 +262,11 @@ internal class ProofCorePurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyFreshOwnedArrayWrite(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
+        var result = search.Classify(
+            new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.FreshOwnedArrayWrite, new SmtBooleanConstant(true))),
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_array_write"));
@@ -263,9 +278,10 @@ internal class ProofCorePurityProofTests
         using var search = new PurityProofSearch();
         var memoryWrite = new SmtBooleanConstant(true);
 
-        var result = search.ClassifyCallerVisibleMemoryWrite(
-            Array.Empty<SmtFormula>(),
-            memoryWrite,
+        var result = search.Classify(
+            new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.CallerVisibleMemoryWrite, memoryWrite)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));

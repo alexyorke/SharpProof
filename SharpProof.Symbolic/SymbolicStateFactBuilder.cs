@@ -27,24 +27,6 @@ internal static class SymbolicStateFactBuilder
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
 
-    internal static void AddRelationPathFact(
-        ref SymbolicState state,
-        SymbolicRelationOperator op,
-        SymbolicTerm left,
-        SymbolicTerm right,
-        SyntaxNode source,
-        string provenance)
-    {
-        if (!CanCompareIrTerms(left, right)) return;
-
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(op, left, right),
-            source,
-            provenance);
-        state = SymbolicOperationTransferKernel.Assume(
-            state, new SymbolicFactCondition(fact), true, source.Span, provenance).State;
-    }
-
     internal static void AddSymbolReferenceNullCondition(
         ref SymbolicState state,
         ISymbol symbol,

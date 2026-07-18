@@ -85,39 +85,6 @@ internal sealed class PurityProofSearch : IDisposable
         return ClassifyTriggeredHazard(pathConditions, impurityCondition, timeout, GenericImpurityDescriptor);
     }
 
-    public PurityProofResult ClassifyStaticCacheRead(
-        IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(PurityHazardKind.StaticCacheRead, pathConditions, null, timeout);
-    }
-
-    public PurityProofResult ClassifyFreshOwnedObjectWrite(
-        IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(PurityHazardKind.FreshOwnedObjectWrite, pathConditions, null, timeout);
-    }
-
-    public PurityProofResult ClassifyFreshOwnedArrayWrite(
-        IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(PurityHazardKind.FreshOwnedArrayWrite, pathConditions, null, timeout);
-    }
-
-    public PurityProofResult ClassifyCallerVisibleMemoryWrite(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula writeCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(
-            PurityHazardKind.CallerVisibleMemoryWrite,
-            pathConditions,
-            writeCondition,
-            timeout);
-    }
-
     public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
     {
         if (query == null || query.Hazard == null)
@@ -165,42 +132,6 @@ internal sealed class PurityProofSearch : IDisposable
         };
     }
 
-
-    public PurityProofResult ClassifyImpureCallReachability(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula callReachabilityCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(
-            PurityHazardKind.ImpureCallReachability,
-            pathConditions,
-            callReachabilityCondition,
-            timeout);
-    }
-
-    public PurityProofResult ClassifyNullDereference(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula receiverIsNullCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(
-            PurityHazardKind.NullDereference,
-            pathConditions,
-            receiverIsNullCondition,
-            timeout);
-    }
-
-    public PurityProofResult ClassifyDivideByZero(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula divisorIsZeroCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyKnownHazard(
-            PurityHazardKind.DivideByZero,
-            pathConditions,
-            divisorIsZeroCondition,
-            timeout);
-    }
 
     private PurityProofResult ClassifyKnownHazard(
         PurityHazardKind kind,

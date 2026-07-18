@@ -57,7 +57,7 @@ public sealed class SymbolicSemanticPipelineTests
         for (var index = 0; index < expressions.Length; index++)
         {
             var context = CreateExpressionContext(string.Empty, expressions[index], declarations);
-            var result = SymbolicSemanticPipeline.LowerConversion(context.Expression, context.LoweringContext);
+            var result = SymbolicSemanticPipeline.LowerTerm(context.Expression, context.LoweringContext);
 
             Assert.That(result.Support, Is.EqualTo(SymbolicLoweringSupport.Exact), expressions[index]);
             Assert.That(result.Value, Is.EqualTo(new SymbolicIntegerConstantTerm(expected[index])),
@@ -81,7 +81,7 @@ public sealed class SymbolicSemanticPipelineTests
             "(" + targetType + ")value",
             declarations);
 
-        var result = SymbolicSemanticPipeline.LowerConversion(context.Expression, context.LoweringContext);
+        var result = SymbolicSemanticPipeline.LowerTerm(context.Expression, context.LoweringContext);
 
         Assert.That(result.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
         Assert.That(result.Value, Is.TypeOf<SymbolicVariableTerm>());
