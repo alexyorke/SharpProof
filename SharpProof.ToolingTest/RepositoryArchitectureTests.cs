@@ -46,6 +46,44 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void Repository_DoesNotTrackGeneratedOrTemporaryArtifacts()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("ls-files");
+        using var process = Process.Start(startInfo)!;
+        var paths = process.StandardOutput.ReadToEnd()
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var standardError = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.That(process.ExitCode, Is.EqualTo(0), standardError);
+
+        var forbiddenExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".binlog", ".coverage", ".log", ".tmp", ".trx"
+        };
+        var violations = paths
+            .Select(static path => path.Replace('\\', '/'))
+            .Where(path =>
+                path.StartsWith("artifacts/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("nupkgs/", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/TestResults/", StringComparison.OrdinalIgnoreCase) ||
+                forbiddenExtensions.Contains(Path.GetExtension(path)))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(violations, Is.Empty,
+            "Generated test, package, build-log, and temporary artifacts must remain untracked.");
+    }
+
+    [Test]
     public void SymbolicAssembly_DoesNotExportLegacySymbolicDtoTypes()
     {
         var exported = typeof(SharpProofAnalysisSession).Assembly

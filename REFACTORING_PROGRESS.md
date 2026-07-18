@@ -216,6 +216,10 @@ This is the active source of truth for the comprehensive refactor. Read
   production-rewrite baseline were deleted. Refactoring metrics schema v2 keeps
   LOC informational; documented completion now depends on eliminating
   duplicated responsibilities and unreachable legacy paths.
+- [x] Thirteen verified ignored stale test-result directories were removed
+  from the workspace. `RepositoryArchitectureTests` now rejects tracked build,
+  package, coverage, test-result, log, and temporary artifacts so generated
+  files cannot silently acquire source ownership.
 
 ## Current evidence
 
@@ -223,7 +227,7 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,145 passing tests and two documented skips.
+- Six lanes: 6,146 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
@@ -244,6 +248,7 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit repository test ownership, compatibility fixtures, and generated/temp
-artifacts; remove the next proven obsolete path and add or tighten the guard
-that prevents its return.
+Audit the remaining compatibility-named production paths and distinguish
+target-framework or schema owners from obsolete adapters. Delete the next
+proven adapter and add characterization or architecture coverage that prevents
+its return.
