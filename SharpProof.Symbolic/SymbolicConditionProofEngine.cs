@@ -220,7 +220,7 @@ internal sealed class SymbolicConditionProofEngine
             return new SymbolicConditionProofResult(
                 conditionText, SymbolicTruthValue.Unreachable, analysis.ReachabilityReason);
 
-        if (!SymbolicProofService.TryEncodeConditionWithPathState(
+        if (!SymbolicProofEncoder.TryEncodeConditionWithPathState(
                 symbolicCondition, analysis.PathState, sourceNode, out var conditionFormula))
             return new SymbolicConditionProofResult(
                 conditionText, SymbolicTruthValue.Unknown, "condition_not_supported");

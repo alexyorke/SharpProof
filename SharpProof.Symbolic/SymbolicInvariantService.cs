@@ -74,8 +74,9 @@ internal sealed class SymbolicInvariantService
 
     private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState)
     {
-        return SymbolicProofService.TryEncodeStatePathConditions(pathState, out var pathConditions)
-            ? pathConditions
+        pathState = SymbolicProofStateFacts.NormalizeState(pathState);
+        return SymbolicProofEncoder.EncodeState(pathState) is { Success: true } encoded
+            ? encoded.PathConditions
             : Array.Empty<SmtFormula>();
     }
 

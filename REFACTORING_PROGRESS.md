@@ -142,6 +142,11 @@ This is the active source of truth for the comprehensive refactor. Read
   rewriting, syntactic truth evaluation, and fact/condition
   containment/contradiction. Proof orchestration and divisor validation consume
   it directly; the service-owned state-fact implementation was deleted.
+- [x] `SymbolicProofEncoder` owns condition/fact/state encoding, version-aware
+  normalization, safe integer-divisor validation, conditional and
+  short-circuit assumptions, and unsupported-encoding classification. Direct
+  consumers use the encoder; the proof service shrank to solver-oriented
+  classification, budgets, and cache coordination.
 
 ## Current evidence
 
@@ -170,6 +175,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract condition/fact/state encoding and safe-integer-divisor validation from
-`SymbolicProofService` into a focused proof encoder, preserving version rewrite
-and short-circuit assumptions before deleting the service-owned implementation.
+Decompose the remaining Z3 regex encoder by moving parser/AST translation away
+from solver expression construction, preserving typed unsupported fallback and
+the existing normalization/validation boundary.
