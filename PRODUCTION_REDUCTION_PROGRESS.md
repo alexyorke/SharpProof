@@ -41,12 +41,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Made `SharpProofTarget` the single query-target model across the public
   session API, Symbolic execution, Analyzer, and CLI. Deleted the duplicate
   internal target, enum, validation, and conversion adapter.
+- [x] Routed divide, modulo, checked arithmetic, checked update, compound
+  assignment, and checked conversion hazards through one operation-level
+  candidate adapter. Deleted seven syntax-specific forwarding routes.
 
 ## Current evidence
 
-- Maintained production: 107,649 lines; foundation overhead: 23 lines;
-  remaining net reduction: 20,023. The first two deletion slices removed 254
-  production C# lines.
+- Maintained production: 107,599 lines; net reduction: 27 lines; remaining
+  reduction: 19,973. The first three deletion slices removed 304 production
+  C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
@@ -60,6 +63,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Consolidate the duplicated generated-purity and exception-summary loading
-infrastructure, preserving trust, compatibility, ordering, and conservative
-unknown behavior while deleting the superseded catalog plumbing.
+Expand operation-level runtime-hazard discovery into the remaining families
+whose canonical lowerers already own classification, trigger construction, and
+unknown behavior; retain syntax only for source discovery and Roslyn gaps.

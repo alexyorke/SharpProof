@@ -58,12 +58,12 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                 if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken,
                         out var divideCandidate)) yield return divideCandidate;
 
-                if (TryCreateCheckedIntegralOverflowCandidate(binaryExpression, semanticModel, cancellationToken,
+                if (TryCreateCheckedOverflowCandidate(binaryExpression, semanticModel, cancellationToken,
                         out var binaryOverflowCandidate)) yield return binaryOverflowCandidate;
 
                 break;
             case PrefixUnaryExpressionSyntax prefixUnaryExpression:
-                if (TryCreateCheckedIntegralOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken,
+                if (TryCreateCheckedOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken,
                         out var unaryOverflowCandidate)) yield return unaryOverflowCandidate;
 
                 if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
@@ -75,12 +75,12 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 break;
             case PostfixUnaryExpressionSyntax postfixUnaryExpression:
-                if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken,
+                if (TryCreateCheckedOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken,
                         out var postfixOverflowCandidate)) yield return postfixOverflowCandidate;
 
                 break;
             case CastExpressionSyntax castExpression:
-                if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel,
+                if (TryCreateCheckedOverflowCandidate(castExpression, semanticModel,
                         cancellationToken, out var conversionOverflowCandidate))
                     yield return conversionOverflowCandidate;
 
@@ -143,7 +143,7 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 break;
             case AssignmentExpressionSyntax assignment:
-                if (TryCreateCompoundAssignmentDivideByZeroCandidate(assignment, semanticModel, cancellationToken,
+                if (TryCreateDivideByZeroCandidate(assignment, semanticModel, cancellationToken,
                         out var compoundDivideCandidate)) yield return compoundDivideCandidate;
 
                 if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken,
@@ -152,7 +152,7 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                 if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken,
                         out var arrayTypeMismatchCandidate)) yield return arrayTypeMismatchCandidate;
 
-                if (TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(assignment, semanticModel,
+                if (TryCreateCheckedOverflowCandidate(assignment, semanticModel,
                         cancellationToken, out var compoundOverflowCandidate)) yield return compoundOverflowCandidate;
 
                 break;
@@ -282,4 +282,54 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                 break;
         }
     }
+
+    private static bool TryCreateDivideByZeroCandidate(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateOperationHazard(
+            site,
+            semanticModel,
+            cancellationToken,
+            SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
+            out candidate);
+    }
+
+    private static bool TryCreateCheckedOverflowCandidate(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateOperationHazard(
+            site,
+            semanticModel,
+            cancellationToken,
+            SymbolicOperationLowerer.TryLowerCheckedOverflowHazard,
+            out candidate);
+    }
+
+    private static bool TryCreateOperationHazard(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        TryLowerOperationHazard lower,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var operation = semanticModel.GetOperation(site, cancellationToken);
+        if (operation == null ||
+            !lower(operation, new SymbolicLoweringContext(semanticModel, cancellationToken), out var hazard))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(site, hazard);
+        return true;
+    }
+
+    private delegate bool TryLowerOperationHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard);
 }
