@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Test;
 
@@ -49,6 +50,39 @@ public sealed class DiagnosticDescriptorMetadataTests
                     descriptor.Id);
             });
         }
+    }
+
+    [Test]
+    public void DiagnosticCatalog_OwnsSupportedDescriptorsAndTypedMetadata()
+    {
+        var definitions = AnalyzerDiagnosticCatalog.All;
+
+        Assert.That(
+            definitions.Select(static definition => definition.Descriptor),
+            Is.EqualTo(new SharpProofAnalyzer().SupportedDiagnostics));
+        Assert.That(
+            definitions.Select(static definition => definition.Descriptor.Id),
+            Is.Unique);
+        Assert.Multiple(() =>
+        {
+            Assert.That(definitions, Has.All.Property(nameof(AnalyzerDiagnosticDefinition.OwningFeature))
+                .Not.EqualTo(AnalyzerFeatures.None));
+            Assert.That(definitions, Has.All.Property(nameof(AnalyzerDiagnosticDefinition.DocumentationUri))
+                .Not.Empty);
+            Assert.That(
+                definitions,
+                Has.All.Matches<AnalyzerDiagnosticDefinition>(definition =>
+                    string.Equals(
+                        definition.DocumentationUri,
+                        definition.Descriptor.HelpLinkUri,
+                        StringComparison.Ordinal)));
+            Assert.That(
+                definitions
+                    .Select(static definition => definition.ConfigurationKey)
+                    .Where(static key => key != null)
+                    .Distinct(StringComparer.Ordinal),
+                Is.SubsetOf(AnalyzerConfigurationOptionRegistry.All.Select(static option => option.Key)));
+        });
     }
 
     private static Dictionary<string, RuleMetadata> ReadCurrentReleaseMetadata(string repositoryRoot)

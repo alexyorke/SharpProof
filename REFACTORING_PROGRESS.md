@@ -100,6 +100,11 @@ This is the active source of truth for the comprehensive refactor. Read
   discovery, nearest-program-point ranking, and containment metadata live in
   `SymbolicSourceTargetSelector`. Source queries and condition proofs share it;
   the service-owned selector and cache were deleted.
+- [x] `AnalyzerDiagnosticCatalog` is the single supported-diagnostics source.
+  Each entry carries its descriptor, owning analyzer feature, optional
+  configuration key, and documentation URI; release, documentation, and
+  configuration metadata are characterized together, and the analyzer-owned
+  duplicate descriptor list was deleted.
 
 ## Current evidence
 
@@ -107,7 +112,7 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,144 passing tests and two documented skips.
+- Six lanes: 6,145 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
@@ -128,6 +133,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Inventory diagnostic descriptor ownership and replace the monolithic
-declaration/supported-diagnostics surfaces with one typed catalog consumed by
-the analyzer coordinator, configuration, and documentation checks.
+Split code-fix registration and execution by diagnostic family behind one
+exported provider and a typed handler registry; delete the provider-owned
+dispatch branches once focused code-fix parity is green.
