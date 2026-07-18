@@ -248,7 +248,7 @@ internal static class SymbolicReachabilityLowerer
         }
 
         var assignmentTransition = selfReferential
-            ? SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+            ? SymbolicOperationTransfer.ApplyComputedUpdate(
                 state,
                 assignedSymbol,
                 assignedValue,
@@ -258,7 +258,7 @@ internal static class SymbolicReachabilityLowerer
                 SymbolicComputedUpdateKind.CompoundAssignment,
                 isChecked: false,
                 "ir.path.inline-assignment")
-            : SymbolicOperationTransferAdapter.ApplyAssignment(
+            : SymbolicOperationTransfer.ApplyAssignment(
                 state,
                 assignedSymbol,
                 assignment.Right,

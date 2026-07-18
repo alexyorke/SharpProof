@@ -46,7 +46,7 @@ internal static class SymbolicStatefulAssignmentTransfer
         SymbolicOperationTransitionResult transition;
         if (SymbolicStateValueFacts.IsKnownNullReference(state, target) ||
             SymbolicStateValueFacts.IsKnownNullableNoValue(state, target))
-            transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            transition = SymbolicOperationTransfer.ApplyAssignment(
                 state,
                 target,
                 assignment.Value.Syntax,
@@ -58,7 +58,7 @@ internal static class SymbolicStatefulAssignmentTransfer
                 postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
                 preInvalidationTargetValue: previousValue);
         else if (assignment.Value.Syntax is ExpressionSyntax right)
-            transition = SymbolicOperationTransferAdapter.ApplyCoalesceAssignment(
+            transition = SymbolicOperationTransfer.ApplyCoalesceAssignment(
                 state,
                 target,
                 right,
@@ -149,7 +149,7 @@ internal static class SymbolicStatefulAssignmentTransfer
         }
         if (bindings.Count == 0)
             return true;
-        var transition = SymbolicOperationTransferAdapter.ApplyBindings(
+        var transition = SymbolicOperationTransfer.ApplyBindings(
             state,
             bindings.ToImmutable(),
             right,
@@ -261,7 +261,7 @@ internal static class SymbolicStatefulAssignmentTransfer
                 updated = mathematical;
         }
 
-        var transition = SymbolicOperationTransferAdapter.ApplyComputedUpdate(
+        var transition = SymbolicOperationTransfer.ApplyComputedUpdate(
             state,
             target,
             updated,

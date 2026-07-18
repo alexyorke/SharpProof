@@ -81,7 +81,7 @@ internal static class EffectSummaryMetadataReader
                     token,
                     methodDefinitionHandlesByDisplaySignature,
                     out var definitionHandle))
-                return EcmaStructuralMethodIdentityAdapter.Create(reader, definitionHandle);
+                return EcmaStructuralMethodIdentity.Create(reader, definitionHandle);
 
             var handle = MetadataTokens.Handle(token);
             if (handle.Kind == HandleKind.MethodSpecification)
@@ -90,9 +90,9 @@ internal static class EffectSummaryMetadataReader
             return handle.Kind switch
             {
                 HandleKind.MethodDefinition =>
-                    EcmaStructuralMethodIdentityAdapter.Create(reader, (MethodDefinitionHandle)handle),
+                    EcmaStructuralMethodIdentity.Create(reader, (MethodDefinitionHandle)handle),
                 HandleKind.MemberReference =>
-                    EcmaStructuralMethodIdentityAdapter.Create(reader, (MemberReferenceHandle)handle),
+                    EcmaStructuralMethodIdentity.Create(reader, (MemberReferenceHandle)handle),
                 _ => null
             };
         }

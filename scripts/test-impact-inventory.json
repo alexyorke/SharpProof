@@ -1716,16 +1716,16 @@
                                                  ]
                         },
                         {
-                            "path":  "Shared/EcmaStructuralMethodIdentityAdapter.cs",
+                            "path":  "Shared/EcmaStructuralMethodIdentity.cs",
                             "module":  "Shared",
                             "declaredTypes":  [
-                                                  "EcmaStructuralMethodIdentityAdapter",
+                                                  "EcmaStructuralMethodIdentity",
                                                   "StructuralDecodedType",
                                                   "StructuralTypeProvider"
                                               ],
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
-                                                     "EcmaStructuralMethodIdentityAdapter"
+                                                     "EcmaStructuralMethodIdentity"
                                                  ]
                         },
                         {
@@ -2613,10 +2613,10 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityOperationTransferAdapter.cs",
+                            "path":  "SharpProof.Analyzer/Engine/PurityOperationTransfer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "PurityOperationTransferAdapter"
+                                                  "PurityOperationTransfer"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -3907,14 +3907,14 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/RoslynStructuralMethodIdentityAdapter.cs",
+                            "path":  "SharpProof.Analyzer/RoslynStructuralMethodIdentity.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "RoslynStructuralMethodIdentityAdapter"
+                                                  "RoslynStructuralMethodIdentity"
                                               ],
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
-                                                     "RoslynStructuralMethodIdentityAdapter"
+                                                     "RoslynStructuralMethodIdentity"
                                                  ]
                         },
                         {
@@ -5074,14 +5074,14 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicOperationTransferAdapter.cs",
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicOperationTransfer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicOperationTransferAdapter"
+                                                  "SymbolicOperationTransfer"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "SymbolicOperationTransferAdapter"
+                                                     "SymbolicOperationTransfer"
                                                  ]
                         },
                         {
@@ -7204,14 +7204,14 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Shared/EcmaStructuralMethodIdentityAdapter.cs",
+                                    "path":  "Shared/EcmaStructuralMethodIdentity.cs",
                                     "module":  "Shared",
                                     "selectedTestFixtures":  [
                                                                  "ExceptionSummaryCatalogValidationTests",
                                                                  "StructuralMethodIdentityTests"
                                                              ],
                                     "tokens":  [
-                                                   "EcmaStructuralMethodIdentityAdapter"
+                                                   "EcmaStructuralMethodIdentity"
                                                ],
                                     "fixtureCount":  2
                                 },
@@ -8385,14 +8385,14 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/RoslynStructuralMethodIdentityAdapter.cs",
+                                    "path":  "SharpProof.Analyzer/RoslynStructuralMethodIdentity.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "EffectSummarySymbolKeyFactoryTests",
                                                                  "StructuralMethodIdentityTests"
                                                              ],
                                     "tokens":  [
-                                                   "RoslynStructuralMethodIdentityAdapter"
+                                                   "RoslynStructuralMethodIdentity"
                                                ],
                                     "fixtureCount":  2
                                 },
@@ -9156,13 +9156,13 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicOperationTransferAdapter.cs",
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicOperationTransfer.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "SymbolicOperationTransferModelTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicOperationTransferAdapter"
+                                                   "SymbolicOperationTransfer"
                                                ],
                                     "fixtureCount":  1
                                 },

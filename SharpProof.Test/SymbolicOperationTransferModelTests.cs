@@ -351,7 +351,7 @@ internal sealed class SymbolicOperationTransferModelTests
             fixture.SemanticModel,
             CancellationToken.None,
             "operation-lowering.declaration"), Is.True);
-        var canonical = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var canonical = SymbolicOperationTransfer.ApplyAssignment(
             new SymbolicState(),
             targetSymbol,
             declarator.Initializer.Value,
@@ -403,7 +403,7 @@ internal sealed class SymbolicOperationTransferModelTests
             fixture.SemanticModel,
             CancellationToken.None,
             "operation-lowering.assignment"), Is.True);
-        var canonical = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var canonical = SymbolicOperationTransfer.ApplyAssignment(
             initialState,
             targetSymbol,
             assignment.Right,
@@ -439,7 +439,7 @@ internal sealed class SymbolicOperationTransferModelTests
         var valueExpression = declarator.Initializer!.Value;
         var target = fixture.SemanticModel.GetDeclaredSymbol(declarator)!;
 
-        var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var transition = SymbolicOperationTransfer.ApplyAssignment(
             new SymbolicState(),
             target,
             valueExpression,
@@ -489,7 +489,7 @@ internal sealed class SymbolicOperationTransferModelTests
             fixture.SemanticModel,
             CancellationToken.None,
             provenance), Is.True);
-        var actual = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var actual = SymbolicOperationTransfer.ApplyAssignment(
             new SymbolicState(),
             target,
             valueExpression,
@@ -557,7 +557,7 @@ internal sealed class SymbolicOperationTransferModelTests
                     targetSymbol)))
         });
 
-        var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var transition = SymbolicOperationTransfer.ApplyAssignment(
             new SymbolicState(),
             targetSymbol,
             valueExpression,
@@ -673,7 +673,7 @@ internal sealed class SymbolicOperationTransferModelTests
         var target = ((Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation)operation.Target).Local;
         var initialState = PurityAnalysisEngine.PurityAnalysisState.Pure;
         var versionedState = initialState.WithSmtSymbolDefinitionVersion(target, operation.Value.Syntax);
-        var symbolic = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var symbolic = SymbolicOperationTransfer.ApplyAssignment(
             versionedState.PathState,
             target,
             operation.Value.Syntax,
@@ -697,7 +697,7 @@ internal sealed class SymbolicOperationTransferModelTests
             smtAnalysis);
         var created = PurityAssignmentEnvelope.TryCreate(operation, initialState, context, out var envelope);
         var purity = PurityAssignmentTransition.Apply(envelope, initialState, context);
-        var purityTransition = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var purityTransition = SymbolicOperationTransfer.ApplyAssignment(
             versionedState.PathState,
             target,
             operation.Value.Syntax,

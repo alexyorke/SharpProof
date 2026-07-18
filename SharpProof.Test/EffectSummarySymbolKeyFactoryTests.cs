@@ -33,8 +33,8 @@ public class EffectSummarySymbolKeyFactoryTests
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("Fixture")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var keys = RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(method);
-        var collapsed = RoslynStructuralMethodIdentityAdapter.Create(method)
+        var keys = RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(method);
+        var collapsed = RoslynStructuralMethodIdentity.Create(method)
             .WithUnavailableParameterRefKindsCollapsed()
             .ToCanonicalKey();
 
@@ -78,7 +78,7 @@ public class EffectSummarySymbolKeyFactoryTests
             .ToArray();
 
         var keys = operators
-            .Select(RoslynStructuralMethodIdentityAdapter.Create)
+            .Select(RoslynStructuralMethodIdentity.Create)
             .ToArray();
 
         Assert.That(keys, Has.Length.EqualTo(2));
@@ -119,7 +119,7 @@ public class EffectSummarySymbolKeyFactoryTests
         var identityResolver = new EffectSummaryIdentityResolver(
             true,
             false,
-            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
+            RoslynStructuralMethodIdentity.GetCanonicalKey);
         var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
             "SharpProof.Analyzer.GeneratedPurityCatalog",
             true)!;
@@ -138,7 +138,7 @@ public class EffectSummarySymbolKeyFactoryTests
         var resolvedAssemblyIdentity = actualAssemblyIdentity!;
         var resolvedMethodIdentity = actualMethodIdentity!;
 
-        var structuralIdentity = RoslynStructuralMethodIdentityAdapter.Create(methodSymbol.OriginalDefinition);
+        var structuralIdentity = RoslynStructuralMethodIdentity.Create(methodSymbol.OriginalDefinition);
         var canonicalKey = structuralIdentity.ToCanonicalKey();
         var identityJson = JsonSerializer.Serialize(structuralIdentity);
 

@@ -159,7 +159,7 @@ internal static class AssemblyEffectSummarizer
             }
 
             if (displayNameSet != null &&
-                displayNameSet.Contains(EcmaStructuralMethodIdentityAdapter.GetCanonicalKey(reader, handle)))
+                displayNameSet.Contains(EcmaStructuralMethodIdentity.GetCanonicalKey(reader, handle)))
                 rootHandles.Add(handle);
         }
 
@@ -398,7 +398,7 @@ internal static class AssemblyEffectSummarizer
         var cacheKey = $"mvid:{moduleVersionId}|token:{metadataToken}|il:{methodBodySha256 ?? "no-il"}";
         var isConstructor = string.Equals(reader.GetString(definition.Name), ".ctor", StringComparison.Ordinal);
         var symbol = GetMethodDisplaySymbol(reader, handle);
-        var identity = EcmaStructuralMethodIdentityAdapter.Create(reader, handle);
+        var identity = EcmaStructuralMethodIdentity.Create(reader, handle);
         var directThrownExceptionSources = thrownExceptionTypes
             .Select(exceptionType => new ExceptionProvenance(
                 exceptionType,

@@ -63,7 +63,7 @@ public sealed class StructuralMethodIdentityTests
         Assert.That(roslynMethods, Is.Not.Empty);
         foreach (var method in roslynMethods)
         {
-            var key = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(method);
+            var key = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
             Assert.That(
                 peKeys,
                 Does.Contain(key),
@@ -84,15 +84,15 @@ public sealed class StructuralMethodIdentityTests
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("tr-TR");
-            var turkishKey = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(firstMethod);
+            var turkishKey = RoslynStructuralMethodIdentity.GetCanonicalKey(firstMethod);
 
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
-            var frenchKey = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(secondMethod);
+            var frenchKey = RoslynStructuralMethodIdentity.GetCanonicalKey(secondMethod);
 
             Assert.That(frenchKey, Is.EqualTo(turkishKey));
             Assert.That(StructuralMethodIdentity.TryParseCanonicalKey(turkishKey, out var parsed), Is.True);
-            Assert.That(parsed, Is.EqualTo(RoslynStructuralMethodIdentityAdapter.Create(firstMethod)));
+            Assert.That(parsed, Is.EqualTo(RoslynStructuralMethodIdentity.Create(firstMethod)));
         }
         finally
         {
@@ -107,7 +107,7 @@ public sealed class StructuralMethodIdentityTests
         var compilation = CreateCompilation(FixtureSource, "AlternateIdentityFixture");
         foreach (var method in GetFixtureMethods(compilation))
         {
-            var identity = RoslynStructuralMethodIdentityAdapter.Create(method);
+            var identity = RoslynStructuralMethodIdentity.Create(method);
             var alternate = identity.WithContainingMetadataType("System.RuntimeType");
             var key = alternate.ToCanonicalKey();
 
@@ -132,7 +132,7 @@ public sealed class StructuralMethodIdentityTests
         Assert.That(type, Is.Not.Null);
         var constructor = type!.InstanceConstructors.Single();
 
-        var identity = RoslynStructuralMethodIdentityAdapter.Create(constructor);
+        var identity = RoslynStructuralMethodIdentity.Create(constructor);
 
         Assert.That(identity.MethodKind, Is.EqualTo("constructor"));
         Assert.That(identity.Name, Is.EqualTo(".ctor"));
@@ -148,7 +148,7 @@ public sealed class StructuralMethodIdentityTests
         var getEnumerator = hashSet!.GetMembers("GetEnumerator")
             .OfType<IMethodSymbol>()
             .Single(method => method.Parameters.Length == 0);
-        var roslynKey = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(getEnumerator.OriginalDefinition);
+        var roslynKey = RoslynStructuralMethodIdentity.GetCanonicalKey(getEnumerator.OriginalDefinition);
 
         var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
         const string resourceName =
@@ -200,7 +200,7 @@ public sealed class StructuralMethodIdentityTests
         using var peReader = new PEReader(stream);
         var reader = peReader.GetMetadataReader();
         var adapterType = LoadContractsAssembly()
-            .GetType("SharpProof.Identity.EcmaStructuralMethodIdentityAdapter", throwOnError: true)!;
+            .GetType("SharpProof.Identity.EcmaStructuralMethodIdentity", throwOnError: true)!;
         var getCanonicalKey = adapterType.GetMethod(
             "GetCanonicalKey",
             BindingFlags.NonPublic | BindingFlags.Static)!;

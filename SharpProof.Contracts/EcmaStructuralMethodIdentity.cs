@@ -4,7 +4,7 @@ using System.Reflection.Metadata;
 
 namespace SharpProof.Identity;
 
-internal static class EcmaStructuralMethodIdentityAdapter
+internal static class EcmaStructuralMethodIdentity
 {
     internal static StructuralMethodIdentity Create(MetadataReader reader, MethodDefinitionHandle handle)
     {
@@ -281,7 +281,7 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         byte rawTypeKind)
     {
         return new StructuralDecodedType(
-            "named:" + EcmaStructuralMethodIdentityAdapter.GetTypeDefinitionMetadataName(reader, handle));
+            "named:" + EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(reader, handle));
     }
 
     public StructuralDecodedType GetTypeFromReference(
@@ -290,7 +290,7 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         byte rawTypeKind)
     {
         return new StructuralDecodedType(
-            "named:" + EcmaStructuralMethodIdentityAdapter.GetTypeReferenceMetadataName(reader, handle));
+            "named:" + EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, handle));
     }
 
     public StructuralDecodedType GetTypeFromSpecification(

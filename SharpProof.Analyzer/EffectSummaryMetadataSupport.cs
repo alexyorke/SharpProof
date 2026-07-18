@@ -11,7 +11,7 @@ using SharpProof.Identity;
 
 // RS1035 exception: Roslyn exposes metadata references but not the PE method-body
 // bytes or full-image hashes required to validate generated effect summaries.
-// This adapter is the single, audited boundary that reads trusted reference and
+// This is the single, audited boundary that reads trusted reference and
 // runtime assembly paths for identity and IL-body-hash validation. Keep analyzer
 // file I/O isolated here and covered by architecture tests.
 #pragma warning disable RS1035
@@ -40,7 +40,7 @@ internal static class SummaryMethodIdentityMap
                 methodBodyHashProvider,
                 definition.RelativeVirtualAddress,
                 includeMethodAttributes ? definition.Attributes : 0);
-            builder[EcmaStructuralMethodIdentityAdapter.GetCanonicalKey(metadataReader, handle)] = identity;
+            builder[EcmaStructuralMethodIdentity.GetCanonicalKey(metadataReader, handle)] = identity;
         }
 
         return builder.ToImmutable();
@@ -277,7 +277,7 @@ internal sealed class EffectSummaryIdentityResolver
         out ActualMethodIdentity identity)
     {
         return TryResolveMethodIdentityFromPath(
-            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
+            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
             assemblyPath, out identity);
     }
 
@@ -300,7 +300,7 @@ internal sealed class EffectSummaryIdentityResolver
         return _runtimeImplementationAssemblyPathCache.GetOrAdd(
             cacheKey,
             _ => ResolveRuntimeImplementationAssemblyPath(
-                RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
+                RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
                 methodSymbol.ContainingAssembly));
     }
 

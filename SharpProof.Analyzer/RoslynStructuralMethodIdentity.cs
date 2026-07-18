@@ -4,7 +4,7 @@ using SharpProof.Identity;
 
 namespace SharpProof.Analyzer;
 
-internal static class RoslynStructuralMethodIdentityAdapter
+internal static class RoslynStructuralMethodIdentity
 {
     internal static StructuralMethodIdentity Create(IMethodSymbol method)
     {

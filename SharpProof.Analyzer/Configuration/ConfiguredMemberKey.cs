@@ -28,7 +28,7 @@ internal static class ConfiguredMemberKey
         }
 
         if (method.ContainingType == null ||
-            string.IsNullOrWhiteSpace(RoslynStructuralMethodIdentityAdapter.GetMetadataTypeName(method.ContainingType)))
+            string.IsNullOrWhiteSpace(RoslynStructuralMethodIdentity.GetMetadataTypeName(method.ContainingType)))
         {
             key = string.Empty;
             return false;
@@ -42,7 +42,7 @@ internal static class ConfiguredMemberKey
     {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
-        var key = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(method.OriginalDefinition);
+        var key = RoslynStructuralMethodIdentity.GetCanonicalKey(method.OriginalDefinition);
         return method.MethodKind switch
         {
             MethodKind.PropertyGet => key + GetterSuffix,

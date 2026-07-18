@@ -46,6 +46,22 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ProductionProjects_DoNotOwnAdapterFiles()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var violations = Directory.EnumerateFiles(root, "*Adapter.cs", SearchOption.AllDirectories)
+            .Where(path => !IsIgnored(path, root))
+            .Where(path => !Path.GetRelativePath(root, path)
+                .StartsWith("SharpProof.Test", StringComparison.OrdinalIgnoreCase))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(violations, Is.Empty,
+            "Canonical owners must expose their responsibility directly instead of preserving adapter layers.");
+    }
+
+    [Test]
     public void Repository_DoesNotTrackGeneratedOrTemporaryArtifacts()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

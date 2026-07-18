@@ -29,7 +29,7 @@ internal static partial class PurityResourceStateFacts
             return nextState;
 
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
-        return PurityOperationTransferAdapter.ApplyLifetime(
+        return PurityOperationTransfer.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.Return,
@@ -134,7 +134,7 @@ internal static partial class PurityResourceStateFacts
         string provenance,
         string evidenceKey)
     {
-        return PurityOperationTransferAdapter.ApplyLifetime(
+        return PurityOperationTransfer.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.Dispose,

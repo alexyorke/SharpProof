@@ -81,7 +81,7 @@ internal static class EffectSummaryCatalogEntryMap
     {
         return Enumerate(
             entriesBySymbol,
-            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol));
+            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol));
     }
 
     internal static IEnumerable<TEntry> Enumerate<TEntry>(

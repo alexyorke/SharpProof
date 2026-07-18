@@ -17,7 +17,7 @@ internal sealed class GeneratedPurityCatalog
         new(
             true,
             false,
-            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
+            RoslynStructuralMethodIdentity.GetCanonicalKey);
 
     public static readonly GeneratedPurityCatalog Empty = new(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
@@ -98,7 +98,7 @@ internal sealed class GeneratedPurityCatalog
         if (actualAssemblyIdentity == null || actualMethodIdentity == null) return false;
 
         var bestEntry = SelectBestEntry(
-            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
+            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity));
 
@@ -125,7 +125,7 @@ internal sealed class GeneratedPurityCatalog
         var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
         var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         var trustedEntries = new List<SummaryEntry>();
-        var methodKeys = RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol).ToArray();
+        var methodKeys = RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol).ToArray();
         var bestEntry = actualAssemblyIdentity != null && actualMethodIdentity != null
             ? SelectBestEntry(
                 methodKeys,
@@ -191,7 +191,7 @@ internal sealed class GeneratedPurityCatalog
             return false;
 
         var bestEntry = SelectBestEntry(
-            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
+            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
                      entry.AssemblyIdentity?.IsComplete == true &&
@@ -277,7 +277,7 @@ internal sealed class GeneratedPurityCatalog
             return false;
 
         var runtimeMethodKeys = ImmutableArray.Create(
-            RoslynStructuralMethodIdentityAdapter.Create(methodSymbol.OriginalDefinition)
+            RoslynStructuralMethodIdentity.Create(methodSymbol.OriginalDefinition)
                 .WithContainingMetadataType("System.RuntimeType")
                 .ToCanonicalKey());
 
@@ -520,7 +520,7 @@ internal sealed class GeneratedPurityCatalog
         if (typeSymbol is not INamedTypeSymbol namedType) return ImmutableArray<string>.Empty;
 
         var identity = new StructuralMethodIdentity(
-            RoslynStructuralMethodIdentityAdapter.GetMetadataTypeName(namedType),
+            RoslynStructuralMethodIdentity.GetMetadataTypeName(namedType),
             "static-constructor",
             ".cctor",
             0,

@@ -15,7 +15,7 @@ internal sealed class ExceptionSummaryCatalog
         new(
             false,
             true,
-            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
+            RoslynStructuralMethodIdentity.GetCanonicalKey);
 
     public static readonly ExceptionSummaryCatalog Empty = new(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);

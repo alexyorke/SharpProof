@@ -217,7 +217,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             return new MethodIdentity(
                 $"0x{MetadataTokens.GetToken(handle):X8}",
                 methodBodySha256,
-                EcmaStructuralMethodIdentityAdapter.Create(metadataReader, handle),
+                EcmaStructuralMethodIdentity.Create(metadataReader, handle),
                 GetMethodExactSymbolKey(metadataReader, handle),
                 methodSymbol);
         }

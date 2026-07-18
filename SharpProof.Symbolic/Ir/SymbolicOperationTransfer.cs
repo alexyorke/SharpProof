@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicOperationTransferAdapter
+internal static class SymbolicOperationTransfer
 {
     internal static SymbolicOperationTransitionResult ApplyAssignment(
         SymbolicState state,

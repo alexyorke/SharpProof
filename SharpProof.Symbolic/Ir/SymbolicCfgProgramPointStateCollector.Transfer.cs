@@ -769,7 +769,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return true;
         }
 
-        var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+        var transition = SymbolicOperationTransfer.ApplyAssignment(
             state,
             target,
             expression,
@@ -828,7 +828,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             syntax,
             semanticModel,
             cancellationToken);
-        var transition = SymbolicOperationTransferAdapter.ApplyLowering(
+        var transition = SymbolicOperationTransfer.ApplyLowering(
             state,
             SymbolicOperationLowerer.LowerExplicitTargetAssignment(
                 syntax,

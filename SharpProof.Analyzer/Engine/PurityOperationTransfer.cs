@@ -6,7 +6,7 @@ using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.Puri
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityOperationTransferAdapter
+internal static class PurityOperationTransfer
 {
     internal static PurityAnalysisState ApplyDeclaredBorrow(
         PurityAnalysisState state,

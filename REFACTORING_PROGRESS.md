@@ -220,6 +220,10 @@ This is the active source of truth for the comprehensive refactor. Read
   from the workspace. `RepositoryArchitectureTests` now rejects tracked build,
   package, coverage, test-result, log, and temporary artifacts so generated
   files cannot silently acquire source ownership.
+- [x] Removed the remaining production adapter files and types. Canonical
+  symbolic transfer, analyzer purity transfer, Roslyn identity, and ECMA
+  identity callers now use their direct owners; an architecture test rejects
+  new production `*Adapter.cs` layers.
 
 ## Current evidence
 
@@ -227,7 +231,7 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,146 passing tests and two documented skips.
+- Six lanes: 6,147 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
@@ -249,6 +253,5 @@ This is the active source of truth for the comprehensive refactor. Read
 ## Next cheapest step
 
 Audit the remaining compatibility-named production paths and distinguish
-target-framework or schema owners from obsolete adapters. Delete the next
-proven adapter and add characterization or architecture coverage that prevents
-its return.
+target-framework and schema owners from obsolete compatibility shims. Delete
+the next proven shim while retaining conservative schema rejection semantics.

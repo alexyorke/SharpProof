@@ -220,7 +220,7 @@ internal static class PurityAssignmentTransition
         state = ApplyDelegateUpdate(target, state, sidecarState, context.CancellationToken);
         if (Has(target, PurityAssignmentTargetEffects.DeclaredBorrow) &&
             target is { Value: { } value, Symbol: ILocalSymbol local })
-            state = PurityOperationTransferAdapter.ApplyDeclaredBorrow(
+            state = PurityOperationTransfer.ApplyDeclaredBorrow(
                 state, local, value, context.SemanticModel, context.CancellationToken);
         return state;
     }
@@ -275,7 +275,7 @@ internal static class PurityAssignmentTransition
         context.CancellationToken.ThrowIfCancellationRequested();
         if (value.Syntax is ExpressionSyntax)
         {
-            var transition = SymbolicOperationTransferAdapter.ApplyAssignment(
+            var transition = SymbolicOperationTransfer.ApplyAssignment(
                 state.PathState, target, value.Syntax, context.SemanticModel, context.CancellationToken,
                 state.GetSmtSymbolVersion, valueState.GetSmtSymbolVersion,
                 provenance: "analyzer.assignment", bindingProvenance: "analyzer.assignment",
@@ -287,7 +287,7 @@ internal static class PurityAssignmentTransition
                SymbolicFactFactory.GetTrackedSymbolType(source)?.IsReferenceType != true ||
                SymbolicFactFactory.GetTrackedSymbolType(target)?.IsReferenceType != true
             ? state
-            : PurityOperationTransferAdapter.ApplyReferenceRelationship(
+            : PurityOperationTransfer.ApplyReferenceRelationship(
                 state, source, valueState, target, SymbolicLifetimeOperationKind.Alias, value.Syntax,
                 "analyzer.assignment.alias", "evidence.assignment.alias");
     }
@@ -322,7 +322,7 @@ internal static class PurityAssignmentTransition
     private static PurityAnalysisState ApplyLifetime(
         PurityAnalysisState state, SymbolicTerm term, ISymbol symbol, IOperation value,
         SymbolicLifetimeOperationKind kind, string provenance, string evidence) =>
-        PurityOperationTransferAdapter.ApplyLifetime(
+        PurityOperationTransfer.ApplyLifetime(
             state, term, kind, value.Syntax, provenance, symbol, evidence);
 
     private static PurityAnalysisState ApplyDelegateUpdate(
@@ -393,7 +393,7 @@ internal static class PurityAssignmentTransition
 
     private static PurityAnalysisState ReplayAlias(
         PurityAnalysisState state, ISymbol alias, SyntaxNode source, bool owned) =>
-        PurityOperationTransferAdapter.ApplyLifetime(
+        PurityOperationTransfer.ApplyLifetime(
             state, PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(alias, state),
             owned ? SymbolicLifetimeOperationKind.AcquireDisposable : SymbolicLifetimeOperationKind.Dispose,
             source, owned ? "analyzer.resource.alias-preserve" : "analyzer.resource.alias-preserve.disposed",
