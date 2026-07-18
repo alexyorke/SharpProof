@@ -1309,10 +1309,6 @@
                              "path":  "SharpProof.Test/RegexTests.cs"
                          },
                          {
-                             "name":  "RequiredMembersArchivedReferenceTests",
-                             "path":  "SharpProof.Test/RequiredMembersArchivedReferenceTests.cs"
-                         },
-                         {
                              "name":  "RequiredMembersSmokeTests",
                              "path":  "SharpProof.Test/RequiredMembersSmokeTests.cs"
                          },
@@ -7226,13 +7222,12 @@
                                                                  "BasicPureTests",
                                                                  "ConstantsTests",
                                                                  "PrimaryConstructorTests",
-                                                                 "RecordTests",
-                                                                 "RequiredMembersArchivedReferenceTests"
+                                                                 "RecordTests"
                                                              ],
                                     "tokens":  [
                                                    "IsExternalInit"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "Shared/StructuralMethodIdentity.cs",
