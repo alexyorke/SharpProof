@@ -21,93 +21,7 @@ namespace SharpProof
     [Shared]
     public sealed class SharpProofCodeFixProvider : CodeFixProvider
     {
-        private static readonly ImmutableDictionary<string, SimpleRemovalRegistration> SimpleRemovalRegistrations =
-            ImmutableArray.Create(
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.PurityNotVerifiedId,
-                        "Remove [EnforcePure] and [Pure] attributes", SimpleRemovalOperation.DeclarationAndAccessors,
-                        nameof(RemoveAttributesMatchingAsync) + "SP0002", "EnforcePureAttribute", "PureAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAttributeId,
-                        "Remove misplaced purity attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync)),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.ConflictingPurityAttributesId,
-                        "Remove conflicting purity boundary attributes", SimpleRemovalOperation.DeclarationAndAccessors,
-                        nameof(RemoveAttributesMatchingAsync) + "SP0005", "PureAttribute", "PureExternalAttribute",
-                        "ImpureAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
-                        "Remove misplaced [AllowSynchronization] attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync) + "SP0007"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.RedundantAllowSynchronizationId,
-                        "Remove [AllowSynchronization] attribute", SimpleRemovalOperation.DeclarationAndAccessors,
-                        nameof(RemoveAttributesMatchingAsync) + "SP0008", "AllowSynchronizationAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
-                        "Remove [ZeroAllocations] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + "SP0013", "ZeroAllocationsAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
-                        "Remove misplaced [ZeroAllocations] attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync) + "SP0014"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.CapabilityViolationId,
-                        "Remove [AllowedCapabilities] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.CapabilityViolationId,
-                        "AllowedCapabilitiesAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.CapabilityUnknownId,
-                        "Remove [AllowedCapabilities] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.CapabilityUnknownId,
-                        "AllowedCapabilitiesAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
-                        "Remove misplaced [AllowedCapabilities] attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync) + "SP0017"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.EnsuresNotProvenId,
-                        "Remove [Ensures] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.EnsuresNotProvenId,
-                        "EnsuresAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.EnsuresUnsupportedId,
-                        "Remove [Ensures] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.EnsuresUnsupportedId,
-                        "EnsuresAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedEnsuresAttributeId,
-                        "Remove misplaced [Ensures] attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync) + "SP0020"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.ComplexityExceededId,
-                        "Remove [ExpectedComplexity] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.ComplexityExceededId,
-                        "ExpectedComplexityAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
-                        "Remove [ExpectedComplexity] attribute", SimpleRemovalOperation.DiagnosticContract,
-                        nameof(RemoveContractAttributeAsync) + SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
-                        "ExpectedComplexityAttribute"),
-                    new SimpleRemovalRegistration(SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId,
-                        "Remove misplaced [ExpectedComplexity] attribute", SimpleRemovalOperation.MisplacedAttribute,
-                        nameof(RemoveMisplacedAttributeAsync) + "SP0023"))
-                .ToImmutableDictionary(static registration => registration.DiagnosticId, StringComparer.Ordinal);
-
-        public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
-            SharpProofDiagnostics.PurityNotVerifiedId,
-            SharpProofDiagnostics.MisplacedAttributeId,
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
-            SharpProofDiagnostics.ConflictingPurityAttributesId,
-            SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId,
-            SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
-            SharpProofDiagnostics.RedundantAllowSynchronizationId,
-            SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
-            SharpProofDiagnostics.CapabilityViolationId,
-            SharpProofDiagnostics.CapabilityUnknownId,
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
-            SharpProofDiagnostics.EnsuresNotProvenId,
-            SharpProofDiagnostics.EnsuresUnsupportedId,
-            SharpProofDiagnostics.MisplacedEnsuresAttributeId,
-            SharpProofDiagnostics.ComplexityExceededId,
-            SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId,
-            SharpProofDiagnostics.MisplacedRequiresAttributeId,
-            SharpProofDiagnostics.SuggestZeroAllocationsId,
-            SharpProofDiagnostics.SuggestAllowedCapabilitiesId,
-            SharpProofDiagnostics.SuggestExpectedComplexityId,
-            SharpProofDiagnostics.SuggestExceptionContractId,
-            SharpProofDiagnostics.SuggestEnsuresId,
-            SharpProofDiagnostics.SuggestRequiresId,
-            SharpProofDiagnostics.SuggestNullableContractId,
-            SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId);
+        public override ImmutableArray<string> FixableDiagnosticIds => CodeFixHandlerRegistry.FixableDiagnosticIds;
 
         public override FixAllProvider? GetFixAllProvider()
         {
@@ -124,7 +38,9 @@ namespace SharpProof
             var configuration = AnalyzerConfiguration.FromOptions(document.Project.AnalyzerOptions);
             var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
 
-            if (SimpleRemovalRegistrations.TryGetValue(diagnostic.Id, out var simpleRemoval))
+            if (!CodeFixHandlerRegistry.TryGet(diagnostic.Id, out var registration)) return;
+
+            if (registration is { Family: CodeFixHandlerFamily.SimpleRemoval, SimpleRemoval: { } simpleRemoval })
             {
                 RegisterSimpleRemovalCodeFix(
                     context,
@@ -136,9 +52,9 @@ namespace SharpProof
                 return;
             }
 
-            switch (diagnostic.Id)
+            switch (registration.Family)
             {
-                case SharpProofDiagnostics.MissingEnforcePureAttributeId:
+                case CodeFixHandlerFamily.AddPurity:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declMissing))
                     {
                         if (declMissing is PropertyDeclarationSyntax or IndexerDeclarationSyntax) break;
@@ -153,7 +69,7 @@ namespace SharpProof
 
                     break;
 
-                case SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId:
+                case CodeFixHandlerFamily.AddPurityOrRemoveSynchronization:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declAllow))
                     {
                         context.RegisterCodeFix(
@@ -173,7 +89,7 @@ namespace SharpProof
 
                     break;
 
-                case SharpProofDiagnostics.MisplacedRequiresAttributeId:
+                case CodeFixHandlerFamily.MisplacedRequires:
                     if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedRequires))
                     {
                         if (CanMoveAttributeToGetter(misplacedRequires))
@@ -194,17 +110,11 @@ namespace SharpProof
 
                     break;
 
-                case SharpProofDiagnostics.SuggestZeroAllocationsId:
-                case SharpProofDiagnostics.SuggestAllowedCapabilitiesId:
-                case SharpProofDiagnostics.SuggestExpectedComplexityId:
-                case SharpProofDiagnostics.SuggestExceptionContractId:
-                case SharpProofDiagnostics.SuggestEnsuresId:
-                case SharpProofDiagnostics.SuggestRequiresId:
-                case SharpProofDiagnostics.SuggestNullableContractId:
+                case CodeFixHandlerFamily.InferredContract:
                     RegisterInferredContractCodeFix(context, document, root, diagnostic);
                     break;
 
-                case SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId:
+                case CodeFixHandlerFamily.NullForgivingRemoval:
                     if (TryFindNullForgivingExpression(root, diagnostic.Location.SourceSpan, out var suppression))
                         context.RegisterCodeFix(
                             CodeAction.Create(
@@ -394,36 +304,6 @@ namespace SharpProof
             context.RegisterCodeFix(
                 CodeAction.Create(registration.Title, apply, registration.EquivalenceKey),
                 diagnostic);
-        }
-
-        private enum SimpleRemovalOperation
-        {
-            MisplacedAttribute,
-            DeclarationAndAccessors,
-            DiagnosticContract
-        }
-
-        private sealed class SimpleRemovalRegistration
-        {
-            internal SimpleRemovalRegistration(
-                string diagnosticId,
-                string title,
-                SimpleRemovalOperation operation,
-                string equivalenceKey,
-                params string[] attributeTypeNames)
-            {
-                DiagnosticId = diagnosticId;
-                Title = title;
-                Operation = operation;
-                EquivalenceKey = equivalenceKey;
-                AttributeTypeNames = attributeTypeNames;
-            }
-
-            internal string DiagnosticId { get; }
-            internal string Title { get; }
-            internal SimpleRemovalOperation Operation { get; }
-            internal string EquivalenceKey { get; }
-            internal string[] AttributeTypeNames { get; }
         }
 
         private static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)

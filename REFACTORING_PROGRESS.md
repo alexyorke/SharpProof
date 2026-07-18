@@ -105,6 +105,10 @@ This is the active source of truth for the comprehensive refactor. Read
   configuration key, and documentation URI; release, documentation, and
   configuration metadata are characterized together, and the analyzer-owned
   duplicate descriptor list was deleted.
+- [x] `CodeFixHandlerRegistry` is the single source for fixable diagnostic IDs,
+  handler-family dispatch, simple-removal operations, titles, equivalence keys,
+  and attribute targets. The exported provider no longer owns duplicated ID or
+  removal-registration lists and dispatches typed families instead of IDs.
 
 ## Current evidence
 
@@ -133,6 +137,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Split code-fix registration and execution by diagnostic family behind one
-exported provider and a typed handler registry; delete the provider-owned
-dispatch branches once focused code-fix parity is green.
+Move code-fix family registration/execution into focused handlers behind
+`CodeFixHandlerRegistry`, leaving the exported provider as the Roslyn entry
+point and deleting its family-specific branches.
