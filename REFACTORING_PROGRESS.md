@@ -118,6 +118,12 @@ This is the active source of truth for the comprehensive refactor. Read
   capabilities, ensures, complexity, requires, placement, and common bugs.
   `SharpProofDiagnostics` now owns only stable IDs/properties and descriptor
   factories, while `AnalyzerDiagnosticCatalog` remains the sole index.
+- [x] Analyzer method requests now compose a canonical immutable
+  `SymbolicMethodAnalysisInput` (method identity, declaration, semantic model,
+  and source) with analyzer-owned operation blocks and resolved root.
+  `MethodAnalysisSnapshot` consumes that request, and cached capability and
+  complexity queries use the shared node-query context instead of rebuilding
+  source/target pairs.
 
 ## Current evidence
 
@@ -146,6 +152,7 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Consolidate the analyzer and Symbolic method-query request/context seams around
-one immutable analysis input and snapshot contract, then delete duplicated
-body/semantic-model resolution where characterization proves parity.
+Move exception-flow, inferred-contract, and nullable proof queries onto the
+canonical method analysis input/snapshot seam where they currently rebuild
+node query context, preserving explicit subnode targets and conservative
+unknown behavior.

@@ -16,19 +16,10 @@ internal sealed class MethodBodyAnalysisState
         new(StringComparer.Ordinal);
 
     internal MethodBodyAnalysisState(
-        IMethodSymbol methodSymbol,
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        ImmutableArray<IOperation> operationBlocks,
-        IOperation? fallbackRootOperation,
+        MethodAnalysisRequest request,
         CancellationToken cancellationToken)
     {
-        Snapshot = MethodAnalysisSnapshot.Create(
-            methodSymbol,
-            declaration,
-            semanticModel,
-            operationBlocks,
-            fallbackRootOperation);
+        Snapshot = MethodAnalysisSnapshot.Create(request);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
@@ -42,8 +33,8 @@ internal sealed class MethodBodyAnalysisState
         return GetNodeQueryOutcome(
             "capability",
             cancellationToken,
-            static (queryService, source, target, token) => queryService.TryQueryCapabilities(
-                new SymbolicQueryContext(source, target),
+            static (queryService, input, token) => queryService.TryQueryCapabilities(
+                input.CreateNodeQuery(),
                 token));
     }
 
@@ -53,21 +44,21 @@ internal sealed class MethodBodyAnalysisState
         return GetNodeQueryOutcome(
             "complexity",
             cancellationToken,
-            static (queryService, source, target, token) => queryService.TryQueryComplexity(
-                new SymbolicQueryContext(source, target),
+            static (queryService, input, token) => queryService.TryQueryComplexity(
+                input.CreateNodeQuery(),
                 token));
     }
 
     private SymbolicOperationResult<TResult> GetNodeQueryOutcome<TResult>(
         string queryKey,
         CancellationToken cancellationToken,
-        Func<SymbolicQueryService, SymbolicSourceInput, SymbolicQueryTarget, CancellationToken,
+        Func<SymbolicQueryService, SymbolicMethodAnalysisInput, CancellationToken,
             SymbolicOperationResult<TResult>> query)
         where TResult : class
     {
         return GetOrCreateSymbolicQueryResult(
             queryKey,
-            () => query(QueryService, Snapshot.Source, SymbolicQueryTarget.Node(), cancellationToken));
+            () => query(QueryService, Snapshot.Input, cancellationToken));
     }
 
     internal T GetOrCreateSymbolicQueryResult<T>(

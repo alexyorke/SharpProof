@@ -9,30 +9,26 @@ namespace SharpProof.Analyzer;
 internal sealed class MethodAnalysisSnapshot
 {
     private MethodAnalysisSnapshot(
-        IMethodSymbol methodSymbol,
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
+        SymbolicMethodAnalysisInput input,
         ImmutableArray<IOperation> operationBlocks,
         IOperation? rootOperation,
         ImmutableArray<IOperation> visibleOperations,
-        MethodBodySemanticFacts semanticFacts,
-        SymbolicSourceInput source)
+        MethodBodySemanticFacts semanticFacts)
     {
-        MethodSymbol = methodSymbol;
-        Declaration = declaration;
-        SemanticModel = semanticModel;
+        Input = input;
         OperationBlocks = operationBlocks;
         RootOperation = rootOperation;
         VisibleOperations = visibleOperations;
         SemanticFacts = semanticFacts;
-        Source = source;
     }
 
-    internal IMethodSymbol MethodSymbol { get; }
+    internal SymbolicMethodAnalysisInput Input { get; }
 
-    internal SyntaxNode Declaration { get; }
+    internal IMethodSymbol MethodSymbol => Input.MethodSymbol;
 
-    internal SemanticModel SemanticModel { get; }
+    internal SyntaxNode Declaration => Input.Declaration;
+
+    internal SemanticModel SemanticModel => Input.SemanticModel;
 
     internal ImmutableArray<IOperation> OperationBlocks { get; }
 
@@ -42,21 +38,14 @@ internal sealed class MethodAnalysisSnapshot
 
     internal MethodBodySemanticFacts SemanticFacts { get; }
 
-    internal SymbolicSourceInput Source { get; }
+    internal SymbolicSourceInput Source => Input.Source;
 
-    internal static MethodAnalysisSnapshot Create(
-        IMethodSymbol methodSymbol,
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        ImmutableArray<IOperation> operationBlocks,
-        IOperation? fallbackRootOperation)
+    internal static MethodAnalysisSnapshot Create(MethodAnalysisRequest request)
     {
-        if (methodSymbol == null) throw new ArgumentNullException(nameof(methodSymbol));
-        if (declaration == null) throw new ArgumentNullException(nameof(declaration));
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+        if (request == null) throw new ArgumentNullException(nameof(request));
 
-        var blocks = operationBlocks.IsDefault ? ImmutableArray<IOperation>.Empty : operationBlocks;
-        var root = fallbackRootOperation ?? SelectRootOperation(blocks);
+        var blocks = request.OperationBlocks;
+        var root = request.FallbackRootOperation ?? SelectRootOperation(blocks);
         var visibleOperations = root == null
             ? ImmutableArray<IOperation>.Empty
             : ExecutionVisibility.VisibleDescendants(root).ToImmutableArray();
@@ -67,14 +56,11 @@ internal sealed class MethodAnalysisSnapshot
             visibleOperations.Any(static operation => operation is ILocalFunctionOperation),
             root != null);
         return new MethodAnalysisSnapshot(
-            methodSymbol,
-            declaration,
-            semanticModel,
+            request.SymbolicInput,
             blocks,
             root,
             visibleOperations,
-            semanticFacts,
-            SymbolicSourceInput.FromNode(declaration, semanticModel));
+            semanticFacts);
     }
 
     private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks)

@@ -158,11 +158,12 @@ public sealed class OperationBlockPipelineTests
             semanticModel,
             CancellationToken.None)!;
         var state = new MethodBodyAnalysisState(
-            methodSymbol,
-            declaration,
-            semanticModel,
-            ImmutableArray.Create(rootOperation),
-            rootOperation,
+            MethodAnalysisRequest.Create(
+                methodSymbol,
+                declaration,
+                semanticModel,
+                ImmutableArray.Create(rootOperation),
+                CancellationToken.None),
             CancellationToken.None);
 
         var firstCapability = state.GetCapabilityOutcome(CancellationToken.None);
