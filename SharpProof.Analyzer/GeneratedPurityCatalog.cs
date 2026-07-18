@@ -359,7 +359,7 @@ internal sealed class GeneratedPurityCatalog
                     !StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
                     !TryCreatePurityEntry(entryElement, out var purityEntry))
                     continue;
-                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
+                var displayName = AnalyzerJsonElementReader.GetTrimmedStringProperty(entryElement, "DisplayName") ??
                                   canonicalKey;
 
                 yield return new SummaryEntry(
@@ -388,7 +388,7 @@ internal sealed class GeneratedPurityCatalog
                     purityElement.ValueKind != JsonValueKind.Object ||
                     !TryCreatePurityEntry(purityElement, out var purityEntry))
                     continue;
-                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
+                var displayName = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "DisplayName") ??
                                   canonicalKey;
 
                 yield return new SummaryEntry(
@@ -409,15 +409,15 @@ internal sealed class GeneratedPurityCatalog
     {
         purityEntry = default;
 
-        var classification = CompatibilityHelpers.GetTrimmedStringProperty(element, "Classification");
+        var classification = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "Classification");
         if (string.IsNullOrWhiteSpace(classification)) return false;
 
         var categories = ReadStringArray(element, "Categories");
-        var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(element, "PrimaryCategory");
+        var primaryCategory = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "PrimaryCategory");
         var freshnessClassification =
-            CompatibilityHelpers.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
         var effectVisibilityClassification =
-            CompatibilityHelpers.GetTrimmedStringProperty(element, "EffectVisibilityClassification") ?? "unknown";
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "EffectVisibilityClassification") ?? "unknown";
         purityEntry = new PurityEntry(
             classification!.Trim(),
             categories,

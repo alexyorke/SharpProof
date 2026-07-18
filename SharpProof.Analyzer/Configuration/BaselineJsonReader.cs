@@ -4,7 +4,7 @@ using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 
-internal static class BaselineJsonCompatibility
+internal static class BaselineJsonReader
 {
     internal static JsonDocumentOptions DocumentOptions { get; } = new()
     {
@@ -45,7 +45,7 @@ internal static class BaselineJsonCompatibility
         out EvidenceSchemaValidationFailure failure)
     {
         var (hasVersion, versionElement, hasCompatibility, compatibilityElement) =
-            JsonElementCompatibility.ReadEvidenceSchemaProperties(
+            JsonElementPropertyReader.ReadEvidenceSchemaProperties(
                 element,
                 versionPropertyName,
                 compatibilityPropertyName);
@@ -94,7 +94,7 @@ internal static class BaselineJsonCompatibility
 
     internal static bool HasPropertyIgnoreCase(JsonElement element, string propertyName)
     {
-        return JsonElementCompatibility.TryGetPropertyIgnoreCase(element, propertyName, out _);
+        return JsonElementPropertyReader.TryGetPropertyIgnoreCase(element, propertyName, out _);
     }
 
     internal static BaselineEntryJsonFields ReadEntryFields(JsonElement element)

@@ -34,15 +34,15 @@ internal sealed class EffectSummaryArtifactSource
             sourceElement.ValueKind != JsonValueKind.Object)
             return null;
 
-        var kind = CompatibilityHelpers.GetTrimmedStringProperty(sourceElement, "Kind");
+        var kind = AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "Kind");
         if (string.IsNullOrWhiteSpace(kind)) return null;
 
         return new EffectSummaryArtifactSource(
             kind!,
-            CompatibilityHelpers.GetTrimmedStringProperty(sourceElement, "Framework"),
-            CompatibilityHelpers.GetTrimmedStringProperty(sourceElement, "PackageId"),
-            CompatibilityHelpers.GetTrimmedStringProperty(sourceElement, "PackageVersion"),
-            CompatibilityHelpers.GetTrimmedStringProperty(sourceElement, "PackageAssemblyRelativePath"));
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "Framework"),
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageId"),
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageVersion"),
+            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageAssemblyRelativePath"));
     }
 
     internal EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity actualAssemblyIdentity)

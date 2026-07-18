@@ -96,8 +96,8 @@ internal sealed class DiagnosticBaseline
         var baseDirectory = GetBaseDirectory(baselinePath);
         try
         {
-            using var document = JsonDocument.Parse(json, BaselineJsonCompatibility.DocumentOptions);
-            if (!BaselineJsonCompatibility.TryValidateBaselineEvidenceSchemaTree(
+            using var document = JsonDocument.Parse(json, BaselineJsonReader.DocumentOptions);
+            if (!BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
                     document.RootElement,
                     requireRootSchema: true,
                     out _))
@@ -116,7 +116,7 @@ internal sealed class DiagnosticBaseline
         string baseDirectory,
         ImmutableArray<BaselineEntry>.Builder builder)
     {
-        BaselineJsonCompatibility.VisitJsonTree(element, (candidate, _) =>
+        BaselineJsonReader.VisitJsonTree(element, (candidate, _) =>
         {
             if (candidate.ValueKind == JsonValueKind.Object)
                 TryAddEntry(candidate, baseDirectory, builder);
@@ -129,7 +129,7 @@ internal sealed class DiagnosticBaseline
         string baseDirectory,
         ImmutableArray<BaselineEntry>.Builder builder)
     {
-        var fields = BaselineJsonCompatibility.ReadEntryFields(element);
+        var fields = BaselineJsonReader.ReadEntryFields(element);
         if (fields.IsValid)
             builder.Add(new BaselineEntry(
                 fields.Id!,

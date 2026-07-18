@@ -35,7 +35,7 @@ internal static class AnalyzerAdditionalFileValidator
 
         try
         {
-            using var document = JsonDocument.Parse(text, BaselineJsonCompatibility.DocumentOptions);
+            using var document = JsonDocument.Parse(text, BaselineJsonReader.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 AddIssue(issues, additionalFile, "unsupported baseline root; evidence v2 requires an object");
@@ -154,7 +154,7 @@ internal static class AnalyzerAdditionalFileValidator
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
         bool required = false)
     {
-        if (BaselineJsonCompatibility.TryValidateEvidenceSchema(
+        if (BaselineJsonReader.TryValidateEvidenceSchema(
                 element,
                 versionPropertyName,
                 compatibilityPropertyName,
@@ -177,7 +177,7 @@ internal static class AnalyzerAdditionalFileValidator
         JsonElement element,
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
     {
-        if (BaselineJsonCompatibility.TryValidateBaselineEvidenceSchemaTree(
+        if (BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
                 element,
                 requireRootSchema: true,
                 out var failure))
@@ -278,11 +278,11 @@ internal static class AnalyzerAdditionalFileValidator
     private static BaselineEntryCounts CountBaselineEntries(JsonElement element)
     {
         var counts = new BaselineEntryCounts();
-        BaselineJsonCompatibility.VisitJsonTree(element, (candidate, _) =>
+        BaselineJsonReader.VisitJsonTree(element, (candidate, _) =>
         {
             if (candidate.ValueKind != JsonValueKind.Object) return true;
 
-            var fields = BaselineJsonCompatibility.ReadEntryFields(candidate);
+            var fields = BaselineJsonReader.ReadEntryFields(candidate);
             if (fields.HasCandidateProperty)
             {
                 counts.CandidateCount++;

@@ -134,10 +134,109 @@
                                 "reason":  "high-fanout analyzer core"
                             },
                             {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Allocation.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Capabilities.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.CommonBugs.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Complexity.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
                                 "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  133,
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Ensures.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Exceptions.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Nullability.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Placement.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Purity.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Requires.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
+                                "tokens":  [
+                                               "SharpProofDiagnostics"
+                                           ]
+                            },
+                            {
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Suggestions.cs",
+                                "reason":  "broad generated fixture dependency",
+                                "module":  "Analyzer",
+                                "fixtureCount":  132,
                                 "tokens":  [
                                                "SharpProofDiagnostics"
                                            ]
@@ -146,7 +245,7 @@
                                 "path":  "Tools/SharpProof.SymbolicCli/CliHost.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Tools",
-                                "fixtureCount":  103,
+                                "fixtureCount":  102,
                                 "tokens":  [
                                                "CliHost",
                                                "Console",
@@ -184,6 +283,7 @@
                          "path":  "SharpProof.Analyzer/SharpProof.Analyzer.csproj",
                          "module":  "Analyzer",
                          "projectReferences":  [
+                                                   "SharpProof.Contracts",
                                                    "SharpProof.ProofCore",
                                                    "SharpProof.Symbolic"
                                                ]
@@ -203,6 +303,14 @@
                          "projectReferences":  [
                                                    "SharpProof.Analyzer",
                                                    "SharpProof.Attributes"
+                                               ]
+                     },
+                     {
+                         "name":  "SharpProof.Contracts",
+                         "path":  "SharpProof.Contracts/SharpProof.Contracts.csproj",
+                         "module":  "Unknown",
+                         "projectReferences":  [
+
                                                ]
                      },
                      {
@@ -243,6 +351,7 @@
                          "module":  "Symbolic",
                          "projectReferences":  [
                                                    "SharpProof.Attributes",
+                                                   "SharpProof.Contracts",
                                                    "SharpProof.ProofCore"
                                                ]
                      },
@@ -252,7 +361,28 @@
                          "module":  "TestInfrastructure",
                          "projectReferences":  [
                                                    "SharpProof.EffectSummary",
-                                                   "SharpProof.ProofCore"
+                                                   "SharpProof.ProofCore",
+                                                   "SharpProof.SymbolicCli.Core",
+                                                   "SharpProof.Testing"
+                                               ]
+                     },
+                     {
+                         "name":  "SharpProof.Testing",
+                         "path":  "SharpProof.Testing/SharpProof.Testing.csproj",
+                         "module":  "Unknown",
+                         "projectReferences":  [
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.CodeFixes",
+                                                   "SharpProof.Symbolic"
+                                               ]
+                     },
+                     {
+                         "name":  "SharpProof.Tooling.Core",
+                         "path":  "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj",
+                         "module":  "Unknown",
+                         "projectReferences":  [
+
                                                ]
                      },
                      {
@@ -262,7 +392,9 @@
                          "projectReferences":  [
                                                    "SharpProof.Baseline.Core",
                                                    "SharpProof.CorpusReport.Core",
-                                                   "SharpProof.Fuzz.Core"
+                                                   "SharpProof.Fuzz.Core",
+                                                   "SharpProof.SymbolicCli.Core",
+                                                   "SharpProof.Testing"
                                                ]
                      },
                      {
@@ -272,6 +404,7 @@
                          "projectReferences":  [
                                                    "SharpProof.Analyzer",
                                                    "SharpProof.CodeFixes",
+                                                   "SharpProof.Contracts",
                                                    "SharpProof.Symbolic"
                                                ]
                      },
@@ -280,7 +413,8 @@
                          "path":  "Tools/SharpProof.Baseline.Core/SharpProof.Baseline.Core.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-
+                                                   "SharpProof.Contracts",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -288,7 +422,8 @@
                          "path":  "Tools/SharpProof.Baseline/SharpProof.Baseline.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "SharpProof.Baseline.Core"
+                                                   "SharpProof.Baseline.Core",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -296,7 +431,7 @@
                          "path":  "Tools/SharpProof.CorpusReport.Core/SharpProof.CorpusReport.Core.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -304,7 +439,8 @@
                          "path":  "Tools/SharpProof.CorpusReport/SharpProof.CorpusReport.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "SharpProof.CorpusReport.Core"
+                                                   "SharpProof.CorpusReport.Core",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -312,7 +448,8 @@
                          "path":  "Tools/SharpProof.EffectSummary/SharpProof.EffectSummary.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-
+                                                   "SharpProof.Contracts",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -321,7 +458,8 @@
                          "module":  "Tools",
                          "projectReferences":  [
                                                    "SharpProof.Analyzer",
-                                                   "SharpProof.Attributes"
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -333,13 +471,23 @@
                                                ]
                      },
                      {
+                         "name":  "SharpProof.SymbolicCli.Core",
+                         "path":  "Tools/SharpProof.SymbolicCli.Core/SharpProof.SymbolicCli.Core.csproj",
+                         "module":  "Unknown",
+                         "projectReferences":  [
+                                                   "SharpProof.Symbolic"
+                                               ]
+                     },
+                     {
                          "name":  "SharpProof.SymbolicCli",
                          "path":  "Tools/SharpProof.SymbolicCli/SharpProof.SymbolicCli.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
                                                    "SharpProof.Analyzer",
                                                    "SharpProof.Attributes",
-                                                   "SharpProof.Symbolic"
+                                                   "SharpProof.Symbolic",
+                                                   "SharpProof.SymbolicCli.Core",
+                                                   "SharpProof.Tooling.Core"
                                                ]
                      },
                      {
@@ -1309,6 +1457,10 @@
                              "path":  "SharpProof.Test/RegexTests.cs"
                          },
                          {
+                             "name":  "RepositoryArchitectureTests",
+                             "path":  "SharpProof.ToolingTest/RepositoryArchitectureTests.cs"
+                         },
+                         {
                              "name":  "RequiredMembersSmokeTests",
                              "path":  "SharpProof.Test/RequiredMembersSmokeTests.cs"
                          },
@@ -1355,6 +1507,10 @@
                          {
                              "name":  "SerializationTests",
                              "path":  "SharpProof.Test/SerializationTests.cs"
+                         },
+                         {
+                             "name":  "SharpProofAnalysisSessionTests",
+                             "path":  "SharpProof.ToolingTest/SharpProofAnalysisSessionTests.cs"
                          },
                          {
                              "name":  "SharpProofCodeFixTests",
@@ -1687,118 +1843,6 @@
                      ],
     "sourceFiles":  [
                         {
-                            "path":  "Shared/BclPurityFallbackHeuristics.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "BclPurityFallbackHeuristics",
-                                                  "Classification",
-                                                  "KnownPrimitiveOrValueAliases",
-                                                  "Shape"
-                                              ],
-                            "referencingFixtureCount":  9,
-                            "referencedTokens":  [
-                                                     "BclPurityFallbackHeuristics",
-                                                     "Classification",
-                                                     "Shape"
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/DotnetSarifBuildRunner.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "DotnetSarifBuildRunner",
-                                                  "MaterializedSarifInput",
-                                                  "MaterializedSarifInputs"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "DotnetSarifBuildRunner"
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/EcmaStructuralMethodIdentity.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "EcmaStructuralMethodIdentity",
-                                                  "StructuralDecodedType",
-                                                  "StructuralTypeProvider"
-                                              ],
-                            "referencingFixtureCount":  2,
-                            "referencedTokens":  [
-                                                     "EcmaStructuralMethodIdentity"
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/EffectSummarySchemaContract.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "EffectSummarySchemaContract"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/JsonElementCompatibility.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "EvidenceSchemaJsonProperties",
-                                                  "JsonElementCompatibility"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/Polyfills/IsExternalInit.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "IsExternalInit"
-                                              ],
-                            "referencingFixtureCount":  5,
-                            "referencedTokens":  [
-                                                     "IsExternalInit"
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/ProofEvidenceSchemaContract.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "ProofEvidenceSchemaContract"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/SarifJsonFacts.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "SarifJsonFacts"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Shared/StructuralMethodIdentity.cs",
-                            "module":  "Shared",
-                            "declaredTypes":  [
-                                                  "StructuralMethodIdentity",
-                                                  "StructuralParameterIdentity",
-                                                  "StructuralRefKinds"
-                                              ],
-                            "referencingFixtureCount":  4,
-                            "referencedTokens":  [
-                                                     "StructuralMethodIdentity",
-                                                     "StructuralParameterIdentity"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/AnalysisTruncationDiagnosticProperties.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1807,6 +1851,19 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "AnalyzerDiagnosticCatalog",
+                                                  "AnalyzerDiagnosticDefinition"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "AnalyzerDiagnosticCatalog",
+                                                     "AnalyzerDiagnosticDefinition"
                                                  ]
                         },
                         {
@@ -1842,10 +1899,20 @@
                                                   "AnalyzerFeatureDependencies",
                                                   "AnalyzerFeatures"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
-                                                     "AnalyzerFeatureDependencies",
                                                      "AnalyzerFeatures"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/AnalyzerJsonElementReader.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "AnalyzerJsonElementReader"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -1984,17 +2051,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/CompatibilityHelpers.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "CompatibilityHelpers"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/ComplexityContractFacts.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2050,7 +2106,7 @@
                                                   "AnalyzerConfigurationValueKind",
                                                   "PurityPolicyImpact"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "AnalyzerConfigurationOption",
                                                      "AnalyzerConfigurationOptionRegistry",
@@ -2070,11 +2126,11 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Configuration/BaselineJsonCompatibility.cs",
+                            "path":  "SharpProof.Analyzer/Configuration/BaselineJsonReader.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BaselineEntryJsonFields",
-                                                  "BaselineJsonCompatibility",
+                                                  "BaselineJsonReader",
                                                   "EvidenceSchemaValidationFailure",
                                                   "EvidenceSchemaValidationFailureKind"
                                               ],
@@ -3269,6 +3325,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ObjectOrCollectionInitializerPurityRule.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ObjectOrCollectionInitializerPurityRule"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/OwnedFreshMutableObjectClassifier.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3365,6 +3432,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "PurityAnalysisContext"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PurityRuleBase.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityRuleBase"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -3765,6 +3843,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/LowerHexEncoding.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "LowerHexEncoding"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/MethodAllocationAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3777,13 +3866,35 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/MethodAnalysisRequest.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "MethodAnalysisRequest"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "MethodAnalysisRequest"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/MethodAnalysisSnapshot.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "MethodAnalysisSnapshot",
+                                                  "MethodBodySemanticFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/MethodBodyAnalysisState.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AnalyzerSymbolicQueryBoundary",
                                                   "MethodBodyAnalysisContext",
-                                                  "MethodBodyAnalysisState",
-                                                  "MethodBodySemanticFacts"
+                                                  "MethodBodyAnalysisState"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
@@ -3883,6 +3994,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/Polyfills/IsExternalInit.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "IsExternalInit"
+                                              ],
+                            "referencingFixtureCount":  4,
+                            "referencedTokens":  [
+                                                     "IsExternalInit"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/RequiresContractHelpers.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3918,17 +4040,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Rules/ObjectOrCollectionInitializerPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ObjectOrCollectionInitializerPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3951,12 +4062,133 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Allocation.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Capabilities.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.CommonBugs.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Complexity.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "SharpProofDiagnostics"
                                               ],
-                            "referencingFixtureCount":  133,
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Ensures.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Exceptions.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Nullability.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Placement.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Purity.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Requires.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
+                            "referencedTokens":  [
+                                                     "SharpProofDiagnostics"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.Suggestions.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SharpProofDiagnostics"
+                                              ],
+                            "referencingFixtureCount":  132,
                             "referencedTokens":  [
                                                      "SharpProofDiagnostics"
                                                  ]
@@ -4004,6 +4236,17 @@
                             "declaredTypes":  [
                                                   "AssociatedAttributePolicy",
                                                   "SymbolAttributeTraversal"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/SymbolEq.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "SymbolEq"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -4189,13 +4432,44 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.CodeFixes/CodeFixHandlerRegistry.cs",
+                            "module":  "CodeFixes",
+                            "declaredTypes":  [
+                                                  "CodeFixHandlerFamily",
+                                                  "CodeFixHandlerRegistration",
+                                                  "CodeFixHandlerRegistry",
+                                                  "SimpleRemovalOperation",
+                                                  "SimpleRemovalRegistration"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.CodeFixes/CodeFixHandlers.cs",
+                            "module":  "CodeFixes",
+                            "declaredTypes":  [
+                                                  "AddPurityCodeFixHandler",
+                                                  "CodeFixHandlers",
+                                                  "ICodeFixHandler",
+                                                  "InferredContractCodeFixHandler",
+                                                  "MisplacedRequiresCodeFixHandler",
+                                                  "NullForgivingCodeFixHandler",
+                                                  "SimpleRemovalCodeFixHandler",
+                                                  "SynchronizationCodeFixHandler"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
                             "module":  "CodeFixes",
                             "declaredTypes":  [
                                                   "SharpProofAttributeNameRewriter",
-                                                  "SharpProofCodeFixProvider",
-                                                  "SimpleRemovalOperation",
-                                                  "SimpleRemovalRegistration"
+                                                  "SharpProofCodeFixProvider"
                                               ],
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
@@ -4214,6 +4488,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/Polyfills/IsExternalInit.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "IsExternalInit"
+                                              ],
+                            "referencingFixtureCount":  4,
+                            "referencedTokens":  [
+                                                     "IsExternalInit"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/PurityProofQuery.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
@@ -4228,6 +4513,17 @@
                                                      "PurityHazard",
                                                      "PurityHazardKind",
                                                      "PurityProofQuery"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/PurityProofResultFactory.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "PurityProofResultFactory"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -4262,26 +4558,14 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "ConcreteFactContext",
-                                                  "SmtBooleanReferenceFactCollector"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.ProofCore/SmtComparisonOperatorFacts.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "SmtComparisonOperatorFacts"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "SmtComparisonOperatorFacts"
                                                  ]
                         },
                         {
@@ -4304,17 +4588,6 @@
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "SmtConditionalFactSimplifier"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtFactFixedPoint.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtFactFixedPoint"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -4465,12 +4738,66 @@
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "Feasibility",
+                                                  "PreparedSmtQuery",
                                                   "SmtSolver"
                                               ],
                             "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "Feasibility",
                                                      "SmtSolver"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Boolean.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet",
+                                                  "SyntacticWorkBudget"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Numeric.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.ReferenceString.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
                                                  ]
                         },
                         {
@@ -4503,14 +4830,72 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/Z3RegexCharacterRanges.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "CharacterRange",
+                                                  "Z3RegexCharacterRanges"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/Z3RegexExpressionFactory.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "Z3RegexExpressionFactory"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/Z3RegexPatternNormalizer.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "NormalizedRegexPattern",
+                                                  "RegexOptionScope",
+                                                  "Z3RegexPatternNormalizer"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/Z3RegexTranslationResult.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "Z3RegexTranslationResult"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/Z3RegexTranslationValidator.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "RegexTranslationFallback",
+                                                  "Z3RegexTranslationValidator"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "RegexTranslationFallback",
+                                                     "Z3RegexTranslationValidator"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/Z3RegexTranslator.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "CharacterClassPart",
-                                                  "CharacterRange",
                                                   "RegexClassTranslation",
                                                   "RegexLookaheadAssertion",
-                                                  "RegexOptionScope",
                                                   "Z3RegexTranslator"
                                               ],
                             "referencingFixtureCount":  0,
@@ -4747,7 +5132,7 @@
                                                   "SymbolicTypeTestAtom",
                                                   "SymbolicVariableTerm"
                                               ],
-                            "referencingFixtureCount":  13,
+                            "referencingFixtureCount":  15,
                             "referencedTokens":  [
                                                      "SymbolicAliasAtom",
                                                      "SymbolicArrayDimensionLengthTerm",
@@ -4852,7 +5237,7 @@
                                                   "SymbolicIrReferenceScanner",
                                                   "VariableReferenceVisitor"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicIrReferenceScanner"
                                                  ]
@@ -4864,9 +5249,9 @@
                                                   "SymbolicIrSubstitution",
                                                   "TermSubstitutionRewriter"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "SymbolicIrSubstitution"
                                                  ]
                         },
                         {
@@ -5213,7 +5598,7 @@
                                                   "GuardedState",
                                                   "SymbolicStateMerger"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "SymbolicStateMerger"
                                                  ]
@@ -5302,6 +5687,71 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Polyfills/IsExternalInit.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "IsExternalInit"
+                                              ],
+                            "referencingFixtureCount":  4,
+                            "referencedTokens":  [
+                                                     "IsExternalInit"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SharpProofAnalysisApi.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "CapabilityQuery",
+                                                  "CapabilityQueryPayload",
+                                                  "ComplexityQuery",
+                                                  "ComplexityQueryPayload",
+                                                  "ConditionQuery",
+                                                  "ConditionQueryPayload",
+                                                  "InvariantQuery",
+                                                  "MethodQuery",
+                                                  "ReachabilityQuery",
+                                                  "RuntimeHazardQuery",
+                                                  "RuntimeHazardQueryPayload",
+                                                  "SharpProofAnalysisBudget",
+                                                  "SharpProofAnalysisOptions",
+                                                  "SharpProofAnalysisSession",
+                                                  "SharpProofBudgetMetadata",
+                                                  "SharpProofError",
+                                                  "SharpProofEvidence",
+                                                  "SharpProofHazard",
+                                                  "SharpProofLocation",
+                                                  "SharpProofPayloadMetadata",
+                                                  "SharpProofQuery",
+                                                  "SharpProofQueryKind",
+                                                  "SharpProofQueryPayload",
+                                                  "SharpProofQueryResult",
+                                                  "SharpProofQueryStatus",
+                                                  "SharpProofRuntimeHazardOptions",
+                                                  "SharpProofSmtMetadata",
+                                                  "SharpProofTarget",
+                                                  "SharpProofTargetKind",
+                                                  "SharpProofTruncationReason",
+                                                  "SharpProofUnknownReason",
+                                                  "SourceLocationQuery",
+                                                  "SourceQueryPayload"
+                                              ],
+                            "referencingFixtureCount":  3,
+                            "referencedTokens":  [
+                                                     "CapabilityQueryPayload",
+                                                     "ComplexityQueryPayload",
+                                                     "ConditionQueryPayload",
+                                                     "RuntimeHazardQueryPayload",
+                                                     "SharpProofAnalysisOptions",
+                                                     "SharpProofAnalysisSession",
+                                                     "SharpProofError",
+                                                     "SharpProofQuery",
+                                                     "SharpProofQueryResult",
+                                                     "SharpProofQueryStatus",
+                                                     "SharpProofTarget",
+                                                     "SourceQueryPayload"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SharpProofEvidenceSchema.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5346,7 +5796,7 @@
                                                   "SmtSolverContextRecycleScope",
                                                   "SmtSolverLifecycleOptions"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ISmtProofSearchSession",
                                                      "SmtAnalysisHealth",
@@ -5374,20 +5824,9 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  22,
+                            "referencingFixtureCount":  21,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtFormulaReferenceScanner.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtFormulaReferenceScanner"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtFormulaReferenceScanner"
                                                  ]
                         },
                         {
@@ -5402,18 +5841,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtFormulaVersionRewriter",
-                                                  "SmtVersionRewrite"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtFormulaVersionRewriter"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Smt/SmtNativeLibraryBootstrap.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5422,30 +5849,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SmtNativeLibraryBootstrap"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtPathConditionMerger.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtPathConditionMergeOptions",
-                                                  "SmtPathConditionMerger"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtPathConditionMergeOptions",
-                                                     "SmtPathConditionMerger"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtProofFacts.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "PurityProofResultFactory"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -5470,70 +5873,6 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet",
-                                                  "SyntacticWorkBudget"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Numeric.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.ReferenceString.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticFormulaOperations.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticFormulaOperations"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticFormulaOperations"
                                                  ]
                         },
                         {
@@ -5667,6 +6006,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityAlgebra.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityAlgebra"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5677,6 +6027,50 @@
                                                   "ResolvedComplexityTarget",
                                                   "StepDirection",
                                                   "SubstitutionResult"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityAnalysisSession.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityAnalysisSession"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityCallModel.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityCallModel"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityCostModel.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityCostModel"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityLoopModel.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityLoopModel"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -5704,11 +6098,32 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityResultProjector.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicComplexityResultProjector"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicComplexityService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "AnalysisSession",
                                                   "SymbolicComplexityService"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicConditionProofEngine.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicConditionProofEngine"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -5773,7 +6188,7 @@
                                                   "SymbolicOperationResult",
                                                   "SymbolicQueryException"
                                               ],
-                            "referencingFixtureCount":  6,
+                            "referencingFixtureCount":  7,
                             "referencedTokens":  [
                                                      "SymbolicError",
                                                      "SymbolicErrorCategory",
@@ -5791,7 +6206,7 @@
                             "declaredTypes":  [
                                                   "SymbolicFactFactory"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  7,
                             "referencedTokens":  [
                                                      "SymbolicFactFactory"
                                                  ]
@@ -5818,7 +6233,7 @@
                                                   "SymbolicInputDomainSynthesizer",
                                                   "Target"
                                               ],
-                            "referencingFixtureCount":  14,
+                            "referencingFixtureCount":  15,
                             "referencedTokens":  [
                                                      "Target"
                                                  ]
@@ -5881,9 +6296,20 @@
                             "declaredTypes":  [
                                                   "SymbolicInvariantTargetFilter"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SymbolicInvariantTargetFilter"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicIrProofResult.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicIrProofResult"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -5907,6 +6333,17 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicMethodAnalysisInput.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicMethodAnalysisInput"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicMethodAnalysisInput"
                                                  ]
                         },
                         {
@@ -5958,6 +6395,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointAnalyzer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicProgramPointAnalyzer"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5973,6 +6421,18 @@
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicProgramPointMetadata"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointProjector.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicProgramPointProjector",
+                                                  "SymbolicProgramPointQueryContext"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -6013,6 +6473,32 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicProofCache.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicEncodedState",
+                                                  "SymbolicProofCache",
+                                                  "SymbolicProofCacheStore"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicProofEncoder.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SafeDivisorAssumption",
+                                                  "SafeDivisorProofStrategy",
+                                                  "SymbolicProofEncoder"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicProofPipeline.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -6039,17 +6525,22 @@
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "ConditionClassificationMode",
-                                                  "EncodedStateCacheEntry",
-                                                  "FormulaSafeDivisorContext",
-                                                  "ProofResultCache",
-                                                  "SafeDivisorAssumption",
-                                                  "SafeDivisorProofStrategy",
-                                                  "SymbolicIrProofResult",
                                                   "SymbolicProofService"
                                               ],
                             "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SymbolicProofService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicProofStateFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicProofStateFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -6083,30 +6574,38 @@
                             "path":  "SharpProof.Symbolic/SymbolicQueryApi.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicQueryContext",
-                                                  "SymbolicQueryLineGroup",
-                                                  "SymbolicQueryOptionHelpers",
-                                                  "SymbolicQueryOptions",
-                                                  "SymbolicQueryResult",
-                                                  "SymbolicQueryScope",
-                                                  "SymbolicQueryScopeKind",
-                                                  "SymbolicQueryService",
-                                                  "SymbolicQueryTarget",
-                                                  "SymbolicQueryTargetKind",
-                                                  "SymbolicSourceInput",
-                                                  "SymbolicSourceInputKind"
+                                                  "SymbolicQueryExecutor"
                                               ],
-                            "referencingFixtureCount":  9,
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SymbolicQueryExecutor"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicQueryContext.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicQueryContext",
+                                                  "SymbolicQueryOptionHelpers",
+                                                  "SymbolicQueryOptions"
+                                              ],
+                            "referencingFixtureCount":  8,
                             "referencedTokens":  [
                                                      "SymbolicQueryContext",
-                                                     "SymbolicQueryOptions",
-                                                     "SymbolicQueryResult",
-                                                     "SymbolicQueryScopeKind",
-                                                     "SymbolicQueryService",
-                                                     "SymbolicQueryTarget",
-                                                     "SymbolicQueryTargetKind",
-                                                     "SymbolicSourceInput",
-                                                     "SymbolicSourceInputKind"
+                                                     "SymbolicQueryOptions"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicQueryDispatchers.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicConditionProofDispatcher",
+                                                  "SymbolicRuntimeHazardQueryDispatcher",
+                                                  "SymbolicSourceQueryDispatcher"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -6133,6 +6632,45 @@
                                                      "SymbolicConditionProofSummary",
                                                      "SymbolicConditionProofSummaryStatus",
                                                      "SymbolicSourceQueryFilter"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicQueryResult.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicQueryLineGroup",
+                                                  "SymbolicQueryResult"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SymbolicQueryResult"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicQueryService.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicQueryService"
+                                              ],
+                            "referencingFixtureCount":  7,
+                            "referencedTokens":  [
+                                                     "SymbolicQueryService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicQueryTarget.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicQueryScope",
+                                                  "SymbolicQueryScopeKind",
+                                                  "SymbolicQueryTarget",
+                                                  "SymbolicQueryTargetKind"
+                                              ],
+                            "referencingFixtureCount":  8,
+                            "referencedTokens":  [
+                                                     "SymbolicQueryScopeKind",
+                                                     "SymbolicQueryTarget",
+                                                     "SymbolicQueryTargetKind"
                                                  ]
                         },
                         {
@@ -6242,24 +6780,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicScopedQueryResults.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicInvariantQueryDiagnostic",
-                                                  "SymbolicInvariantQueryStatus",
-                                                  "SymbolicInvariantQueryView",
-                                                  "SymbolicInvariantTargetPathSummary",
-                                                  "SymbolicInvariantTargetSummary",
-                                                  "TargetFactBuilder",
-                                                  "TargetPathBuilder"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SymbolicInvariantQueryDiagnostic",
-                                                     "SymbolicInvariantQueryStatus"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/SymbolicSourceCompilation.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -6268,8 +6788,7 @@
                                               ],
                             "referencingFixtureCount":  3,
                             "referencedTokens":  [
-                                                     "SymbolicSourceCompilation",
-                                                     "SymbolicSourceCompilationKind"
+                                                     "SymbolicSourceCompilation"
                                                  ]
                         },
                         {
@@ -6291,7 +6810,20 @@
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "SymbolicSourceFile"
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicSourceInput.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicSourceInput",
+                                                  "SymbolicSourceInputKind"
+                                              ],
+                            "referencingFixtureCount":  8,
+                            "referencedTokens":  [
+                                                     "SymbolicSourceInput",
+                                                     "SymbolicSourceInputKind"
                                                  ]
                         },
                         {
@@ -6319,16 +6851,48 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicSourceProgramPointExecutor.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicSourceProgramPointExecutor"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "ProgramPointQueryContext",
-                                                  "QueryNodeIndex",
                                                   "SymbolicSourceQueryService"
                                               ],
                             "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "SymbolicSourceQueryService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicSourceRangeQueryExecutor.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicSourceRangeQueryExecutor"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicSourceTargetSelector.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "QueryNodeIndex",
+                                                  "SymbolicSourceTargetSelector"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -6437,6 +7001,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolMutationFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/ValidatedSymbolicQueryRequest.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "ValidatedSymbolicQueryRequest"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -6563,6 +7138,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryAnalysisPipeline.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryAnalysisPipeline"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCallPurityRules.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6589,6 +7175,17 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "EffectSummaryClassificationEvidenceRules"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCli.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryCli"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -6646,6 +7243,17 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "EffectSummaryIlAnalyzer"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryInputResolver.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryInputResolver"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -6711,6 +7319,28 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryOutputWriter.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryOutputWriter"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryProgressStore.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryProgressStore"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/EffectSummarySemanticWrapperRules.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6736,10 +7366,10 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.EffectSummary/Program.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/GeneratedPurityCatalogReader.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "EffectSummaryCli"
+                                                  "GeneratedPurityCatalogReader"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -6913,23 +7543,11 @@
                                                   "Console",
                                                   "Scope"
                                               ],
-                            "referencingFixtureCount":  103,
+                            "referencingFixtureCount":  102,
                             "referencedTokens":  [
                                                      "CliHost",
                                                      "Console",
                                                      "Scope"
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliDiagnosticSelector.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCliDiagnosticSelector",
-                                                  "SymbolicCliSelectedDiagnostic"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SymbolicCliDiagnosticSelector"
                                                  ]
                         },
                         {
@@ -6963,16 +7581,9 @@
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliExplainReport.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "SymbolicCliExplainCapabilityResult",
-                                                  "SymbolicCliExplainCapabilityTruncation",
-                                                  "SymbolicCliExplainComplexityResult",
-                                                  "SymbolicCliExplainComplexityTruncation",
-                                                  "SymbolicCliExplainCrossLink",
                                                   "SymbolicCliExplainDiagnostic",
-                                                  "SymbolicCliExplainDiagnosticResult",
-                                                  "SymbolicCliExplainMethodTargetResult",
+                                                  "SymbolicCliExplainDiagnostics",
                                                   "SymbolicCliExplainProject",
-                                                  "SymbolicCliExplainProjectTruncation",
                                                   "SymbolicCliExplainReport",
                                                   "SymbolicCliExplainSource",
                                                   "SymbolicCliExplainTarget",
@@ -6996,37 +7607,13 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonProjectionExtensions.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "Converter",
-                                                  "ISymbolicRawJsonProjection",
-                                                  "SymbolicCliJsonProjectionExtensions",
-                                                  "SymbolicCliProjectionJson",
-                                                  "SymbolicRawJsonProjectionConverter"
-                                              ],
-                            "referencingFixtureCount":  2,
-                            "referencedTokens":  [
-                                                     "Converter"
-                                                 ]
-                        },
-                        {
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonRequest.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "SymbolicCliJsonGateOptions",
-                                                  "SymbolicCliJsonOutputOptions",
-                                                  "SymbolicCliJsonParseOptions",
-                                                  "SymbolicCliJsonQueryOptions",
-                                                  "SymbolicCliJsonRequest",
-                                                  "SymbolicCliJsonSmtOptions",
-                                                  "SymbolicCliJsonSource",
-                                                  "SymbolicCliJsonSourceMap",
-                                                  "SymbolicCliJsonTarget"
+                                                  "SymbolicCliJsonRequest"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "SymbolicCliJsonGateOptions",
                                                      "SymbolicCliJsonRequest"
                                                  ]
                         },
@@ -7047,17 +7634,6 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SymbolicCliOutputPolicy"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliQueryResultAdapter.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCliScopedQueryProjection"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -7087,71 +7663,6 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCliCounts",
-                                                  "SymbolicCompactRuntimeHazardProjection",
-                                                  "SymbolicCompactRuntimeHazardQueryOptions",
-                                                  "SymbolicSchemaResultBase"
-                                              ],
-                            "referencingFixtureCount":  2,
-                            "referencedTokens":  [
-                                                     "SymbolicCompactRuntimeHazardProjection",
-                                                     "SymbolicCompactRuntimeHazardQueryOptions",
-                                                     "SymbolicSchemaResultBase"
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCompactAnalysisSummary",
-                                                  "SymbolicCompactOutputTruncation",
-                                                  "SymbolicCompactSmtDiagnostics"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SymbolicCompactSmtDiagnostics"
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCompactConservativeUnknownDiagnostic",
-                                                  "SymbolicCompactInvariantQueryView",
-                                                  "SymbolicCompactInvariantSummary",
-                                                  "SymbolicCompactLineResult",
-                                                  "SymbolicCompactMergedPathFacts",
-                                                  "SymbolicCompactProgramPointResult"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCompactQueryOptions",
-                                                  "SymbolicCompactQueryProjection",
-                                                  "SymbolicCompactQueryScope",
-                                                  "SymbolicCompactSourceQueryDescriptor",
-                                                  "SymbolicInvariantQueryFocus",
-                                                  "SymbolicInvariantQueryProjection",
-                                                  "SymbolicInvariantQuerySummary",
-                                                  "SymbolicOrderedJson"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SymbolicCompactQueryOptions",
-                                                     "SymbolicCompactQueryProjection",
-                                                     "SymbolicInvariantQueryProjection"
-                                                 ]
-                        },
-                        {
                             "path":  "Tools/VsixHarness/Program.cs",
                             "module":  "VSIX",
                             "declaredTypes":  [
@@ -7172,77 +7683,16 @@
                     ],
     "fixtureDependencies":  [
                                 {
-                                    "path":  "Shared/BclPurityFallbackHeuristics.cs",
-                                    "module":  "Shared",
+                                    "path":  "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
+                                    "module":  "Analyzer",
                                     "selectedTestFixtures":  [
-                                                                 "AnalyzerPackagingTests",
-                                                                 "BasicImpurityInteractionTests",
-                                                                 "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "EffectSummarySymbolKeyFactoryTests",
-                                                                 "EffectSummaryToolTests",
-                                                                 "PureStateInteractionTests",
-                                                                 "PurityDirectThrowVisibilityTests",
-                                                                 "StructuralMethodIdentityTests"
+                                                                 "DiagnosticDescriptorMetadataTests"
                                                              ],
                                     "tokens":  [
-                                                   "BclPurityFallbackHeuristics",
-                                                   "Classification",
-                                                   "Shape"
-                                               ],
-                                    "fixtureCount":  9
-                                },
-                                {
-                                    "path":  "Shared/DotnetSarifBuildRunner.cs",
-                                    "module":  "Shared",
-                                    "selectedTestFixtures":  [
-                                                                 "ScriptProcessOwnershipTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "DotnetSarifBuildRunner"
+                                                   "AnalyzerDiagnosticCatalog",
+                                                   "AnalyzerDiagnosticDefinition"
                                                ],
                                     "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "Shared/EcmaStructuralMethodIdentity.cs",
-                                    "module":  "Shared",
-                                    "selectedTestFixtures":  [
-                                                                 "ExceptionSummaryCatalogValidationTests",
-                                                                 "StructuralMethodIdentityTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "EcmaStructuralMethodIdentity"
-                                               ],
-                                    "fixtureCount":  2
-                                },
-                                {
-                                    "path":  "Shared/Polyfills/IsExternalInit.cs",
-                                    "module":  "Shared",
-                                    "selectedTestFixtures":  [
-                                                                 "BasicPureTests",
-                                                                 "ConstantsTests",
-                                                                 "PrimaryConstructorTests",
-                                                                 "RecordTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "IsExternalInit"
-                                               ],
-                                    "fixtureCount":  4
-                                },
-                                {
-                                    "path":  "Shared/StructuralMethodIdentity.cs",
-                                    "module":  "Shared",
-                                    "selectedTestFixtures":  [
-                                                                 "EffectSummarySchemaV5Tests",
-                                                                 "EffectSummarySymbolKeyFactoryTests",
-                                                                 "ExceptionSummaryCatalogValidationTests",
-                                                                 "StructuralMethodIdentityTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "StructuralMethodIdentity",
-                                                   "StructuralParameterIdentity"
-                                               ],
-                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
@@ -7260,16 +7710,16 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerFeatureCompositionTests",
+                                                                 "DiagnosticDescriptorMetadataTests",
                                                                  "EnsuresContractTests",
                                                                  "NullableContractVerificationTests",
                                                                  "PurityDirectThrowVisibilityTests",
                                                                  "ReadmeGeneratedExamplesTests"
                                                              ],
                                     "tokens":  [
-                                                   "AnalyzerFeatureDependencies",
                                                    "AnalyzerFeatures"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
@@ -7290,6 +7740,7 @@
                                                                  "AnalyzerPackagingTests",
                                                                  "AnalyzerTestHostConfigurationTests",
                                                                  "ConfigurationProfileTests",
+                                                                 "DiagnosticDescriptorMetadataTests",
                                                                  "PurityPolicyAuditTests"
                                                              ],
                                     "tokens":  [
@@ -7298,7 +7749,7 @@
                                                    "AnalyzerConfigurationScope",
                                                    "PurityPolicyImpact"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
@@ -8350,6 +8801,17 @@
                                     "fixtureCount":  13
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/MethodAnalysisRequest.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "OperationBlockPipelineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "MethodAnalysisRequest"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/MethodBodyAnalysisState.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -8360,6 +8822,20 @@
                                                    "MethodBodyAnalysisState"
                                                ],
                                     "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Polyfills/IsExternalInit.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "BasicPureTests",
+                                                                 "ConstantsTests",
+                                                                 "PrimaryConstructorTests",
+                                                                 "RecordTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "IsExternalInit"
+                                               ],
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/RequiresContractHelpers.cs",
@@ -8714,6 +9190,20 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.ProofCore/Polyfills/IsExternalInit.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "BasicPureTests",
+                                                                 "ConstantsTests",
+                                                                 "PrimaryConstructorTests",
+                                                                 "RecordTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "IsExternalInit"
+                                               ],
+                                    "fixtureCount":  4
+                                },
+                                {
                                     "path":  "SharpProof.ProofCore/PurityProofQuery.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
@@ -8758,6 +9248,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SmtAffineIntegerTerm"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtComparisonOperatorFacts.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtComparisonOperatorFacts"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -8864,6 +9365,54 @@
                                     "fixtureCount":  6
                                 },
                                 {
+                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Boolean.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Numeric.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.ReferenceString.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.ProofCore/SmtWitness.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
@@ -8878,6 +9427,18 @@
                                                    "SmtWitnessStatus"
                                                ],
                                     "fixtureCount":  4
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/Z3RegexTranslationValidator.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ProofCoreZ3SmokeTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "RegexTranslationFallback",
+                                                   "Z3RegexTranslationValidator"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/CSharpSyntaxFacts.cs",
@@ -8946,6 +9507,8 @@
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "SmtAnalysisServiceTests",
+                                                                 "SmtFormulaVersionRewriterTests",
+                                                                 "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantServiceTests",
                                                                  "SymbolicIrTests",
@@ -9009,7 +9572,7 @@
                                                    "SymbolicTypeTestAtom",
                                                    "SymbolicVariableTerm"
                                                ],
-                                    "fixtureCount":  13
+                                    "fixtureCount":  15
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
@@ -9059,10 +9622,22 @@
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrReferenceScanner.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "SymbolicCfgProgramPointStateCollectorTests"
+                                                                 "SymbolicCfgProgramPointStateCollectorTests",
+                                                                 "SymbolicSemanticPipelineTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicIrReferenceScanner"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrSubstitution.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "SmtFormulaVersionRewriterTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicIrSubstitution"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9218,13 +9793,14 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "PurityAnalysisStateMergerTests",
+                                                                 "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicOperationTransferModelTests",
                                                                  "SymbolicStateMergerTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicStateMerger"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/MethodBodyOperationResolver.cs",
@@ -9252,6 +9828,44 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/Polyfills/IsExternalInit.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "BasicPureTests",
+                                                                 "ConstantsTests",
+                                                                 "PrimaryConstructorTests",
+                                                                 "RecordTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "IsExternalInit"
+                                               ],
+                                    "fixtureCount":  4
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SharpProofAnalysisApi.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SharpProofAnalysisSessionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "CapabilityQueryPayload",
+                                                   "ComplexityQueryPayload",
+                                                   "ConditionQueryPayload",
+                                                   "RuntimeHazardQueryPayload",
+                                                   "SharpProofAnalysisOptions",
+                                                   "SharpProofAnalysisSession",
+                                                   "SharpProofError",
+                                                   "SharpProofQuery",
+                                                   "SharpProofQueryResult",
+                                                   "SharpProofQueryStatus",
+                                                   "SharpProofTarget",
+                                                   "SourceQueryPayload"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SharpProofEvidenceSchema.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9270,7 +9884,6 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerHostConcurrencyStressTests",
-                                                                 "AnalyzerPackagingTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "SymbolicProofPipelineTests"
                                                              ],
@@ -9281,7 +9894,7 @@
                                                    "SmtSolverContextRecycleScope",
                                                    "SmtSolverLifecycleOptions"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisOptions.cs",
@@ -9331,7 +9944,6 @@
                                                                  "PathSensitiveSmtInvariantTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
-                                                                 "SmtSyntacticClassifierTests",
                                                                  "StringLengthSmtTests",
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
@@ -9347,18 +9959,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  22
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtFormulaReferenceScanner.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SymbolicSemanticPipelineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtFormulaReferenceScanner"
-                                               ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  21
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaStructuralKey.cs",
@@ -9372,17 +9973,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtFormulaVersionRewriterTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtFormulaVersionRewriter"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/Smt/SmtNativeLibraryBootstrap.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9390,77 +9980,6 @@
                                                              ],
                                     "tokens":  [
                                                    "SmtNativeLibraryBootstrap"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtPathConditionMerger.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SymbolicAnalysisLimitsTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtPathConditionMergeOptions",
-                                                   "SmtPathConditionMerger"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Numeric.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.ReferenceString.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticFormulaOperations.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticFormulaOperations"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9549,6 +10068,7 @@
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
                                                                  "OperationBlockPipelineTests",
+                                                                 "SharpProofAnalysisSessionTests",
                                                                  "SymbolicCliErrorModelTests",
                                                                  "SymbolicErrorModelTests",
                                                                  "SymbolicExplainCliTests",
@@ -9564,13 +10084,12 @@
                                                    "SymbolicOperationResult",
                                                    "SymbolicQueryException"
                                                ],
-                                    "fixtureCount":  6
+                                    "fixtureCount":  7
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicFactFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "SmtFormulaVersionRewriterTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInputWitnessTests",
                                                                  "SymbolicIrTests",
@@ -9582,7 +10101,7 @@
                                     "tokens":  [
                                                    "SymbolicFactFactory"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  7
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicFormulaDisplay.cs",
@@ -9608,6 +10127,7 @@
                                                                  "ImpurityCatalogAccessorTests",
                                                                  "ObjectInitializerTests",
                                                                  "PurityDirectThrowVisibilityTests",
+                                                                 "SharpProofAnalysisSessionTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInvariantTargetFilterTests",
                                                                  "SymbolicOperationTransferModelTests",
@@ -9617,7 +10137,7 @@
                                     "tokens":  [
                                                    "Target"
                                                ],
-                                    "fixtureCount":  14
+                                    "fixtureCount":  15
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicInputWitness.cs",
@@ -9662,10 +10182,23 @@
                                     "path":  "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "SymbolicInvariantTargetFilterTests"
+                                                                 "AnalyzerPackagingTests",
+                                                                 "SymbolicInvariantTargetFilterTests",
+                                                                 "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicInvariantTargetFilter"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicMethodAnalysisInput.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ExceptionFlowResultGraphTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicMethodAnalysisInput"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9784,6 +10317,17 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicQueryExecutor"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicQueryContext.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
                                                                  "CapabilityContractTests",
                                                                  "CompactDomainProjectionTests",
                                                                  "SymbolicAnalysisLimitsTests",
@@ -9795,16 +10339,9 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicQueryContext",
-                                                   "SymbolicQueryOptions",
-                                                   "SymbolicQueryResult",
-                                                   "SymbolicQueryScopeKind",
-                                                   "SymbolicQueryService",
-                                                   "SymbolicQueryTarget",
-                                                   "SymbolicQueryTargetKind",
-                                                   "SymbolicSourceInput",
-                                                   "SymbolicSourceInputKind"
+                                                   "SymbolicQueryOptions"
                                                ],
-                                    "fixtureCount":  9
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicQueryFactSummaries.cs",
@@ -9823,6 +10360,55 @@
                                                    "SymbolicSourceQueryFilter"
                                                ],
                                     "fixtureCount":  5
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicQueryResult.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicQueryResult"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicQueryService.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicQueryService"
+                                               ],
+                                    "fixtureCount":  7
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicQueryTarget.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicQueryTargetTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicQueryScopeKind",
+                                                   "SymbolicQueryTarget",
+                                                   "SymbolicQueryTargetKind"
+                                               ],
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicReachabilityService.cs",
@@ -9854,7 +10440,7 @@
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "CompactDomainProjectionTests",
+                                                                 "AnalyzerPackagingTests",
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicInvariantServiceTests",
                                                                  "SymbolicOperationTransferModelTests",
@@ -9887,18 +10473,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/SymbolicScopedQueryResults.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "SymbolicSourceQueryLineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicInvariantQueryDiagnostic",
-                                                   "SymbolicInvariantQueryStatus"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/SymbolicSourceCompilation.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9907,8 +10481,7 @@
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicSourceCompilation",
-                                                   "SymbolicSourceCompilationKind"
+                                                   "SymbolicSourceCompilation"
                                                ],
                                     "fixtureCount":  3
                                 },
@@ -9922,6 +10495,25 @@
                                                    "SymbolicSourceCompilationProfile"
                                                ],
                                     "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicSourceInput.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicSourceInput",
+                                                   "SymbolicSourceInputKind"
+                                               ],
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicSourceMap.cs",
@@ -10140,17 +10732,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliDiagnosticSelector.cs",
-                                    "module":  "Tools",
-                                    "selectedTestFixtures":  [
-                                                                 "SymbolicCliDiagnosticSelectorTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicCliDiagnosticSelector"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliErrorWriter.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
@@ -10187,25 +10768,12 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonProjectionExtensions.cs",
-                                    "module":  "Tools",
-                                    "selectedTestFixtures":  [
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "EffectSummaryToolTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "Converter"
-                                               ],
-                                    "fixtureCount":  2
-                                },
-                                {
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliJsonRequest.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicCliJsonGateOptions",
                                                    "SymbolicCliJsonRequest"
                                                ],
                                     "fixtureCount":  1
@@ -10218,44 +10786,6 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicCliOptions"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs",
-                                    "module":  "Tools",
-                                    "selectedTestFixtures":  [
-                                                                 "AnalyzerPackagingTests",
-                                                                 "CompactDomainProjectionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicCompactRuntimeHazardProjection",
-                                                   "SymbolicCompactRuntimeHazardQueryOptions",
-                                                   "SymbolicSchemaResultBase"
-                                               ],
-                                    "fixtureCount":  2
-                                },
-                                {
-                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs",
-                                    "module":  "Tools",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtAnalysisServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicCompactSmtDiagnostics"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs",
-                                    "module":  "Tools",
-                                    "selectedTestFixtures":  [
-                                                                 "SymbolicSourceQueryLineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicCompactQueryOptions",
-                                                   "SymbolicCompactQueryProjection",
-                                                   "SymbolicInvariantQueryProjection"
                                                ],
                                     "fixtureCount":  1
                                 },

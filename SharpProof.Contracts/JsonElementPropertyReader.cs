@@ -8,7 +8,7 @@ internal readonly record struct EvidenceSchemaJsonProperties(
     bool HasCompatibility,
     JsonElement Compatibility);
 
-internal static class JsonElementCompatibility
+internal static class JsonElementPropertyReader
 {
     internal static EvidenceSchemaJsonProperties ReadEvidenceSchemaProperties(
         JsonElement element,

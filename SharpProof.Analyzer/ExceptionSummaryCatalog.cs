@@ -493,13 +493,13 @@ internal sealed class ExceptionSummaryCatalog
         out string exceptionType,
         out string? sourcePath)
     {
-        sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath");
+        sourcePath = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath");
         return TryGetExceptionType(element, out exceptionType);
     }
 
     private static bool TryGetExceptionType(JsonElement element, out string exceptionType)
     {
-        var value = CompatibilityHelpers.GetTrimmedStringProperty(element, "ExceptionType");
+        var value = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "ExceptionType");
         if (value == null)
         {
             exceptionType = null!;
@@ -512,7 +512,7 @@ internal sealed class ExceptionSummaryCatalog
 
     private static string? GetEdgeSourcePath(JsonElement element)
     {
-        return CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath");
+        return AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath");
     }
 
     private static StructuralMethodIdentity? GetEdgeCalleeIdentity(JsonElement element)

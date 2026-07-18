@@ -224,6 +224,11 @@ This is the active source of truth for the comprehensive refactor. Read
   symbolic transfer, analyzer purity transfer, Roslyn identity, and ECMA
   identity callers now use their direct owners; an architecture test rejects
   new production `*Adapter.cs` layers.
+- [x] Removed the remaining generic compatibility helpers. Baseline JSON
+  reading, case-insensitive schema-property lookup, analyzer JSON projection,
+  and lower-hex encoding now have direct single-purpose owners. Effect-summary
+  compatibility reporting remains because it rejects untrusted schema/data;
+  it is product validation rather than a legacy shim.
 
 ## Current evidence
 
@@ -245,13 +250,13 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
   typed registries.
 - [x] Decompose EffectSummary host and standardize lightweight tool hosting.
-- [ ] Finish test-lane/repository organization and remove dead compatibility
+- [x] Finish test-lane/repository organization and remove dead compatibility
   paths.
 - [ ] Run final Release, six-lane, package-consumer, NuGet, VSIX, generated-doc,
   fuzz, EffectSummary, architecture, and public-API gates.
 
 ## Next cheapest step
 
-Audit the remaining compatibility-named production paths and distinguish
-target-framework and schema owners from obsolete compatibility shims. Delete
-the next proven shim while retaining conservative schema rejection semantics.
+Run the final comprehensive Release, packaging, consumer, generated-doc, fuzz,
+EffectSummary, architecture, and public-API gates; repair any regression and
+record the final evidence.

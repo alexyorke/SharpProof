@@ -385,9 +385,9 @@ internal sealed class SummaryAssemblyIdentity
 
     public static SummaryAssemblyIdentity? FromJson(JsonElement assemblyElement)
     {
-        var assemblyName = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "AssemblyName");
-        var assemblySha256 = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "AssemblySha256");
-        var moduleVersionId = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "ModuleVersionId");
+        var assemblyName = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "AssemblyName");
+        var assemblySha256 = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "AssemblySha256");
+        var moduleVersionId = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "ModuleVersionId");
         if (string.IsNullOrWhiteSpace(assemblyName) &&
             string.IsNullOrWhiteSpace(assemblySha256) &&
             string.IsNullOrWhiteSpace(moduleVersionId))
@@ -458,8 +458,8 @@ internal sealed class SummaryMethodIdentity
 
     public static SummaryMethodIdentity? FromJson(JsonElement methodElement)
     {
-        var metadataToken = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "MetadataToken");
-        var methodBodySha256 = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "MethodBodySha256");
+        var metadataToken = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "MetadataToken");
+        var methodBodySha256 = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "MethodBodySha256");
         if (string.IsNullOrWhiteSpace(metadataToken) && string.IsNullOrWhiteSpace(methodBodySha256)) return null;
 
         return new SummaryMethodIdentity(metadataToken?.Trim(), methodBodySha256?.Trim());
@@ -570,7 +570,7 @@ internal sealed class MethodBodyHashProvider
                 if (il == null) return null;
 
                 using var sha256 = SHA256.Create();
-                return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(il));
+                return LowerHexEncoding.Encode(sha256.ComputeHash(il));
             }
         }
         catch (IOException)
@@ -626,7 +626,7 @@ internal sealed class ActualAssemblyIdentity
     {
         using var stream = File.OpenRead(path);
         using var sha256 = SHA256.Create();
-        return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(stream));
+        return LowerHexEncoding.Encode(sha256.ComputeHash(stream));
     }
 }
 
