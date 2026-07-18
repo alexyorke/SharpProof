@@ -314,12 +314,7 @@ public sealed class SymbolicSemanticPipelineTests
             nameof(MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof));
         var site = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
         var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
-            site,
-            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(site),
-            SymbolicExceptionPreconditionKind.NegativeLength,
-            SymbolicRuntimeHazardKind.NegativeArrayLength,
-            "test.aggregate",
-            "test_category",
+            fixture.SemanticModel.GetOperation(site)!,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
             out var hazard);
 
@@ -328,7 +323,7 @@ public sealed class SymbolicSemanticPipelineTests
         Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
         Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance,
-            Is.EqualTo("test.aggregate.aggregate.unsupported.trigger"));
+            Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported.trigger"));
     }
 
     [Test]

@@ -230,12 +230,7 @@ internal sealed class SymbolicOperationTransferModelTests
         var creation = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
 
         var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
-            creation,
-            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(creation),
-            SymbolicExceptionPreconditionKind.NegativeLength,
-            SymbolicRuntimeHazardKind.NegativeArrayLength,
-            "ir.runtime-hazard.array.negative-length",
-            "definite_negative_array_length",
+            fixture.SemanticModel.GetOperation(creation)!,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
             out var hazard);
 
@@ -260,12 +255,7 @@ internal sealed class SymbolicOperationTransferModelTests
         var creation = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
 
         var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
-            creation,
-            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(creation),
-            SymbolicExceptionPreconditionKind.NegativeLength,
-            SymbolicRuntimeHazardKind.NegativeArrayLength,
-            "ir.runtime-hazard.array.negative-length",
-            "definite_negative_array_length",
+            fixture.SemanticModel.GetOperation(creation)!,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
             out var hazard);
 
@@ -286,13 +276,10 @@ internal sealed class SymbolicOperationTransferModelTests
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
             nameof(CollectionCardinalityHazardLowering_EmitsExactCountPrecondition));
-        var receiver = fixture.Root.DescendantNodes().OfType<MemberAccessExpressionSyntax>().Single().Expression;
+        var invocation = fixture.Root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
 
         var lowered = SymbolicOperationLowerer.TryLowerInvalidCollectionCardinalityHazard(
-            receiver,
-            SymbolicRelationOperator.Equal,
-            0,
-            "definite_invalid_collection_cardinality",
+            fixture.SemanticModel.GetOperation(invocation)!,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None),
             out var hazard);
 

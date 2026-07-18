@@ -74,11 +74,15 @@ Tests are excluded from the metric and must not be deleted.
   switch no-match. Deleted their syntax dispatch branches and forwarding
   adapters; syntax remains only where Roslyn operations do not carry required
   source evidence.
+- [x] Moved array/stackalloc lengths, element and Array.GetValue bounds,
+  slicing, collection cardinality, and array-store mismatch discovery behind
+  the same operation registry. Direct lowerer tests now exercise `IOperation`
+  requests instead of compatibility-shaped metadata parameter lists.
 
 ## Current evidence
 
-- Maintained production: 106,608 lines; net reduction: 1,018 lines; remaining
-  reduction: 18,982. The first eleven deletion slices removed 1,424 production
+- Maintained production: 106,444 lines; net reduction: 1,182 lines; remaining
+  reduction: 18,818. The first twelve deletion slices removed 1,715 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -93,6 +97,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Move operation-exposed slicing, collection-cardinality, and array hazard shape
-discovery into the canonical lowerers, leaving the source candidate factory
-only for Roslyn gaps and evidence projection.
+Move cast, nullable-value, null receiver, and dynamic-binding hazard discovery
+behind operation-owned lowerers, consolidating their common reference
+precondition path while preserving source categories and evidence spans.

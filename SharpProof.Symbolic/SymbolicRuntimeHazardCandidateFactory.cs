@@ -23,6 +23,12 @@ internal static class SymbolicRuntimeHazardCandidateFactory
         SymbolicOperationLowerer.TryLowerMathAbsOverflowHazard,
         SymbolicOperationLowerer.TryLowerMathClampBoundsHazard,
         SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard,
+        SymbolicOperationLowerer.TryLowerArrayStoreMismatchHazard,
+        SymbolicOperationLowerer.TryLowerArrayGetValueBoundsHazard,
+        SymbolicOperationLowerer.TryLowerElementAccessBoundsHazard,
+        SymbolicOperationLowerer.TryLowerSlicingBoundsHazard,
+        SymbolicOperationLowerer.TryLowerInvalidCollectionCardinalityHazard,
+        SymbolicOperationLowerer.TryLowerNegativeLengthHazard,
         SymbolicOperationLowerer.TryLowerSwitchNoMatchHazard
     ];
 
@@ -127,30 +133,10 @@ internal static class SymbolicRuntimeHazardCandidateFactory
                 if (TryCreateNullDereferenceCandidate(elementAccess, elementAccess.Expression, semanticModel,
                         cancellationToken, out var elementNullCandidate)) yield return elementNullCandidate;
 
-                if (TryCreateIndexOrRangeCandidate(elementAccess, semanticModel, cancellationToken,
-                        out var indexCandidate)) yield return indexCandidate;
-
                 break;
             case AssignmentExpressionSyntax assignment:
                 if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken,
                         out var deconstructionNullCandidate)) yield return deconstructionNullCandidate;
-
-                if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken,
-                        out var arrayTypeMismatchCandidate)) yield return arrayTypeMismatchCandidate;
-
-                break;
-            case ArrayCreationExpressionSyntax arrayCreation:
-                if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken,
-                        out var negativeLengthCandidate)) yield return negativeLengthCandidate;
-
-                break;
-            case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
-                if (TryCreateNegativeStackAllocLengthCandidate(
-                        stackAllocCreation,
-                        semanticModel,
-                        cancellationToken,
-                        out var negativeStackAllocLengthCandidate))
-                    yield return negativeStackAllocLengthCandidate;
 
                 break;
             case ForEachStatementSyntax forEachStatement:
@@ -188,19 +174,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory
 
                 if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken,
                         out var invocationDynamicCandidate)) yield return invocationDynamicCandidate;
-
-                if (TryCreateArrayGetValueIndexOutOfRangeCandidate(invocation, semanticModel, cancellationToken,
-                        out var arrayGetValueCandidate)) yield return arrayGetValueCandidate;
-
-                if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken,
-                        out var slicingCandidate)) yield return slicingCandidate;
-
-                if (TryCreateInvalidCollectionCardinalityCandidate(
-                        invocation,
-                        semanticModel,
-                        cancellationToken,
-                        out var collectionCardinalityCandidate))
-                    yield return collectionCardinalityCandidate;
 
                 if (invocation.Expression is not MemberAccessExpressionSyntax &&
                     TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel,

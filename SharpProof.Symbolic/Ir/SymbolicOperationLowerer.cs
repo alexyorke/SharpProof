@@ -173,6 +173,40 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerNegativeLengthHazard(
+        IOperation operation,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard)
+    {
+        var shape = operation.Syntax switch
+        {
+            ArrayCreationExpressionSyntax array => (
+                Lengths: CSharpSyntaxFacts.GetExplicitArraySizeExpressions(array),
+                Precondition: SymbolicExceptionPreconditionKind.NegativeLength,
+                Kind: SymbolicRuntimeHazardKind.NegativeArrayLength,
+                Provenance: "ir.runtime-hazard.array.negative-length",
+                Category: ExceptionCategories.DefiniteNegativeArrayLength),
+            StackAllocArrayCreationExpressionSyntax stackAlloc => (
+                Lengths: SymbolicRuntimeHazardSyntaxFacts.GetStackAllocLengthExpressions(stackAlloc),
+                Precondition: SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                Kind: SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+                Provenance: "ir.runtime-hazard.stackalloc.negative-length",
+                Category: ExceptionCategories.DefiniteNegativeStackAllocLength),
+            _ => default
+        };
+        if (shape.Lengths == null) return NoHazard(out hazard);
+
+        return TryLowerNegativeLengthHazardCore(
+            operation.Syntax,
+            shape.Lengths,
+            shape.Precondition,
+            shape.Kind,
+            shape.Provenance,
+            shape.Category,
+            context,
+            out hazard);
+    }
+
+    private static bool TryLowerNegativeLengthHazardCore(
         SyntaxNode site,
         IEnumerable<ExpressionSyntax> lengthExpressions,
         SymbolicExceptionPreconditionKind preconditionKind,
@@ -223,13 +257,23 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerInvalidCollectionCardinalityHazard(
-        ExpressionSyntax receiver,
-        SymbolicRelationOperator relation,
-        long triggeringCount,
-        string category,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation is not IInvocationOperation invocationOperation ||
+            operation.Syntax is not InvocationExpressionSyntax invocation ||
+            invocationOperation.TargetMethod is not
+            {
+                IsStatic: false,
+                Parameters.Length: 0,
+                Name: "Dequeue" or "Peek" or "Pop"
+            } method ||
+            !IsKnownCardinalityCheckedCollection(method.ContainingType) ||
+            invocation.Expression is not MemberAccessExpressionSyntax instanceMember)
+            return NoHazard(out hazard);
+
+        var receiver = instanceMember.Expression;
         var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(receiver, context);
         if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Int } count })
             return NoHazard(out hazard);
@@ -241,25 +285,38 @@ internal static partial class SymbolicOperationLowerer
             SymbolicExceptionPreconditionKind.InvalidCollectionCardinality,
             count,
             SymbolicIrLowerer.CreateRelationCondition(
-                relation,
+                SymbolicRelationOperator.Equal,
                 count,
-                new SymbolicIntegerConstantTerm(triggeringCount),
+                new SymbolicIntegerConstantTerm(0),
                 receiver,
                 provenance + ".trigger"),
             ExceptionTypes.InvalidOperationException,
-            category,
+            ExceptionCategories.DefiniteInvalidCollectionCardinality,
             provenance);
         return true;
     }
 
+    private static bool IsKnownCardinalityCheckedCollection(INamedTypeSymbol type)
+    {
+        return type.ContainingNamespace.ToDisplayString() == "System.Collections.Generic" &&
+               type.OriginalDefinition.MetadataName is "Queue`1" or "Stack`1" or "PriorityQueue`2";
+    }
+
     internal static bool TryLowerElementAccessBoundsHazard(
-        ElementAccessExpressionSyntax elementAccess,
-        SymbolicRuntimeHazardKind hazardKind,
-        string exceptionType,
-        string category,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation.Syntax is not ElementAccessExpressionSyntax elementAccess ||
+            !SymbolicRuntimeHazardSyntaxFacts.TryGetIndexOrRangeHazardMetadata(
+                elementAccess,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var hazardKind,
+                out var exceptionType,
+                out var category))
+            return NoHazard(out hazard);
+
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.index.out-of-range";
@@ -338,14 +395,18 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerArrayGetValueBoundsHazard(
-        InvocationExpressionSyntax invocation,
-        IInvocationOperation invocationOperation,
-        ExpressionSyntax receiverExpression,
-        IArrayTypeSymbol arrayType,
-        string category,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation is not IInvocationOperation invocationOperation ||
+            operation.Syntax is not InvocationExpressionSyntax invocation ||
+            !SymbolicRuntimeHazardSyntaxFacts.IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
+            invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+            invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
+            invocationOperation.Arguments.Length != arrayType.Rank)
+            return NoHazard(out hazard);
+
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.array-get-value.index-out-of-range";
@@ -378,7 +439,7 @@ internal static partial class SymbolicOperationLowerer
             subject,
             trigger,
             ExceptionTypes.IndexOutOfRangeException,
-            category,
+            ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
             provenance);
         return true;
     }
@@ -409,15 +470,21 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerSlicingBoundsHazard(
-        InvocationExpressionSyntax invocation,
-        ExpressionSyntax sourceExpression,
-        ExpressionSyntax startExpression,
-        ExpressionSyntax? countExpression,
-        bool oneArgumentUpperBoundIsInclusive,
-        string category,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation is not IInvocationOperation invocationOperation ||
+            operation.Syntax is not InvocationExpressionSyntax invocation ||
+            !SymbolicRuntimeHazardSyntaxFacts.TryGetSlicingInvocationShape(
+                invocationOperation,
+                out var sourceExpression,
+                out var startExpression,
+                out var countExpression,
+                out var oneArgumentUpperBoundIsInclusive,
+                out var category))
+            return NoHazard(out hazard);
+
         var inRange = SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
             sourceExpression,
             startExpression,
@@ -514,12 +581,22 @@ internal static partial class SymbolicOperationLowerer
     }
 
     internal static bool TryLowerArrayStoreMismatchHazard(
-        AssignmentExpressionSyntax assignment,
-        ElementAccessExpressionSyntax elementAccess,
-        IArrayTypeSymbol declaredArrayType,
+        IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard)
     {
+        if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
+            !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(assignment.Left) is not
+                ElementAccessExpressionSyntax elementAccess ||
+            !SymbolicRuntimeHazardSyntaxFacts.TryGetArrayElementStoreType(
+                elementAccess,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var declaredArrayType) ||
+            !SymbolicTypeFacts.IsReferenceType(declaredArrayType.ElementType))
+            return NoHazard(out hazard);
+
         var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
         var subject = receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } value }
             ? value
