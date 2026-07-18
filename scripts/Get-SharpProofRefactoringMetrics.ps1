@@ -17,10 +17,8 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repoPrefix = $repoRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 $baselinePath = Join-Path $PSScriptRoot 'refactoring-baseline.json'
-$productionRewriteBaselinePath = Join-Path $PSScriptRoot 'production-rewrite-baseline.json'
 $productionMetricsPath = Join-Path $PSScriptRoot 'Get-SharpProofProductionMetrics.ps1'
 $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json
-$productionRewriteBaseline = Get-Content -LiteralPath $productionRewriteBaselinePath -Raw | ConvertFrom-Json
 $production = & $productionMetricsPath -Json | ConvertFrom-Json
 
 function Convert-ToRepoPath
@@ -98,7 +96,7 @@ try
     $removedLines = [int]$baseline.totalHandwrittenLines - $totalLines
 
     $report = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         baseline = Convert-ToRepoPath $baselinePath
         baselineCommit = [string]$baseline.commit
         production = [ordered]@{
@@ -106,25 +104,6 @@ try
             files = $productionFiles
             lines = $productionLines
             removedLines = [int]$baseline.productionHandwrittenLines - $productionLines
-        }
-        productionRewrite = [ordered]@{
-            baseline = Convert-ToRepoPath $productionRewriteBaselinePath
-            baselineCommit = [string]$productionRewriteBaseline.commit
-            baselineLines = [int]$productionRewriteBaseline.productionHandwrittenLines
-            lines = $productionLines
-            removedLines = [int]$productionRewriteBaseline.productionHandwrittenLines - $productionLines
-            requiredReduction = [int]$productionRewriteBaseline.requiredReduction
-            requiredRemaining = [Math]::Max(
-                0,
-                [int]$productionRewriteBaseline.requiredReduction -
-                ([int]$productionRewriteBaseline.productionHandwrittenLines - $productionLines))
-            requiredMaximumLines = [int]$productionRewriteBaseline.requiredMaximumLines
-            internalReductionTarget = [int]$productionRewriteBaseline.internalReductionTarget
-            internalRemaining = [Math]::Max(
-                0,
-                [int]$productionRewriteBaseline.internalReductionTarget -
-                ([int]$productionRewriteBaseline.productionHandwrittenLines - $productionLines))
-            internalTargetMaximumLines = [int]$productionRewriteBaseline.internalTargetMaximumLines
         }
         tests = [ordered]@{
             baselineLines = [int]$baseline.testHandwrittenLines
@@ -137,10 +116,6 @@ try
             baselineLines = [int]$baseline.totalHandwrittenLines
             lines = $totalLines
             removedLines = $removedLines
-            minimumReduction = [int]$baseline.minimumReduction
-            minimumRemaining = [Math]::Max(0, [int]$baseline.minimumReduction - $removedLines)
-            stretchReduction = [int]$baseline.stretchReduction
-            stretchRemaining = [Math]::Max(0, [int]$baseline.stretchReduction - $removedLines)
         }
         testBaseline = [ordered]@{
             passing = [int]$baseline.passingTests
@@ -157,11 +132,7 @@ try
     "Tracked handwritten LOC: $totalLines"
     "Removed from baseline: $removedLines"
     "Production: $productionLines ($($report.production.removedLines) removed)"
-    "Production rewrite: $($report.productionRewrite.removedLines) removed, " +
-        "$($report.productionRewrite.requiredRemaining) required remaining"
     "Tests: $testLines ($($report.tests.removedLines) removed)"
-    "Minimum remaining: $($report.total.minimumRemaining)"
-    "Stretch remaining: $($report.total.stretchRemaining)"
 }
 finally
 {

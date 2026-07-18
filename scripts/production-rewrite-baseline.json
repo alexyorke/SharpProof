@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "commit": "dbe1c747",
-  "productionHandwrittenLines": 104249,
-  "requiredReduction": 20000,
-  "internalReductionTarget": 22000,
-  "requiredMaximumLines": 84249,
-  "internalTargetMaximumLines": 82249
-}

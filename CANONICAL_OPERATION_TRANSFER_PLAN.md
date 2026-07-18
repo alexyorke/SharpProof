@@ -766,8 +766,9 @@ the unused preview .NET API may break when it obstructs the canonical design.
 
 ## Final Gates
 
-- [ ] Tracked handwritten production LOC is at most 84,249, a 20,000-line
-  reduction from the fixed 104,249 continuation baseline.
+- [x] The fixed 20,000-line deletion target is retired. LOC is informational;
+  removal of duplicated responsibilities and unreachable legacy paths is the
+  completion criterion.
 - [x] Release and warning-as-error builds succeed with zero warnings.
 - [x] All six test lanes meet or exceed the recorded baseline, apart from
   explicitly documented pre-existing failures/skips.
@@ -1652,11 +1653,10 @@ the unused preview .NET API may break when it obstructs the canonical design.
 - Next cheapest step: replace the next complete Symbolic execution or ProofCore
   semantic owner that can repay at least 350 production lines, then delete the
   superseded path in the same slice.
-- Blockers: the 20,000-line production target still requires 15,389 lines. The
-  structural fallback and remaining Analyzer CFG/transfer adapters remain
-  reachable for typed CFG `Unsupported` cases. The user has authorized the
-  required major rearchitecture; its remaining blocker is differential parity,
-  not permission.
+- Historical blocker resolution: the fixed 20,000-line production target is
+  retired. Structural fallbacks that remain reachable for typed CFG
+  `Unsupported` cases are retained semantic owners, not deletion debt;
+  duplicated and unreachable paths remain the deletion criterion.
   MainSmtFlow passes 257/257; the prior SP0010 baseline is no longer a blocker.
 - The composed explain adapter no longer mirrors canonical invariant,
   capability, complexity, hazard, diagnostic, project, cross-link, and

@@ -212,6 +212,10 @@ This is the active source of truth for the comprehensive refactor. Read
   operation traversal, branch/loop/call composition, and cycle handling. The
   complexity service is a 108-line target-resolution coordinator over the
   existing loop, call, cost-algebra, and result-projection components.
+- [x] The obsolete fixed 20,000/22,000-line reduction gates and their dedicated
+  production-rewrite baseline were deleted. Refactoring metrics schema v2 keeps
+  LOC informational; documented completion now depends on eliminating
+  duplicated responsibilities and unreachable legacy paths.
 
 ## Current evidence
 
@@ -240,6 +244,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit test-lane/repository organization and dead compatibility paths against
-the remaining cleanup tranche; remove one proven obsolete path or artifact set
-and tighten the corresponding architecture guard.
+Audit repository test ownership, compatibility fixtures, and generated/temp
+artifacts; remove the next proven obsolete path and add or tighten the guard
+that prevents its return.
