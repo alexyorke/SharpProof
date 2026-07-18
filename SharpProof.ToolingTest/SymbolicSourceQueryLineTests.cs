@@ -576,7 +576,7 @@ internal class TestClass
         Assert.That(aggregateProof.Target, Is.EqualTo("value"));
         Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
         Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
-        var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+        var summary = SymbolicInvariantFactSummary.Merge(result.ProgramPoints.Select(point => point.Facts));
         Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
         Assert.That(summary.MergedInvariantText, Does.Contain("value"));
         Assert.That(result.Facts, Is.EquivalentTo(summary.Facts));
@@ -1284,7 +1284,7 @@ internal class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences());
 
         Assert.That(result.ProgramPoints, Is.Empty);
-        var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+        var summary = SymbolicInvariantFactSummary.Merge(result.ProgramPoints.Select(point => point.Facts));
         Assert.That(summary.Facts, Is.Empty);
         Assert.That(summary.MergedInvariantText, Is.EqualTo("true"));
         Assert.That(result.Facts, Is.Empty);

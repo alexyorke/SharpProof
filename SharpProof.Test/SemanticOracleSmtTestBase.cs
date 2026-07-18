@@ -365,7 +365,8 @@ public sealed class NotNullIfNotNullIndexer
             .DescendantNodes()
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
-        var snapshot = SharedInvariantService.GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
+        var snapshot = SharedInvariantService.AnalyzeAt(statement, context.SemanticModel,
+            cancellationToken: CancellationToken.None);
 
         return snapshot.Facts.ToArray();
     }
@@ -392,7 +393,7 @@ public sealed class NotNullIfNotNullIndexer
         return state
             .Normalize()
             .PathConditions
-            .Select(SymbolicInvariantService.FormatCondition)
+            .Select(SymbolicFormulaDisplay.Format)
             .ToArray();
     }
 
@@ -408,8 +409,8 @@ public sealed class NotNullIfNotNullIndexer
             .DescendantNodes()
             .OfType<ExpressionSyntax>()
             .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
-        var snapshot =
-            SharedInvariantService.GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
+        var snapshot = SharedInvariantService.AnalyzeAt(expression, context.SemanticModel,
+            cancellationToken: CancellationToken.None);
 
         return snapshot.Facts.ToArray();
     }

@@ -9,24 +9,6 @@ namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicInvariantService
 {
-    public SymbolicInvariantSnapshot GetInvariantsAt(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken = default,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        var point = CollectProgramPoint(
-            site,
-            semanticModel,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts,
-            null);
-        var facts = FormatFacts(point.Formulas);
-        var mergedInvariantText = FormatMergedInvariant(point.Formulas);
-
-        return new SymbolicInvariantSnapshot(point.Position, facts, mergedInvariantText, point.Truncation);
-    }
-
     public SymbolicProgramPointAnalysis AnalyzeAt(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -99,139 +81,6 @@ internal sealed class SymbolicInvariantService
             pathState,
             EncodePathState(pathState),
             limitScope.Snapshot());
-    }
-
-    public SymbolicInvariantImplicationResult ProveImplicationAt(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        SymbolicCondition condition,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken = default,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        if (site == null) throw new ArgumentNullException(nameof(site));
-
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        var analysis = AnalyzeAt(
-            site,
-            semanticModel,
-            smtAnalysis,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts);
-        return ProveImplication(analysis, condition, smtAnalysis);
-    }
-
-    public static SymbolicInvariantImplicationResult ProveImplication(
-        SymbolicProgramPointAnalysis analysis,
-        SymbolicCondition condition,
-        SmtAnalysisService? smtAnalysis)
-    {
-        if (analysis == null) throw new ArgumentNullException(nameof(analysis));
-
-        if (condition == null) throw new ArgumentNullException(nameof(condition));
-
-        var conditionText = FormatCondition(condition);
-        if (smtAnalysis == null)
-            return new SymbolicInvariantImplicationResult(
-                analysis.SpanStart,
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                "smt_required",
-                analysis.Reachability,
-                analysis.ReachabilityReason,
-                analysis.SmtDiagnostics);
-
-        if (analysis.Reachability == SymbolicReachability.Unreachable)
-            return new SymbolicInvariantImplicationResult(
-                analysis.SpanStart,
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                analysis.ReachabilityReason,
-                analysis.Reachability,
-                analysis.ReachabilityReason,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
-
-        var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            analysis.PathState,
-            condition,
-            smtAnalysis);
-        if (truthProof.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return new SymbolicInvariantImplicationResult(
-                analysis.SpanStart,
-                conditionText,
-                SymbolicTruthValue.ProvenTrue,
-                truthProof.Info.Reason,
-                analysis.Reachability,
-                analysis.ReachabilityReason,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
-
-        if (truthProof.Info.Status == SymbolicProofStatus.ProvenFalse)
-            return new SymbolicInvariantImplicationResult(
-                analysis.SpanStart,
-                conditionText,
-                SymbolicTruthValue.ProvenFalse,
-                truthProof.Info.Reason,
-                analysis.Reachability,
-                analysis.ReachabilityReason,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
-
-        return new SymbolicInvariantImplicationResult(
-            analysis.SpanStart,
-            conditionText,
-            SymbolicTruthValue.Unknown,
-            truthProof.Info.Reason,
-            analysis.Reachability,
-            analysis.ReachabilityReason,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
-    }
-
-    internal static string FormatCondition(SymbolicCondition condition)
-    {
-        return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula)
-            ? SymbolicFormulaDisplay.Format(formula)
-            : condition.ToString() ?? string.Empty;
-    }
-
-    internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
-    {
-        return SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);
-    }
-
-    public static SymbolicInvariantFactSummary MergeInvariantFacts(IEnumerable<IEnumerable<string>> factSets)
-    {
-        if (factSets == null) throw new ArgumentNullException(nameof(factSets));
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var facts = new List<string>();
-        foreach (var factSet in factSets)
-        {
-            if (factSet == null) continue;
-
-            foreach (var fact in factSet)
-                if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
-                    facts.Add(fact);
-        }
-
-        return new SymbolicInvariantFactSummary(facts);
-    }
-
-    public static string FormatMergedInvariantFacts(IReadOnlyList<string> facts)
-    {
-        if (facts == null) throw new ArgumentNullException(nameof(facts));
-
-        if (facts.Count == 0) return "true";
-
-        if (facts.Count == 1) return facts[0];
-
-        return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
-    }
-
-    private static IReadOnlyList<string> FormatFacts(IEnumerable<SmtFormula> formulas)
-    {
-        return FlattenProjectedConjunctions(formulas)
-            .Select(static fact => SymbolicFormulaDisplay.Format(fact))
-            .ToArray();
     }
 
     private static SymbolicProgramPointAnalysis CreateAnalysis(
@@ -347,64 +196,46 @@ internal sealed class SymbolicInvariantService
         SymbolicAnalysisTruncationInfo Truncation);
 }
 
-internal sealed class SymbolicInvariantSnapshot
-{
-    internal SymbolicInvariantSnapshot(
-        int spanStart,
-        IReadOnlyList<string> facts,
-        string mergedInvariantText,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
-        SpanStart = spanStart;
-        Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-        MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
-        Truncation = truncation ?? SymbolicAnalysisTruncationInfo.None;
-    }
-
-    public int SpanStart { get; }
-
-    public IReadOnlyList<string> Facts { get; }
-
-    public string MergedInvariantText { get; }
-
-    public SymbolicAnalysisTruncationInfo Truncation { get; }
-}
-
 internal sealed class SymbolicInvariantFactSummary
 {
     public SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
     {
         Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-        MergedInvariantText = SymbolicInvariantService.FormatMergedInvariantFacts(facts);
+        MergedInvariantText = FormatMergedInvariantFacts(facts);
     }
 
     public IReadOnlyList<string> Facts { get; }
 
     public string MergedInvariantText { get; }
-}
 
-internal sealed class SymbolicInvariantImplicationResult(
-    int spanStart,
-    string condition,
-    SymbolicTruthValue truthValue,
-    string reason,
-    SymbolicReachability reachability,
-    string reachabilityReason,
-    SymbolicSmtDiagnostics smtDiagnostics)
-{
-    public int SpanStart { get; } = spanStart;
+    internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets)
+    {
+        if (factSets == null) throw new ArgumentNullException(nameof(factSets));
 
-    public string Condition { get; } = condition ?? throw new ArgumentNullException(nameof(condition));
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var facts = new List<string>();
+        foreach (var factSet in factSets)
+        {
+            if (factSet == null) continue;
 
-    public SymbolicTruthValue TruthValue { get; } = truthValue;
+            foreach (var fact in factSet)
+                if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
+                    facts.Add(fact);
+        }
 
-    public string Reason { get; } = reason ?? string.Empty;
+        return new SymbolicInvariantFactSummary(facts);
+    }
 
-    public SymbolicReachability Reachability { get; } = reachability;
-
-    public string ReachabilityReason { get; } = reachabilityReason ?? string.Empty;
-
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+    internal static string FormatMergedInvariantFacts(IReadOnlyList<string> facts)
+    {
+        if (facts == null) throw new ArgumentNullException(nameof(facts));
+        return facts.Count switch
+        {
+            0 => "true",
+            1 => facts[0],
+            _ => string.Join(" && ", facts.Select(static fact => "(" + fact + ")"))
+        };
+    }
 }
 
 internal sealed class SymbolicProgramPointAnalysis(

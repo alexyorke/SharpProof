@@ -31,15 +31,13 @@ public class TestClass
         var (returnStatement, semanticModel, condition) = CreateGuardedReturnContext(source, "return value;");
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
+        var proof = ProveCondition(
             returnStatement,
             semanticModel,
             condition,
             smtAnalysis);
 
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        Assert.That(proof.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
-        Assert.That(proof.SmtDiagnostics.IsConfigured, Is.True);
     }
 
     [Test]
@@ -63,14 +61,13 @@ public class TestClass
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var negatedCondition = new SymbolicNotCondition(condition);
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
+        var proof = ProveCondition(
             returnStatement,
             semanticModel,
             negatedCondition,
             smtAnalysis);
 
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        Assert.That(proof.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
     }
 
     [Test]
@@ -93,14 +90,13 @@ public class TestClass
         var (returnStatement, semanticModel, _) = CreateGuardedReturnContext(source, "return value;");
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
+        var proof = ProveCondition(
             returnStatement,
             semanticModel,
             new SymbolicConstantCondition(true),
             smtAnalysis);
 
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable), proof.Reason);
-        Assert.That(proof.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
     }
 
     [Test]
@@ -122,15 +118,16 @@ public class TestClass
 
         var (returnStatement, semanticModel, condition) = CreateGuardedReturnContext(source, "return value;");
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
-            returnStatement,
-            semanticModel,
-            condition,
-            null);
+        var linePosition = returnStatement.GetLocation().GetLineSpan().StartLinePosition;
+        var outcome = new SymbolicQueryExecutor().TryProve(
+            new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(semanticModel.SyntaxTree, semanticModel.Compilation),
+                SharpProofTarget.Point(linePosition.Line + 1, linePosition.Character + 1)),
+            SymbolicFormulaDisplay.Format(condition));
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        Assert.That(proof.Reason, Is.EqualTo("smt_required"));
-        Assert.That(proof.SmtDiagnostics.IsConfigured, Is.False);
+        Assert.That(outcome.IsSuccess, Is.False);
+        Assert.That(outcome.Error, Is.Not.Null);
+        Assert.That(outcome.Error!.Message, Does.Contain("SMT analysis"));
     }
 
     [Test]
@@ -175,7 +172,7 @@ public class TestClass
             Is.True);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
+        var proof = ProveCondition(
             returnStatement,
             semanticModel,
             condition,
@@ -346,7 +343,7 @@ public class TestClass
             "ir.test.compound-assignment.zero");
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var proof = new SymbolicInvariantService().ProveImplicationAt(
+        var proof = ProveCondition(
             division,
             semanticModel,
             zeroCondition,
@@ -385,5 +382,21 @@ public class TestClass
         Assert.That(guardCondition, Is.Not.Null);
 
         return (returnStatement, semanticModel, guardCondition!);
+    }
+
+    private static SymbolicConditionProofResult ProveCondition(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        SymbolicCondition condition,
+        SmtAnalysisService smtAnalysis)
+    {
+        return new SymbolicQueryExecutor().ProveAtSyntaxNode(
+            semanticModel,
+            node,
+            SymbolicFormulaDisplay.Format(condition),
+            condition,
+            new SymbolicState(),
+            smtAnalysis,
+            false);
     }
 }

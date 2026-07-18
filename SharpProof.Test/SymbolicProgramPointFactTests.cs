@@ -2061,7 +2061,7 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
     }
 
-    private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
+    private static SymbolicProgramPointAnalysis GetSnapshotAtStatement(string source, string statementPrefix)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
@@ -2078,10 +2078,10 @@ public class TestClass
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
 
-        return new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel);
+        return new SymbolicInvariantService().AnalyzeAt(statement, semanticModel);
     }
 
-    private static SymbolicInvariantSnapshot GetSnapshotAtBlockContainingStatement(string source,
+    private static SymbolicProgramPointAnalysis GetSnapshotAtBlockContainingStatement(string source,
         string statementPrefix)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
@@ -2100,7 +2100,7 @@ public class TestClass
             .Single(node => node.Statements.Any(statement =>
                 statement.ToString().StartsWith(statementPrefix, StringComparison.Ordinal)));
 
-        return new SymbolicInvariantService().GetInvariantsAt(block, semanticModel);
+        return new SymbolicInvariantService().AnalyzeAt(block, semanticModel);
     }
 
     private static SymbolicConditionProofResult ProveAtMarker(

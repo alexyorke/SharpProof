@@ -58,11 +58,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Deleted the 243-line `SymbolicSourceQueryService` facade. Query dispatchers
   now own the program-point, range, and proof components directly; retained
   source-query tests use executor-based helpers in `SharpProof.Testing`.
+- [x] Removed the legacy invariant snapshot and implication entry points and
+  their duplicate result DTOs. Tests now use `SymbolicProgramPointAnalysis` and
+  the canonical condition-proof executor; display and fact merging live with
+  their focused projection types.
 
 ## Current evidence
 
-- Maintained production: 107,018 lines; net reduction: 608 lines; remaining
-  reduction: 19,392. The first seven deletion slices removed 885 production
+- Maintained production: 106,886 lines; net reduction: 740 lines; remaining
+  reduction: 19,260. The first eight deletion slices removed 1,017 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -77,6 +81,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Migrate test-only `SymbolicInvariantService` entry points and formatting
-projections to executor-owned snapshots or focused projection components;
-delete each superseded method with its adapter.
+Consolidate the runtime-hazard query facade into the executor dispatcher and
+move retained source-compilation conveniences to `SharpProof.Testing`; delete
+the superseded production entry points in the same tranche.

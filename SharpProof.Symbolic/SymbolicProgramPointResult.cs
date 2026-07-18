@@ -234,7 +234,7 @@ internal sealed class SymbolicInvariantResult
             facts
                 .Select(static (fact, index) => SymbolicInvariantCondition.FromText(index, fact))
                 .ToArray(),
-            mergedInvariantText ?? SymbolicInvariantService.FormatMergedInvariantFacts(facts),
+            mergedInvariantText ?? SymbolicInvariantFactSummary.FormatMergedInvariantFacts(facts),
             mergeKind);
     }
 

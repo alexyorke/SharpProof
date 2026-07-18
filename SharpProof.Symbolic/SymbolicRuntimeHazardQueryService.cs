@@ -254,7 +254,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             sourceSpan.StartColumn,
             sourceSpan.EndLine,
             sourceSpan.EndColumn,
-            SymbolicInvariantService.FormatCondition(triggerCondition),
+            SymbolicFormulaDisplay.Format(triggerCondition),
             SymbolicFactInfo.FromFact(triggerPrecondition),
             analysis.MergedInvariantText,
             analysis.Facts,

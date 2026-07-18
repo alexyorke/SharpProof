@@ -243,7 +243,7 @@ internal sealed class SymbolicQueryResult
         IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
-        var factSummary = SymbolicInvariantService.MergeInvariantFacts(
+        var factSummary = SymbolicInvariantFactSummary.Merge(
             programPoints.Select(static point => point.Facts));
         var observedInvariant = SymbolicInvariantResult.FromFacts(
             factSummary.Facts,

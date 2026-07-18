@@ -231,7 +231,7 @@ internal sealed class SymbolicMergedPathFacts
             conservativeUnknowns,
             conservativeUnknownDiagnostics,
             mergedFacts,
-            SymbolicInvariantService.FormatMergedInvariantFacts(mergedFacts),
+            SymbolicInvariantFactSummary.FormatMergedInvariantFacts(mergedFacts),
             candidatePoints.Length,
             unreachableProgramPointCount,
             false);

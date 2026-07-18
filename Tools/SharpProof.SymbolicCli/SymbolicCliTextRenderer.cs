@@ -169,7 +169,7 @@ internal static class SymbolicCliTextRenderer
             options.InvariantTargets,
             static target => target.UnknownFacts);
         var text = options.HasInvariantTargetFilter
-            ? SymbolicInvariantService.FormatMergedInvariantFacts(must.Concat(unknown).ToArray())
+            ? SymbolicInvariantFactSummary.FormatMergedInvariantFacts(must.Concat(unknown).ToArray())
             : query.Text;
         Console.WriteLine($"{label}: Must={must.Count}, Maybe={maybe.Count}, Unknown={unknown.Count}");
         Console.WriteLine($"{label} text: {text}");
