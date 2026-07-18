@@ -185,6 +185,14 @@ This is the active source of truth for the comprehensive refactor. Read
   overload. Its nonfatal predicate and typed error writer remain authoritative,
   fatal exceptions still escape, and the local top-level catch adapter was
   deleted.
+- [x] The canonical method-analysis path has one `MethodAnalysisRequest`
+  construction point, one immutable `MethodAnalysisSnapshot` construction
+  point, and one session-owned cache. Analyzer features and symbolic
+  capability/complexity queries consume the snapshot's shared symbolic input.
+- [x] `SymbolicQueryContext` now owns the immutable source/target/options
+  request boundary, and `SymbolicQueryOptions` owns normalized references,
+  limits, implied conditions, and SMT dependencies in its own file. These
+  request concerns were removed from the aggregate query API file.
 
 ## Current evidence
 
@@ -197,7 +205,7 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Remaining tranches
 
-- [ ] Consolidate internal analysis request, context, and immutable snapshot
+- [x] Consolidate internal analysis request, context, and immutable snapshot
   shared by analyzer and Symbolic query consumers.
 - [x] Redesign and reduce the public Symbolic API; adapt CLI while preserving
   external output.
@@ -213,6 +221,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit the canonical internal analysis request/context/snapshot tranche against
-current call sites and tests; close proven requirements and identify the next
-remaining duplicated request or snapshot construction path.
+Continue decomposing `SymbolicQueryApi`: move source input, target/scope, and
+result aggregation/projection into responsibility-owned files while preserving
+the single executor and exact query behavior.
