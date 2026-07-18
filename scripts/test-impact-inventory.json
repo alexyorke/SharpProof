@@ -354,22 +354,6 @@
                         ],
     "projects":  [
                      {
-                         "name":  "DebugProbe",
-                         "path":  "artifacts/DebugProbe/DebugProbe.csproj",
-                         "module":  "Unknown",
-                         "projectReferences":  [
-                                                   "SharpProof.Symbolic"
-                                               ]
-                     },
-                     {
-                         "name":  "ScenarioExport",
-                         "path":  "artifacts/ScenarioExport/ScenarioExport.csproj",
-                         "module":  "Unknown",
-                         "projectReferences":  [
-                                                   "SharpProof.Test"
-                                               ]
-                     },
-                     {
                          "name":  "SharpProof.Symbolic.Sample",
                          "path":  "samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj",
                          "module":  "Unknown",
@@ -1210,6 +1194,10 @@
                          {
                              "name":  "InferredContractSuggestionTests",
                              "path":  "SharpProof.Test/InferredContractSuggestionTests.cs"
+                         },
+                         {
+                             "name":  "InferredMethodSummaryTests",
+                             "path":  "SharpProof.Test/InferredMethodSummaryTests.cs"
                          },
                          {
                              "name":  "InheritanceInteractionTests",
@@ -4616,6 +4604,31 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Contracts/InferredMethodSummary.cs",
+                            "module":  "Contracts",
+                            "declaredTypes":  [
+                                                  "InferredEffectVisibility",
+                                                  "InferredFreshness",
+                                                  "InferredMethodEffects",
+                                                  "InferredMethodSummary",
+                                                  "InferredPurity",
+                                                  "InferredSummarySource",
+                                                  "InferredSummaryUnknownReason",
+                                                  "MethodSummaryCacheKey"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "InferredEffectVisibility",
+                                                     "InferredFreshness",
+                                                     "InferredMethodEffects",
+                                                     "InferredMethodSummary",
+                                                     "InferredPurity",
+                                                     "InferredSummarySource",
+                                                     "InferredSummaryUnknownReason",
+                                                     "MethodSummaryCacheKey"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Contracts/JsonElementPropertyReader.cs",
                             "module":  "Contracts",
                             "declaredTypes":  [
@@ -4657,10 +4670,11 @@
                                                   "StructuralParameterIdentity",
                                                   "StructuralRefKinds"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "StructuralMethodIdentity",
-                                                     "StructuralParameterIdentity"
+                                                     "StructuralParameterIdentity",
+                                                     "StructuralRefKinds"
                                                  ]
                         },
                         {
@@ -9630,6 +9644,24 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Contracts/InferredMethodSummary.cs",
+                                    "module":  "Contracts",
+                                    "selectedTestFixtures":  [
+                                                                 "InferredMethodSummaryTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "InferredEffectVisibility",
+                                                   "InferredFreshness",
+                                                   "InferredMethodEffects",
+                                                   "InferredMethodSummary",
+                                                   "InferredPurity",
+                                                   "InferredSummarySource",
+                                                   "InferredSummaryUnknownReason",
+                                                   "MethodSummaryCacheKey"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Contracts/Polyfills/IsExternalInit.cs",
                                     "module":  "Contracts",
                                     "selectedTestFixtures":  [
@@ -9650,13 +9682,15 @@
                                                                  "EffectSummarySchemaV5Tests",
                                                                  "EffectSummarySymbolKeyFactoryTests",
                                                                  "ExceptionSummaryCatalogValidationTests",
+                                                                 "InferredMethodSummaryTests",
                                                                  "StructuralMethodIdentityTests"
                                                              ],
                                     "tokens":  [
                                                    "StructuralMethodIdentity",
-                                                   "StructuralParameterIdentity"
+                                                   "StructuralParameterIdentity",
+                                                   "StructuralRefKinds"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs",

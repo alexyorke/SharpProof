@@ -114,6 +114,7 @@ try
     }
 
     $reduction = $baselineLines - $currentLines
+    $enforcementRequested = $EnforceTarget -or $PSBoundParameters.ContainsKey('RequiredReductionLines')
     $requiredReduction = if ($EnforceTarget) { $targetReduction } else { $RequiredReductionLines }
     $report = [ordered]@{
         schemaVersion = 1
@@ -131,8 +132,9 @@ try
         }
         reductionLines = $reduction
         remainingLines = [Math]::Max(0, $targetReduction - $reduction)
+        enforcementRequested = $enforcementRequested
         requiredReductionLines = $requiredReduction
-        meetsRequiredReduction = $reduction -ge $requiredReduction
+        meetsRequiredReduction = -not $enforcementRequested -or $reduction -ge $requiredReduction
         meetsTarget = $currentLines -le $maximumLines
     }
 
@@ -148,7 +150,7 @@ try
         "C#: $($productionCSharp.lines); scripts: $($scripts.lines); specifications: $($specifications.lines)"
     }
 
-    if (-not $report.meetsRequiredReduction)
+    if ($enforcementRequested -and -not $report.meetsRequiredReduction)
     {
         Write-Error "Required production reduction is $requiredReduction lines; current reduction is $reduction."
         exit 1

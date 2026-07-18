@@ -29,12 +29,19 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Added a reporting command with milestone and final-target enforcement.
 - [x] Added an architecture test that validates the 20,000-line target,
   baseline arithmetic, and non-test production categories.
+- [x] Added the shared inferred-summary model with typed purity, effects,
+  freshness, visibility, explicit unknown reasons, stable cache keys, and
+  semantic differential comparison.
+- [x] EffectSummary now projects its existing classification into that shared
+  model without changing its serialized contract. Contracts owns the mapping
+  so Analyzer can reuse it without depending on the executable tool.
 
 ## Current evidence
 
-- Maintained production: 107,626 lines; reduction: 0; remaining: 20,000.
+- Maintained production: 107,891 lines; foundation overhead: 265 lines;
+  remaining net reduction: 20,265.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,148 passing tests and two documented skips.
+- Six lanes: 6,154 passing tests and two documented skips.
 
 ## Milestones
 
@@ -46,5 +53,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Introduce the inferred method-summary value model, cache identity, conservative
-failure semantics, and differential seams without changing analyzer verdicts.
+Migrate the first bounded manual semantic-rule family to generic inferred
+summary predicates, delete its member-specific implementation, and preserve
+classification output through differential tests.

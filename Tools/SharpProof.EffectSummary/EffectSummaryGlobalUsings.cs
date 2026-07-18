@@ -11,6 +11,7 @@ global using System.Text;
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
 global using SharpProof.Identity;
+global using SharpProof.Inference;
 global using SharpProof.Schema;
 global using SharpProof.Analyzer.Engine;
 global using static EffectSummaryMetadataReader;
