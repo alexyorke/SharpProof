@@ -208,6 +208,10 @@ This is the active source of truth for the comprehensive refactor. Read
   span, line-span, and all-lines selection, execution, aggregation, ordering,
   and scope projection. The source query service's range loops and selection
   implementations were deleted, reducing it to a 243-line facade.
+- [x] `SymbolicComplexityAnalysisSession` now owns recursive summary caching,
+  operation traversal, branch/loop/call composition, and cycle handling. The
+  complexity service is a 108-line target-resolution coordinator over the
+  existing loop, call, cost-algebra, and result-projection components.
 
 ## Current evidence
 
@@ -224,7 +228,7 @@ This is the active source of truth for the comprehensive refactor. Read
   shared by analyzer and Symbolic query consumers.
 - [x] Redesign and reduce the public Symbolic API; adapt CLI while preserving
   external output.
-- [ ] Decompose query/proof/source services and complexity/solver components by
+- [x] Decompose query/proof/source services and complexity/solver components by
   responsibility, deleting duplicate orchestration.
 - [x] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
   typed registries.
@@ -236,6 +240,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Audit `SymbolicComplexityService` against the planned loop modeling,
-recursion/call summary, cost algebra, and result projection boundaries; extract
-the next responsibility still owned by the coordinator.
+Audit test-lane/repository organization and dead compatibility paths against
+the remaining cleanup tranche; remove one proven obsolete path or artifact set
+and tighten the corresponding architecture guard.
