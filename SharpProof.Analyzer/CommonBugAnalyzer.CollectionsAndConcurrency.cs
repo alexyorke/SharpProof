@@ -61,7 +61,7 @@ internal static partial class CommonBugAnalyzer
         AnalyzeCollectionMutationDuringEnumeration(context, session);
         AnalyzeCapturedForLoopVariables(context, session);
 
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             switch (operation)
@@ -100,7 +100,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        foreach (var loop in context.State.VisibleOperations.OfType<IForEachLoopOperation>())
+        foreach (var loop in context.Snapshot.VisibleOperations.OfType<IForEachLoopOperation>())
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             var collection = Unwrap(loop.Collection);
@@ -229,7 +229,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        var root = context.State.RootOperation;
+        var root = context.Snapshot.RootOperation;
         if (root == null) return;
 
         foreach (var lambda in root.DescendantsAndSelf().OfType<IAnonymousFunctionOperation>())

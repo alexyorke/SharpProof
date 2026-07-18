@@ -178,10 +178,10 @@ public sealed class OperationBlockPipelineTests
             Assert.That(firstComplexity.IsSuccess, Is.True);
             Assert.That(state.GetSymbolicQueryExecutionCount("capability"), Is.EqualTo(1));
             Assert.That(state.GetSymbolicQueryExecutionCount("complexity"), Is.EqualTo(1));
-            Assert.That(state.SemanticFacts.OperationBlockCount, Is.EqualTo(1));
-            Assert.That(state.SemanticFacts.HasRootOperation, Is.True);
-            Assert.That(state.SemanticFacts.VisibleOperationCount, Is.GreaterThan(0));
-            Assert.That(state.SemanticFacts.ReturnOperationCount, Is.EqualTo(1));
+            Assert.That(state.Snapshot.SemanticFacts.OperationBlockCount, Is.EqualTo(1));
+            Assert.That(state.Snapshot.SemanticFacts.HasRootOperation, Is.True);
+            Assert.That(state.Snapshot.SemanticFacts.VisibleOperationCount, Is.GreaterThan(0));
+            Assert.That(state.Snapshot.SemanticFacts.ReturnOperationCount, Is.EqualTo(1));
         });
 
         using (var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default))

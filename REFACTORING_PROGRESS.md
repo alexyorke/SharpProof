@@ -1,0 +1,57 @@
+# SharpProof Refactoring Progress
+
+This is the active source of truth for the comprehensive refactor. Read
+`docs/refactoring-baseline.md` for the immutable starting point and
+`CANONICAL_OPERATION_TRANSFER_PLAN.md` for historical semantic constraints.
+
+## Invariants
+
+- Preserve diagnostics, proof outcomes, conservative `Unknown` behavior,
+  CLI/JSON/SARIF bytes, package contents, and attribute semantics.
+- Public .NET API breaks are allowed when they produce a cleaner design.
+- Land bounded green commits; delete superseded paths in the same tranche.
+- Run .NET commands through `scripts/Invoke-SharpProofDotnet.ps1` or the
+  repository test wrapper.
+
+## Completed
+
+- [x] Baseline captured in `docs/refactoring-baseline.md`.
+- [x] Architecture tests enforce module ownership, dependency direction, and
+  absence of cross-project source compilation.
+- [x] `SharpProof.Contracts` and `SharpProof.Tooling.Core` own former `Shared`
+  production code. Commit `ff682340`.
+- [x] `SharpProof.Testing` owns shared fixtures; tooling tests have one owner;
+  `SharpProof.SymbolicCli.Core` owns reusable CLI projections. No external
+  `<Compile Include>` remains. Commit `0d9043b1`.
+- [x] Analyzer method facts now live in an immutable `MethodAnalysisSnapshot`;
+  feature analyzers consume the snapshot while session state exclusively owns
+  symbolic query execution and caching.
+
+## Current evidence
+
+- Branch: `codex/nullable-contract-verification`.
+- Handwritten production source: 99,712 lines across 437 files.
+- Architecture inventory: zero unassigned files and zero dependency violations.
+- Release solution build: zero warnings and errors.
+- Six lanes: 6,135 passing tests and two documented skips.
+
+## Remaining tranches
+
+- [ ] Consolidate internal analysis request, context, and immutable snapshot
+  shared by analyzer and Symbolic query consumers.
+- [ ] Redesign and reduce the public Symbolic API; adapt CLI while preserving
+  external output.
+- [ ] Decompose query/proof/source services and complexity/solver components by
+  responsibility, deleting duplicate orchestration.
+- [ ] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
+  typed registries.
+- [ ] Decompose EffectSummary host and standardize lightweight tool hosting.
+- [ ] Finish test-lane/repository organization and remove dead compatibility
+  paths.
+- [ ] Run final Release, six-lane, package-consumer, NuGet, VSIX, generated-doc,
+  fuzz, EffectSummary, architecture, and public-API gates.
+
+## Next cheapest step
+
+Extract request validation and target resolution from `SymbolicQueryService`,
+then route its query families through the same validated internal request.

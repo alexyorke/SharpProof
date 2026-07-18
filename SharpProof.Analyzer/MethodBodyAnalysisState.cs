@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
@@ -24,39 +23,16 @@ internal sealed class MethodBodyAnalysisState
         IOperation? fallbackRootOperation,
         CancellationToken cancellationToken)
     {
-        MethodSymbol = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
-        Declaration = declaration ?? throw new ArgumentNullException(nameof(declaration));
-        SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
-        OperationBlocks = operationBlocks.IsDefault ? ImmutableArray<IOperation>.Empty : operationBlocks;
-        RootOperation = fallbackRootOperation ?? SelectRootOperation(OperationBlocks);
-        VisibleOperations = RootOperation == null
-            ? ImmutableArray<IOperation>.Empty
-            : ExecutionVisibility.VisibleDescendants(RootOperation).ToImmutableArray();
-        SemanticFacts = new MethodBodySemanticFacts(
-            OperationBlocks.Length,
-            VisibleOperations.Length,
-            VisibleOperations.Count(static operation => operation is IReturnOperation),
-            VisibleOperations.Any(static operation => operation is ILocalFunctionOperation),
-            RootOperation != null);
-        Source = SymbolicSourceInput.FromNode(Declaration, SemanticModel);
+        Snapshot = MethodAnalysisSnapshot.Create(
+            methodSymbol,
+            declaration,
+            semanticModel,
+            operationBlocks,
+            fallbackRootOperation);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    internal IMethodSymbol MethodSymbol { get; }
-
-    internal SyntaxNode Declaration { get; }
-
-    internal SemanticModel SemanticModel { get; }
-
-    internal ImmutableArray<IOperation> OperationBlocks { get; }
-
-    internal IOperation? RootOperation { get; }
-
-    internal ImmutableArray<IOperation> VisibleOperations { get; }
-
-    internal MethodBodySemanticFacts SemanticFacts { get; }
-
-    internal SymbolicSourceInput Source { get; }
+    internal MethodAnalysisSnapshot Snapshot { get; }
 
     internal SymbolicQueryService QueryService { get; } = new();
 
@@ -91,7 +67,7 @@ internal sealed class MethodBodyAnalysisState
     {
         return GetOrCreateSymbolicQueryResult(
             queryKey,
-            () => query(QueryService, Source, SymbolicQueryTarget.Node(), cancellationToken));
+            () => query(QueryService, Snapshot.Source, SymbolicQueryTarget.Node(), cancellationToken));
     }
 
     internal T GetOrCreateSymbolicQueryResult<T>(
@@ -131,42 +107,6 @@ internal sealed class MethodBodyAnalysisState
     {
         return _queryExecutionCounts.TryGetValue(queryKey, out var count) ? count : 0;
     }
-
-    private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks)
-    {
-        if (operationBlocks.IsDefaultOrEmpty) return null;
-
-        return operationBlocks
-            .OrderByDescending(static operation => operation.Syntax.Span.Length)
-            .First();
-    }
-}
-
-internal sealed class MethodBodySemanticFacts
-{
-    internal MethodBodySemanticFacts(
-        int operationBlockCount,
-        int visibleOperationCount,
-        int returnOperationCount,
-        bool containsLocalFunction,
-        bool hasRootOperation)
-    {
-        OperationBlockCount = operationBlockCount;
-        VisibleOperationCount = visibleOperationCount;
-        ReturnOperationCount = returnOperationCount;
-        ContainsLocalFunction = containsLocalFunction;
-        HasRootOperation = hasRootOperation;
-    }
-
-    internal int OperationBlockCount { get; }
-
-    internal int VisibleOperationCount { get; }
-
-    internal int ReturnOperationCount { get; }
-
-    internal bool ContainsLocalFunction { get; }
-
-    internal bool HasRootOperation { get; }
 }
 
 internal static class AnalyzerSymbolicQueryBoundary
@@ -210,11 +150,13 @@ internal sealed class MethodBodyAnalysisContext
 
     internal MethodBodyAnalysisState State { get; }
 
-    internal IMethodSymbol MethodSymbol => State.MethodSymbol;
+    internal MethodAnalysisSnapshot Snapshot => State.Snapshot;
 
-    internal SyntaxNode Node => State.Declaration;
+    internal IMethodSymbol MethodSymbol => Snapshot.MethodSymbol;
 
-    internal SemanticModel SemanticModel => State.SemanticModel;
+    internal SyntaxNode Node => Snapshot.Declaration;
+
+    internal SemanticModel SemanticModel => Snapshot.SemanticModel;
 
     internal AnalyzerOptions Options { get; }
 

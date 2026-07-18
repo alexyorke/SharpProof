@@ -28,9 +28,9 @@ internal static class MethodAllocationAnalyzer
             .Any(source => attributePolicy.HasAttribute(source, "ZeroAllocationsAttribute"));
         if (!hasZeroAllocationsAttribute) return;
 
-        if (context.State.RootOperation == null) return;
+        if (context.Snapshot.RootOperation == null) return;
 
-        foreach (var allocationSite in CollectAllocationSites(context.State.VisibleOperations))
+        foreach (var allocationSite in CollectAllocationSites(context.Snapshot.VisibleOperations))
         {
             var location = allocationSite.Syntax.GetLocation();
             var properties = CreateAllocationProperties(allocationSite, methodSymbol, context.Node.SyntaxTree);
@@ -48,9 +48,9 @@ internal static class MethodAllocationAnalyzer
         }
     }
 
-    internal static bool HasVisibleAllocationSites(MethodBodyAnalysisState state)
+    internal static bool HasVisibleAllocationSites(MethodAnalysisSnapshot snapshot)
     {
-        return CollectAllocationSites(state.VisibleOperations).Any();
+        return CollectAllocationSites(snapshot.VisibleOperations).Any();
     }
 
     private static ImmutableDictionary<string, string?> CreateAllocationProperties(

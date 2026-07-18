@@ -11,7 +11,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        var operations = context.State.VisibleOperations;
+        var operations = context.Snapshot.VisibleOperations;
         var method = context.MethodSymbol;
         var containsAwait = operations.Any(static operation => operation is IAwaitOperation);
 

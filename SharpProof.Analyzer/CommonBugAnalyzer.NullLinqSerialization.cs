@@ -39,7 +39,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is IInvocationOperation invocation)

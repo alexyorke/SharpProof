@@ -43,7 +43,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         var mode = session.Configuration.TrustedBoundaryReviewMode;
         if (mode == TrustedBoundaryReviewMode.Off) return;
 
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             foreach (var symbol in GetReferencedBoundarySymbols(operation))

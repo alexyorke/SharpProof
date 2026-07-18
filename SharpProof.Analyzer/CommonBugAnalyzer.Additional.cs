@@ -31,7 +31,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        foreach (var binary in context.State.VisibleOperations.OfType<IBinaryOperation>())
+        foreach (var binary in context.Snapshot.VisibleOperations.OfType<IBinaryOperation>())
         {
             if (!SuspiciousIdenticalOperators.Contains(binary.OperatorKind) ||
                 binary.OperatorMethod != null ||
@@ -74,7 +74,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
             switch (operation)
             {
                 case IUsingOperation usingOperation:
@@ -128,7 +128,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        var operations = context.State.VisibleOperations;
+        var operations = context.Snapshot.VisibleOperations;
         foreach (var statement in operations.OfType<IExpressionStatementOperation>())
             if (Unwrap(statement.Operation) is IInvocationOperation invocation && IsDeferredQuery(invocation))
                 Report(

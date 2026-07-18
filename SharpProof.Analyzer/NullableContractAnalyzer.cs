@@ -15,7 +15,7 @@ internal static class NullableContractAnalyzer
 {
     internal static void Analyze(MethodBodyAnalysisContext context, AnalyzerSession session)
     {
-        if (context.State.RootOperation == null) return;
+        if (context.Snapshot.RootOperation == null) return;
 
         var completions = CollectNormalCompletions(context);
         if (completions.Length != 0)
@@ -467,7 +467,7 @@ internal static class NullableContractAnalyzer
 
     private static bool HasVisibleAssignmentToMember(MethodBodyAnalysisContext context, ISymbol member)
     {
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is not ISimpleAssignmentOperation assignment) continue;
@@ -562,7 +562,7 @@ internal static class NullableContractAnalyzer
             (IFieldSymbol or IPropertySymbol))
             return false;
 
-        foreach (var invocation in context.State.VisibleOperations
+        foreach (var invocation in context.Snapshot.VisibleOperations
                      .OfType<IInvocationOperation>()
                      .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart))
         {
@@ -663,7 +663,7 @@ internal static class NullableContractAnalyzer
     private static ImmutableArray<NormalCompletion> CollectNormalCompletions(MethodBodyAnalysisContext context)
     {
         var builder = ImmutableArray.CreateBuilder<NormalCompletion>();
-        foreach (var operation in context.State.VisibleOperations)
+        foreach (var operation in context.Snapshot.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is not IReturnOperation returnOperation ||

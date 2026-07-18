@@ -69,7 +69,7 @@ internal static class MethodEnsuresAnalyzer
 
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
         var completionSites =
-            CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.State,
+            CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.Snapshot,
                 context.CancellationToken);
         if (completionSites.Length == 0) return;
 
@@ -341,13 +341,13 @@ internal static class MethodEnsuresAnalyzer
         IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
         SemanticModel semanticModel,
-        MethodBodyAnalysisState analysisState,
+        MethodAnalysisSnapshot snapshot,
         CancellationToken cancellationToken)
     {
-        if (analysisState.RootOperation == null) return ImmutableArray<CompletionSite>.Empty;
+        if (snapshot.RootOperation == null) return ImmutableArray<CompletionSite>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<CompletionSite>();
-        foreach (var operation in analysisState.VisibleOperations)
+        foreach (var operation in snapshot.VisibleOperations)
             if (operation is IReturnOperation returnOperation)
             {
                 if (AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(

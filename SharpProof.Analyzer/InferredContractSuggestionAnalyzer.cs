@@ -22,7 +22,7 @@ internal static class InferredContractSuggestionAnalyzer
             context.Node.SyntaxTree,
             session.Configuration.InferredContractSuggestions);
         if (!options.IsEnabled ||
-            context.State.RootOperation == null ||
+            context.Snapshot.RootOperation == null ||
             !IsSupportedDeclaration(context.Node) ||
             !MatchesScope(context.MethodSymbol, options.Scope))
             return;
@@ -113,7 +113,7 @@ internal static class InferredContractSuggestionAnalyzer
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "ZeroAllocationsAttribute") ||
-            MethodAllocationAnalyzer.HasVisibleAllocationSites(context.State))
+            MethodAllocationAnalyzer.HasVisibleAllocationSites(context.Snapshot))
             return;
 
         Report(
