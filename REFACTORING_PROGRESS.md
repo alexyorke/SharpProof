@@ -156,6 +156,10 @@ This is the active source of truth for the comprehensive refactor. Read
   and argument-error handling. CLI orchestration moved to `EffectSummaryCli`,
   deleting the monolithic host class from the executable entry-point file while
   preserving command behavior and generated artifacts.
+- [x] `EffectSummaryProgressStore` now owns sharded input fingerprints,
+  artifact-spec and sharded checkpoint validation, atomic persistence, and tool
+  identity. The CLI's progress adapters and duplicated JSON helpers were
+  deleted; resume behavior and fingerprint mismatch failures remain exact.
 
 ## Current evidence
 
@@ -184,6 +188,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract EffectSummary progress/checkpoint persistence from `EffectSummaryCli`
-behind a typed store, then delete the corresponding CLI-owned helpers while
-preserving resume fingerprints and generated artifacts.
+Extract EffectSummary input/dependency resolution or output/report writing from
+`EffectSummaryCli`, deleting the corresponding CLI-owned helpers while
+preserving paths, manifests, JSON bytes, and command failures.

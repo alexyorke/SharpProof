@@ -128,7 +128,7 @@ internal static class EffectSummaryCli
         var artifactSpecSha256 = EffectSummaryHash.FileSha256(artifactSpecPath);
         var completedOutputPaths = normalizedProgressPath == null || !resume || !File.Exists(normalizedProgressPath)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            : LoadCompletedArtifactOutputs(normalizedProgressPath, artifactSpecSha256);
+            : EffectSummaryProgressStore.LoadArtifactSpec(normalizedProgressPath, artifactSpecSha256);
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> resolvedPurityEntries =
             new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
 
@@ -154,7 +154,10 @@ internal static class EffectSummaryCli
                     resolvedPurityEntries.Values.Concat(effectSummary.GeneratedPurityCatalog.Entries));
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
-                SaveArtifactSpecProgress(normalizedProgressPath, artifactSpecSha256, completedOutputPaths);
+                EffectSummaryProgressStore.SaveArtifactSpec(
+                    normalizedProgressPath,
+                    artifactSpecSha256,
+                    completedOutputPaths);
         }
 
         if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
@@ -245,10 +248,10 @@ internal static class EffectSummaryCli
         var normalizedProgressPath = string.IsNullOrWhiteSpace(options.ProgressPath)
             ? null
             : Path.GetFullPath(options.ProgressPath);
-        var inputFingerprint = ComputeShardedInputFingerprint(options, assemblyPaths);
+        var inputFingerprint = EffectSummaryProgressStore.ComputeShardedInputFingerprint(options, assemblyPaths);
         var completedOutputPaths = normalizedProgressPath == null || !options.Resume || !File.Exists(normalizedProgressPath)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            : LoadShardedProgress(normalizedProgressPath, inputFingerprint);
+            : EffectSummaryProgressStore.LoadSharded(normalizedProgressPath, inputFingerprint);
 
         foreach (var assemblyPath in assemblyPaths)
         {
@@ -259,7 +262,10 @@ internal static class EffectSummaryCli
             WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
-                SaveShardedProgress(normalizedProgressPath, inputFingerprint, completedOutputPaths);
+                EffectSummaryProgressStore.SaveSharded(
+                    normalizedProgressPath,
+                    inputFingerprint,
+                    completedOutputPaths);
         }
 
         if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
@@ -281,143 +287,6 @@ internal static class EffectSummaryCli
         return Path.Combine(
             outputDirectory,
             $"{safeAssemblyName}.{pathHash}.SharpProof.EffectSummary.json");
-    }
-
-    private static string ComputeShardedInputFingerprint(CliOptions options, IReadOnlyList<string> assemblyPaths)
-    {
-        var payload = JsonSerializer.Serialize(new
-        {
-            ToolModuleVersionId = GetToolModuleVersionId(),
-            Assemblies = assemblyPaths.Select(path => new
-            {
-                Path = Path.GetFullPath(path),
-                Sha256 = EffectSummaryHash.FileSha256(path)
-            }),
-            options.Limit,
-            options.SymbolPrefixes,
-            options.ExactSymbols,
-            options.CanonicalKeys,
-            options.ExcludedSymbolPrefixes,
-            options.IncludeCallees,
-            options.MaxDepth,
-            options.MaxExceptionEdges,
-            options.IncludeTransitiveRoots,
-            options.IncludePurityClassification,
-            options.CompareManualCatalogs,
-            options.IncludeBclFallbackInventory
-        });
-        return EffectSummaryHash.Sha256(payload);
-    }
-
-    private static HashSet<string> LoadShardedProgress(string progressPath, string inputFingerprint)
-    {
-        return LoadCompletedOutputPaths(
-            progressPath,
-            "InputFingerprint",
-            inputFingerprint,
-            $"Unsupported sharded effect-summary progress schema in '{progressPath}'.",
-            $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
-    }
-
-    private static void SaveShardedProgress(
-        string progressPath,
-        string inputFingerprint,
-        IEnumerable<string> completedOutputPaths)
-    {
-        SaveProgressJson(
-            progressPath,
-            new ShardedEffectSummaryProgressDocument
-            {
-                SchemaVersion = 1,
-                ToolModuleVersionId = GetToolModuleVersionId(),
-                InputFingerprint = inputFingerprint,
-                CompletedOutputPaths = completedOutputPaths
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-            });
-    }
-
-    private static HashSet<string> LoadCompletedArtifactOutputs(string progressPath, string artifactSpecSha256)
-    {
-        return LoadCompletedOutputPaths(
-            progressPath,
-            "ArtifactSpecSha256",
-            artifactSpecSha256,
-            $"Unsupported artifact-spec progress schema in '{progressPath}'.",
-            $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
-    }
-
-    private static HashSet<string> LoadCompletedOutputPaths(
-        string progressPath,
-        string fingerprintPropertyName,
-        string expectedFingerprint,
-        string unsupportedSchemaMessage,
-        string fingerprintMismatchMessage)
-    {
-        using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
-        var root = document.RootElement;
-        if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            schemaVersionElement.GetInt32() != 1)
-            throw new InvalidOperationException(unsupportedSchemaMessage);
-
-        var recordedFingerprint = root.TryGetProperty(fingerprintPropertyName, out var fingerprintElement)
-            ? fingerprintElement.GetString()
-            : null;
-        if (!string.Equals(recordedFingerprint, expectedFingerprint, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(fingerprintMismatchMessage);
-
-        var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
-            completedElement.ValueKind == JsonValueKind.Array)
-            foreach (var pathElement in completedElement.EnumerateArray())
-            {
-                var path = pathElement.GetString();
-                if (!string.IsNullOrWhiteSpace(path)) completedOutputPaths.Add(Path.GetFullPath(path));
-            }
-
-        return completedOutputPaths;
-    }
-
-    private static void SaveArtifactSpecProgress(
-        string progressPath,
-        string artifactSpecSha256,
-        IEnumerable<string> completedOutputPaths)
-    {
-        SaveProgressJson(
-            progressPath,
-            new ArtifactSpecProgressDocument
-            {
-                SchemaVersion = 1,
-                ArtifactSpecSha256 = artifactSpecSha256,
-                CompletedOutputPaths = completedOutputPaths
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-            });
-    }
-
-    private static void SaveProgressJson(string progressPath, object progress)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(progressPath)!);
-        var temporaryPath = progressPath + ".tmp-" + Guid.NewGuid().ToString("N");
-        try
-        {
-            File.WriteAllText(
-                temporaryPath,
-                JsonSerializer.Serialize(
-                    progress,
-                    new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporaryPath, progressPath, true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-        }
-    }
-
-    private static string GetToolModuleVersionId()
-    {
-        return typeof(EffectSummaryCli).Assembly.ManifestModule.ModuleVersionId.ToString("D");
     }
 
     private static EffectSummaryDocument BuildDocument(
