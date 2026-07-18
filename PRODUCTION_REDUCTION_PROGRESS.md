@@ -133,12 +133,17 @@ Tests are excluded from the metric and must not be deleted.
   complete, while architecture tests enforce the supported session/query/result
   boundary and prevent raw SMT types from entering the public API. No build,
   CI, documentation, or product path consumed the duplicate source scanner.
+- [x] Retired the standalone clone and risk inventories plus their stale manual
+  clone adjudications. Neither scanner had a build, CI, documentation, or
+  product consumer; both duplicated canonical source/architecture metrics, and
+  their rules still named the removed `Shared` root and deleted query facades.
+  Production metrics and generated test-impact ownership remain enforced.
 
 ## Current evidence
 
-- Maintained production: 104,485 lines (99,501 C#, 4,104 scripts, and 880
-  specifications); net reduction: 3,141 lines; remaining reduction: 16,859.
-  This tranche removed 324 maintained script lines without deleting tests.
+- Maintained production: 104,152 lines (99,501 C#, 3,771 scripts, and 880
+  specifications); net reduction: 3,474 lines; remaining reduction: 16,526.
+  This tranche removed 333 maintained script lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 

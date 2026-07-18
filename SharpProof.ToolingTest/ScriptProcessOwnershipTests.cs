@@ -150,16 +150,12 @@ public sealed class ScriptProcessOwnershipTests
             "SharpProofSourceInventory.ps1"));
         Assert.That(inventorySource, Does.Contain("Path is outside the repository root"));
         Assert.That(inventorySource, Does.Contain("StartsWith($rootPrefix"));
-        foreach (var scriptName in new[]
-                 {
-                     "Get-SharpProofProductionMetrics.ps1",
-                     "Get-SharpProofCloneInventory.ps1"
-                 })
-        {
-            var source = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", scriptName));
-            Assert.That(source, Does.Contain("SharpProofSourceInventory.ps1"), scriptName);
-            Assert.That(source, Does.Not.Contain("function Convert-ToRepoPath"), scriptName);
-        }
+        var metricsSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Get-SharpProofProductionMetrics.ps1"));
+        Assert.That(metricsSource, Does.Contain("SharpProofSourceInventory.ps1"));
+        Assert.That(metricsSource, Does.Not.Contain("function Convert-ToRepoPath"));
 
         var dotnetWrapper = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -178,20 +174,12 @@ public sealed class ScriptProcessOwnershipTests
     }
 
     [Test]
-    public void DemoAndInventoryScriptsFailClosed()
+    public void DemoAndTestImpactInventoryScriptsFailClosed()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
         var demoScript = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "demo-sharpproof.ps1"));
         Assert.That(demoScript, Does.Contain("Assert-NativeCommandSucceeded"));
         Assert.That(demoScript, Does.Contain("failed with exit code"));
-
-        var auditScript = File.ReadAllText(Path.Combine(
-            repositoryRoot,
-            "scripts",
-            "Get-SharpProofAuditInventory.ps1"));
-        Assert.That(auditScript, Does.Contain("$symbolicPath"));
-        Assert.That(auditScript, Does.Contain("Measure-Object -Line"));
-        Assert.That(auditScript, Does.Contain("Path is outside the repository root"));
 
         var impactScript = File.ReadAllText(Path.Combine(
             repositoryRoot,
