@@ -8,8 +8,6 @@ internal static class EffectSummarySemanticWrapperRules
         new(HasPureStringFromReadOnlyCharSpanWrapperPattern, "none"),
         new(HasPureStringSliceNormalizationWrapperPattern, "none"),
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
-        new(HasPureTypeMetadataWrapperPattern, "none"),
-        new(HasPureRuntimeTypeMetadataWrapperPattern, "none"),
         new(HasPureTypeIdentityWrapperPattern, "none"),
         new(HasPureCharScalarProjectionWrapperPattern, "none"),
         new(HasPureGuardedStringCharScanWrapperPattern, "none"),
@@ -142,91 +140,6 @@ internal static class EffectSummarySemanticWrapperRules
                string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
                summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
                summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
-    }
-
-    internal static bool HasPureTypeMetadataWrapperPattern(MethodEffectSummary summary)
-    {
-        if (!HasFieldlessDynamicDispatchWrapperShape(summary) ||
-            !IsParameterlessProperty(summary.Identity, "System.Type"))
-            return false;
-
-        var callSites = EnumerateCallSites(summary).ToArray();
-        if (summary.Identity.Name == "Attributes")
-            return CallSitesMatch(
-                callSites,
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true));
-
-        if (!string.Equals(summary.Identity.ReturnType, "named:System.Boolean", StringComparison.Ordinal))
-            return false;
-
-        if (IsPureTypeAttributeFlagsWrapperMethod(summary.Identity.Name))
-            return CallSitesMatch(
-                callSites,
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true));
-
-        if (TryGetPureTypeSingleImplWrapperCall(summary.Identity.Name, out var implCall))
-            return CallSitesMatch(callSites, (implCall, true));
-
-        return summary.Identity.Name switch
-        {
-            "IsClass" => CallSitesMatch(
-                callSites,
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true),
-                ("System.Type.get_IsValueType()->bool", false)),
-            "IsNested" => CallSitesMatch(
-                callSites,
-                ("System.Reflection.MemberInfo.get_DeclaringType()->System.Type", true),
-                ("System.Type.op_Inequality(System.Type, System.Type)->bool", false)),
-            "IsInterface" => CallSitesMatch(
-                callSites,
-                ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            _ => false
-        };
-    }
-
-    internal static bool HasPureRuntimeTypeMetadataWrapperPattern(MethodEffectSummary summary)
-    {
-        if (!IsParameterlessProperty(summary.Identity, "System.RuntimeType")) return false;
-
-        var callSites = EnumerateCallSites(summary).ToArray();
-        return summary.Identity.Name switch
-        {
-            "ContainsGenericParameters" =>
-                HasFieldlessDynamicDispatchWrapperShape(summary) &&
-                CallSitesMatch(
-                    callSites,
-                    ("System.RuntimeTypeHandle.ContainsGenericVariables()->bool", false),
-                    ("System.Type.GetRootElementType()->System.Type", false),
-                    ("System.Type.get_TypeHandle()->System.RuntimeTypeHandle", true)),
-            "IsEnum" =>
-                CallsOnly(summary, "calls_method", "reads_instance_field", "virtual_call") &&
-                summary.RootCandidates.All(static root =>
-                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
-                summary.Fields.Length == 1 &&
-                string.Equals(summary.Fields[0], "System.Runtime.CompilerServices.MethodTable.ParentMethodTable",
-                    StringComparison.Ordinal) &&
-                CallSitesMatch(
-                    callSites,
-                    ("System.GC.KeepAlive(object)->void", false),
-                    ("System.Runtime.CompilerServices.TypeHandle.AsMethodTable()->System.Runtime.CompilerServices.MethodTable*",
-                        false),
-                    ("System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()->System.Runtime.CompilerServices.TypeHandle",
-                        false),
-                    ("System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()->bool", false),
-                    ("System.RuntimeType.GetNativeTypeHandle()->System.Runtime.CompilerServices.TypeHandle", false),
-                    ("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)->System.Type", false),
-                    ("System.Type.IsSubclassOf(System.Type)->bool", true)),
-            _ => false
-        };
-    }
-
-    private static bool IsParameterlessProperty(StructuralMethodIdentity identity, string containingType)
-    {
-        return string.Equals(identity.ContainingMetadataType, containingType, StringComparison.Ordinal) &&
-               string.Equals(identity.MethodKind, "property-get", StringComparison.Ordinal) &&
-               identity.GenericArity == 0 &&
-               identity.Parameters.Length == 0;
     }
 
     internal static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
@@ -756,45 +669,6 @@ internal static class EffectSummarySemanticWrapperRules
                 return false;
 
         return true;
-    }
-
-    internal static bool IsPureTypeAttributeFlagsWrapperMethod(string propertyName)
-    {
-        return propertyName is
-            "IsAbstract" or
-            "IsAnsiClass" or
-            "IsAutoClass" or
-            "IsAutoLayout" or
-            "IsExplicitLayout" or
-            "IsImport" or
-            "IsLayoutSequential" or
-            "IsNestedAssembly" or
-            "IsNestedFamANDAssem" or
-            "IsNestedFamily" or
-            "IsNestedFamORAssem" or
-            "IsNestedPrivate" or
-            "IsNestedPublic" or
-            "IsNotPublic" or
-            "IsPublic" or
-            "IsSealed" or
-            "IsSpecialName" or
-            "IsUnicodeClass";
-    }
-
-    internal static bool TryGetPureTypeSingleImplWrapperCall(string propertyName, out string implCall)
-    {
-        implCall = propertyName switch
-        {
-            "IsArray" => "System.Type.IsArrayImpl()->bool",
-            "IsByRef" => "System.Type.IsByRefImpl()->bool",
-            "IsCOMObject" => "System.Type.IsCOMObjectImpl()->bool",
-            "IsPointer" => "System.Type.IsPointerImpl()->bool",
-            "IsPrimitive" => "System.Type.IsPrimitiveImpl()->bool",
-            "IsValueType" => "System.Type.IsValueTypeImpl()->bool",
-            _ => string.Empty
-        };
-
-        return implCall.Length != 0;
     }
 
     internal static bool IsTypeIdentityWrapperMethod(string symbol)

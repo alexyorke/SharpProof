@@ -35,11 +35,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] EffectSummary now projects its existing classification into that shared
   model without changing its serialized contract. Contracts owns the mapping
   so Analyzer can reuse it without depending on the executable tool.
+- [x] Removed the manual `System.Type` and `System.RuntimeType` metadata-member
+  wrapper catalogs. Generic call-graph inference now owns those classifications;
+  six runtime metadata slices characterize the unchanged output.
 
 ## Current evidence
 
-- Maintained production: 107,891 lines; foundation overhead: 265 lines;
-  remaining net reduction: 20,265.
+- Maintained production: 107,777 lines; foundation overhead: 151 lines;
+  remaining net reduction: 20,151. The first inferred-rule migration removed
+  126 production C# lines.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
@@ -53,6 +57,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Migrate the first bounded manual semantic-rule family to generic inferred
-summary predicates, delete its member-specific implementation, and preserve
-classification output through differential tests.
+Replace the next manual semantic-rule family only where inferred call summaries
+can preserve conservative dynamic-dispatch behavior, then move into the first
+canonical symbolic traversal deletion batch.
