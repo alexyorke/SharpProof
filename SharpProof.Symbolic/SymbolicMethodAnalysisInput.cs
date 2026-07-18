@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic.Ir;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
@@ -41,4 +43,53 @@ internal sealed class SymbolicMethodAnalysisInput
 
     internal SymbolicQueryContext CreateNodeQuery(SymbolicQueryOptions? options = null) =>
         new(Source, SymbolicQueryTarget.Node(), options);
+
+    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtNode(
+        SymbolicQueryService queryService,
+        SyntaxNode node,
+        string condition,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        ValidateNode(node);
+        return queryService.TryProveAtSyntaxNode(
+            SemanticModel,
+            node,
+            condition,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
+    }
+
+    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtNode(
+        SymbolicQueryService queryService,
+        SyntaxNode node,
+        string condition,
+        SymbolicCondition symbolicCondition,
+        SymbolicState initialState,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        ValidateNode(node);
+        return queryService.TryProveAtSyntaxNode(
+            SemanticModel,
+            node,
+            condition,
+            symbolicCondition,
+            initialState,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
+    }
+
+    private void ValidateNode(SyntaxNode node)
+    {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        if (node.SyntaxTree != Declaration.SyntaxTree)
+            throw new ArgumentException(
+                "The proof node must belong to the analyzed method syntax tree.",
+                nameof(node));
+    }
 }

@@ -124,6 +124,11 @@ This is the active source of truth for the comprehensive refactor. Read
   `MethodAnalysisSnapshot` consumes that request, and cached capability and
   complexity queries use the shared node-query context instead of rebuilding
   source/target pairs.
+- [x] Exception-flow (including recursive source callees), inferred exception
+  contracts, ensures proofs, and nullable proofs now consume the canonical
+  method input. Subnode proof validation is centralized on that input, and the
+  parallel node/semantic-model/method tuples were deleted without weakening
+  unknown or unsupported outcomes.
 
 ## Current evidence
 
@@ -152,7 +157,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Move exception-flow, inferred-contract, and nullable proof queries onto the
-canonical method analysis input/snapshot seam where they currently rebuild
-node query context, preserving explicit subnode targets and conservative
-unknown behavior.
+Decompose `SymbolicProofService` by lowering/encoding, solver execution, and
+result projection responsibilities, using existing differential proof tests to
+delete duplicated static orchestration in bounded green tranches.

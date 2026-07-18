@@ -31,10 +31,8 @@ internal static partial class ExceptionFlowEngine
             var syntax = syntaxReference.GetSyntax(cancellationToken);
             var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
             var result = AnalyzeMethod(
-                syntax,
-                semanticModel,
+                SymbolicMethodAnalysisInput.Create(invokedMethod, syntax, semanticModel),
                 cancellationToken,
-                invokedMethod,
                 exceptionSummaryCatalog,
                 smtAnalysis,
                 attributePolicy,

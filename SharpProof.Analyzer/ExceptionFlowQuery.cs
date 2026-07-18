@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -7,15 +8,17 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowEngine
 {
     internal static ExceptionFlowResult AnalyzeMethod(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
+        SymbolicMethodAnalysisInput input,
         CancellationToken cancellationToken,
-        IMethodSymbol methodSymbol,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         HashSet<IMethodSymbol>? visitedMethods = null)
     {
+        if (input == null) throw new ArgumentNullException(nameof(input));
+        var methodNode = input.Declaration;
+        var semanticModel = input.SemanticModel;
+        var methodSymbol = input.MethodSymbol;
         var isRoot = visitedMethods == null;
         visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEq.Default)
         {

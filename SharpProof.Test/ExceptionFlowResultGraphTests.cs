@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
@@ -59,10 +60,8 @@ public sealed class ExceptionFlowResultGraphTests
         var methodSymbol = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return ExceptionFlowEngine.AnalyzeMethod(
-            method,
-            model,
+            SymbolicMethodAnalysisInput.Create(methodSymbol, method, model),
             CancellationToken.None,
-            methodSymbol,
             ExceptionSummaryCatalog.Empty,
             smt,
             SharpProofAttributeIdentityPolicy.Create(ImmutableHashSet<string>.Empty));

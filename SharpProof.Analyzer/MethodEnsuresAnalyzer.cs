@@ -185,8 +185,8 @@ internal static class MethodEnsuresAnalyzer
                         out var initialState,
                         out var oldFailureReason))
                 {
-                    var proofOutcome = queryService.TryProveAtSyntaxNode(
-                        context.SemanticModel,
+                    var proofOutcome = context.Snapshot.Input.TryProveAtNode(
+                        queryService,
                         completionSite.QueryNode,
                         proofCondition,
                         symbolicCondition,
@@ -201,8 +201,8 @@ internal static class MethodEnsuresAnalyzer
                 }
                 else if (oldFailureReason == null)
                 {
-                    var proofOutcome = queryService.TryProveAtSyntaxNode(
-                            context.SemanticModel,
+                    var proofOutcome = context.Snapshot.Input.TryProveAtNode(
+                            queryService,
                             completionSite.QueryNode,
                             proofCondition,
                             purityService.SmtAnalysis,
