@@ -9,9 +9,9 @@ internal sealed class SymbolicQueryExecutor
 {
     private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicComplexityService _complexityService;
+    private readonly SymbolicConditionProofDispatcher _conditionProofDispatcher;
     private readonly SymbolicRuntimeHazardQueryDispatcher _runtimeHazardDispatcher;
     private readonly SymbolicSourceQueryDispatcher _sourceQueryDispatcher;
-    private readonly SymbolicSourceQueryService _sourceQueryService;
 
     internal SymbolicQueryExecutor()
         : this(new SymbolicInvariantService())
@@ -22,8 +22,9 @@ internal sealed class SymbolicQueryExecutor
     {
         if (invariantService == null) throw new ArgumentNullException(nameof(invariantService));
 
-        _sourceQueryService = new SymbolicSourceQueryService(invariantService);
-        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(invariantService, _sourceQueryService);
+        var sourceQueryService = new SymbolicSourceQueryService(invariantService);
+        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(invariantService, sourceQueryService);
+        _conditionProofDispatcher = new SymbolicConditionProofDispatcher(sourceQueryService);
         _runtimeHazardDispatcher = new SymbolicRuntimeHazardQueryDispatcher(
             new SymbolicRuntimeHazardQueryService(invariantService));
         _complexityService = new SymbolicComplexityService();
@@ -60,29 +61,7 @@ internal sealed class SymbolicQueryExecutor
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
 
         return ExecuteWithLimits(validatedRequest, cancellationToken, (request, token) =>
-        {
-            request.RequireTarget(
-                static kind => kind == SymbolicQueryTargetKind.Point,
-                "Condition proof requests require a point target.");
-            var smtAnalysis = request.RequireSmt("Condition proof requests require SMT analysis.");
-            return SymbolicSourceInputDispatcher.Execute(
-                request.Source,
-                request.Target,
-                request.Options,
-                SymbolicSourceCompilationKind.Query,
-                "Condition proof source kind is not supported.",
-                (syntaxTree, compilation, target, queryToken) => _sourceQueryService.ProveConditionAtSyntaxTree(
-                    syntaxTree,
-                    compilation,
-                    target.LineNumber!.Value,
-                    target.ColumnNumber ?? 1,
-                    conditionText,
-                    smtAnalysis,
-                    queryToken),
-                static (_, _, _, _) =>
-                    throw new NotSupportedException("Condition proof source kind is not supported."),
-                token);
-        });
+            _conditionProofDispatcher.Prove(request, conditionText, token));
     }
 
     public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
@@ -101,7 +80,7 @@ internal sealed class SymbolicQueryExecutor
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        return _sourceQueryService.ProveConditionAtSyntaxNode(
+        return _conditionProofDispatcher.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,
@@ -137,7 +116,7 @@ internal sealed class SymbolicQueryExecutor
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        return _sourceQueryService.ProveConditionAtSyntaxNode(
+        return _conditionProofDispatcher.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,

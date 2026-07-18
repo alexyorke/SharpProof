@@ -45,6 +45,9 @@ This is the active source of truth for the comprehensive refactor. Read
   `SymbolicQueryExecutor`; the executor now owns API coordination while the
   dispatchers own source-kind validation, target routing, and node/syntax-tree
   execution. The superseded executor branches were deleted.
+- [x] Condition-proof target, SMT, and source dispatch plus syntax-node proof
+  execution live in `SymbolicConditionProofDispatcher`; the executor retains
+  only common request validation, limits, and error coordination.
 
 ## Current evidence
 
@@ -73,6 +76,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Separate condition-proof target resolution and execution from
-`SymbolicQueryExecutor`, then split source-query aggregation from result
-projection while deleting the superseded orchestration.
+Split source-query aggregation from result projection, then decompose
+complexity modeling into loop, call-summary, cost-algebra, and projection
+responsibilities while deleting superseded orchestration.

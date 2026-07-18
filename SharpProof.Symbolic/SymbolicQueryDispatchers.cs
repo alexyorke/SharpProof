@@ -1,9 +1,87 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
+
+internal sealed class SymbolicConditionProofDispatcher
+{
+    private readonly SymbolicSourceQueryService _service;
+
+    internal SymbolicConditionProofDispatcher(SymbolicSourceQueryService service)
+    {
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+    }
+
+    internal SymbolicConditionProofResult Prove(
+        ValidatedSymbolicQueryRequest request,
+        string conditionText,
+        CancellationToken cancellationToken)
+    {
+        request.RequireTarget(
+            static kind => kind == SymbolicQueryTargetKind.Point,
+            "Condition proof requests require a point target.");
+        var smtAnalysis = request.RequireSmt("Condition proof requests require SMT analysis.");
+
+        return SymbolicSourceInputDispatcher.Execute(
+            request.Source,
+            request.Target,
+            request.Options,
+            SymbolicSourceCompilationKind.Query,
+            "Condition proof source kind is not supported.",
+            (syntaxTree, compilation, target, token) => _service.ProveConditionAtSyntaxTree(
+                syntaxTree,
+                compilation,
+                target.LineNumber!.Value,
+                target.ColumnNumber ?? 1,
+                conditionText,
+                smtAnalysis,
+                token),
+            static (_, _, _, _) =>
+                throw new NotSupportedException("Condition proof source kind is not supported."),
+            cancellationToken);
+    }
+
+    internal SymbolicConditionProofResult ProveAtSyntaxNode(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        return _service.ProveConditionAtSyntaxNode(
+            semanticModel,
+            node,
+            conditionText,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
+    }
+
+    internal SymbolicConditionProofResult ProveAtSyntaxNode(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        string conditionText,
+        SymbolicCondition symbolicCondition,
+        SymbolicState initialState,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        return _service.ProveConditionAtSyntaxNode(
+            semanticModel,
+            node,
+            conditionText,
+            symbolicCondition,
+            initialState,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
+    }
+}
 
 internal sealed class SymbolicSourceQueryDispatcher
 {
