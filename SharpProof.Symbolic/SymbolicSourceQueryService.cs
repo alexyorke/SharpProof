@@ -14,7 +14,7 @@ namespace SharpProof.Symbolic;
 internal sealed class SymbolicSourceQueryService
 {
     private static readonly ConditionalWeakTable<SyntaxTree, QueryNodeIndex> QueryNodeIndexes = new();
-    private readonly SymbolicInvariantService _invariantService;
+    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer;
 
     public SymbolicSourceQueryService()
         : this(new SymbolicInvariantService())
@@ -23,7 +23,8 @@ internal sealed class SymbolicSourceQueryService
 
     public SymbolicSourceQueryService(SymbolicInvariantService invariantService)
     {
-        _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
+        _programPointAnalyzer = new SymbolicProgramPointAnalyzer(
+            invariantService ?? throw new ArgumentNullException(nameof(invariantService)));
     }
 
     public SymbolicProgramPointResult QuerySyntaxTree(
@@ -342,7 +343,7 @@ internal sealed class SymbolicSourceQueryService
     {
         ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
 
-        var query = AnalyzeProgramPointNode(
+        var query = _programPointAnalyzer.Analyze(
             semanticModel,
             node.SpanStart,
             node,
@@ -390,7 +391,7 @@ internal sealed class SymbolicSourceQueryService
 
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
 
-        var query = AnalyzeProgramPointNode(
+        var query = _programPointAnalyzer.Analyze(
             semanticModel,
             node.SpanStart,
             node,
@@ -460,7 +461,7 @@ internal sealed class SymbolicSourceQueryService
         var root = syntaxTree.GetRoot(cancellationToken);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
         var node = FindQueryNode(root, position);
-        return AnalyzeProgramPointNode(semanticModel, position, node, smtAnalysis, cancellationToken);
+        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
     }
 
     private SymbolicProgramPointQueryContext AnalyzeProgramPointAtPosition(
@@ -477,29 +478,7 @@ internal sealed class SymbolicSourceQueryService
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var node = FindQueryNode(root, position);
-        return AnalyzeProgramPointNode(semanticModel, position, node, smtAnalysis, cancellationToken);
-    }
-
-    private SymbolicProgramPointQueryContext AnalyzeProgramPointNode(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode node,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicState? initialState = null)
-    {
-        var analysis = node is ForStatementSyntax forStatement
-            ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
-            : _invariantService.AnalyzeAt(
-                node,
-                semanticModel,
-                smtAnalysis,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts,
-                initialState);
-
-        return new SymbolicProgramPointQueryContext(semanticModel, position, node, analysis);
+        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
     }
 
     private static IReadOnlyList<SymbolicConditionProofResult> ProveConditions(
@@ -861,7 +840,7 @@ internal sealed class SymbolicSourceQueryService
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null)
     {
-        var query = AnalyzeProgramPointNode(
+        var query = _programPointAnalyzer.Analyze(
             semanticModel,
             node.SpanStart,
             node,

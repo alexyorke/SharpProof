@@ -87,6 +87,10 @@ This is the active source of truth for the comprehensive refactor. Read
   oversized, normalization-failed, and unsupported-fragment outcomes are
   explicit; `Z3FormulaEncoder` consumes the typed result while preserving
   conservative unsupported behavior.
+- [x] Program-point invariant execution, including initial-state and
+  current-statement completion semantics, lives in
+  `SymbolicProgramPointAnalyzer`. `SymbolicSourceQueryService` retains target
+  resolution and aggregation; its duplicate invariant execution was deleted.
 
 ## Current evidence
 
@@ -115,6 +119,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Separate program-point analysis and condition-proof execution from
-`SymbolicSourceQueryService`, leaving it as target aggregation and deleting
-the superseded methods.
+Move condition parsing, speculative binding, solver execution, and proof-result
+construction into a dedicated proof engine; leave source-query aggregation as
+the service responsibility and delete superseded implementations.
