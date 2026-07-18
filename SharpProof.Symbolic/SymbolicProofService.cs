@@ -32,7 +32,7 @@ internal sealed class SymbolicProofService
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
-        state = NormalizeState(state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
         if (state.IsContradictory)
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.Unreachable,
@@ -61,7 +61,7 @@ internal sealed class SymbolicProofService
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
-        state = NormalizeState(state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
         return TryEncodeState(state, out pathConditions, out _);
     }
 
@@ -98,8 +98,8 @@ internal sealed class SymbolicProofService
 
         if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
 
-        state = NormalizeState(state);
-        if (rewriteQueryVersions) condition = RewriteQueryConditionToCurrentVersions(condition, state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
+        if (rewriteQueryVersions) condition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(condition, state);
 
         if (state.IsContradictory) return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
 
@@ -315,7 +315,7 @@ internal sealed class SymbolicProofService
                 new SymbolicRelationAtom(relationOperator, term, zero),
                 sourceNode,
                 "ir.safe-divisor.non-zero");
-            if (StateContainsFact(state, nonZeroFact)) return true;
+            if (SymbolicProofStateFacts.StateContainsFact(state, nonZeroFact)) return true;
         }
 
         var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
@@ -324,19 +324,19 @@ internal sealed class SymbolicProofService
             "ir.safe-divisor.zero");
         if (zeroCondition is SymbolicFactCondition factCondition)
         {
-            if (StateContradictsFact(state, factCondition.Fact)) return true;
+            if (SymbolicProofStateFacts.StateContradictsFact(state, factCondition.Fact)) return true;
 
-            if (StateContainsFact(state, factCondition.Fact)) return false;
+            if (SymbolicProofStateFacts.StateContainsFact(state, factCondition.Fact)) return false;
         }
 
-        if (TryEvaluateConditionFromState(state, zeroCondition, out var value)) return !value;
+        if (SymbolicProofStateFacts.TryEvaluateConditionFromState(state, zeroCondition, out var value)) return !value;
 
-        return StateContradictsCondition(state, zeroCondition);
+        return SymbolicProofStateFacts.StateContradictsCondition(state, zeroCondition);
     }
 
     private static SymbolicState AssumePathCondition(SymbolicState state, SymbolicCondition condition)
     {
-        return NormalizeState(state.AddPathCondition(condition));
+        return SymbolicProofStateFacts.NormalizeState(state.AddPathCondition(condition));
     }
 
     private static SafeDivisorAssumption<SymbolicState> AssumeStatePathCondition(
@@ -373,8 +373,8 @@ internal sealed class SymbolicProofService
 
         if (fact == null) throw new ArgumentNullException(nameof(fact));
 
-        state = NormalizeState(state);
-        fact = RewriteQueryFactToCurrentVersions(fact, state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
+        fact = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(fact, state);
         if (state.IsContradictory)
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.ProvenTrue,
@@ -387,12 +387,12 @@ internal sealed class SymbolicProofService
                     "ir_target_fact_syntactic_true")
                 : ClassifySyntacticallyFalseImplication(state, "ir_target_fact_syntactic_false");
 
-        if (StateContainsFact(state, fact))
+        if (SymbolicProofStateFacts.StateContainsFact(state, fact))
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.ProvenTrue,
                 "ir_state_contains_fact");
 
-        if (StateContradictsFact(state, fact))
+        if (SymbolicProofStateFacts.StateContradictsFact(state, fact))
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.ProvenFalse,
                 "ir_state_contradicts_fact");
@@ -421,23 +421,23 @@ internal sealed class SymbolicProofService
 
         if (branchCondition == null) throw new ArgumentNullException(nameof(branchCondition));
 
-        state = NormalizeState(state);
-        branchCondition = RewriteQueryConditionToCurrentVersions(branchCondition, state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
+        branchCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(branchCondition, state);
         if (state.IsContradictory)
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.Unreachable,
                 ContradictoryStateReason);
 
-        if (TryClassifySyntacticConditionTruth(branchCondition, out var syntacticStatus))
+        if (SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(branchCondition, out var syntacticStatus))
             return syntacticStatus == SymbolicProofStatus.ProvenTrue
                 ? ClassifyReachability(state)
                 : SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.Unreachable,
                     "ir_branch_syntactic_false");
 
-        if (StateContainsCondition(state, branchCondition)) return ClassifyReachability(state);
+        if (SymbolicProofStateFacts.StateContainsCondition(state, branchCondition)) return ClassifyReachability(state);
 
-        if (StateContradictsCondition(state, branchCondition))
+        if (SymbolicProofStateFacts.StateContradictsCondition(state, branchCondition))
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.Unreachable,
                 "ir_state_contradicts_branch");
@@ -532,8 +532,8 @@ internal sealed class SymbolicProofService
         if (state == null) throw new ArgumentNullException(nameof(state));
         if (condition == null) throw new ArgumentNullException(nameof(condition));
 
-        normalizedState = NormalizeState(state);
-        rewrittenCondition = RewriteQueryConditionToCurrentVersions(condition, normalizedState);
+        normalizedState = SymbolicProofStateFacts.NormalizeState(state);
+        rewrittenCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(condition, normalizedState);
         if (normalizedState.IsContradictory)
         {
             result = SymbolicIrProofResult.Syntactic(
@@ -544,7 +544,7 @@ internal sealed class SymbolicProofService
             return true;
         }
 
-        if (TryClassifySyntacticConditionTruth(rewrittenCondition, out var syntacticStatus))
+        if (SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(rewrittenCondition, out var syntacticStatus))
         {
             if (mode == ConditionClassificationMode.Implication &&
                 syntacticStatus == SymbolicProofStatus.ProvenFalse)
@@ -562,7 +562,7 @@ internal sealed class SymbolicProofService
             return true;
         }
 
-        if (StateContainsCondition(normalizedState, rewrittenCondition))
+        if (SymbolicProofStateFacts.StateContainsCondition(normalizedState, rewrittenCondition))
         {
             result = SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.ProvenTrue,
@@ -570,7 +570,7 @@ internal sealed class SymbolicProofService
             return true;
         }
 
-        if (StateContradictsCondition(normalizedState, rewrittenCondition))
+        if (SymbolicProofStateFacts.StateContradictsCondition(normalizedState, rewrittenCondition))
         {
             result = SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.ProvenFalse,
@@ -594,8 +594,8 @@ internal sealed class SymbolicProofService
 
         if (triggerPrecondition == null) throw new ArgumentNullException(nameof(triggerPrecondition));
 
-        state = NormalizeState(state);
-        triggerPrecondition = RewriteQueryFactToCurrentVersions(triggerPrecondition, state);
+        state = SymbolicProofStateFacts.NormalizeState(state);
+        triggerPrecondition = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(triggerPrecondition, state);
         if (state.IsContradictory)
             return SymbolicIrProofResult.Syntactic(
                 SymbolicProofStatus.Unreachable,
@@ -643,216 +643,6 @@ internal sealed class SymbolicProofService
         var result = classify();
         proofCache.TryAddResult(key, result);
         return result;
-    }
-
-    private static SymbolicState NormalizeState(SymbolicState state)
-    {
-        return state.Normalize();
-    }
-
-    private static SymbolicCondition RewriteQueryConditionToCurrentVersions(SymbolicCondition condition,
-        SymbolicState state)
-    {
-        return state.SymbolVersions.Count == 0
-            ? condition
-            : SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, state.SymbolVersions);
-    }
-
-    private static SymbolicFact RewriteQueryFactToCurrentVersions(SymbolicFact fact, SymbolicState state)
-    {
-        return state.SymbolVersions.Count == 0
-            ? fact
-            : SymbolicIrVersionRewriter.RewriteToCurrentVersions(fact, state.SymbolVersions);
-    }
-
-    private static bool TryClassifySyntacticConditionTruth(
-        SymbolicCondition condition,
-        out SymbolicProofStatus status)
-    {
-        switch (SymbolicState.CreateProofConditionKey(condition))
-        {
-            case "const:true":
-                status = SymbolicProofStatus.ProvenTrue;
-                return true;
-            case "const:false":
-                status = SymbolicProofStatus.ProvenFalse;
-                return true;
-            default:
-                status = SymbolicProofStatus.Unknown;
-                return false;
-        }
-    }
-
-    private static bool StateContainsFact(SymbolicState state, SymbolicFact fact)
-    {
-        var factKey = SymbolicState.CreateProofFactKey(fact);
-        var factConditionKey = "fact-condition:" + factKey;
-        return state.Facts.Any(candidate => string.Equals(
-                   SymbolicState.CreateProofFactKey(candidate),
-                   factKey,
-                   StringComparison.Ordinal)) ||
-               state.PathConditions.Any(candidate =>
-                   string.Equals(
-                       SymbolicState.CreateProofConditionKey(candidate),
-                       factConditionKey,
-                       StringComparison.Ordinal) ||
-                   SymbolicState.EnumerateProofConditionFactKeys(candidate).Any(conditionFactKey => string.Equals(
-                       conditionFactKey,
-                       factKey,
-                       StringComparison.Ordinal)));
-    }
-
-    private static bool StateContradictsFact(SymbolicState state, SymbolicFact fact)
-    {
-        return StateContainsFact(state, fact.Negate());
-    }
-
-    private static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
-    {
-        if (TryEvaluateConditionFromState(state, condition, out var value)) return value;
-
-        if (condition is SymbolicFactCondition factCondition &&
-            StateContainsFact(state, factCondition.Fact))
-            return true;
-
-        var conditionKey = SymbolicState.CreateProofConditionKey(condition);
-        return state.Facts.Any(candidate => string.Equals(
-                   "fact-condition:" + SymbolicState.CreateProofFactKey(candidate),
-                   conditionKey,
-                   StringComparison.Ordinal)) ||
-               state.PathConditions.Any(candidate => string.Equals(
-                   SymbolicState.CreateProofConditionKey(candidate),
-                   conditionKey,
-                   StringComparison.Ordinal));
-    }
-
-    private static bool StateContradictsCondition(SymbolicState state, SymbolicCondition condition)
-    {
-        if (TryEvaluateConditionFromState(state, condition, out var value)) return !value;
-
-        return StateContainsCondition(state, new SymbolicNotCondition(condition));
-    }
-
-    private static bool TryEvaluateConditionFromState(
-        SymbolicState state,
-        SymbolicCondition condition,
-        out bool value)
-    {
-        return TryEvaluateConditionFromState(
-            state,
-            condition,
-            new Dictionary<string, bool>(StringComparer.Ordinal),
-            out value);
-    }
-
-    private static bool TryEvaluateConditionFromState(
-        SymbolicState state,
-        SymbolicCondition condition,
-        IDictionary<string, bool> memo,
-        out bool value)
-    {
-        var conditionKey = SymbolicState.CreateProofConditionKey(condition);
-        if (memo.TryGetValue(conditionKey, out value)) return true;
-
-        if (state.Facts.Any(fact => string.Equals(
-                "fact-condition:" + SymbolicState.CreateProofFactKey(fact),
-                conditionKey,
-                StringComparison.Ordinal)) ||
-            state.PathConditions.Any(pathCondition => string.Equals(
-                SymbolicState.CreateProofConditionKey(pathCondition),
-                conditionKey,
-                StringComparison.Ordinal)))
-        {
-            value = true;
-            memo[conditionKey] = true;
-            return true;
-        }
-
-        var negatedConditionKey = SymbolicState.CreateProofConditionKey(new SymbolicNotCondition(condition));
-        if (state.PathConditions.Any(pathCondition => string.Equals(
-                SymbolicState.CreateProofConditionKey(pathCondition),
-                negatedConditionKey,
-                StringComparison.Ordinal)))
-        {
-            value = false;
-            memo[conditionKey] = false;
-            return true;
-        }
-
-        switch (condition)
-        {
-            case SymbolicConstantCondition constant:
-                value = constant.Value;
-                memo[conditionKey] = value;
-                return true;
-            case SymbolicFactCondition factCondition:
-                if (StateContainsFact(state, factCondition.Fact))
-                {
-                    value = true;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                if (StateContradictsFact(state, factCondition.Fact))
-                {
-                    value = false;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                break;
-            case SymbolicNotCondition notCondition:
-                if (TryEvaluateConditionFromState(state, notCondition.Operand, memo, out var operandValue))
-                {
-                    value = !operandValue;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                break;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
-                var leftAndKnown = TryEvaluateConditionFromState(state, andCondition.Left, memo, out var leftAndValue);
-                var rightAndKnown =
-                    TryEvaluateConditionFromState(state, andCondition.Right, memo, out var rightAndValue);
-                if ((leftAndKnown && !leftAndValue) ||
-                    (rightAndKnown && !rightAndValue))
-                {
-                    value = false;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                if (leftAndKnown && rightAndKnown)
-                {
-                    value = leftAndValue && rightAndValue;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                break;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition:
-                var leftOrKnown = TryEvaluateConditionFromState(state, orCondition.Left, memo, out var leftOrValue);
-                var rightOrKnown = TryEvaluateConditionFromState(state, orCondition.Right, memo, out var rightOrValue);
-                if ((leftOrKnown && leftOrValue) ||
-                    (rightOrKnown && rightOrValue))
-                {
-                    value = true;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                if (leftOrKnown && rightOrKnown)
-                {
-                    value = leftOrValue || rightOrValue;
-                    memo[conditionKey] = value;
-                    return true;
-                }
-
-                break;
-        }
-
-        value = false;
-        return false;
     }
 
     private SymbolicBudgetInfo? CreateBudgetInfo()

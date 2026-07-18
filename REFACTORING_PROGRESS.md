@@ -138,6 +138,10 @@ This is the active source of truth for the comprehensive refactor. Read
   encoded-state namespaces plus hit/miss/eviction accounting. The nested cache,
   weak table, fallback singleton, and capacity constants were deleted from the
   proof service.
+- [x] `SymbolicProofStateFacts` owns state normalization, query version
+  rewriting, syntactic truth evaluation, and fact/condition
+  containment/contradiction. Proof orchestration and divisor validation consume
+  it directly; the service-owned state-fact implementation was deleted.
 
 ## Current evidence
 
