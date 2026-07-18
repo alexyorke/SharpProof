@@ -31,12 +31,11 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
-    public void ProductionProjects_DoNotCompileSourceFromAnotherProject()
+    public void Projects_DoNotCompileSourceFromAnotherProject()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var violations = Directory.EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
             .Where(path => !IsIgnored(path, root))
-            .Where(path => !IsTestProject(path))
             .SelectMany(GetExternalCompileItems)
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
@@ -70,9 +69,4 @@ public sealed class RepositoryArchitectureTests
                relative.StartsWith("artifacts/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsTestProject(string path)
-    {
-        var name = Path.GetFileNameWithoutExtension(path);
-        return name is "SharpProof.Test" or "SharpProof.ToolingTest";
-    }
 }

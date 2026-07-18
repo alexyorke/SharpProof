@@ -55,7 +55,13 @@
       "name": "SymbolicCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.SymbolicCli/" ],
-      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic" ]
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic", "SymbolicCliCore" ]
+    },
+    {
+      "name": "SymbolicCliCore",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.SymbolicCli.Core/" ],
+      "allowedProjectReferences": [ "Symbolic" ]
     },
     {
       "name": "FuzzCore",

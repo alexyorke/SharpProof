@@ -74,7 +74,7 @@ public sealed class ImpactedTestSelectionScriptTests
     public async Task ListOnlyJson_UsesToolingLaneForLinkedEffectSummaryFixture()
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Test/EffectSummaryToolTests.cs");
+            "SharpProof.ToolingTest/EffectSummaryToolTests.cs");
         var root = recommendation.RootElement;
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
@@ -82,7 +82,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
         Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("EffectSummaryToolTests"));
         Assert.That(
-            GetStringArray(GetEvidenceEntry(root, "SharpProof.Test/EffectSummaryToolTests.cs", "changed-test-file"),
+            GetStringArray(GetEvidenceEntry(root, "SharpProof.ToolingTest/EffectSummaryToolTests.cs", "changed-test-file"),
                 "selectedTestFixtures"),
             Does.Contain("EffectSummaryToolTests"));
     }
@@ -91,7 +91,7 @@ public sealed class ImpactedTestSelectionScriptTests
     public async Task ListOnlyJson_UsesToolingLaneForLinkedPackagingFixture()
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Test/AnalyzerPackagingTests.cs");
+            "SharpProof.ToolingTest/AnalyzerPackagingTests.cs");
         var root = recommendation.RootElement;
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
@@ -99,7 +99,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
         Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("AnalyzerPackagingTests"));
         Assert.That(
-            GetStringArray(GetEvidenceEntry(root, "SharpProof.Test/AnalyzerPackagingTests.cs", "changed-test-file"),
+            GetStringArray(GetEvidenceEntry(root, "SharpProof.ToolingTest/AnalyzerPackagingTests.cs", "changed-test-file"),
                 "selectedTestFixtures"),
             Does.Contain("AnalyzerPackagingTests"));
     }
@@ -575,7 +575,7 @@ public sealed class ImpactedTestSelectionScriptTests
     public async Task ListOnlyJson_UsesToolingLaneForLinkedCodeFixFixture()
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Test/SharpProofCodeFixTests.cs");
+            "SharpProof.ToolingTest/SharpProofCodeFixTests.cs");
         var root = recommendation.RootElement;
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
@@ -583,7 +583,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
         Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("SharpProofCodeFixTests"));
         Assert.That(
-            GetStringArray(GetEvidenceEntry(root, "SharpProof.Test/SharpProofCodeFixTests.cs", "changed-test-file"),
+            GetStringArray(GetEvidenceEntry(root, "SharpProof.ToolingTest/SharpProofCodeFixTests.cs", "changed-test-file"),
                 "selectedTestFixtures"),
             Does.Contain("SharpProofCodeFixTests"));
     }
@@ -592,7 +592,7 @@ public sealed class ImpactedTestSelectionScriptTests
     public async Task ListOnlyJson_UsesToolingLaneForLinkedImpactedSelectionFixture()
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Test/ImpactedTestSelectionScriptTests.cs");
+            "SharpProof.ToolingTest/ImpactedTestSelectionScriptTests.cs");
         var root = recommendation.RootElement;
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
@@ -601,7 +601,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("ImpactedTestSelectionScriptTests"));
         Assert.That(
             GetStringArray(
-                GetEvidenceEntry(root, "SharpProof.Test/ImpactedTestSelectionScriptTests.cs", "changed-test-file"),
+                GetEvidenceEntry(root, "SharpProof.ToolingTest/ImpactedTestSelectionScriptTests.cs", "changed-test-file"),
                 "selectedTestFixtures"),
             Does.Contain("ImpactedTestSelectionScriptTests"));
     }

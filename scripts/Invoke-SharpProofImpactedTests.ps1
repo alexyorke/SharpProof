@@ -1119,7 +1119,7 @@ function Add-TestFilesReferencingTokens
         foreach ($match in $matches)
         {
             $repoPath = Convert-ToRepoPath $match
-            if ($repoPath -eq 'SharpProof.Test/ImpactedTestSelectionScriptTests.cs')
+            if ($repoPath -eq 'SharpProof.ToolingTest/ImpactedTestSelectionScriptTests.cs')
             {
                 continue
             }

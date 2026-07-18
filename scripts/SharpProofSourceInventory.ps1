@@ -26,7 +26,7 @@ function Test-SharpProofProductionSourcePath
         $RepoPath -notmatch '^artifacts/' -and
         $RepoPath -notmatch '^docs/readme-examples/' -and
         $RepoPath -notmatch '(^|/)\.[^/]+/' -and
-        $RepoPath -notmatch '^SharpProof\.(Test|ToolingTest)/' -and
+        $RepoPath -notmatch '^SharpProof\.(Test|Testing|ToolingTest)/' -and
         $RepoPath -notmatch '^SharpProof\.(Demo|Smoke\.Net472)/'
 }
 

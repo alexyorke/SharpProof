@@ -6,32 +6,11 @@
     <ProjectReference Include="..\Tools\SharpProof.Baseline.Core\SharpProof.Baseline.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.CorpusReport.Core\SharpProof.CorpusReport.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
+    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
+    <ProjectReference Include="..\Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\SharpProof.Test\AnalyzerTestHost.cs" Link="Imported\AnalyzerTestHost.cs" />
-    <Compile Include="..\SharpProof.Test\AnalyzerPackagingTests.cs" Link="Imported\AnalyzerPackagingTests.cs" />
-    <Compile Include="..\SharpProof.Test\SharpProofCodeFixTests.cs" Link="Imported\SharpProofCodeFixTests.cs" />
-    <Compile Include="..\SharpProof.Test\EffectSummaryToolTests.cs" Link="Imported\EffectSummaryToolTests.cs" />
-    <Compile Include="..\SharpProof.Test\EffectSummaryToolTests.Helpers.cs" Link="Imported\EffectSummaryToolTests.Helpers.cs" />
-    <Compile Include="..\SharpProof.Test\ExceptionSummaryCatalogValidationTests.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.cs" />
-    <Compile Include="..\SharpProof.Test\ExceptionSummaryCatalogValidationTests.Helpers.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.Helpers.cs" />
-    <Compile Include="..\SharpProof.Test\GeneratedPurityTestSupport.cs" Link="Imported\GeneratedPurityTestSupport.cs" />
-    <Compile Include="..\SharpProof.Test\ImpactedTestSelectionJsonSession.cs" Link="Imported\ImpactedTestSelectionJsonSession.cs" />
-    <Compile Include="..\SharpProof.Test\ImpactedTestSelectionScriptTests.cs" Link="Imported\ImpactedTestSelectionScriptTests.cs" />
-    <Compile Include="..\SharpProof.Test\MsBuildPropertyTestResolver.cs" Link="Imported\MsBuildPropertyTestResolver.cs" />
-    <Compile Include="..\SharpProof.Test\ReadmeExampleAttribute.cs" Link="Imported\ReadmeExampleAttribute.cs" />
-    <Compile Include="..\SharpProof.Test\RoslynTestFixture.cs" Link="Imported\RoslynTestFixture.cs" />
-    <Compile Include="..\SharpProof.Test\SymbolicSourceQueryTestSession.cs" Link="Imported\SymbolicSourceQueryTestSession.cs" />
-    <Compile Include="..\SharpProof.Test\SymbolicSourceQueryServiceTestExtensions.cs" Link="Imported\SymbolicSourceQueryServiceTestExtensions.cs" />
-    <Compile Include="..\SharpProof.Test\TestReflectionFacts.cs" Link="Imported\TestReflectionFacts.cs" />
-    <Compile Include="..\SharpProof.Test\TestProcessSupport.cs" Link="Imported\TestProcessSupport.cs" />
-    <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2.cs" />
-    <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
-    <Compile Include="..\SharpProof.Test\Verifiers\SharpProofVerifierReferences.cs" Link="Imported\Verifiers\SharpProofVerifierReferences.cs" />
-    <Compile Include="..\SharpProof.Test\Verifiers\CSharpVerifierHelper.cs" Link="Imported\Verifiers\CSharpVerifierHelper.cs" />
-    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicInvariantProjection.cs" Link="Imported\SymbolicCli\SymbolicInvariantProjection.cs" />
-    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCliDiagnosticSelector.cs" Link="Imported\SymbolicCli\SymbolicCliDiagnosticSelector.cs" />
   </ItemGroup>
 
 </Project>

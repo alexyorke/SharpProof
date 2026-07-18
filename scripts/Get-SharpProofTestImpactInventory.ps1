@@ -243,7 +243,7 @@ try
         {
             foreach ($testEntry in $testFileEntries)
             {
-                if ([string]::Equals([string]$testEntry.path, 'SharpProof.Test/ImpactedTestSelectionScriptTests.cs', [StringComparison]::OrdinalIgnoreCase))
+                if ([string]::Equals([string]$testEntry.path, 'SharpProof.ToolingTest/ImpactedTestSelectionScriptTests.cs', [StringComparison]::OrdinalIgnoreCase))
                 {
                     continue
                 }

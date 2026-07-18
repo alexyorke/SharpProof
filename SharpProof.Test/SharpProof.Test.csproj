@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
+    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
+    <ProjectReference Include="..\Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
@@ -27,14 +29,6 @@
   </Target>
 
   <ItemGroup>
-    <Compile Remove="EffectSummaryToolTests.cs" />
-    <Compile Remove="EffectSummaryToolTests.Helpers.cs" />
-    <Compile Remove="ExceptionSummaryCatalogValidationTests.cs" />
-    <Compile Remove="ExceptionSummaryCatalogValidationTests.Helpers.cs" />
-    <Compile Remove="AnalyzerPackagingTests.cs" />
-    <Compile Remove="ImpactedTestSelectionJsonSession.cs" />
-    <Compile Remove="ImpactedTestSelectionScriptTests.cs" />
-    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicInvariantProjection.cs" Link="Imported\SymbolicCli\SymbolicInvariantProjection.cs" />
   </ItemGroup>
 
 </Project>

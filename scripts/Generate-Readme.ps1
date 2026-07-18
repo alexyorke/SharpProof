@@ -47,6 +47,7 @@ function Get-ReadmeExampleTests {
     $pattern = '(?ms)(?<attributes>(?:^[ \t]*\[[^\r\n]+\][ \t]*\r?\n)+)[ \t]*public\s+(?:async\s+)?(?:Task(?:<[^>\r\n]+>)?|ValueTask(?:<[^>\r\n]+>)?|void)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)'
     foreach ($file in $files) {
         $fullPath = Join-Path $Root $file
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { continue }
         $content = Get-Content -LiteralPath $fullPath -Raw
         foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($content, $pattern)) {
             $attributes = $match.Groups['attributes'].Value
