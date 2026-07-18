@@ -167,6 +167,9 @@ This is the active source of truth for the comprehensive refactor. Read
   selection, dependency output normalization, and deterministic shard paths.
   The CLI-owned input/path adapters were deleted without changing path errors
   or assembly selection.
+- [x] `GeneratedPurityCatalogReader` now owns persisted catalog metadata
+  extraction, structural identity parsing, and tolerant optional-field
+  projection. The CLI-owned JSON traversal and entry adapter were deleted.
 
 ## Current evidence
 
@@ -195,6 +198,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract generated-catalog metadata reading from `EffectSummaryCli`, then reduce
-document construction to a typed analysis/report pipeline and audit whether the
+Reduce EffectSummary document construction to a typed analysis/report pipeline,
+delete the CLI-owned construction helper, then audit whether the
 EffectSummary/tool-host tranche can be closed.
