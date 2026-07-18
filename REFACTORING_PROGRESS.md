@@ -91,6 +91,11 @@ This is the active source of truth for the comprehensive refactor. Read
   current-statement completion semantics, lives in
   `SymbolicProgramPointAnalyzer`. `SymbolicSourceQueryService` retains target
   resolution and aggregation; its duplicate invariant execution was deleted.
+- [x] Condition parsing, speculative binding, symbolic lowering, SMT proof
+  execution, witness construction, and batch proof evaluation live in
+  `SymbolicConditionProofEngine`. `SymbolicSourceQueryService` retains only its
+  internal facade and source-result aggregation; the superseded proof
+  implementation was deleted.
 
 ## Current evidence
 
@@ -119,6 +124,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Move condition parsing, speculative binding, solver execution, and proof-result
-construction into a dedicated proof engine; leave source-query aggregation as
-the service responsibility and delete superseded implementations.
+Separate source target selection and line/position candidate resolution from
+`SymbolicSourceQueryService`, leaving it as a thin source-query coordinator and
+deleting the superseded selection implementation.

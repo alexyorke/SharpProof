@@ -15,6 +15,7 @@ internal sealed class SymbolicSourceQueryService
 {
     private static readonly ConditionalWeakTable<SyntaxTree, QueryNodeIndex> QueryNodeIndexes = new();
     private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer;
+    private readonly SymbolicConditionProofEngine _conditionProofEngine;
 
     public SymbolicSourceQueryService()
         : this(new SymbolicInvariantService())
@@ -25,6 +26,7 @@ internal sealed class SymbolicSourceQueryService
     {
         _programPointAnalyzer = new SymbolicProgramPointAnalyzer(
             invariantService ?? throw new ArgumentNullException(nameof(invariantService)));
+        _conditionProofEngine = new SymbolicConditionProofEngine(_programPointAnalyzer);
     }
 
     public SymbolicProgramPointResult QuerySyntaxTree(
@@ -294,18 +296,16 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return ProveConditionAtSyntaxTree(
-            syntaxTree,
-            compilation,
+        => _conditionProofEngine.ProveAtSource(
+            sourceText,
+            filePath,
             line,
             column,
             conditionText,
             smtAnalysis,
-            cancellationToken);
-    }
+            references,
+            cancellationToken,
+            compilationProfile);
 
     public SymbolicConditionProofResult ProveConditionAtSyntaxTree(
         SyntaxTree syntaxTree,
@@ -315,23 +315,8 @@ internal sealed class SymbolicSourceQueryService
         string conditionText,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default)
-    {
-        ValidateSyntaxTreeQuery(syntaxTree, compilation);
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-
-        var query = AnalyzeProgramPoint(
-            syntaxTree,
-            compilation,
-            line,
-            column,
-            null,
-            cancellationToken);
-        return ProveConditionAtQuery(query, conditionText, smtAnalysis, cancellationToken);
-    }
+        => _conditionProofEngine.ProveAtSyntaxTree(
+            syntaxTree, compilation, line, column, conditionText, smtAnalysis, cancellationToken);
 
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
         SemanticModel semanticModel,
@@ -340,18 +325,13 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService smtAnalysis,
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
-    {
-        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
-
-        var query = _programPointAnalyzer.Analyze(
+        => _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
-            node.SpanStart,
             node,
-            null,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts);
-        return ProveConditionAtQuery(query, conditionText, smtAnalysis, cancellationToken);
-    }
+            conditionText,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
 
     internal SymbolicConditionProofResult ProveConditionAtAnalysis(
         SemanticModel semanticModel,
@@ -360,20 +340,8 @@ internal sealed class SymbolicSourceQueryService
         string conditionText,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default)
-    {
-        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
-
-        if (analysis == null) throw new ArgumentNullException(nameof(analysis));
-
-        return ProveCondition(
-            semanticModel,
-            node.SpanStart,
-            node,
-            analysis,
-            conditionText,
-            smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(analysis.Truncation);
-    }
+        => _conditionProofEngine.ProveAtAnalysis(
+            semanticModel, node, analysis, conditionText, smtAnalysis, cancellationToken);
 
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
         SemanticModel semanticModel,
@@ -384,70 +352,21 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService smtAnalysis,
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
-    {
-        ValidateProofRequest(semanticModel, node, conditionText, smtAnalysis);
-
-        if (symbolicCondition == null) throw new ArgumentNullException(nameof(symbolicCondition));
-
-        if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-
-        var query = _programPointAnalyzer.Analyze(
+        => _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
-            node.SpanStart,
             node,
-            null,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts,
-            initialState);
-        return ProveCondition(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
             conditionText,
             symbolicCondition,
-            smtAnalysis).WithAnalysisTruncation(query.Analysis.Truncation);
-    }
-
-    private static void ValidateProofRequest(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        string conditionText,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-        if (node == null) throw new ArgumentNullException(nameof(node));
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-    }
-
-    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
-        string sourceText, string filePath, IEnumerable<MetadataReference>? references,
-        CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
-        SymbolicSourceCompilation.Create(
-            sourceText, filePath, SymbolicSourceCompilationKind.Query, references, cancellationToken,
-            compilationProfile);
+            initialState,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken);
 
     private static void ValidateSyntaxTreeQuery(SyntaxTree syntaxTree, Compilation compilation)
     {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
     }
-
-    private static SymbolicConditionProofResult ProveConditionAtQuery(
-        SymbolicProgramPointQueryContext query,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken) =>
-        ProveCondition(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            conditionText,
-            smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
 
     private SymbolicProgramPointQueryContext AnalyzeProgramPoint(
         SyntaxTree syntaxTree,
@@ -481,247 +400,7 @@ internal sealed class SymbolicSourceQueryService
         return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
     }
 
-    private static IReadOnlyList<SymbolicConditionProofResult> ProveConditions(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode sourceNode,
-        SymbolicProgramPointAnalysis analysis,
-        IEnumerable<string>? conditionTexts,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
-
-        var proofs = conditionTexts
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => ProveCondition(
-                semanticModel,
-                position,
-                sourceNode,
-                analysis,
-                condition,
-                smtAnalysis,
-                cancellationToken).WithAnalysisTruncation(analysis.Truncation))
-            .ToArray();
-        return proofs;
-    }
-
-    private static SymbolicConditionProofResult ProveCondition(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode sourceNode,
-        SymbolicProgramPointAnalysis analysis,
-        string conditionText,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
-        if (smtAnalysis == null)
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                "smt_required");
-
-        if (analysis.Reachability == SymbolicReachability.Unreachable)
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                analysis.ReachabilityReason);
-
-        if (!TryCreateSpeculativeCondition(
-                semanticModel,
-                position,
-                conditionText,
-                out var condition,
-                out var conditionSemanticModel,
-                out var failureReason))
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                failureReason);
-
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            condition,
-            new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } symbolicCondition })
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                "condition_not_supported");
-
-        return ProveCondition(
-            semanticModel,
-            position,
-            sourceNode,
-            analysis,
-            conditionText,
-            symbolicCondition,
-            smtAnalysis);
-    }
-
-    private static SymbolicConditionProofResult ProveCondition(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode sourceNode,
-        SymbolicProgramPointAnalysis analysis,
-        string conditionText,
-        SymbolicCondition symbolicCondition,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (analysis.Reachability == SymbolicReachability.Unreachable)
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                analysis.ReachabilityReason);
-
-        if (!SymbolicProofService.TryEncodeConditionWithPathState(
-                symbolicCondition,
-                analysis.PathState,
-                sourceNode,
-                out var conditionFormula))
-            return new SymbolicConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                "condition_not_supported");
-
-        if (analysis.Reachability == SymbolicReachability.NotChecked)
-        {
-            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibility(
-                analysis.PathState,
-                smtAnalysis);
-            if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
-                return new SymbolicConditionProofResult(
-                    conditionText,
-                    SymbolicTruthValue.Unreachable,
-                    reachabilityProof.Info.Reason,
-                    conditionFormula);
-        }
-
-        var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            analysis.PathState,
-            symbolicCondition,
-            smtAnalysis);
-        var truthValue = truthProof.Info.Status switch
-        {
-            SymbolicProofStatus.ProvenTrue => SymbolicTruthValue.ProvenTrue,
-            SymbolicProofStatus.ProvenFalse => SymbolicTruthValue.ProvenFalse,
-            SymbolicProofStatus.Unreachable => SymbolicTruthValue.Unreachable,
-            _ => SymbolicTruthValue.Unknown
-        };
-        return CreateConditionProofResult(
-            conditionText,
-            truthValue,
-            truthProof,
-            conditionFormula,
-            analysis,
-            semanticModel,
-            position);
-    }
-
-    private static SymbolicConditionProofResult CreateConditionProofResult(
-        string conditionText,
-        SymbolicTruthValue truthValue,
-        SymbolicIrProofResult proof,
-        SmtFormula conditionFormula,
-        SymbolicProgramPointAnalysis analysis,
-        SemanticModel? semanticModel,
-        int position)
-    {
-        var reason = proof.RawResult?.Reason ?? proof.Info.Reason;
-        var effectiveTruth = truthValue;
-        if (effectiveTruth == SymbolicTruthValue.Unreachable)
-            return new SymbolicConditionProofResult(
-                conditionText,
-                effectiveTruth,
-                reason,
-                conditionFormula,
-                witness: SymbolicInputWitnessFactory.None(reason));
-
-        var rawResult = proof.RawResult;
-        var outcomeCondition = effectiveTruth == SymbolicTruthValue.ProvenFalse
-            ? new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
-            : conditionFormula;
-        var unknownTrueBranch = effectiveTruth == SymbolicTruthValue.Unknown &&
-                                string.Equals(
-                                    proof.Info.Reason,
-                                    "ir_condition_true_branch_feasibility_unknown",
-                                    StringComparison.Ordinal);
-        var unknownFalseBranch = effectiveTruth == SymbolicTruthValue.Unknown &&
-                                 proof.Info.Reason is
-                                     "ir_condition_false_branch_feasibility_unknown" or
-                                     "ir_condition_both_branches_feasible";
-        var selectedModel = unknownTrueBranch
-            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
-            : effectiveTruth == SymbolicTruthValue.Unknown
-                ? null
-                : rawResult?.PathCheck.Witness;
-        var selectedConditions = analysis.PathConditions.Concat(new[] { outcomeCondition });
-        var witness = SymbolicInputWitnessFactory.Create(
-            selectedModel,
-            selectedConditions,
-            semanticModel,
-            position,
-            SymbolicWitnessStatus.Unsupported,
-            "condition_witness_unavailable");
-        var counterexampleModel = unknownFalseBranch
-            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
-            : null;
-        var counterexample = counterexampleModel != null
-            ? SymbolicInputWitnessFactory.Create(
-                counterexampleModel,
-                analysis.PathConditions.Concat(new[]
-                {
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
-                }),
-                semanticModel,
-                position,
-                SymbolicWitnessStatus.Unsupported,
-                "condition_counterexample_unavailable")
-            : SymbolicInputWitnessFactory.None("counterexample_not_available");
-        return new SymbolicConditionProofResult(
-            conditionText,
-            effectiveTruth,
-            reason,
-            conditionFormula,
-            witness: witness,
-            counterexampleWitness: counterexample);
-    }
-
-    private static bool TryCreateSpeculativeCondition(
-        SemanticModel semanticModel,
-        int position,
-        string conditionText,
-        out ExpressionSyntax condition,
-        out SemanticModel conditionSemanticModel,
-        out string failureReason)
-    {
-        var statement = SyntaxFactory.ParseStatement(
-            "if (" + conditionText + ") { }",
-            options: semanticModel.SyntaxTree.Options as CSharpParseOptions);
-        if (statement.ContainsDiagnostics ||
-            statement is not IfStatementSyntax ifStatement)
-        {
-            condition = SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
-            conditionSemanticModel = semanticModel;
-            failureReason = "condition_parse_failure";
-            return false;
-        }
-
-        if (!semanticModel.TryGetSpeculativeSemanticModel(position, ifStatement, out var speculativeModel) ||
-            speculativeModel == null)
-        {
-            condition = ifStatement.Condition;
-            conditionSemanticModel = semanticModel;
-            failureReason = "condition_binding_failure";
-            return false;
-        }
-
-        conditionSemanticModel = speculativeModel;
-        condition = ifStatement.Condition;
-        failureReason = string.Empty;
-        return true;
-    }
-
-    private static SyntaxNode FindQueryNode(SyntaxNode root, int position)
+    internal static SyntaxNode FindQueryNode(SyntaxNode root, int position)
     {
         var token = root.FindToken(position);
         var expressionContextNode = FindExpressionContextNode(token, position);
@@ -867,7 +546,7 @@ internal sealed class SymbolicSourceQueryService
             containsRequestedPosition);
     }
 
-    private static SymbolicProgramPointResult ProjectSourceQueryResult(
+    private SymbolicProgramPointResult ProjectSourceQueryResult(
         SyntaxTree syntaxTree,
         SymbolicProgramPointQueryContext query,
         int line,
@@ -881,7 +560,7 @@ internal sealed class SymbolicSourceQueryService
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null)
     {
-        var conditionProofs = ProveConditions(
+        var conditionProofs = _conditionProofEngine.ProveAll(
             query.SemanticModel,
             query.Position,
             query.Node,
