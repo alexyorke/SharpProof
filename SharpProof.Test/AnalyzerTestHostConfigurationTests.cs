@@ -664,6 +664,9 @@ public sealed class TestClass
                 Source = File.ReadAllText(path)
             })
             .Where(file => !allowedFiles.Contains(file.Path) &&
+                           !file.Path.StartsWith(
+                               "SharpProof.Analyzer/SharpProofDiagnostics.",
+                               StringComparison.Ordinal) &&
                            file.Source.Contains("sharpproof_", StringComparison.Ordinal))
             .Select(file => file.Path)
             .ToArray();

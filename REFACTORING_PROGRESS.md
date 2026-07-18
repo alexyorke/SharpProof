@@ -113,6 +113,11 @@ This is the active source of truth for the comprehensive refactor. Read
   purity, synchronization, misplaced-requires, inferred-contract, and
   null-forgiving handlers. The exported provider resolves the typed registry
   entry and delegates once; its family-specific dispatch branches were deleted.
+- [x] Diagnostic descriptor declarations are split into feature-owned partial
+  files for purity, nullability, allocation, exceptions, suggestions,
+  capabilities, ensures, complexity, requires, placement, and common bugs.
+  `SharpProofDiagnostics` now owns only stable IDs/properties and descriptor
+  factories, while `AnalyzerDiagnosticCatalog` remains the sole index.
 
 ## Current evidence
 
@@ -131,7 +136,7 @@ This is the active source of truth for the comprehensive refactor. Read
   external output.
 - [ ] Decompose query/proof/source services and complexity/solver components by
   responsibility, deleting duplicate orchestration.
-- [ ] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
+- [x] Replace monolithic analyzer diagnostic and code-fix dispatch surfaces with
   typed registries.
 - [ ] Decompose EffectSummary host and standardize lightweight tool hosting.
 - [ ] Finish test-lane/repository organization and remove dead compatibility
@@ -141,6 +146,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Split `SharpProofDiagnostics` descriptor declarations by owning feature while
-keeping `AnalyzerDiagnosticCatalog` as the sole supported-diagnostics index;
-delete the monolithic declaration block and preserve descriptor identity.
+Consolidate the analyzer and Symbolic method-query request/context seams around
+one immutable analysis input and snapshot contract, then delete duplicated
+body/semantic-model resolution where characterization proves parity.

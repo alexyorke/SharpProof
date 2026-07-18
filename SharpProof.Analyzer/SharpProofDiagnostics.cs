@@ -3,7 +3,7 @@ using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
-public static class SharpProofDiagnostics
+public static partial class SharpProofDiagnostics
 {
     public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionPropertyName;
     public const string EvidenceSchemaCompatibilityProperty =
@@ -214,582 +214,82 @@ public static class SharpProofDiagnostics
 
     public const string RedundantAllowSynchronizationId = "SP0008";
 
-    public static readonly DiagnosticDescriptor PurityNotVerifiedRule = CreateDescriptor(
-        PurityNotVerifiedId,
-        "Purity Not Proven",
-        "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure",
-        "Purity",
-        DiagnosticSeverity.Error,
-        "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the symbolic proof evidence.");
-
-    public static readonly DiagnosticDescriptor NullableReturnContractViolationRule = CreateDescriptor(
-        NullableReturnContractViolationId,
-        "Nullable return contract violated",
-        "Method '{0}' can return null despite contract '{1}'",
-        "Nullability",
-        DiagnosticSeverity.Warning,
-        "Reports a reachable normal return that violates the declared nullable return contract.");
-
-    public static readonly DiagnosticDescriptor NullableParameterPostconditionViolationRule = CreateDescriptor(
-        NullableParameterPostconditionViolationId,
-        "Nullable parameter postcondition violated",
-        "Method '{0}' can complete with parameter '{1}' null despite contract '{2}'",
-        "Nullability",
-        DiagnosticSeverity.Warning,
-        "Reports a reachable normal completion that violates a nullable parameter postcondition.");
-
-    public static readonly DiagnosticDescriptor NullableMemberContractViolationRule = CreateDescriptor(
-        NullableMemberContractViolationId,
-        "Nullable member contract violated",
-        "Method '{0}' can complete with member '{1}' null despite contract '{2}'",
-        "Nullability",
-        DiagnosticSeverity.Warning,
-        "Reports a reachable normal completion that violates a member-not-null contract.");
-
-    public static readonly DiagnosticDescriptor UnsafeNullForgivingOperatorRule = CreateDescriptor(
-        UnsafeNullForgivingOperatorId,
-        "Null-forgiving operator is unsafe",
-        "Null-forgiving operator can suppress a feasible null value for '{0}'",
-        "Nullability",
-        DiagnosticSeverity.Warning,
-        "Reports a null-forgiving operator reached by a proven null execution.");
-
-    public static readonly DiagnosticDescriptor UnnecessaryNullForgivingOperatorRule = CreateDescriptor(
-        UnnecessaryNullForgivingOperatorId,
-        "Null-forgiving operator is unnecessary",
-        "Null-forgiving operator is unnecessary because '{0}' is proven non-null",
-        "Nullability",
-        DiagnosticSeverity.Info,
-        "Reports a null-forgiving operator whose operand is already proven non-null.");
-
-    public static readonly DiagnosticDescriptor SuggestNullableContractRule = CreateDescriptor(
-        SuggestNullableContractId,
-        "Nullable contract can be declared",
-        "Method '{0}' satisfies nullable contract '{1}'",
-        "Nullability",
-        DiagnosticSeverity.Info,
-        "Suggests a nullable contract proved by every relevant completion path.");
-
-    public static readonly DiagnosticDescriptor NullableVerificationInconclusiveRule = CreateDescriptor(
-        NullableVerificationInconclusiveId,
-        "Nullable verification was inconclusive",
-        "Nullable contract '{1}' on '{0}' could not be verified: {2}",
-        "Nullability",
-        DiagnosticSeverity.Info,
-        "Reports bounded nullable proofs that ended as unsupported or unknown.");
-
-    public static readonly DiagnosticDescriptor BclFallbackGuessRule = CreateDescriptor(
-        BclFallbackGuessId,
-        "BCL Purity Fallback Guess",
-        "BCL purity fallback for '{0}': {1} ({2})",
-        "Purity",
-        DiagnosticSeverity.Info,
-        "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with sharpproof_emit_explanations or sharpproof_report_bcl_fallback_guesses.");
-
-    public static readonly DiagnosticDescriptor AllocationInZeroAllocationMethodRule = CreateDescriptor(
-        AllocationInZeroAllocationMethodId,
-        "Allocation In [ZeroAllocations] Method",
-        "Method '{1}' is marked [ZeroAllocations], but operation '{0}' allocates",
-        "Allocation",
-        DiagnosticSeverity.Warning,
-        "Reports direct source-visible allocation sites inside methods annotated with [ZeroAllocations].");
-
-    public static readonly DiagnosticDescriptor PurityExplanationRule = CreateDescriptor(
-        PurityExplanationId,
-        "Purity Diagnostic Explanation",
-        "Purity analysis for '{0}': {1}",
-        "Purity",
-        DiagnosticSeverity.Info,
-        "Provides structured explanation data for a purity diagnostic.");
-
-    public static readonly DiagnosticDescriptor ExceptionSummaryRule = CreateDescriptor(
-        ExceptionSummaryId,
-        "Method May Throw Exceptions",
-        "Method '{0}' can throw: {1}",
-        "ExceptionFlow",
-        DiagnosticSeverity.Info,
-        "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.");
-
-    public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = CreateDescriptor(
-        UncaughtExceptionSiteId,
-        "Operation May Throw Uncaught Exceptions",
-        "Operation '{0}' may throw uncaught exceptions: {1}",
-        "ExceptionFlow",
-        DiagnosticSeverity.Warning,
-        "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all/sites-and-unknowns/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.");
-
-    public static readonly DiagnosticDescriptor UnknownRuntimeHazardRule = CreateDescriptor(
-        UnknownRuntimeHazardId,
-        "Runtime Hazard Candidate Could Not Be Proven",
-        "Runtime hazard candidate '{0}' at operation '{1}' could not be proven: {2}",
-        "ExceptionFlow",
-        DiagnosticSeverity.Info,
-        "Reports bounded runtime-hazard candidates whose trigger could not be proven or rejected. " +
-        "Enable with sharpproof_runtime_hazard_mode = unknowns, sites-and-unknowns, or all-and-unknowns. " +
-        "The diagnostic is informational by default and carries stable proof, reason, trigger, and baseline metadata.");
-
-    private static readonly LocalizableString InferredContractSuggestionMessageFormat =
-        "Method '{0}' has {1}; consider adding {2} ({3} confidence)";
-
-    private static readonly LocalizableString InferredContractSuggestionDescription =
-        "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. " +
-        "Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.";
-
-    public static readonly DiagnosticDescriptor SuggestZeroAllocationsRule = CreateInferredContractDescriptor(
-        SuggestZeroAllocationsId,
-        "Inferred [ZeroAllocations] Contract");
-
-    public static readonly DiagnosticDescriptor SuggestAllowedCapabilitiesRule = CreateInferredContractDescriptor(
-        SuggestAllowedCapabilitiesId,
-        "Inferred [AllowedCapabilities] Contract");
-
-    public static readonly DiagnosticDescriptor SuggestExpectedComplexityRule = CreateInferredContractDescriptor(
-        SuggestExpectedComplexityId,
-        "Inferred [ExpectedComplexity] Contract");
-
-    public static readonly DiagnosticDescriptor SuggestExceptionContractRule = CreateInferredContractDescriptor(
-        SuggestExceptionContractId,
-        "Inferred Exception Contract");
-
-    public static readonly DiagnosticDescriptor SuggestEnsuresRule = CreateInferredContractDescriptor(
-        SuggestEnsuresId,
-        "Inferred [Ensures] Contract");
-
-    public static readonly DiagnosticDescriptor SuggestRequiresRule = CreateInferredContractDescriptor(
-        SuggestRequiresId,
-        "Inferred [Requires] Contract");
-
-    public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule =
-        CreateMisplacedGetterAliasingAttributeDescriptor(
-        MisplacedZeroAllocationsAttributeId,
-        "ZeroAllocations",
-        "allocation");
-
-    public static readonly DiagnosticDescriptor CapabilityViolationRule = CreateDescriptor(
-        CapabilityViolationId,
-        "Disallowed Capability Use",
-        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' requires capabilities: {2}",
-        "Capabilities",
-        DiagnosticSeverity.Warning,
-        "Reports source-visible operations or proven transitive callees that exceed the method's declared allowed capability set.");
-
-    public static readonly DiagnosticDescriptor CapabilityUnknownRule = CreateDescriptor(
-        CapabilityUnknownId,
-        "Capability Contract Not Proven",
-        "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}",
-        "Capabilities",
-        DiagnosticSeverity.Warning,
-        "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the capability proof evidence.");
-
-    public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule =
-        CreateMisplacedGetterAliasingAttributeDescriptor(
-        MisplacedAllowedCapabilitiesAttributeId,
-        "AllowedCapabilities",
-        "capability");
-
-    public static readonly DiagnosticDescriptor EnsuresNotProvenRule = CreateDescriptor(
-        EnsuresNotProvenId,
-        "Postcondition Not Proven",
-        "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'",
-        "Contracts",
-        DiagnosticSeverity.Warning,
-        "Reports return sites that contradict a declared [Ensures] postcondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence for each return site.");
-
-    public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = CreateDescriptor(
-        EnsuresUnsupportedId,
-        "Postcondition Could Not Be Verified",
-        "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}",
-        "Contracts",
-        DiagnosticSeverity.Warning,
-        "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.");
-
-    public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule =
-        CreateMisplacedGetterAliasingAttributeDescriptor(
-        MisplacedEnsuresAttributeId,
-        "Ensures",
-        "symbolic postcondition");
-
-    public static readonly DiagnosticDescriptor ComplexityExceededRule = CreateDescriptor(
-        ComplexityExceededId,
-        "Declared Complexity Exceeded",
-        "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound",
-        "Complexity",
-        DiagnosticSeverity.Warning,
-        "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity proof evidence.");
-
-    public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = CreateDescriptor(
-        ComplexityCouldNotBeVerifiedId,
-        "Declared Complexity Could Not Be Verified",
-        "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}",
-        "Complexity",
-        DiagnosticSeverity.Warning,
-        "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity analysis details.");
-
-    public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule =
-        CreateMisplacedGetterAliasingAttributeDescriptor(
-        MisplacedExpectedComplexityAttributeId,
-        "ExpectedComplexity",
-        "complexity");
-
-    public static readonly DiagnosticDescriptor InvalidContractArgumentRule = CreateDescriptor(
-        InvalidContractArgumentId,
-        "Invalid SharpProof Contract Argument",
-        "SharpProof contract '{0}' has invalid argument '{1}': {2}",
-        "Usage",
-        DiagnosticSeverity.Error,
-        "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.");
-
-    public static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = CreateDescriptor(
-        InvalidAnalyzerConfigurationId,
-        "Invalid SharpProof Analyzer Configuration",
-        "SharpProof analyzer option '{0}' has invalid value '{1}': {2}",
-        "Configuration",
-        DiagnosticSeverity.Warning,
-        "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.");
-
-    public static readonly DiagnosticDescriptor InvalidAdditionalFileRule = CreateDescriptor(
-        InvalidAdditionalFileId,
-        "Invalid SharpProof Analyzer Additional File",
-        "SharpProof analyzer input file '{0}' is invalid: {1}",
-        "Configuration",
-        DiagnosticSeverity.Warning,
-        "Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles instead of silently dropping their data.");
-
-    public static readonly DiagnosticDescriptor TrustedBoundaryReviewRule = CreateDescriptor(
-        TrustedBoundaryReviewId,
-        "Trusted Purity Boundary Review",
-        "Purity trust source '{0}' for '{1}' was {2}{3}",
-        "Review",
-        DiagnosticSeverity.Info,
-        "Reports structured, opt-in audit evidence for applied and overridden purity trust shortcuts.");
-
-    public static readonly DiagnosticDescriptor UnrecognizedAttributeIdentityRule = CreateDescriptor(
-        UnrecognizedAttributeIdentityId,
-        "Unrecognized SharpProof Attribute Identity",
-        "Attribute '{0}' looks like a SharpProof contract, but type '{1}' is not in an accepted SharpProof attribute namespace",
-        "Usage",
-        DiagnosticSeverity.Warning,
-        "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.");
-
-    public static readonly DiagnosticDescriptor RequiresNotProvenRule = CreateDescriptor(
-        RequiresNotProvenId,
-        "Precondition Not Proven",
-        "Call to '{0}' does not prove precondition '{1}'",
-        "Contracts",
-        DiagnosticSeverity.Warning,
-        "Reports calls whose current path facts contradict a declared [Requires] precondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence.");
-
-    public static readonly DiagnosticDescriptor RequiresUnsupportedRule = CreateDescriptor(
-        RequiresUnsupportedId,
-        "Precondition Could Not Be Verified",
-        "Precondition '{1}' for '{0}' could not be verified: {2}",
-        "Contracts",
-        DiagnosticSeverity.Warning,
-        "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.");
-
-    public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = CreateDescriptor(
-        MisplacedRequiresAttributeId,
-        "Misplaced [Requires] Attribute",
-        "The [Requires] attribute can only be applied to method-like declarations",
-        "Usage",
-        DiagnosticSeverity.Error,
-        "[Requires] configures symbolic call-site precondition analysis for a method-like declaration. On a property or indexer, place it on the explicit get accessor.");
-
-    public static readonly DiagnosticDescriptor ExceptionContractViolationRule = CreateDescriptor(
-        ExceptionContractViolationId,
-        "Exception Contract Violated",
-        "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}",
-        "ExceptionFlow",
-        DiagnosticSeverity.Warning,
-        "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.");
-
-    public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = CreateDescriptor(
-        MisplacedExceptionContractAttributeId,
-        "Misplaced Exception Contract Attribute",
-        "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
-        "Usage",
-        DiagnosticSeverity.Error,
-        "[DoesNotThrow] and [AllowedExceptions] configure exception analysis for method-like declarations or alias the getter of a getter-bearing property or indexer.");
-
-    public static readonly DiagnosticDescriptor MisplacedAttributeRule = CreateDescriptor(
-        MisplacedAttributeId,
-        "Misplaced [EnforcePure] Attribute",
-        "The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
-        "Usage",
-        DiagnosticSeverity.Error,
-        "[EnforcePure] and [Pure] configure purity analysis for a method-like declaration or alias the getter of a getter-bearing property or indexer.");
-
-    public static readonly DiagnosticDescriptor MissingEnforcePureAttributeRule = CreateDescriptor(
-        MissingEnforcePureAttributeId,
-        "Missing [EnforcePure] Attribute",
-        "Method '{0}' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.",
-        "Purity",
-        DiagnosticSeverity.Warning,
-        "This method seems to only contain operations considered pure, but it lacks the [EnforcePure] attribute. Adding the attribute helps ensure its purity is maintained and communicates intent.");
-
-    public static readonly DiagnosticDescriptor ConflictingPurityAttributesRule = CreateDescriptor(
-        ConflictingPurityAttributesId,
-        "Conflicting purity attributes",
-        "Method '{0}' has conflicting purity attributes applied",
-        "Usage",
-        DiagnosticSeverity.Warning,
-        "Apply one purity contract to a method. Combining enforcing, trusted-external, and explicit-impure attributes is contradictory or confusing.");
-
-    public static readonly DiagnosticDescriptor AllowSynchronizationWithoutPurityAttributeRule = CreateDescriptor(
-        AllowSynchronizationWithoutPurityAttributeId,
-        "[AllowSynchronization] requires a purity attribute",
-        "Method '{0}' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]",
-        "Usage",
-        DiagnosticSeverity.Warning,
-        "[AllowSynchronization] only affects methods participating in purity analysis. Apply [EnforcePure] or [Pure] for it to have effect.");
-
-    public static readonly DiagnosticDescriptor MisplacedAllowSynchronizationAttributeRule = CreateDescriptor(
-        MisplacedAllowSynchronizationAttributeId,
-        "Misplaced [AllowSynchronization] Attribute",
-        "The [AllowSynchronization] attribute can only be applied to method declarations",
-        "Usage",
-        DiagnosticSeverity.Error,
-        "[AllowSynchronization] configures analyzer behavior for a method and should not be used on non-method declarations.");
-
-    public static readonly DiagnosticDescriptor RedundantAllowSynchronizationRule = CreateDescriptor(
-        RedundantAllowSynchronizationId,
-        "Redundant [AllowSynchronization]",
-        "Method '{0}' is marked with [AllowSynchronization] but contains no synchronization constructs",
-        "Usage",
-        DiagnosticSeverity.Info,
-        "Remove [AllowSynchronization] when the method does not use synchronization (e.g., lock).");
-
-    public static readonly DiagnosticDescriptor AwaitNullConditionalRule = CreateCommonBugDescriptor(
-        AwaitNullConditionalId,
-        "Awaiting a null-conditional expression",
-        "Awaiting null-conditional expression '{0}' can dereference a null awaitable",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "A null-conditional invocation produces a null awaitable when its receiver is null. Coalesce to a non-null awaitable or guard the receiver before awaiting.");
-
-    public static readonly DiagnosticDescriptor TaskConvertedToStringRule = CreateCommonBugDescriptor(
-        TaskConvertedToStringId,
-        "Task converted to text without awaiting",
-        "Task expression '{0}' is converted to text instead of awaiting its result",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "String concatenation and interpolation call ToString on Task objects; they do not use the asynchronous result.");
-
-    public static readonly DiagnosticDescriptor TaskCompletionSourceContinuationsRule = CreateCommonBugDescriptor(
-        TaskCompletionSourceContinuationsId,
-        "TaskCompletionSource may run continuations synchronously",
-        "TaskCompletionSource construction '{0}' does not prove RunContinuationsAsynchronously",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "TaskCompletionSource should normally include TaskCreationOptions.RunContinuationsAsynchronously to prevent completing threads from running arbitrary continuations inline.");
-
-    public static readonly DiagnosticDescriptor AsyncVoidRule = CreateCommonBugDescriptor(
-        AsyncVoidId,
-        "Async void method is not an event handler",
-        "Async void method '{0}' is not an event handler; return Task so callers can observe completion and exceptions",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "Async void prevents callers from awaiting completion and routes exceptions through the current synchronization context. It is reserved for event-handler-shaped methods.");
-
-    public static readonly DiagnosticDescriptor BlockingAsyncRule = CreateCommonBugDescriptor(
-        BlockingAsyncId,
-        "Async method blocks on asynchronous work",
-        "Async method '{0}' synchronously blocks on '{1}'",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "Calling Task.Result, Task.Wait, or GetAwaiter().GetResult() inside async code can deadlock or starve worker threads. Await the operation instead.");
-
-    public static readonly DiagnosticDescriptor NullTaskReturnRule = CreateCommonBugDescriptor(
-        NullTaskReturnId,
-        "Task-returning method returns null",
-        "Task-returning method '{0}' returns null; callers that await it will throw",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "A non-async method whose declared return type is Task or Task<T> must return a task object, not null.");
-
-    public static readonly DiagnosticDescriptor TaskUsedAsDisposableRule = CreateCommonBugDescriptor(
-        TaskUsedAsDisposableId,
-        "Task used as a disposable resource",
-        "Task expression '{0}' is disposed by using instead of awaiting its result",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Warning,
-        "Using a Task disposes the task object; it does not await the asynchronous operation or manage the resource produced by that operation.");
-
-    public static readonly DiagnosticDescriptor AsyncValidationDeferredRule = CreateCommonBugDescriptor(
-        AsyncValidationDeferredId,
-        "Public async parameter validation is deferred",
-        "Validation in async method '{0}' is captured by the returned task; use a synchronous wrapper when fail-fast argument validation is required",
-        "AsyncCorrectness",
-        DiagnosticSeverity.Info,
-        "Exceptions thrown from an async Task method, including validation before its first await, are stored in the returned task. A synchronous wrapper is required when callers must observe argument errors at invocation time.");
-
-    public static readonly DiagnosticDescriptor CollectionMutationDuringEnumerationRule = CreateCommonBugDescriptor(
-        CollectionMutationDuringEnumerationId,
-        "Collection mutated during enumeration",
-        "Collection '{0}' is mutated by '{1}' while it is being enumerated",
-        "CollectionSafety",
-        DiagnosticSeverity.Warning,
-        "Mutating the same ordinary mutable collection inside its foreach body invalidates the active enumerator and commonly throws InvalidOperationException.");
-
-    public static readonly DiagnosticDescriptor CapturedLoopVariableRule = CreateCommonBugDescriptor(
-        CapturedLoopVariableId,
-        "For-loop variable captured by an escaping closure",
-        "For-loop variable '{0}' is captured by a closure that can observe a later iteration value",
-        "Correctness",
-        DiagnosticSeverity.Warning,
-        "For-loop iteration variables are shared across iterations. Copy the value into a local inside the loop before capturing it in a lambda that can escape the iteration.");
-
-    public static readonly DiagnosticDescriptor MutableStructRule = CreateCommonBugDescriptor(
-        MutableStructId,
-        "Struct exposes mutable instance state",
-        "Struct '{0}' has mutable instance state; copies can be modified independently",
-        "Design",
-        DiagnosticSeverity.Info,
-        "Mutable value types are frequently modified through accidental copies. Prefer readonly struct, record struct with immutable members, or a class when shared mutation is intended.");
-
-    public static readonly DiagnosticDescriptor OwnedDisposableFieldRule = CreateCommonBugDescriptor(
-        OwnedDisposableFieldId,
-        "Owned disposable field has no owner disposal contract",
-        "Type '{0}' creates disposable field '{1}' but does not implement '{2}'",
-        "ResourceLifetime",
-        DiagnosticSeverity.Warning,
-        "A field initialized or assigned from a local allocation is owned by its containing type. The owner must expose the matching deterministic disposal lifecycle.");
-
-    public static readonly DiagnosticDescriptor HttpClientInLoopRule = CreateCommonBugDescriptor(
-        HttpClientInLoopId,
-        "HttpClient created repeatedly inside a loop",
-        "HttpClient is created inside loop '{0}'; reuse a client or use IHttpClientFactory",
-        "ResourceLifetime",
-        DiagnosticSeverity.Warning,
-        "Repeated HttpClient construction creates avoidable connection pools and can exhaust sockets under sustained load.");
-
-    public static readonly DiagnosticDescriptor UnsynchronizedSharedMutationRule = CreateCommonBugDescriptor(
-        UnsynchronizedSharedMutationId,
-        "Shared state mutated by a parallel callback",
-        "Shared state '{0}' is mutated in '{1}' without visible synchronization",
-        "Concurrency",
-        DiagnosticSeverity.Warning,
-        "Captured locals and fields mutated by Task, Thread, timer, or Parallel callbacks require synchronization such as Interlocked or lock, or should be replaced with isolated state.");
-
-    public static readonly DiagnosticDescriptor ConcurrentCollectionEnumerationRule = CreateCommonBugDescriptor(
-        ConcurrentCollectionEnumerationId,
-        "Concurrent collection enumerated through LINQ",
-        "LINQ operator '{0}' enumerates concurrent collection '{1}' without snapshot guarantees",
-        "Concurrency",
-        DiagnosticSeverity.Info,
-        "Concurrent collection members have documented concurrency behavior, but interface and LINQ extension methods do not necessarily provide an atomic snapshot.");
-
-    public static readonly DiagnosticDescriptor BoxingInLoopRule = CreateCommonBugDescriptor(
-        BoxingInLoopId,
-        "Value boxed inside a loop",
-        "Value of type '{0}' is boxed inside loop '{1}'",
-        "Performance",
-        DiagnosticSeverity.Info,
-        "Repeated boxing allocates objects and adds GC pressure. Prefer generic APIs or strongly typed interfaces in repeated paths.");
-
-    public static readonly DiagnosticDescriptor MaybeNullResultDereferenceRule = CreateCommonBugDescriptor(
-        MaybeNullResultDereferenceId,
-        "Maybe-null query result is dereferenced",
-        "Result of '{0}' can be null or empty-default and is dereferenced immediately",
-        "Nullability",
-        DiagnosticSeverity.Warning,
-        "Default-returning lookup and LINQ APIs require a guard, a non-null fallback, or a proof that a matching element exists before dereference.");
-
-    public static readonly DiagnosticDescriptor PrematureQueryMaterializationRule = CreateCommonBugDescriptor(
-        PrematureQueryMaterializationId,
-        "Queryable is materialized before further filtering",
-        "'{0}' materializes IQueryable before subsequent '{1}' processing",
-        "Performance",
-        DiagnosticSeverity.Info,
-        "Compose supported filters and projections on IQueryable before materialization so the remote provider can execute them.");
-
-    public static readonly DiagnosticDescriptor DeferredQuerySideEffectRule = CreateCommonBugDescriptor(
-        DeferredQuerySideEffectId,
-        "Deferred query lambda mutates state",
-        "Deferred LINQ operator '{0}' contains state mutation '{1}'",
-        "Correctness",
-        DiagnosticSeverity.Warning,
-        "Side effects in deferred LINQ lambdas run on every enumeration and can therefore execute zero, one, or multiple times unexpectedly.");
-
-    public static readonly DiagnosticDescriptor QueryTranslationRiskRule = CreateCommonBugDescriptor(
-        QueryTranslationRiskId,
-        "Queryable expression calls source-only method",
-        "Queryable operator '{0}' calls source method '{1}' that the remote provider may not translate",
-        "Compatibility",
-        DiagnosticSeverity.Info,
-        "Remote IQueryable providers translate a bounded method set. Source-only helper calls in query predicates and selectors require provider-specific translation support.");
-
-    public static readonly DiagnosticDescriptor SerializationCycleRiskRule = CreateCommonBugDescriptor(
-        SerializationCycleRiskId,
-        "Serialized source type has a reference cycle",
-        "Type '{0}' contains a serializable reference cycle and is serialized without explicit cycle handling",
-        "Serialization",
-        DiagnosticSeverity.Info,
-        "System.Text.Json rejects reachable object cycles by default. Project cyclic entities to DTOs, ignore a link, or configure deliberate reference handling.");
-
-    public static readonly DiagnosticDescriptor SerializerAttributeMismatchRule = CreateCommonBugDescriptor(
-        SerializerAttributeMismatchId,
-        "Serializer ignores attribute from another JSON library",
-        "Serializer '{0}' does not honor attribute '{1}' on member '{2}'",
-        "Serialization",
-        DiagnosticSeverity.Warning,
-        "Newtonsoft.Json and System.Text.Json define similarly named attributes that are not interchangeable.");
-
-    public static readonly DiagnosticDescriptor IneffectiveRequiredAttributeRule = CreateCommonBugDescriptor(
-        IneffectiveRequiredAttributeId,
-        "Required attribute cannot reject a non-nullable value type default",
-        "[Required] on non-nullable value member '{0}' cannot distinguish omitted input from default({1})",
-        "Usage",
-        DiagnosticSeverity.Info,
-        "Use a nullable value type when model binding must distinguish missing input, then validate the resulting value range separately.");
-
-    public static readonly DiagnosticDescriptor UncheckedAllocationArithmeticRule = CreateCommonBugDescriptor(
-        UncheckedAllocationArithmeticId,
-        "Allocation length uses unchecked arithmetic",
-        "Allocation length expression '{0}' can wrap before bounds validation",
-        "Correctness",
-        DiagnosticSeverity.Warning,
-        "Compute allocation sizes in a checked context so overflow is reported instead of becoming a wrapped negative or undersized length.");
-
-    public static readonly DiagnosticDescriptor SuppressionWithoutJustificationRule = CreateCommonBugDescriptor(
-        SuppressionWithoutJustificationId,
-        "Diagnostic suppression lacks justification",
-        "Suppression '{0}' has no reviewable diagnostic scope or justification",
-        "Review",
-        DiagnosticSeverity.Info,
-        "Broad pragma suppressions and SuppressMessage attributes without justification hide warning debt and should be narrowed or documented.");
-
-    public static readonly DiagnosticDescriptor NullableAnalysisDisabledRule = CreateCommonBugDescriptor(
-        NullableAnalysisDisabledId,
-        "Nullable analysis explicitly disabled",
-        "Nullable analysis is disabled for this source region",
-        "Nullability",
-        DiagnosticSeverity.Info,
-        "Explicit nullable-disable directives create blind spots in compile-time null-state analysis. Prefer scoped annotations and resolved warnings.");
-
-    public static readonly DiagnosticDescriptor IdenticalOperandsRule = CreateCommonBugDescriptor(
-        IdenticalOperandsId,
-        "Binary operation uses the same value on both sides",
-        "Operation '{0}' uses '{1}' as both operands; verify that the second operand is correct",
-        "Correctness",
-        DiagnosticSeverity.Warning,
-        "Identical stable operands in built-in comparisons, subtraction, division, and remainder usually indicate a copied or mistyped operand. Floating-point and user-defined operators are excluded because they need not be reflexive.");
-
-    public static readonly DiagnosticDescriptor ContainerOwnedServiceDisposedRule = CreateCommonBugDescriptor(
-        ContainerOwnedServiceDisposedId,
-        "Container-owned service is disposed by its consumer",
-        "Service resolved by '{0}' is disposed by consuming code; the dependency-injection container owns its lifetime",
-        "ResourceLifetime",
-        DiagnosticSeverity.Warning,
-        "Services resolved from IServiceProvider are disposed by their owning service provider or scope. Consumers should not wrap the resolved service in using or call Dispose directly.");
-
-    public static readonly DiagnosticDescriptor UnconsumedDeferredQueryRule = CreateCommonBugDescriptor(
-        UnconsumedDeferredQueryId,
-        "Deferred query is never consumed",
-        "Deferred query produced by '{0}' is never enumerated or materialized",
-        "Correctness",
-        DiagnosticSeverity.Warning,
-        "LINQ query operators are deferred. Constructing a query and discarding it performs no work and does not execute its predicate or selector.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private static DiagnosticDescriptor CreateDescriptor(
         string id,
