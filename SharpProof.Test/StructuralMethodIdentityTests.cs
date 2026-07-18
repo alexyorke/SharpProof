@@ -199,7 +199,7 @@ public sealed class StructuralMethodIdentityTests
         using var stream = new MemoryStream(assemblyBytes, writable: false);
         using var peReader = new PEReader(stream);
         var reader = peReader.GetMetadataReader();
-        var adapterType = LoadEffectSummaryAssembly()
+        var adapterType = LoadContractsAssembly()
             .GetType("SharpProof.Identity.EcmaStructuralMethodIdentityAdapter", throwOnError: true)!;
         var getCanonicalKey = adapterType.GetMethod(
             "GetCanonicalKey",
@@ -210,9 +210,9 @@ public sealed class StructuralMethodIdentityTests
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private static Assembly LoadEffectSummaryAssembly()
+    private static Assembly LoadContractsAssembly()
     {
-        var copiedPath = Path.Combine(AppContext.BaseDirectory, "SharpProof.EffectSummary.dll");
+        var copiedPath = Path.Combine(AppContext.BaseDirectory, "SharpProof.Contracts.dll");
         if (File.Exists(copiedPath)) return Assembly.LoadFrom(copiedPath);
 
         var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
@@ -220,16 +220,15 @@ public sealed class StructuralMethodIdentityTests
         {
             var path = Path.Combine(
                 repositoryRoot,
-                "Tools",
-                "SharpProof.EffectSummary",
+                "SharpProof.Contracts",
                 "bin",
                 configuration,
-                "net8.0",
-                "SharpProof.EffectSummary.dll");
+                "netstandard2.0",
+                "SharpProof.Contracts.dll");
             if (File.Exists(path)) return Assembly.LoadFrom(path);
         }
 
-        throw new FileNotFoundException("SharpProof.EffectSummary.dll was not built.");
+        throw new FileNotFoundException("SharpProof.Contracts.dll was not built.");
     }
 
     private static CSharpCompilation CreateCompilation(string source, string assemblyName)

@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\SharpProof.Tooling.Core\SharpProof.Tooling.Core.csproj" />
-  </ItemGroup>
 </Project>

@@ -90,7 +90,7 @@ public sealed class ScriptProcessOwnershipTests
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
         var runnerSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "Shared",
+            "SharpProof.Tooling.Core",
             "DotnetSarifBuildRunner.cs"));
         var exitCheck = runnerSource.IndexOf("if (process.ExitCode != 0)", StringComparison.Ordinal);
         var sarifCheck = runnerSource.IndexOf("if (!File.Exists(sarifPath))", StringComparison.Ordinal);

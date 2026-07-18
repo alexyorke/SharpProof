@@ -1,5 +1,12 @@
 # Canonical Operation Transfer Rewrite
 
+> Historical note: this rewrite established the canonical semantic pipeline and
+> its parity fixtures. The comprehensive refactor that follows uses the bounded
+> cleanup items and behavior gates below, but retires the 20,000-line deletion
+> target. Completion is now based on removal of reachable duplicate semantics,
+> explicit project ownership, and green external behavior gates. The fresh
+> baseline is recorded in `docs/refactoring-baseline.md`.
+
 This file is the source of truth for the production-code reduction goal. At the
 start of every continuation, read this file before choosing work. Take the first
 unchecked item whose prerequisites are complete. At the end of every green

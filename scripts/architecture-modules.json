@@ -10,9 +10,9 @@
   ],
   "modules": [
     {
-      "name": "Shared",
+      "name": "Contracts",
       "layer": 0,
-      "pathPrefixes": [ "Shared/" ],
+      "pathPrefixes": [ "SharpProof.Contracts/" ],
       "allowedProjectReferences": []
     },
     {
@@ -31,13 +31,13 @@
       "name": "Symbolic",
       "layer": 2,
       "pathPrefixes": [ "SharpProof.Symbolic/" ],
-      "allowedProjectReferences": [ "Attributes", "ProofCore" ]
+      "allowedProjectReferences": [ "Attributes", "Contracts", "ProofCore" ]
     },
     {
       "name": "Analyzer",
       "layer": 3,
       "pathPrefixes": [ "SharpProof.Analyzer/" ],
-      "allowedProjectReferences": [ "Attributes", "ProofCore", "Symbolic" ]
+      "allowedProjectReferences": [ "Attributes", "Contracts", "ProofCore", "Symbolic" ]
     },
     {
       "name": "CodeFixes",
@@ -49,7 +49,7 @@
       "name": "EffectSummary",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.EffectSummary/" ],
-      "allowedProjectReferences": []
+      "allowedProjectReferences": [ "Contracts" ]
     },
     {
       "name": "SymbolicCli",
@@ -73,25 +73,25 @@
       "name": "BaselineCore",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.Baseline.Core/" ],
-      "allowedProjectReferences": []
+      "allowedProjectReferences": [ "Contracts", "ToolingCore" ]
     },
     {
       "name": "BaselineCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.Baseline/" ],
-      "allowedProjectReferences": [ "BaselineCore" ]
+      "allowedProjectReferences": [ "BaselineCore", "ToolingCore" ]
     },
     {
       "name": "CorpusReportCore",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.CorpusReport.Core/" ],
-      "allowedProjectReferences": []
+      "allowedProjectReferences": [ "ToolingCore" ]
     },
     {
       "name": "CorpusReportCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.CorpusReport/" ],
-      "allowedProjectReferences": [ "CorpusReportCore" ]
+      "allowedProjectReferences": [ "CorpusReportCore", "ToolingCore" ]
     },
     {
       "name": "VsixHarness",
@@ -109,7 +109,13 @@
       "name": "VSIX",
       "layer": 5,
       "pathPrefixes": [ "SharpProof.Vsix/" ],
-      "allowedProjectReferences": [ "Analyzer", "CodeFixes", "Symbolic" ]
+      "allowedProjectReferences": [ "Analyzer", "CodeFixes", "Contracts", "Symbolic" ]
+    },
+    {
+      "name": "ToolingCore",
+      "layer": 4,
+      "pathPrefixes": [ "SharpProof.Tooling.Core/" ],
+      "allowedProjectReferences": []
     },
     {
       "name": "Samples",

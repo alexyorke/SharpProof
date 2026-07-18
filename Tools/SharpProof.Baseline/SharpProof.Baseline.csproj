@@ -6,6 +6,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Baseline.Core\SharpProof.Baseline.Core.csproj" />
-    <Compile Include="..\..\Shared\DotnetSarifBuildRunner.cs" Link="DotnetSarifBuildRunner.cs" />
+    <ProjectReference Include="..\..\SharpProof.Tooling.Core\SharpProof.Tooling.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -54,6 +54,7 @@
     <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
+    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -35,8 +35,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" PrivateAssets="all" />
-    <Compile Include="..\Shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
-    <Compile Include="..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
+    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,8 +49,10 @@
 
   <Target Name="_AddSymbolicRuntimeDependency">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.dll" PackagePath="lib/$(TargetFramework)" />
-      <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.pdb" PackagePath="lib/$(TargetFramework)" />
+    <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.dll" PackagePath="lib/$(TargetFramework)" />
+    <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.pdb" PackagePath="lib/$(TargetFramework)" />
+    <TfmSpecificPackageFile Include="..\SharpProof.Contracts\bin\$(Configuration)\$(TargetFramework)\SharpProof.Contracts.dll" PackagePath="lib/$(TargetFramework)" />
+    <TfmSpecificPackageFile Include="..\SharpProof.Contracts\bin\$(Configuration)\$(TargetFramework)\SharpProof.Contracts.pdb" PackagePath="lib/$(TargetFramework)" />
     </ItemGroup>
   </Target>
 

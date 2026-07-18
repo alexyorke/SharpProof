@@ -3,8 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
-    <Compile Include="..\..\Shared\JsonElementCompatibility.cs" Link="Shared\JsonElementCompatibility.cs" />
-    <Compile Include="..\..\Shared\SarifJsonFacts.cs" Link="Shared\SarifJsonFacts.cs" />
+    <ProjectReference Include="..\..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Tooling.Core\SharpProof.Tooling.Core.csproj" />
   </ItemGroup>
 </Project>
