@@ -163,6 +163,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] `EffectSummaryOutputWriter` now owns external JSON serialization,
   stdout/file selection, directory creation, and stable dependency-manifest
   bytes. The CLI-owned output and manifest forwarding helpers were deleted.
+- [x] `EffectSummaryInputResolver` now owns explicit/runtime assembly
+  selection, dependency output normalization, and deterministic shard paths.
+  The CLI-owned input/path adapters were deleted without changing path errors
+  or assembly selection.
 
 ## Current evidence
 
@@ -191,6 +195,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract EffectSummary input and dependency-path resolution from
-`EffectSummaryCli`, deleting the corresponding CLI-owned helpers while
-preserving assembly selection, normalized paths, and command failures.
+Extract generated-catalog metadata reading from `EffectSummaryCli`, then reduce
+document construction to a typed analysis/report pipeline and audit whether the
+EffectSummary/tool-host tranche can be closed.

@@ -53,13 +53,13 @@ internal static class EffectSummaryCli
         foreach (var artifact in document.Artifacts)
         {
             var artifactOptions = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
-            foreach (var assemblyPath in ResolveInputAssemblies(artifactOptions))
+            foreach (var assemblyPath in EffectSummaryInputResolver.ResolveAssemblies(artifactOptions))
                 inputs.Add(Path.GetFullPath(assemblyPath));
 
             if (!string.IsNullOrWhiteSpace(artifactOptions.SourceSummaryPath))
                 inputs.Add(Path.GetFullPath(artifactOptions.SourceSummaryPath!));
 
-            var outputPath = ResolveDependencyOutputPath(
+            var outputPath = EffectSummaryInputResolver.ResolveDependencyOutputPath(
                 artifact.OutputPath,
                 options.DependencyOutputRoot,
                 artifactSpecDirectory);
@@ -71,29 +71,6 @@ internal static class EffectSummaryCli
         EffectSummaryOutputWriter.WriteManifestIfChanged(options.InputManifestPath!, inputs);
         EffectSummaryOutputWriter.WriteManifestIfChanged(options.OutputManifestPath!, outputs);
         return 0;
-    }
-
-    private static string ResolveDependencyOutputPath(
-        string? artifactOutputPath,
-        string? outputRoot,
-        string artifactSpecDirectory)
-    {
-        if (string.IsNullOrWhiteSpace(artifactOutputPath))
-            throw new ArgumentException("Artifact spec entries require OutputPath.");
-
-        if (Path.IsPathRooted(artifactOutputPath))
-        {
-            if (!string.IsNullOrWhiteSpace(outputRoot))
-                throw new InvalidOperationException(
-                    "Artifact spec OutputPath values must be relative when --dependency-output-root is used.");
-
-            return Path.GetFullPath(artifactOutputPath);
-        }
-
-        var baseDirectory = string.IsNullOrWhiteSpace(outputRoot)
-            ? artifactSpecDirectory
-            : Path.GetFullPath(outputRoot);
-        return Path.GetFullPath(Path.Combine(baseDirectory, artifactOutputPath));
     }
 
     private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
@@ -221,7 +198,7 @@ internal static class EffectSummaryCli
 
     private static int RunSharded(CliOptions options)
     {
-        var assemblyPaths = ResolveInputAssemblies(options);
+        var assemblyPaths = EffectSummaryInputResolver.ResolveAssemblies(options);
         var outputDirectory = Path.GetFullPath(options.ShardOutputPath!);
         Directory.CreateDirectory(outputDirectory);
 
@@ -235,7 +212,7 @@ internal static class EffectSummaryCli
 
         foreach (var assemblyPath in assemblyPaths)
         {
-            var outputPath = GetShardOutputPath(outputDirectory, assemblyPath);
+            var outputPath = EffectSummaryInputResolver.GetShardOutputPath(outputDirectory, assemblyPath);
             if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 
             completedOutputPaths.Remove(outputPath);
@@ -253,28 +230,12 @@ internal static class EffectSummaryCli
         return 0;
     }
 
-    private static string GetShardOutputPath(string outputDirectory, string assemblyPath)
-    {
-        var assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-        if (string.IsNullOrWhiteSpace(assemblyName)) assemblyName = "assembly";
-
-        var invalidFileNameCharacters = Path.GetInvalidFileNameChars();
-        var safeAssemblyName = new string(
-            assemblyName
-                .Select(character => invalidFileNameCharacters.Contains(character) ? '_' : character)
-                .ToArray());
-        var pathHash = EffectSummaryHash.Sha256(Path.GetFullPath(assemblyPath))[..12];
-        return Path.Combine(
-            outputDirectory,
-            $"{safeAssemblyName}.{pathHash}.SharpProof.EffectSummary.json");
-    }
-
     private static EffectSummaryDocument BuildDocument(
         CliOptions options,
         IReadOnlyList<string>? inputAssemblies = null,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
     {
-        var assemblies = inputAssemblies ?? ResolveInputAssemblies(options);
+        var assemblies = inputAssemblies ?? EffectSummaryInputResolver.ResolveAssemblies(options);
 
         var reports = assemblies
             .Select(path => AssemblyEffectSummarizer.Summarize(
@@ -323,15 +284,6 @@ internal static class EffectSummaryCli
             bclFallbackInventory);
 
         return document;
-    }
-
-    private static string[] ResolveInputAssemblies(CliOptions options)
-    {
-        if (options.AssemblyPaths.Count != 0) return options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
-
-        return options.AllRuntimeAssemblies
-            ? RuntimeAssemblyResolver.ResolveSystemRuntimeAssemblies(options.Framework)
-            : new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) };
     }
 
     private static void PrintHelp()
