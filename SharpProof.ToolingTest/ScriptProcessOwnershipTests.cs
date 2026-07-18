@@ -152,7 +152,6 @@ public sealed class ScriptProcessOwnershipTests
         Assert.That(inventorySource, Does.Contain("StartsWith($rootPrefix"));
         foreach (var scriptName in new[]
                  {
-                     "Get-SharpProofRawSmtHotspots.ps1",
                      "Get-SharpProofProductionMetrics.ps1",
                      "Get-SharpProofCloneInventory.ps1"
                  })

@@ -128,18 +128,23 @@ Tests are excluded from the metric and must not be deleted.
   parser/repartitioner; impacted selection now infers Main versus Tooling from
   the generated fixture inventory. Fixed six-lane filters, worker caps,
   fail-fast settings, profiling, and concurrent execution remain intact.
+- [x] Retired the completed raw-SMT migration hotspot inventory. The canonical
+  operation-transfer plan records every migration phase and deletion gate as
+  complete, while architecture tests enforce the supported session/query/result
+  boundary and prevent raw SMT types from entering the public API. No build,
+  CI, documentation, or product path consumed the duplicate source scanner.
 
 ## Current evidence
 
-- Maintained production: 104,809 lines (99,501 C#, 4,428 scripts, and 880
-  specifications); net reduction: 2,817 lines; remaining reduction: 17,183.
-  This tranche removed 240 maintained script lines without deleting tests.
+- Maintained production: 104,485 lines (99,501 C#, 4,104 scripts, and 880
+  specifications); net reduction: 3,141 lines; remaining reduction: 16,859.
+  This tranche removed 324 maintained script lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
 ## Milestones
 
-- [ ] 3,000 lines removed: inferred-summary foundation and first migrated rules.
+- [x] 3,000 lines removed: inferred-summary foundation and first migrated rules.
 - [ ] 7,000 lines removed: manual semantic catalogs substantially migrated.
 - [ ] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
 - [ ] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
