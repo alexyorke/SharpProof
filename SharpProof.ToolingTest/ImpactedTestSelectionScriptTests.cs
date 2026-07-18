@@ -231,7 +231,7 @@ public sealed class ImpactedTestSelectionScriptTests
     }
 
     [TestCase("scripts/test-impact-inventory.json")]
-    [TestCase("scripts/test-impact-modules.json")]
+    [TestCase("scripts/TestImpactPolicy.ps1")]
     public async Task ListOnlyJson_SelectsSelectorTestsForImpactMetadata(string changedFile)
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
@@ -266,7 +266,7 @@ public sealed class ImpactedTestSelectionScriptTests
     }
 
     [Test]
-    public async Task ListOnlyJson_DoesNotFallbackWhenMappedAnalyzerFilesShareFixtures()
+    public async Task ListOnlyJson_MapsMultipleAnalyzerFilesThroughGeneratedClosure()
     {
         const string exceptionSitesFile = "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs";
         const string exceptionQueryFile = "SharpProof.Analyzer/ExceptionFlowQuery.cs";
@@ -304,46 +304,25 @@ public sealed class ImpactedTestSelectionScriptTests
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
         var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var manifestEvidence = GetEvidenceEntry(root, changedFile, "module-manifest");
         var command = root.GetProperty("suggestedCommand").GetString();
 
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
         Assert.That(
             GetStringArray(root, "fullSuiteFallbackReasons"),
-            Has.Some.Contains("PurityCore"));
-        Assert.That(manifestEvidence.GetProperty("module").GetString(), Is.EqualTo("PurityCore"));
+            Has.Some.Contains("high-fanout analyzer core"));
         Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(fixtures, Does.Contain("EnsuresContractTests"));
         Assert.That(fixtures, Does.Contain("AnalyzerFeatureCompositionTests"));
         Assert.That(command, Does.Contain("-TestLane All"));
     }
 
     [Test]
-    public async Task ListOnlyJson_UsesExplicitEnsuresModuleAndReverseClosure()
+    public async Task ListOnlyJson_UsesInferredAnalyzerClosureForEnsures()
     {
         const string changedFile = "SharpProof.Analyzer/MethodEnsuresAnalyzer.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var fixtures = GetStringArray(root, "selectedTestFixtures");
-        var evidence = GetEvidenceEntry(root, changedFile, "module-manifest");
-
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
-        Assert.That(fixtures, Is.EquivalentTo(new[]
-        {
-            "AnalyzerFeatureCompositionTests",
-            "DiagnosticExplainPropertyTests",
-            "EnsuresContractTests",
-            "RequiresContractTests"
-        }));
-        Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("Ensures"));
-        Assert.That(
-            root.GetProperty("selectionEvidence").EnumerateArray().Any(entry =>
-                entry.GetProperty("changedFile").GetString() == changedFile &&
-                (entry.GetProperty("source").GetString() == "token-reference" ||
-                 entry.GetProperty("source").GetString() == "inventory-symbol-reference")),
-            Is.False);
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
+        Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("EnsuresContractTests"));
     }
 
     [Test]
@@ -352,39 +331,31 @@ public sealed class ImpactedTestSelectionScriptTests
         const string changedFile = "SharpProof.Analyzer/SharpProofAnalyzer.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
-        var evidence = GetEvidenceEntry(root, changedFile, "module-manifest");
-
-        Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
-        Assert.That(
-            GetStringArray(root, "selectedTestFixtures"),
-            Is.EquivalentTo(new[] { "AnalyzerFeatureCompositionTests" }));
-        Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("AnalyzerComposition"));
-        Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Has.Some.Contains("AnalyzerComposition"));
+        AssertUsesInferredModuleClosure(root, changedFile, "Analyzer");
+        Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("AnalyzerFeatureCompositionTests"));
     }
 
     [Test]
-    public async Task ListOnlyJson_MissingModuleManifestFallsBackForAnalyzerChange()
+    public async Task ListOnlyJson_MissingGeneratedInventoryFallsBackForAnalyzerChange()
     {
         const string changedFile = "SharpProof.Analyzer/MethodEnsuresAnalyzer.cs";
-        var missingManifestPath = Path.Combine(
+        var missingInventoryPath = Path.Combine(
             FindRepositoryRoot(),
             "scripts",
-            "missing-test-impact-modules.json");
-        Assert.That(File.Exists(missingManifestPath), Is.False);
+            "missing-test-impact-inventory.json");
+        Assert.That(File.Exists(missingInventoryPath), Is.False);
 
-        using var recommendation = await RunImpactedSelectorJsonWithManifestAsync(
-            missingManifestPath,
+        using var recommendation = await RunImpactedSelectorJsonWithInventoryAsync(
+            missingInventoryPath,
             changedFile);
         var root = recommendation.RootElement;
-        var moduleManifest = root.GetProperty("moduleManifest");
+        var inventory = root.GetProperty("inventory");
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
         Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
-        Assert.That(moduleManifest.GetProperty("loaded").GetBoolean(), Is.False);
-        Assert.That(moduleManifest.GetProperty("valid").GetBoolean(), Is.False);
+        Assert.That(inventory.GetProperty("loaded").GetBoolean(), Is.False);
         Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"),
-            Has.Some.Contains("invalid module impact manifest"));
+            Has.Some.Contains("no impacted-test mapping"));
     }
 
     [Test]
@@ -502,7 +473,6 @@ public sealed class ImpactedTestSelectionScriptTests
         using var recommendation = await RunImpactedSelectorJsonAsync(
             "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs");
         var inventory = recommendation.RootElement.GetProperty("inventory");
-        var moduleManifest = recommendation.RootElement.GetProperty("moduleManifest");
 
         Assert.That(inventory.GetProperty("loaded").GetBoolean(), Is.True);
         Assert.That(inventory.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
@@ -511,12 +481,6 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Contracts"));
         Assert.That(GetStringArray(inventory, "modules"), Does.Contain("ToolingCore"));
         Assert.That(GetStringArray(inventory, "modules"), Does.Not.Contain("Shared"));
-        Assert.That(moduleManifest.GetProperty("loaded").GetBoolean(), Is.True);
-        Assert.That(moduleManifest.GetProperty("valid").GetBoolean(), Is.True);
-        Assert.That(moduleManifest.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-        Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("PurityCore"));
-        Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("Ensures"));
-        Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("AnalyzerComposition"));
     }
 
     [Test]
@@ -528,7 +492,6 @@ public sealed class ImpactedTestSelectionScriptTests
 
         Assert.That(output, Does.Contain("Impact-selection evidence:"));
         Assert.That(output, Does.Contain("Inventory loaded: True"));
-        Assert.That(output, Does.Contain("Module manifest loaded: True; valid: True"));
         Assert.That(output, Does.Contain("inventory-symbol-reference"));
         Assert.That(output, Does.Contain("module=CodeFixes"));
         Assert.That(output, Does.Contain("tokens=SharpProofCodeFixProvider"));
@@ -615,14 +578,14 @@ public sealed class ImpactedTestSelectionScriptTests
         return await JsonSession.Value.InvokeJsonAsync(workers, changedFiles);
     }
 
-    private static async Task<JsonDocument> RunImpactedSelectorJsonWithManifestAsync(
-        string moduleImpactManifestPath,
+    private static async Task<JsonDocument> RunImpactedSelectorJsonWithInventoryAsync(
+        string impactInventoryPath,
         params string[] changedFiles)
     {
         var output = await RunImpactedSelectorProcessAsync(
             false,
             true,
-            moduleImpactManifestPath,
+            impactInventoryPath,
             changedFiles);
         return JsonDocument.Parse(output);
     }
@@ -639,7 +602,7 @@ public sealed class ImpactedTestSelectionScriptTests
     private static async Task<string> RunImpactedSelectorProcessAsync(
         bool explain,
         bool json,
-        string moduleImpactManifestPath,
+        string impactInventoryPath,
         params string[] changedFiles)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -652,10 +615,10 @@ public sealed class ImpactedTestSelectionScriptTests
 
         if (explain) startInfo.ArgumentList.Add("-Explain");
 
-        if (!string.IsNullOrWhiteSpace(moduleImpactManifestPath))
+        if (!string.IsNullOrWhiteSpace(impactInventoryPath))
         {
-            startInfo.ArgumentList.Add("-ModuleImpactManifestPath");
-            startInfo.ArgumentList.Add(moduleImpactManifestPath);
+            startInfo.ArgumentList.Add("-ImpactInventoryPath");
+            startInfo.ArgumentList.Add(impactInventoryPath);
         }
 
         startInfo.ArgumentList.Add("-ChangedFile");

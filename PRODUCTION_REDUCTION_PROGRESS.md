@@ -118,13 +118,17 @@ Tests are excluded from the metric and must not be deleted.
   Diagnostics remain present and conservative; as an intentional unreleased
   API break, evidence sources and categories may now describe the inferred path
   instead of the deleted semantic-rule name.
+- [x] Retired the three-entry handwritten analyzer test-impact manifest and its
+  parallel validation, ownership, dependency-closure, and evidence engine. The
+  generated repository inventory is now the sole production/project ownership
+  source; inferred mappings conservatively require the full suite. Selector
+  tests retain every case against the generated path, and no test was deleted.
 
 ## Current evidence
 
-- Maintained production: 105,413 lines (99,501 C#, 5,032 scripts, and 880
-  specifications); net reduction: 2,213 lines; remaining reduction: 17,787.
-  This tranche removed 303 maintained nonblank lines (394 physical source
-  lines) without deleting tests.
+- Maintained production: 105,049 lines (99,501 C#, 4,668 scripts, and 880
+  specifications); net reduction: 2,577 lines; remaining reduction: 17,423.
+  This tranche removed 364 maintained script lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 

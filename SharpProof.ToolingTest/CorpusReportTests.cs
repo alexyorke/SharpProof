@@ -527,7 +527,9 @@ public class CorpusReportTests
             UseShellExecute = false
         };
         startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--no-restore");
+        startInfo.ArgumentList.Add("--no-build");
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add("Release");
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.CorpusReport", "SharpProof.CorpusReport.csproj"));
         startInfo.ArgumentList.Add("--");
