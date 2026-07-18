@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.ProofCore.Collections;
 using SharpProof.ProofCore.Purity;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
@@ -14,22 +12,20 @@ namespace SharpProof.Symbolic;
 internal sealed class SymbolicProofService
 {
     private const string ContradictoryStateReason = "path_unsatisfiable";
-    private const int PerServiceProofCacheEntryLimit = 2048;
-    private const int ProcessFallbackProofCacheEntryLimit = 4096;
-    private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
-    private static readonly ProofResultCache s_fallbackCache = new(ProcessFallbackProofCacheEntryLimit);
     private static readonly ExpressionSyntax s_syntheticProofNode = SyntaxFactory.IdentifierName("__symbolic_proof__");
     private static readonly SafeDivisorProofStrategy<SymbolicState> StateSafeDivisorStrategy = new(
         IsTermProvablyNonZero,
         AssumeStatePathCondition,
         true);
     private readonly SymbolicProofPipeline proofPipeline;
+    private readonly SymbolicProofCache proofCache;
     private readonly SmtAnalysisService? smtAnalysis;
 
     public SymbolicProofService(SmtAnalysisService? smtAnalysis)
     {
         this.smtAnalysis = smtAnalysis;
         proofPipeline = new SymbolicProofPipeline(smtAnalysis);
+        proofCache = SymbolicProofCacheStore.Get(smtAnalysis);
     }
 
     public SymbolicIrProofResult ClassifyReachability(SymbolicState state)
@@ -642,21 +638,11 @@ internal sealed class SymbolicProofService
         string key,
         Func<SymbolicIrProofResult> classify)
     {
-        var cache = GetProofResultCache();
-        if (cache.TryGetResult(key, out var cached)) return cached.WithCacheHit(CreateBudgetInfo());
+        if (proofCache.TryGetResult(key, out var cached)) return cached.WithCacheHit(CreateBudgetInfo());
 
         var result = classify();
-        cache.TryAddResult(key, result);
+        proofCache.TryAddResult(key, result);
         return result;
-    }
-
-    private ProofResultCache GetProofResultCache()
-    {
-        return smtAnalysis != null
-            ? s_serviceCaches.GetValue(
-                smtAnalysis,
-                static _ => new ProofResultCache(PerServiceProofCacheEntryLimit))
-            : s_fallbackCache;
     }
 
     private static SymbolicState NormalizeState(SymbolicState state)
@@ -874,7 +860,6 @@ internal sealed class SymbolicProofService
         var service = smtAnalysis;
         if (service == null) return null;
 
-        var proofCache = GetProofResultCache();
         var cache = new SymbolicCacheInfo(
             service.CacheHitCount + proofCache.HitCount,
             service.CacheMissCount + proofCache.MissCount,
@@ -895,11 +880,10 @@ internal sealed class SymbolicProofService
         out ImmutableArray<SmtFormula> pathConditions,
         out SymbolicUnknownReason unknownReason)
     {
-        var cache = GetProofResultCache();
-        if (!cache.TryGetEncodedState(state.NormalizedProofKey, out var entry))
+        if (!proofCache.TryGetEncodedState(state.NormalizedProofKey, out var entry))
         {
             entry = EncodeStateUncached(state);
-            cache.TryAddEncodedState(state.NormalizedProofKey, entry);
+            proofCache.TryAddEncodedState(state.NormalizedProofKey, entry);
         }
 
         pathConditions = entry.PathConditions;
@@ -907,7 +891,7 @@ internal sealed class SymbolicProofService
         return entry.Success;
     }
 
-    private static EncodedStateCacheEntry EncodeStateUncached(SymbolicState state)
+    private static SymbolicEncodedState EncodeStateUncached(SymbolicState state)
     {
         var builder = ImmutableArray.CreateBuilder<SmtFormula>(
             state.Facts.Length + state.PathConditions.Length);
@@ -941,72 +925,15 @@ internal sealed class SymbolicProofService
         }
 
         if (skippedUnsupported && builder.Count == 0)
-            return new EncodedStateCacheEntry(
+            return new SymbolicEncodedState(
                 false,
                 ImmutableArray<SmtFormula>.Empty,
                 SymbolicUnknownReason.UnsupportedIrEncoding);
 
-        return new EncodedStateCacheEntry(
+        return new SymbolicEncodedState(
             true,
             builder.ToImmutable(),
             SymbolicUnknownReason.None);
     }
 
-    private sealed class ProofResultCache
-    {
-        private const string EncodedStatePrefix = "encoded-state:";
-        private const string ResultPrefix = "proof-result:";
-        private readonly BoundedConcurrentCache<string, object> _values;
-
-        internal ProofResultCache(int capacity)
-        {
-            _values = new BoundedConcurrentCache<string, object>(capacity, StringComparer.Ordinal);
-        }
-
-        internal int Count => _values.Count;
-        internal long HitCount => _values.HitCount;
-        internal long MissCount => _values.MissCount;
-        internal long EvictionCount => _values.EvictionCount;
-
-        internal bool TryGetResult(string key, out SymbolicIrProofResult result)
-        {
-            if (_values.TryGetValue(ResultPrefix + key, out var value) &&
-                value is SymbolicIrProofResult cached)
-            {
-                result = cached;
-                return true;
-            }
-
-            result = null!;
-            return false;
-        }
-
-        internal void TryAddResult(string key, SymbolicIrProofResult result)
-        {
-            _values.TryAdd(ResultPrefix + key, result);
-        }
-
-        internal bool TryGetEncodedState(string key, out EncodedStateCacheEntry entry)
-        {
-            if (_values.TryGetValue(EncodedStatePrefix + key, out var value) &&
-                value is EncodedStateCacheEntry cached)
-            {
-                entry = cached;
-                return true;
-            }
-
-            entry = default;
-            return false;
-        }
-
-        internal void TryAddEncodedState(string key, EncodedStateCacheEntry entry)
-        {
-            _values.TryAdd(EncodedStatePrefix + key, entry);
-        }
-    }
-
-    private readonly record struct EncodedStateCacheEntry(
-        bool Success,
-        ImmutableArray<SmtFormula> PathConditions,
-        SymbolicUnknownReason UnknownReason);
 }

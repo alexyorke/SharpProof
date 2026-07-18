@@ -133,6 +133,11 @@ This is the active source of truth for the comprehensive refactor. Read
   projection, SMT outcome mapping, proof-stage classification, and structured
   unknown-reason mapping. `SymbolicProofService` no longer owns result
   projection or mixes it with state encoding and solver orchestration.
+- [x] `SymbolicProofCacheStore` owns bounded per-SMT-service cache lifetimes and
+  the bounded process fallback; `SymbolicProofCache` owns proof-result and
+  encoded-state namespaces plus hit/miss/eviction accounting. The nested cache,
+  weak table, fallback singleton, and capacity constants were deleted from the
+  proof service.
 
 ## Current evidence
 
@@ -161,6 +166,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract bounded proof and encoded-state cache ownership from
-`SymbolicProofService`, including per-SMT-service lifetime and process fallback
-behavior, then delete the nested cache implementation.
+Extract condition/fact/state encoding and safe-integer-divisor validation from
+`SymbolicProofService` into a focused proof encoder, preserving version rewrite
+and short-circuit assumptions before deleting the service-owned implementation.
