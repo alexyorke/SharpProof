@@ -95,6 +95,26 @@ public sealed class SymbolicErrorModelTests
     }
 
     [Test]
+    public void SymbolicQueryService_PublicQueriesShareNullContextValidation()
+    {
+        var service = new SymbolicQueryService();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.Throws<ArgumentNullException>(() => service.Query(null!))!.ParamName,
+                Is.EqualTo("context"));
+            Assert.That(Assert.Throws<ArgumentNullException>(() => service.Prove(null!, string.Empty))!.ParamName,
+                Is.EqualTo("context"));
+            Assert.That(Assert.Throws<ArgumentNullException>(() => service.QueryRuntimeHazards(null!))!.ParamName,
+                Is.EqualTo("context"));
+            Assert.That(Assert.Throws<ArgumentNullException>(() => service.QueryComplexity(null!))!.ParamName,
+                Is.EqualTo("context"));
+            Assert.That(Assert.Throws<ArgumentNullException>(() => service.QueryCapabilities(null!))!.ParamName,
+                Is.EqualTo("context"));
+        });
+    }
+
+    [Test]
     public void SymbolicQueryService_TryQuery_ReturnsTypedCancellationFailure()
     {
         using var cancellation = new CancellationTokenSource();

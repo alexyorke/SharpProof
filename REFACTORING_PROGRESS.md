@@ -26,6 +26,9 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Analyzer method facts now live in an immutable `MethodAnalysisSnapshot`;
   feature analyzers consume the snapshot while session state exclusively owns
   symbolic query execution and caching.
+- [x] `SymbolicQueryService` routes all public query families through one
+  validated internal request, including common context validation, analysis
+  limits, target requirements, and SMT requirements.
 
 ## Current evidence
 
@@ -53,5 +56,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract request validation and target resolution from `SymbolicQueryService`,
-then route its query families through the same validated internal request.
+Extract source dispatch and result projection from `SymbolicQueryService` so
+the public service becomes a thin request coordinator.

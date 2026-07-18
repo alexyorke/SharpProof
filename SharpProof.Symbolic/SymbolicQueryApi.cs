@@ -35,12 +35,12 @@ public sealed class SymbolicQueryService
         SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return ExecuteWithLimits(context, cancellationToken, (source, target, options, token) =>
+        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
         {
-            var result = QueryCore(source, target, options, token);
-            return options.Filter == null || options.Filter.IsEmpty
+            var result = QueryCore(request, token);
+            return request.Options.Filter == null || request.Options.Filter.IsEmpty
                 ? result
-                : result.Filter(options.Filter);
+                : result.Filter(request.Options.Filter);
         });
     }
 
@@ -56,23 +56,20 @@ public sealed class SymbolicQueryService
         string conditionText,
         CancellationToken cancellationToken = default)
     {
-        if (context == null) throw new ArgumentNullException(nameof(context));
-
+        var validatedRequest = ValidatedSymbolicQueryRequest.Create(context);
         if (string.IsNullOrWhiteSpace(conditionText))
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
 
-        var pointTarget = context.Target.Kind == SymbolicQueryTargetKind.Point
-            ? context.Target
-            : throw new ArgumentException("Condition proof requests require a point target.", nameof(context));
-        var options = context.Options;
-        if (options.SmtAnalysis == null)
-            throw new ArgumentException("Condition proof requests require SMT analysis.", nameof(context));
-
-        return ExecuteWithLimits(context, cancellationToken, (source, _, queryOptions, token) =>
-            SymbolicSourceInputDispatcher.Execute(
-                source,
-                pointTarget,
-                queryOptions,
+        return ExecuteWithLimits(validatedRequest, cancellationToken, (request, token) =>
+        {
+            request.RequireTarget(
+                static kind => kind == SymbolicQueryTargetKind.Point,
+                "Condition proof requests require a point target.");
+            var smtAnalysis = request.RequireSmt("Condition proof requests require SMT analysis.");
+            return SymbolicSourceInputDispatcher.Execute(
+                request.Source,
+                request.Target,
+                request.Options,
                 SymbolicSourceCompilationKind.Query,
                 "Condition proof source kind is not supported.",
                 (syntaxTree, compilation, target, queryToken) => _sourceQueryService.ProveConditionAtSyntaxTree(
@@ -81,11 +78,12 @@ public sealed class SymbolicQueryService
                     target.LineNumber!.Value,
                     target.ColumnNumber ?? 1,
                     conditionText,
-                    queryOptions.SmtAnalysis!,
+                    smtAnalysis,
                     queryToken),
                 static (_, _, _, _) =>
                     throw new NotSupportedException("Condition proof source kind is not supported."),
-                token));
+                token);
+        });
     }
 
     public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
@@ -177,36 +175,32 @@ public sealed class SymbolicQueryService
         SymbolicRuntimeHazardQueryOptions? hazardOptions = null,
         CancellationToken cancellationToken = default)
     {
-        if (context == null) throw new ArgumentNullException(nameof(context));
-
-        var options = context.Options;
-        if (options.SmtAnalysis == null)
-            throw new ArgumentException("Runtime hazard queries require SMT analysis.", nameof(context));
-
         hazardOptions ??= SymbolicRuntimeHazardQueryOptions.Default;
-        var source = context.Source;
-        var target = context.Target;
-        if (!SupportsRuntimeHazardTarget(target.Kind) && source.Kind != SymbolicSourceInputKind.Node)
-            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
+        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
+        {
+            var smtAnalysis = request.RequireSmt("Runtime hazard queries require SMT analysis.");
+            if (!SupportsRuntimeHazardTarget(request.Target.Kind) &&
+                request.Source.Kind != SymbolicSourceInputKind.Node)
+                throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
 
-        return ExecuteWithLimits(context, cancellationToken, (querySource, queryTarget, queryOptions, token) =>
-            SymbolicSourceInputDispatcher.Execute(
-                querySource,
-                queryTarget,
-                queryOptions,
+            return SymbolicSourceInputDispatcher.Execute(
+                request.Source,
+                request.Target,
+                request.Options,
                 SymbolicSourceCompilationKind.RuntimeHazards,
                 "Runtime hazard source kind is not supported.",
                 (syntaxTree, compilation, dispatchedTarget, queryToken) => QuerySyntaxTreeRuntimeHazards(
-                    syntaxTree, compilation, dispatchedTarget, queryOptions, hazardOptions, queryToken),
+                    syntaxTree, compilation, dispatchedTarget, request.Options, hazardOptions, queryToken),
                 (node, semanticModel, dispatchedTarget, queryToken) =>
                     _runtimeHazardQueryService.QueryNodeRuntimeHazards(
                         node,
                         semanticModel,
-                        queryOptions.SmtAnalysis!,
+                        smtAnalysis,
                         queryToken,
                         hazardOptions,
                         dispatchedTarget.IncludeNestedCallables),
-                token));
+                token);
+        });
     }
 
     public SymbolicOperationResult<SymbolicRuntimeHazardQueryResult> TryQueryRuntimeHazards(
@@ -221,7 +215,8 @@ public sealed class SymbolicQueryService
         SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return ExecuteWithLimits(context, cancellationToken, _complexityService.Query);
+        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
+            _complexityService.Query(request.Source, request.Target, request.Options, token));
     }
 
     public SymbolicOperationResult<SymbolicComplexityResult> TryQueryComplexity(
@@ -235,7 +230,8 @@ public sealed class SymbolicQueryService
         SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return ExecuteWithLimits(context, cancellationToken, _capabilityService.Query);
+        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
+            _capabilityService.Query(request.Source, request.Target, request.Options, token));
     }
 
     public SymbolicOperationResult<SymbolicCapabilityResult> TryQueryCapabilities(
@@ -261,37 +257,43 @@ public sealed class SymbolicQueryService
     private static TResult ExecuteWithLimits<TResult>(
         SymbolicQueryContext context,
         CancellationToken cancellationToken,
-        Func<SymbolicSourceInput, SymbolicQueryTarget, SymbolicQueryOptions, CancellationToken, TResult> operation)
+        Func<ValidatedSymbolicQueryRequest, CancellationToken, TResult> operation)
     {
-        if (context == null) throw new ArgumentNullException(nameof(context));
+        return ExecuteWithLimits(
+            ValidatedSymbolicQueryRequest.Create(context),
+            cancellationToken,
+            operation);
+    }
 
-        var options = context.Options;
-        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
-        return operation(context.Source, context.Target, options, cancellationToken);
+    private static TResult ExecuteWithLimits<TResult>(
+        ValidatedSymbolicQueryRequest request,
+        CancellationToken cancellationToken,
+        Func<ValidatedSymbolicQueryRequest, CancellationToken, TResult> operation)
+    {
+        using var limitScope = SymbolicAnalysisLimitContext.Push(request.Options.AnalysisLimits);
+        return operation(request, cancellationToken);
     }
 
     private SymbolicQueryResult QueryCore(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
+        ValidatedSymbolicQueryRequest request,
         CancellationToken cancellationToken)
     {
-        if (!SupportsScopedQueryTarget(target.Kind) &&
-            source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
-            throw new NotSupportedException(source.Kind == SymbolicSourceInputKind.File
+        if (!SupportsScopedQueryTarget(request.Target.Kind) &&
+            request.Source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
+            throw new NotSupportedException(request.Source.Kind == SymbolicSourceInputKind.File
                 ? "Target kind is not supported for file queries."
                 : "Target kind is not supported for source queries.");
 
         return SymbolicSourceInputDispatcher.Execute(
-            source,
-            target,
-            options,
+            request.Source,
+            request.Target,
+            request.Options,
             SymbolicSourceCompilationKind.Query,
             "Source kind is not supported.",
             (syntaxTree, compilation, queryTarget, token) =>
-                QuerySyntaxTree(syntaxTree, compilation, queryTarget, options, token),
+                QuerySyntaxTree(syntaxTree, compilation, queryTarget, request.Options, token),
             (node, semanticModel, queryTarget, token) =>
-                QueryNode(node, semanticModel, queryTarget, options, token),
+                QueryNode(node, semanticModel, queryTarget, request.Options, token),
             cancellationToken);
     }
 
