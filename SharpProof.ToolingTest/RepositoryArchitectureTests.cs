@@ -32,6 +32,43 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ProductionReductionBaseline_IsConsistentAndExcludesTests()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var script = Path.Combine(root, "scripts", "Get-SharpProofProductionReduction.ps1");
+        var startInfo = TestProcessSupport.CreatePowerShellStartInfo(root);
+        startInfo.ArgumentList.Add("-File");
+        startInfo.ArgumentList.Add(script);
+        startInfo.ArgumentList.Add("-Json");
+        using var process = Process.Start(startInfo)!;
+        var standardOutput = process.StandardOutput.ReadToEnd();
+        var standardError = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.That(process.ExitCode, Is.EqualTo(0), standardError);
+        using var document = JsonDocument.Parse(standardOutput);
+        var report = document.RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(report.GetProperty("targetReductionLines").GetInt32(), Is.EqualTo(20_000));
+            Assert.That(
+                report.GetProperty("maximumMaintainedProductionLines").GetInt32(),
+                Is.EqualTo(report.GetProperty("baselineLines").GetInt32() - 20_000));
+            Assert.That(
+                report.GetProperty("current").GetProperty("productionCSharp").GetProperty("files").GetInt32(),
+                Is.GreaterThan(0));
+            Assert.That(
+                report.GetProperty("current").GetProperty("scripts").GetProperty("files").GetInt32(),
+                Is.GreaterThan(0));
+            Assert.That(
+                report.GetProperty("current").GetProperty("specifications").GetProperty("files").GetInt32(),
+                Is.GreaterThan(0));
+            Assert.That(report.GetProperty("requiredReductionLines").GetInt32(), Is.Zero);
+            Assert.That(report.GetProperty("meetsRequiredReduction").GetBoolean(), Is.True);
+        });
+    }
+
+    [Test]
     public void Projects_DoNotCompileSourceFromAnotherProject()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
