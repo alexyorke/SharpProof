@@ -123,12 +123,17 @@ Tests are excluded from the metric and must not be deleted.
   generated repository inventory is now the sole production/project ownership
   source; inferred mappings conservatively require the full suite. Selector
   tests retain every case against the generated path, and no test was deleted.
+- [x] Made the requested test lane the single project-routing owner for filtered
+  runs. Deleted five handwritten fixture catalogs and the duplicate filter-name
+  parser/repartitioner; impacted selection now infers Main versus Tooling from
+  the generated fixture inventory. Fixed six-lane filters, worker caps,
+  fail-fast settings, profiling, and concurrent execution remain intact.
 
 ## Current evidence
 
-- Maintained production: 105,049 lines (99,501 C#, 4,668 scripts, and 880
-  specifications); net reduction: 2,577 lines; remaining reduction: 17,423.
-  This tranche removed 364 maintained script lines without deleting tests.
+- Maintained production: 104,809 lines (99,501 C#, 4,428 scripts, and 880
+  specifications); net reduction: 2,817 lines; remaining reduction: 17,183.
+  This tranche removed 240 maintained script lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
@@ -143,9 +148,9 @@ Tests are excluded from the metric and must not be deleted.
 ## Current tranche
 
 Replace the next complete duplicated semantic or orchestration owner whose
-superseded path repays at least 350 maintained-production lines. Prefer inferred
-or canonical analysis over manual catalogs when characterization proves it is
-complete; otherwise preserve the explicit owner. Require focused parity before
-deleting the old path in the same tranche, and do not revisit the independently
-required string-hash, type-identity, CFG/loop-transfer, or EffectSummary
-assembly-reader owners.
+superseded path repays at least 200 maintained-production lines, preferring
+350-line or larger cuts. Prefer inferred or canonical analysis over manual
+catalogs when characterization proves it is complete; otherwise preserve the
+explicit owner. Require focused parity before deleting the old path in the same
+tranche, and do not revisit the independently required string-hash,
+type-identity, CFG/loop-transfer, or EffectSummary assembly-reader owners.

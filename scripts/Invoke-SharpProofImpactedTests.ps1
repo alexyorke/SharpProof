@@ -652,44 +652,28 @@ function Get-TestLaneForFixtures
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
-        [string[]]$ClassNames
+        [string[]]$ClassNames,
+
+        [AllowNull()]$Inventory
     )
 
-    if ($ClassNames.Count -eq 0)
-    {
-        return 'All'
-    }
-
-    $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'AnalyzerPackagingTests',
-        'BaselineWorkflowTests',
-        'CorpusReportTests',
-        'EffectSummaryToolTests',
-        'ExceptionSummaryCatalogValidationTests',
-        'FuzzToolTests',
-        'ImpactedTestSelectionScriptTests',
-        'SharpProofCodeFixTests',
-        'RoslynConstructCoverageTests',
-        'RoslynShapeManifestCoverageTests',
-        'SymbolicRuntimeHazardQueryTests',
-        'SymbolicSourceQueryLineTests'))
-    {
-        [void]$toolingFixtures.Add($fixture)
-    }
-
+    if ($ClassNames.Count -eq 0 -or $null -eq $Inventory) { return 'All' }
     $hasToolingFixture = $false
     $hasMainFixture = $false
     foreach ($className in $ClassNames)
     {
-        if ($toolingFixtures.Contains($className))
+        $paths = @($Inventory.testFixtures |
+            Where-Object { [string]::Equals([string]$_.name, $className, [StringComparison]::Ordinal) } |
+            ForEach-Object { [string]$_.path })
+        if (@($paths | Where-Object { $_.StartsWith('SharpProof.ToolingTest/', [StringComparison]::Ordinal) }).Count -gt 0)
         {
             $hasToolingFixture = $true
         }
-        else
+        if (@($paths | Where-Object { $_.StartsWith('SharpProof.Test/', [StringComparison]::Ordinal) }).Count -gt 0)
         {
             $hasMainFixture = $true
         }
+        if ($paths.Count -eq 0) { return 'All' }
     }
 
     if ($hasToolingFixture -and -not $hasMainFixture)
@@ -986,7 +970,7 @@ try
     $filter = if ($classNames.Count -gt 0) { Join-TestFilter $classNames } else { '' }
     $filterTooLong = $filter.Length -gt 7000
     $requiresFull = $fullReasons.Count -gt 0 -or $filterTooLong
-    $testLane = if ($requiresFull) { 'All' } else { Get-TestLaneForFixtures $classNames }
+    $testLane = if ($requiresFull) { 'All' } else { Get-TestLaneForFixtures $classNames $impactInventory }
     $suggestedAction = if ($requiresFull -and -not $ForcePartial)
     {
         'RunFullSuite'

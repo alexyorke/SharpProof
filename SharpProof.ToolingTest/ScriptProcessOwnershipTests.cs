@@ -72,7 +72,7 @@ public sealed class ScriptProcessOwnershipTests
     }
 
     [Test]
-    public void TestLaneRoutingRecognizesBothTestNamespaces()
+    public void FilteredTestLaneRoutingUsesRequestedProjectBoundary()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
@@ -80,8 +80,9 @@ public sealed class ScriptProcessOwnershipTests
             "scripts",
             "Invoke-SharpProofTests.ps1"));
 
-        Assert.That(source, Does.Contain("SharpProof\\.(?:Test|ToolingTest)\\."));
-        Assert.That(source, Does.Contain("if ($match.Groups[1].Value -eq 'SharpProof')"));
+        Assert.That(source, Does.Contain("'Main' { return @($mainProject) }"));
+        Assert.That(source, Does.Contain("default { return @($mainProject, $toolingProject) }"));
+        Assert.That(source, Does.Not.Contain("SharpProof\\.(?:Test|ToolingTest)\\."));
     }
 
     [Test]

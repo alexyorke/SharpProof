@@ -201,221 +201,12 @@ function Resolve-SharpProofTestProjects
         return @($mainSmtProject, $mainGeneralProject, $toolingProject)
     }
 
-    $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'AnalyzerPackagingTests',
-        'BaselineWorkflowTests',
-        'CorpusReportTests',
-        'EffectSummaryToolTests',
-        'ExceptionSummaryCatalogValidationTests',
-        'FuzzToolTests',
-        'ImpactedTestSelectionScriptTests',
-        'SharpProofCodeFixTests',
-        'RoslynConstructCoverageTests',
-        'RoslynShapeManifestCoverageTests',
-        'SymbolicRuntimeHazardQueryTests',
-        'SymbolicSourceQueryLineTests'))
+    switch ($RequestedLane)
     {
-        [void]$toolingFixtures.Add($fixture)
+        'Main' { return @($mainProject) }
+        'MainSmt' { return @($mainSmtProject) }
+        default { return @($mainProject, $toolingProject) }
     }
-
-    $smtHeavyFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'DiagnosticEvidenceTests',
-        'ElementAccessSmtTests',
-        'ExceptionFlowPathFactStressTests',
-        'ExceptionReachabilitySmtTests',
-        'ExpressionAtomSmtTests',
-        'ForeachSmtInvariantTests',
-        'LoopExitSmtInvariantTests',
-        'PathSensitiveSmtInvariantTests',
-        'PatternSmtInvariantTests',
-        'ReferenceReachabilitySmtTests',
-        'SemanticOracleAnalyzerSmtTests',
-        'SemanticOracleRuntimeHazardAnalyzerSmtTests',
-        'SemanticOracleSmtTests',
-        'SmtAnalysisServiceTests',
-        'StringLengthSmtTests'))
-    {
-        [void]$smtHeavyFixtures.Add($fixture)
-    }
-
-    $smtOracleFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'SemanticOracleSmtTests',
-        'PatternSmtInvariantTests',
-        'ExceptionReachabilitySmtTests'))
-    {
-        [void]$smtOracleFixtures.Add($fixture)
-    }
-
-    $smtAnalyzerFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'SemanticOracleAnalyzerSmtTests',
-        'DiagnosticEvidenceTests'))
-    {
-        [void]$smtAnalyzerFixtures.Add($fixture)
-    }
-
-    $smtFlowFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'ExceptionFlowPathFactStressTests',
-        'SemanticOracleRuntimeHazardAnalyzerSmtTests'))
-    {
-        [void]$smtFlowFixtures.Add($fixture)
-    }
-
-    $smtCoreFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($fixture in @(
-        'ElementAccessSmtTests',
-        'ExpressionAtomSmtTests',
-        'ForeachSmtInvariantTests',
-        'LoopExitSmtInvariantTests',
-        'PathSensitiveSmtInvariantTests',
-        'ReferenceReachabilitySmtTests',
-        'SmtAnalysisServiceTests',
-        'StringLengthSmtTests'))
-    {
-        [void]$smtCoreFixtures.Add($fixture)
-    }
-
-    $matchedFixtureNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($match in [regex]::Matches($Filter, 'SharpProof\.(?:Test|ToolingTest)\.([A-Za-z_][A-Za-z0-9_]*)'))
-    {
-        [void]$matchedFixtureNames.Add($match.Groups[1].Value)
-    }
-
-    foreach ($match in [regex]::Matches($Filter, 'FullyQualifiedName~([A-Za-z_][A-Za-z0-9_]*)'))
-    {
-        if ($match.Groups[1].Value -eq 'SharpProof')
-        {
-            continue
-        }
-
-        [void]$matchedFixtureNames.Add($match.Groups[1].Value)
-    }
-
-    $matchedFixtures = @($matchedFixtureNames | Sort-Object)
-
-    if ($matchedFixtures.Count -eq 0)
-    {
-        return @($mainProject, $toolingProject)
-    }
-
-    $hasToolingFixture = $false
-    $hasMainFixture = $false
-    foreach ($fixture in $matchedFixtures)
-    {
-        if ($toolingFixtures.Contains($fixture))
-        {
-            $hasToolingFixture = $true
-        }
-        else
-        {
-            $hasMainFixture = $true
-        }
-    }
-
-    if ($hasToolingFixture -and -not $hasMainFixture)
-    {
-        return @($toolingProject)
-    }
-
-    if ($hasMainFixture -and -not $hasToolingFixture)
-    {
-        if ($RequestedLane -eq 'Main' -or $RequestedLane -eq 'MainSmt')
-        {
-            $hasSmtHeavyFixture = $false
-            $hasMainGeneralFixture = $false
-            foreach ($fixture in $matchedFixtures)
-            {
-                if ($toolingFixtures.Contains($fixture))
-                {
-                    continue
-                }
-
-                if ($smtHeavyFixtures.Contains($fixture))
-                {
-                    $hasSmtHeavyFixture = $true
-                }
-                else
-                {
-                    $hasMainGeneralFixture = $true
-                }
-            }
-
-            if ($hasSmtHeavyFixture -and -not $hasMainGeneralFixture)
-            {
-                $needsOracle = $false
-                $needsAnalyzer = $false
-                $needsFlow = $false
-                $needsCore = $false
-                foreach ($fixture in $matchedFixtures)
-                {
-                    if ($smtOracleFixtures.Contains($fixture))
-                    {
-                        $needsOracle = $true
-                    }
-                    elseif ($smtAnalyzerFixtures.Contains($fixture))
-                    {
-                        $needsAnalyzer = $true
-                    }
-                    elseif ($smtFlowFixtures.Contains($fixture))
-                    {
-                        $needsFlow = $true
-                    }
-                    elseif ($smtCoreFixtures.Contains($fixture))
-                    {
-                        $needsCore = $true
-                    }
-                }
-
-                $selectedSmtProjects = New-Object System.Collections.Generic.List[object]
-                if ($needsOracle)
-                {
-                    $selectedSmtProjects.Add($mainSmtOracleProject)
-                }
-
-                if ($needsAnalyzer)
-                {
-                    $selectedSmtProjects.Add($mainSmtAnalyzerProject)
-                }
-
-                if ($needsFlow)
-                {
-                    $selectedSmtProjects.Add($mainSmtFlowProject)
-                }
-
-                if ($needsCore)
-                {
-                    $selectedSmtProjects.Add($mainSmtCoreProject)
-                }
-
-                if ($selectedSmtProjects.Count -gt 0)
-                {
-                    return @($selectedSmtProjects.ToArray())
-                }
-
-                return @($mainSmtProject)
-            }
-
-            if ($RequestedLane -eq 'MainSmt')
-            {
-                return @($mainSmtProject)
-            }
-
-            if ($hasMainGeneralFixture -and -not $hasSmtHeavyFixture)
-            {
-                return @($mainGeneralProject)
-            }
-
-            return @($mainSmtProject, $mainGeneralProject)
-        }
-
-        return @($mainProject)
-    }
-
-    return @($mainProject, $toolingProject)
 }
 
 function Get-SharpProofDefaultWorkerCount
@@ -426,22 +217,10 @@ function Get-SharpProofDefaultWorkerCount
         [string]$LaneName
     )
 
-    $processorCount = [Environment]::ProcessorCount
-    switch ($LaneName)
-    {
-        'Main' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
-        'MainSmt' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
-        'MainSmtOracle' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
-        'MainSmtAnalyzer' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
-        'MainSmtFlow' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
-        'MainSmtCore' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
-        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
-        'Tooling'
-        {
-            $defaultWorkerCount = 20
-            return [Math]::Max(1, [Math]::Min($processorCount, $defaultWorkerCount))
-        }
-    }
+    $cap = if ($LaneName -eq 'Tooling') { 20 }
+        elseif ($LaneName.StartsWith('MainSmt', [StringComparison]::Ordinal)) { 4 }
+        else { 8 }
+    return [Math]::Max(1, [Math]::Min([Environment]::ProcessorCount, $cap))
 }
 
 function Join-SharpProofTestFilter
@@ -479,57 +258,22 @@ function New-SharpProofRunSettings
         [bool]$EnableFailFast
     )
 
-    if ($WorkerCount -le 0 -and -not $EnableFailFast)
-    {
-        return ''
-    }
+    if ($WorkerCount -le 0 -and -not $EnableFailFast) { return '' }
 
     $settingsPath = Join-Path ([System.IO.Path]::GetTempPath()) ('sharpproof-test-' + [guid]::NewGuid().ToString('N') + '.runsettings')
-
-    $runConfigurationLines = New-Object System.Collections.Generic.List[string]
-    if ($WorkerCount -gt 0)
-    {
-        $runConfigurationLines.Add("    <MaxCpuCount>$WorkerCount</MaxCpuCount>")
-    }
-
-    $nunitLines = New-Object System.Collections.Generic.List[string]
-    if ($WorkerCount -gt 0)
-    {
-        $nunitLines.Add("    <NumberOfTestWorkers>$WorkerCount</NumberOfTestWorkers>")
-    }
-
-    if ($EnableFailFast)
-    {
-        $nunitLines.Add('    <StopOnError>true</StopOnError>')
-    }
-
-    $runConfigurationXml = if ($runConfigurationLines.Count -gt 0)
-    {
-        "<RunConfiguration>`n$($runConfigurationLines -join "`n")`n  </RunConfiguration>"
-    }
-    else
-    {
-        '<RunConfiguration />'
-    }
-
-    $nunitXml = if ($nunitLines.Count -gt 0)
-    {
-        "<NUnit>`n$($nunitLines -join "`n")`n  </NUnit>"
-    }
-    else
-    {
-        '<NUnit />'
-    }
+    $runConfigurationXml = if ($WorkerCount -gt 0) { "<RunConfiguration><MaxCpuCount>$WorkerCount</MaxCpuCount></RunConfiguration>" } else { '<RunConfiguration />' }
+    $workerXml = if ($WorkerCount -gt 0) { "<NumberOfTestWorkers>$WorkerCount</NumberOfTestWorkers>" } else { '' }
+    $failFastXml = if ($EnableFailFast) { '<StopOnError>true</StopOnError>' } else { '' }
 
     $settingsXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
   $runConfigurationXml
-  $nunitXml
+  <NUnit>$workerXml$failFastXml</NUnit>
 </RunSettings>
 "@
 
-    Set-Content -LiteralPath $settingsPath -Value $settingsXml -Encoding utf8
+    [System.IO.File]::WriteAllText($settingsPath, $settingsXml + "`n", [System.Text.UTF8Encoding]::new($false))
     return $settingsPath
 }
 
