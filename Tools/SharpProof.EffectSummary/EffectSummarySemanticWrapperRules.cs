@@ -16,9 +16,7 @@ internal static class EffectSummarySemanticWrapperRules
         new(HasPureStringLengthCheckedConcatWrapperPattern, "internal_only"),
         new(HasPureStringArrayConcatWrapperPattern, "internal_only"),
         new(HasPureGuardedImmutableStringRewriteWrapperPattern, "none", GetGuardedRewriteVisibility),
-        new(HasPureIndexedStringReplaceWrapperPattern, "internal_only"),
-        new(HasPureStackLocalCharBuilderStringWrapperPattern, "internal_only"),
-        new(HasPureImmutableStringRewriteWrapperPattern, "internal_only")
+        new(HasPureIndexedStringReplaceWrapperPattern, "internal_only")
     ];
 
     internal static bool TryClassifySemanticPureWrapper(
@@ -139,29 +137,6 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
                    string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
-    }
-
-    internal static bool HasPureStackLocalCharBuilderStringWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "allocates_object", "calls_method") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(static call =>
-                   call.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)",
-                       StringComparison.Ordinal)) &&
-               summary.Calls.Any(static call =>
-                   call.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal)) &&
-               summary.Calls.Any(static call =>
-                   string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
-               summary.Calls.All(IsStackLocalCharBuilderStringWrapperCall);
-    }
-
-    internal static bool HasPureImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_static_field") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(static call =>
-                   call.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
-               summary.Calls.All(IsImmutableStringRewriteWrapperCall);
     }
 
     internal static bool HasPureStringSubstringWrapperPattern(MethodEffectSummary summary)
@@ -488,22 +463,6 @@ internal static class EffectSummarySemanticWrapperRules
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Empty()"),
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Item(int)"),
         Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Length()"),
-        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.IO.PathInternal.IsDirectorySeparator(char)"),
-        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Span`1<char>..ctor("),
-        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Text.ValueStringBuilder..ctor(System.Span`1<char>)"),
-        Prefix(SemanticCallFamily.StackLocalCharBuilder, "System.Text.ValueStringBuilder.Append(char)"),
-        Exact(SemanticCallFamily.StackLocalCharBuilder, "object.ToString()->string"),
-        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.IsNullOrEmpty(string)->bool"),
-        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.get_Chars(int)->char"),
-        Exact(SemanticCallFamily.StackLocalCharBuilder, "string.get_Length()->int"),
-        Prefix(SemanticCallFamily.ImmutableStringRewrite, "System.IO.PathInternal.IsDirectorySeparator(char)"),
-        Prefix(SemanticCallFamily.ImmutableStringRewrite, "System.MemoryExtensions.AsSpan(string"),
-        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.Concat(System.ReadOnlySpan`1<char>"),
-        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.StartsWith(char)->bool"),
-        Prefix(SemanticCallFamily.ImmutableStringRewrite, "string.Substring(int, int)->string"),
-        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.get_Chars(int)->char"),
-        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.get_Length()->int"),
-        Exact(SemanticCallFamily.ImmutableStringRewrite, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>"),
         Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToLower(string)->string"),
         Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToUpper(string)->string"),
         Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "System.Type.Equals(System.Type)->bool"),
@@ -560,8 +519,6 @@ internal static class EffectSummarySemanticWrapperRules
     private enum SemanticCallFamily
     {
         ReadOnlyCharSpanSearch = 1 << 0,
-        StackLocalCharBuilder = 1 << 4,
-        ImmutableStringRewrite = 1 << 5,
         InvariantTextInfo = 1 << 6,
         TypeIdentity = 1 << 7,
         TypeIdentityAnchor = 1 << 8,
@@ -598,12 +555,6 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.ReadOnlyCharSpanSearch);
-
-    internal static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol) =>
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.StackLocalCharBuilder);
-
-    internal static bool IsImmutableStringRewriteWrapperCall(string callSymbol) =>
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.ImmutableStringRewrite);
 
     internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.InvariantTextInfo);

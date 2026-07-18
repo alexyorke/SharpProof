@@ -87,11 +87,15 @@ Tests are excluded from the metric and must not be deleted.
   normalization wrapper rules. Generic fixed-point inference reproduces their
   runtime and analyzer classifications; the fresh-copy and span-search rules
   were independently shown to remain necessary and were retained.
+- [x] Removed the stack-local char-builder and immutable string-rewrite wrapper
+  rules after independent PathCore and analyzer string-suite characterization.
+  Generic fixed-point inference now owns both classifications and their call
+  families are deleted.
 
 ## Current evidence
 
-- Maintained production: 106,207 lines; net reduction: 1,419 lines; remaining
-  reduction: 18,581. The first fourteen deletion slices removed 2,331 production
+- Maintained production: 106,162 lines; net reduction: 1,464 lines; remaining
+  reduction: 18,536. The first fifteen deletion slices removed 2,381 production
   C# lines and have repaid the inferred-summary/architecture foundation.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
@@ -106,6 +110,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Characterize the stack-local char-builder and immutable-string-rewrite wrapper
-rules independently against PathCore, the full analyzer string suite, and their
-generated catalog consumers; delete only rules reproduced by fixed-point inference.
+Characterize the char-scalar projection and guarded string-scan wrapper rules
+independently against their runtime catalog slices and analyzer consumers;
+delete only rules reproduced by fixed-point inference.
