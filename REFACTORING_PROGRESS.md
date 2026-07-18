@@ -48,6 +48,10 @@ This is the active source of truth for the comprehensive refactor. Read
 - [x] Condition-proof target, SMT, and source dispatch plus syntax-node proof
   execution live in `SymbolicConditionProofDispatcher`; the executor retains
   only common request validation, limits, and error coordination.
+- [x] Program-point result construction is centralized in
+  `SymbolicProgramPointProjector` over an immutable query context. Syntax-tree
+  aggregation and direct node queries share it, and duplicate node projection
+  was deleted.
 
 ## Current evidence
 
@@ -76,6 +80,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Split source-query aggregation from result projection, then decompose
-complexity modeling into loop, call-summary, cost-algebra, and projection
-responsibilities while deleting superseded orchestration.
+Decompose complexity modeling into loop, call-summary, cost-algebra, and
+projection responsibilities while deleting superseded orchestration.

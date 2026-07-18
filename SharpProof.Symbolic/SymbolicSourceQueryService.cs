@@ -435,7 +435,7 @@ internal sealed class SymbolicSourceQueryService
     }
 
     private static SymbolicConditionProofResult ProveConditionAtQuery(
-        ProgramPointQueryContext query,
+        SymbolicProgramPointQueryContext query,
         string conditionText,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken) =>
@@ -448,7 +448,7 @@ internal sealed class SymbolicSourceQueryService
             smtAnalysis,
             cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
 
-    private ProgramPointQueryContext AnalyzeProgramPoint(
+    private SymbolicProgramPointQueryContext AnalyzeProgramPoint(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int line,
@@ -463,7 +463,7 @@ internal sealed class SymbolicSourceQueryService
         return AnalyzeProgramPointNode(semanticModel, position, node, smtAnalysis, cancellationToken);
     }
 
-    private ProgramPointQueryContext AnalyzeProgramPointAtPosition(
+    private SymbolicProgramPointQueryContext AnalyzeProgramPointAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int position,
@@ -480,7 +480,7 @@ internal sealed class SymbolicSourceQueryService
         return AnalyzeProgramPointNode(semanticModel, position, node, smtAnalysis, cancellationToken);
     }
 
-    private ProgramPointQueryContext AnalyzeProgramPointNode(
+    private SymbolicProgramPointQueryContext AnalyzeProgramPointNode(
         SemanticModel semanticModel,
         int position,
         SyntaxNode node,
@@ -499,7 +499,7 @@ internal sealed class SymbolicSourceQueryService
                 includeCurrentStatementCompletionFacts,
                 initialState);
 
-        return new ProgramPointQueryContext(semanticModel, position, node, analysis);
+        return new SymbolicProgramPointQueryContext(semanticModel, position, node, analysis);
     }
 
     private static IReadOnlyList<SymbolicConditionProofResult> ProveConditions(
@@ -890,7 +890,7 @@ internal sealed class SymbolicSourceQueryService
 
     private static SymbolicProgramPointResult ProjectSourceQueryResult(
         SyntaxTree syntaxTree,
-        ProgramPointQueryContext query,
+        SymbolicProgramPointQueryContext query,
         int line,
         int column,
         IEnumerable<string>? impliedConditions,
@@ -910,7 +910,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             smtAnalysis,
             cancellationToken);
-        return CreateSourceQueryResult(
+        return SymbolicProgramPointProjector.Project(
             syntaxTree,
             query,
             line,
@@ -923,80 +923,6 @@ internal sealed class SymbolicSourceQueryService
             requestedPosition,
             requestedPositionDistance,
             containsRequestedPosition);
-    }
-
-    private static SymbolicProgramPointResult CreateSourceQueryResult(
-        SyntaxTree syntaxTree,
-        ProgramPointQueryContext query,
-        int line,
-        int column,
-        IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
-        SymbolicSmtDiagnostics smtDiagnostics,
-        CancellationToken cancellationToken,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
-        var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(
-            syntaxTree,
-            query.Node.Span,
-            cancellationToken);
-        var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);
-        var invariant = SymbolicInvariantResult.FromFormulas(
-            query.Analysis.PathConditions,
-            mergedInvariantText);
-        return new SymbolicProgramPointResult(
-            syntaxTree.FilePath,
-            line,
-            column,
-            query.Position,
-            query.Node.SpanStart,
-            query.Node.Kind().ToString(),
-            query.Analysis.Facts,
-            query.Analysis.Reachability,
-            query.Analysis.ReachabilityReason,
-            conditionProofs,
-            smtDiagnostics,
-            mergedInvariantText,
-            invariant,
-            query.Node.Span.End,
-            nodeSourceSpan.StartLine,
-            nodeSourceSpan.StartColumn,
-            nodeSourceSpan.EndLine,
-            nodeSourceSpan.EndColumn,
-            SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition,
-            SymbolicFactInfo.FromState(query.Analysis.PathState),
-            SymbolicInputWitnessFactory.CreateReachability(
-                query.Analysis.ReachabilityProof?.PathCheck.Witness,
-                query.Analysis.PathConditions,
-                query.SemanticModel,
-                query.Position,
-                query.Analysis.Reachability,
-                query.Analysis.ReachabilityReason),
-            query.Analysis.Truncation);
-    }
-
-    private sealed class ProgramPointQueryContext(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode node,
-        SymbolicProgramPointAnalysis analysis)
-    {
-        public SemanticModel SemanticModel { get; } = semanticModel;
-
-        public int Position { get; } = position;
-
-        public SyntaxNode Node { get; } = node;
-
-        public SymbolicProgramPointAnalysis Analysis { get; } = analysis;
     }
 
     private sealed class QueryNodeIndex

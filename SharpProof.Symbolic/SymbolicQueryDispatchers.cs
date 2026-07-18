@@ -179,23 +179,16 @@ internal sealed class SymbolicSourceQueryDispatcher
                 options.IncludeCurrentStatementCompletionFacts);
         var linePosition = SymbolicSourceLocation.GetLineAndColumn(
             node.SyntaxTree, node.SpanStart, cancellationToken, true);
-        var span = SymbolicSourceLocation.GetNodeSourceSpan(node.SyntaxTree, node.Span, cancellationToken);
         var proofs = CreateNodeProofs(
             semanticModel, node, analysis, options.ImpliedConditions, options.SmtAnalysis, cancellationToken);
-        var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(analysis.PathConditions);
-        var invariant = SymbolicInvariantResult.FromFormulas(analysis.PathConditions, mergedInvariantText);
-
-        return SymbolicQueryResult.From(new SymbolicProgramPointResult(
-            node.SyntaxTree.FilePath, linePosition.Line, linePosition.Column, node.SpanStart, node.SpanStart,
-            node.Kind().ToString(), analysis.Facts, analysis.Reachability, analysis.ReachabilityReason, proofs,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis), mergedInvariantText, invariant, node.Span.End,
-            span.StartLine, span.StartColumn, span.EndLine, span.EndColumn,
-            SymbolicProgramPointMetadata.GetContainingMethodName(node),
-            SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()),
-            symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState),
-            reachabilityWitness: SymbolicInputWitnessFactory.CreateReachability(
-                analysis.ReachabilityProof?.PathCheck.Witness, analysis.PathConditions, semanticModel,
-                node.SpanStart, analysis.Reachability, analysis.ReachabilityReason)));
+        return SymbolicQueryResult.From(SymbolicProgramPointProjector.Project(
+            node.SyntaxTree,
+            new SymbolicProgramPointQueryContext(semanticModel, node.SpanStart, node, analysis),
+            linePosition.Line,
+            linePosition.Column,
+            proofs,
+            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
+            cancellationToken));
     }
 
     private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
