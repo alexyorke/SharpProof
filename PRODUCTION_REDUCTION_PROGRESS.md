@@ -94,6 +94,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Removed char-scalar projection and guarded string-scan wrapper rules after
   runtime Char-helper and analyzer string-suite parity. Their shared manual
   identity/display parser was unreachable and is deleted with the rules.
+- [x] Characterized the remaining string-hash and `System.Type` identity
+  wrapper rules independently. Removing either changes its runtime catalog
+  slice from `pure` to `conservative_unknown`, and string hashing also regresses
+  analyzer string invariants, so both remain explicit semantic owners rather
+  than legacy deletion debt.
+- [x] Re-audited the CFG program-point collector, loop transfer, and
+  EffectSummary assembly-document reader. Each remains reachable and owns
+  distinct proof, loop-invalidation, or exception-summary behavior; none is a
+  compatibility adapter that can be removed without deleting a feature.
 
 ## Current evidence
 
@@ -113,6 +122,8 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Characterize the string-hash wrapper rule independently against the runtime
-GetHashCode catalog slice and analyzer consumers; delete its call family only
-if generic fixed-point inference preserves exact output.
+Replace the next complete Symbolic execution or ProofCore semantic owner whose
+superseded path repays at least 350 maintained-production lines. Require focused
+normalized-result and conservative-unknown parity before deleting the old path
+in the same tranche; do not revisit the independently required string-hash,
+type-identity, CFG/loop-transfer, or EffectSummary assembly-reader owners.
