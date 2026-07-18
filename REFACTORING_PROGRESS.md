@@ -69,6 +69,11 @@ This is the active source of truth for the comprehensive refactor. Read
   substitution. Loop bound recognition, step validation, dependency tracking,
   and mutation analysis live in `SymbolicComplexityLoopModel`; the former
   `AnalysisSession` implementations were deleted.
+- [x] Complexity call target resolution, top-level fallback traversal,
+  known/external/dynamic classification, source-method recursion, parameter
+  substitution, and callee evidence live in `SymbolicComplexityCallModel`.
+  Recursive summary caching remains the sole responsibility of the reduced
+  `AnalysisSession`, and its duplicate call-model methods were deleted.
 
 ## Current evidence
 
@@ -97,5 +102,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Extract complexity call resolution, source-summary recursion, and callee cost
-substitution from the analysis session while deleting superseded orchestration.
+Split `Z3RegexTranslator` into normalization, supported-fragment validation,
+encoding, and fallback classification while preserving conservative unknowns.
