@@ -10,6 +10,21 @@ internal class ProofCoreZ3SmokeTests
 {
     private static readonly TimeSpan SolverTimeout = TimeSpan.FromMilliseconds(50);
 
+    [TestCase("^[a-z]+$", RegexTranslationFallback.None)]
+    [TestCase("[", RegexTranslationFallback.InvalidPattern)]
+    public void RegexTranslationValidator_ClassifiesInput(string pattern, RegexTranslationFallback expected)
+    {
+        Assert.That(Z3RegexTranslationValidator.Validate(pattern, RegexOptions.CultureInvariant), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void RegexTranslationValidator_ClassifiesOversizedPatternBeforeParsing()
+    {
+        Assert.That(
+            Z3RegexTranslationValidator.Validate(new string('a', 257), RegexOptions.None),
+            Is.EqualTo(RegexTranslationFallback.PatternTooLong));
+    }
+
     private static void AssertSatisfiability(
         Feasibility expected,
         IEnumerable<SmtFormula> pathConditions,

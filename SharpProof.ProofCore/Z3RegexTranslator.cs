@@ -10,7 +10,6 @@ internal sealed class Z3RegexTranslator
     // Keep large Unicode category unions conservative; Z3 range-heavy regexes can get expensive
     // and smaller shorthand/category classes cover the common analyzer facts precisely.
     private const int MaxCharacterClassRangeCount = 512;
-    private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
 
     private readonly bool _canUseIgnoreCase;
     private readonly Context _context;
@@ -33,32 +32,31 @@ internal sealed class Z3RegexTranslator
     }
 
 
-    public static bool TryTranslate(Context context, string pattern, RegexOptions options, out ReExpr regex,
-        out bool isExact)
+    internal static Z3RegexTranslationResult Translate(Context context, string pattern, RegexOptions options)
     {
-        regex = null!;
-        isExact = true;
-        if (pattern.Length > 256) return false;
+        var fallback = Z3RegexTranslationValidator.Validate(pattern, options);
+        if (fallback != RegexTranslationFallback.None)
+            return Z3RegexTranslationResult.Failed(fallback);
 
-        if (!IsValidDotNetRegexPattern(pattern, options)) return false;
-
-        if (!Z3RegexPatternNormalizer.TryNormalize(pattern, options, out var normalized)) return false;
+        if (!Z3RegexPatternNormalizer.TryNormalize(pattern, options, out var normalized))
+            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.NormalizationFailed);
 
         var translator = new Z3RegexTranslator(context, normalized.Body, options);
-        if (!translator.TryParseExpression(out var body)) return false;
+        if (!translator.TryParseExpression(out var body))
+            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.UnsupportedFragment);
 
         translator.SkipIgnoredPatternTrivia();
-        if (translator._position != translator._pattern.Length) return false;
+        if (translator._position != translator._pattern.Length)
+            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.UnsupportedFragment);
 
-        regex = body;
-        isExact = translator._isExact;
+        var regex = body;
         if (!normalized.StartAnchored) regex = context.MkConcat(translator.CreateAnyStringRegex(), regex);
 
         if (normalized.DollarEndAnchored || normalized.FinalNewlineEndAnchored)
             regex = context.MkConcat(regex, translator.CreateOptionalFinalNewlineRegex());
         else if (!normalized.StrictEndAnchored) regex = context.MkConcat(regex, translator.CreateAnyStringRegex());
 
-        return true;
+        return Z3RegexTranslationResult.Succeeded(regex, translator._isExact);
     }
 
     private bool TryParseExpression(out ReExpr regex)
@@ -1026,19 +1024,6 @@ internal sealed class Z3RegexTranslator
     private bool Peek(char value)
     {
         return _position < _pattern.Length && _pattern[_position] == value;
-    }
-
-    private static bool IsValidDotNetRegexPattern(string pattern, RegexOptions options)
-    {
-        try
-        {
-            _ = new Regex(pattern, options, RegexSyntaxValidationTimeout);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
     }
 
     private static bool IsRegexMetaCharacter(char value)

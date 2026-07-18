@@ -247,10 +247,11 @@ internal sealed class Z3FormulaEncoder : IDisposable
         if (!CanEncodeRegexOptions(formula.Options))
             throw new InvalidOperationException("Unsupported SMT regex options.");
 
-        if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, formula.Options, out var regex, out _))
+        var translation = Z3RegexTranslator.Translate(_context, formula.Pattern, formula.Options);
+        if (!translation.Success)
             throw new InvalidOperationException("Unsupported SMT regex pattern.");
 
-        return _context.MkInRe(EncodeString(formula.Value), regex);
+        return _context.MkInRe(EncodeString(formula.Value), translation.Regex!);
     }
 
     private BoolExpr EncodeRuntimeTypeTest(SmtRuntimeTypeTestFormula formula)
@@ -469,8 +470,9 @@ internal sealed class Z3FormulaEncoder : IDisposable
         var key = (pattern, options);
         if (_regexPrecisionCache.TryGetValue(key, out var cached)) return cached;
 
-        var precision = Z3RegexTranslator.TryTranslate(_context, pattern, options, out _, out var isExact)
-            ? isExact
+        var translation = Z3RegexTranslator.Translate(_context, pattern, options);
+        var precision = translation.Success
+            ? translation.IsExact
                 ? RegexTranslationPrecision.Exact
                 : RegexTranslationPrecision.Approximate
             : RegexTranslationPrecision.Unsupported;

@@ -82,6 +82,11 @@ This is the active source of truth for the comprehensive refactor. Read
   `Z3RegexPatternNormalizer`, which produces a normalized body and explicit
   start/end semantics before Z3 parsing begins. Duplicate translator-owned
   anchor and lexical helpers were deleted.
+- [x] Regex input validation and fallback classification live in
+  `Z3RegexTranslationValidator` and `Z3RegexTranslationResult`. Invalid,
+  oversized, normalization-failed, and unsupported-fragment outcomes are
+  explicit; `Z3FormulaEncoder` consumes the typed result while preserving
+  conservative unsupported behavior.
 
 ## Current evidence
 
@@ -89,7 +94,7 @@ This is the active source of truth for the comprehensive refactor. Read
 - Handwritten production source: 99,712 lines across 437 files.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,141 passing tests and two documented skips.
+- Six lanes: 6,144 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 
 ## Remaining tranches
@@ -110,6 +115,6 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-Finish splitting `Z3RegexTranslator`: isolate supported-fragment validation and
-fallback classification from stateful Z3 encoding while preserving
-conservative unknown behavior.
+Separate program-point analysis and condition-proof execution from
+`SymbolicSourceQueryService`, leaving it as target aggregation and deleting
+the superseded methods.
