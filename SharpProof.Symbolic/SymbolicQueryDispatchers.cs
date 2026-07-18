@@ -21,7 +21,7 @@ internal sealed class SymbolicConditionProofDispatcher
         CancellationToken cancellationToken)
     {
         request.RequireTarget(
-            static kind => kind == SymbolicQueryTargetKind.Point,
+            static kind => kind == SharpProofTargetKind.Point,
             "Condition proof requests require a point target.");
         var smtAnalysis = request.RequireSmt("Condition proof requests require SMT analysis.");
 
@@ -34,8 +34,8 @@ internal sealed class SymbolicConditionProofDispatcher
             (syntaxTree, compilation, target, token) => _service.ProveConditionAtSyntaxTree(
                 syntaxTree,
                 compilation,
-                target.LineNumber!.Value,
-                target.ColumnNumber ?? 1,
+                target.Line!.Value,
+                target.Column ?? 1,
                 conditionText,
                 smtAnalysis,
                 token),
@@ -119,43 +119,43 @@ internal sealed class SymbolicSourceQueryDispatcher
             cancellationToken);
     }
 
-    private static bool SupportsScopedTarget(SymbolicQueryTargetKind kind)
+    private static bool SupportsScopedTarget(SharpProofTargetKind kind)
     {
-        return kind is SymbolicQueryTargetKind.Point or SymbolicQueryTargetKind.Position or
-            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.LineSpan or
-            SymbolicQueryTargetKind.AllLines;
+        return kind is SharpProofTargetKind.Point or SharpProofTargetKind.Position or
+            SharpProofTargetKind.Line or SharpProofTargetKind.Span or SharpProofTargetKind.LineSpan or
+            SharpProofTargetKind.AllLines;
     }
 
     private SymbolicQueryResult QuerySyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
         return target.Kind switch
         {
-            SymbolicQueryTargetKind.Point => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLinePoint(
-                syntaxTree, compilation, target.LineNumber!.Value, target.ColumnNumber ?? 1, cancellationToken,
+            SharpProofTargetKind.Point => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLinePoint(
+                syntaxTree, compilation, target.Line!.Value, target.Column ?? 1, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts)),
-            SymbolicQueryTargetKind.Position => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAtPosition(
-                syntaxTree, compilation, target.PositionOffset!.Value, cancellationToken,
+            SharpProofTargetKind.Position => SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAtPosition(
+                syntaxTree, compilation, target.Position!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions)),
-            SymbolicQueryTargetKind.Line => _sourceQueryService.QuerySyntaxTreeLine(
-                syntaxTree, compilation, target.LineNumber!.Value, cancellationToken,
+            SharpProofTargetKind.Line => _sourceQueryService.QuerySyntaxTreeLine(
+                syntaxTree, compilation, target.Line!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SymbolicQueryTargetKind.Span => _sourceQueryService.QuerySyntaxTreeSpan(
+            SharpProofTargetKind.Span => _sourceQueryService.QuerySyntaxTreeSpan(
                 syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SymbolicQueryTargetKind.LineSpan => _sourceQueryService.QuerySyntaxTreeLineSpan(
+            SharpProofTargetKind.LineSpan => _sourceQueryService.QuerySyntaxTreeLineSpan(
                 syntaxTree, compilation, target.StartLine!.Value, target.StartColumn!.Value,
                 target.EndLine!.Value, target.EndColumn!.Value, cancellationToken,
                 options.SmtAnalysis, options.ImpliedConditions, options.IncludeExpressionProgramPoints,
                 options.IncludeCurrentStatementCompletionFacts),
-            SymbolicQueryTargetKind.AllLines => _sourceQueryService.QuerySyntaxTreeAllLines(
+            SharpProofTargetKind.AllLines => _sourceQueryService.QuerySyntaxTreeAllLines(
                 syntaxTree, compilation, cancellationToken, options.SmtAnalysis, options.ImpliedConditions,
                 options.IncludeExpressionProgramPoints, options.IncludeCurrentStatementCompletionFacts),
             _ => throw new NotSupportedException("Target kind is not supported for syntax tree queries.")
@@ -165,11 +165,11 @@ internal sealed class SymbolicSourceQueryDispatcher
     private SymbolicQueryResult QueryNode(
         SyntaxNode node,
         SemanticModel semanticModel,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        if (target.Kind != SymbolicQueryTargetKind.Node)
+        if (target.Kind != SharpProofTargetKind.Node)
             throw new NotSupportedException("Node sources require a node target.");
 
         var analysis = node is ForStatementSyntax forStatement
@@ -239,30 +239,30 @@ internal sealed class SymbolicRuntimeHazardQueryDispatcher
             cancellationToken);
     }
 
-    private static bool SupportsTarget(SymbolicQueryTargetKind kind)
+    private static bool SupportsTarget(SharpProofTargetKind kind)
     {
-        return kind is SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Point or
-            SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.AllLines;
+        return kind is SharpProofTargetKind.Line or SharpProofTargetKind.Point or
+            SharpProofTargetKind.Span or SharpProofTargetKind.AllLines;
     }
 
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         SymbolicRuntimeHazardQueryOptions hazardOptions,
         CancellationToken cancellationToken)
     {
         return target.Kind switch
         {
-            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Point =>
+            SharpProofTargetKind.Line or SharpProofTargetKind.Point =>
                 _service.QuerySyntaxTreeRuntimeHazardsLine(
-                    syntaxTree, compilation, target.LineNumber!.Value, options.SmtAnalysis!, cancellationToken,
+                    syntaxTree, compilation, target.Line!.Value, options.SmtAnalysis!, cancellationToken,
                     hazardOptions),
-            SymbolicQueryTargetKind.Span => _service.QuerySyntaxTreeRuntimeHazardsSpan(
+            SharpProofTargetKind.Span => _service.QuerySyntaxTreeRuntimeHazardsSpan(
                 syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value,
                 options.SmtAnalysis!, cancellationToken, hazardOptions),
-            SymbolicQueryTargetKind.AllLines => _service.QuerySyntaxTreeRuntimeHazards(
+            SharpProofTargetKind.AllLines => _service.QuerySyntaxTreeRuntimeHazards(
                 syntaxTree, compilation, options.SmtAnalysis!, cancellationToken, hazardOptions),
             _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
         };

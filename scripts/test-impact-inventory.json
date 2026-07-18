@@ -1604,6 +1604,10 @@
                              "path":  "SharpProof.ToolingTest/SharpProofCodeFixTests.cs"
                          },
                          {
+                             "name":  "SharpProofTargetTests",
+                             "path":  "SharpProof.Test/SymbolicQueryTargetTests.cs"
+                         },
+                         {
                              "name":  "SimpleCollectionExpressionTests",
                              "path":  "SharpProof.Test/SimpleCollectionExpressionTests.cs"
                          },
@@ -1782,10 +1786,6 @@
                          {
                              "name":  "SymbolicProofPipelineTests",
                              "path":  "SharpProof.Test/SymbolicProofPipelineTests.cs"
-                         },
-                         {
-                             "name":  "SymbolicQueryTargetTests",
-                             "path":  "SharpProof.Test/SymbolicQueryTargetTests.cs"
                          },
                          {
                              "name":  "SymbolicQueryWitnessTests",
@@ -5936,7 +5936,7 @@
                                                   "SourceLocationQuery",
                                                   "SourceQueryPayload"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  11,
                             "referencedTokens":  [
                                                      "CapabilityQueryPayload",
                                                      "ComplexityQueryPayload",
@@ -5949,6 +5949,7 @@
                                                      "SharpProofQueryResult",
                                                      "SharpProofQueryStatus",
                                                      "SharpProofTarget",
+                                                     "SharpProofTargetKind",
                                                      "SourceQueryPayload"
                                                  ]
                         },
@@ -6863,15 +6864,11 @@
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicQueryScope",
-                                                  "SymbolicQueryScopeKind",
-                                                  "SymbolicQueryTarget",
-                                                  "SymbolicQueryTargetKind"
+                                                  "SymbolicQueryScopeKind"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "SymbolicQueryScopeKind",
-                                                     "SymbolicQueryTarget",
-                                                     "SymbolicQueryTargetKind"
+                                                     "SymbolicQueryScopeKind"
                                                  ]
                         },
                         {
@@ -10360,8 +10357,16 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
                                                                  "RepositoryArchitectureTests",
-                                                                 "SharpProofAnalysisSessionTests"
+                                                                 "SharpProofAnalysisSessionTests",
+                                                                 "SharpProofTargetTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "CapabilityQueryPayload",
@@ -10375,9 +10380,10 @@
                                                    "SharpProofQueryResult",
                                                    "SharpProofQueryStatus",
                                                    "SharpProofTarget",
+                                                   "SharpProofTargetKind",
                                                    "SourceQueryPayload"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  11
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SharpProofEvidenceSchema.cs",
@@ -10844,10 +10850,10 @@
                                     "selectedTestFixtures":  [
                                                                  "CapabilityContractTests",
                                                                  "CompactDomainProjectionTests",
+                                                                 "SharpProofTargetTests",
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicComplexityTests",
                                                                  "SymbolicErrorModelTests",
-                                                                 "SymbolicQueryTargetTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -10908,21 +10914,12 @@
                                     "path":  "SharpProof.Symbolic/SymbolicQueryTarget.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "CapabilityContractTests",
-                                                                 "CompactDomainProjectionTests",
-                                                                 "SymbolicAnalysisLimitsTests",
-                                                                 "SymbolicComplexityTests",
-                                                                 "SymbolicErrorModelTests",
-                                                                 "SymbolicQueryTargetTests",
-                                                                 "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicQueryScopeKind",
-                                                   "SymbolicQueryTarget",
-                                                   "SymbolicQueryTargetKind"
+                                                   "SymbolicQueryScopeKind"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicReachabilityService.cs",
@@ -10990,8 +10987,8 @@
                                     "path":  "SharpProof.Symbolic/SymbolicSourceCompilation.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "SharpProofTargetTests",
                                                                  "SymbolicComplexityTests",
-                                                                 "SymbolicQueryTargetTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [

@@ -130,7 +130,7 @@ internal static class MethodRequiresAnalyzer
                 var proofOutcome = queryService.TryProve(
                     new SymbolicQueryContext(
                         source,
-                        SymbolicQueryTarget.Point(line, column),
+                        SharpProofTarget.Point(line, column),
                         options),
                     rewrittenCondition,
                     context.CancellationToken);

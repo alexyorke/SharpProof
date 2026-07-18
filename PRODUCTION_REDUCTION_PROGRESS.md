@@ -38,12 +38,15 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Removed the manual `System.Type` and `System.RuntimeType` metadata-member
   wrapper catalogs. Generic call-graph inference now owns those classifications;
   six runtime metadata slices characterize the unchanged output.
+- [x] Made `SharpProofTarget` the single query-target model across the public
+  session API, Symbolic execution, Analyzer, and CLI. Deleted the duplicate
+  internal target, enum, validation, and conversion adapter.
 
 ## Current evidence
 
-- Maintained production: 107,777 lines; foundation overhead: 151 lines;
-  remaining net reduction: 20,151. The first inferred-rule migration removed
-  126 production C# lines.
+- Maintained production: 107,649 lines; foundation overhead: 23 lines;
+  remaining net reduction: 20,023. The first two deletion slices removed 254
+  production C# lines.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,154 passing tests and two documented skips.
 
@@ -57,6 +60,6 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Replace the next manual semantic-rule family only where inferred call summaries
-can preserve conservative dynamic-dispatch behavior, then move into the first
-canonical symbolic traversal deletion batch.
+Consolidate the duplicated generated-purity and exception-summary loading
+infrastructure, preserving trust, compatibility, ordering, and conservative
+unknown behavior while deleting the superseded catalog plumbing.

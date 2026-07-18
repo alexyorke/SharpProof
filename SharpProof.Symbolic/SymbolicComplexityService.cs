@@ -12,7 +12,7 @@ internal sealed class SymbolicComplexityService
 {
     public SymbolicComplexityResult Query(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {

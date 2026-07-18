@@ -36,19 +36,19 @@ public sealed class SymbolicQueryWitnessTests
 
         var point = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
-            SymbolicQueryTarget.Position(position),
+            SharpProofTarget.AtPosition(position),
             options));
         var lineResult = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
-            SymbolicQueryTarget.Line(line),
+            SharpProofTarget.LineNumber(line),
             options));
         var span = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
-            SymbolicQueryTarget.Span(position, position + targetText.Length),
+            SharpProofTarget.Span(position, position + targetText.Length),
             options));
         var allLines = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
-            SymbolicQueryTarget.AllLines(),
+            SharpProofTarget.AllLines(),
             options));
 
         var programPoint = point.ProgramPoints.Single();
@@ -78,7 +78,7 @@ public sealed class SymbolicQueryWitnessTests
 
         var proof = service.Prove(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
-            SymbolicQueryTarget.Point(line, FindColumn(source, position)),
+            SharpProofTarget.Point(line, FindColumn(source, position)),
             options),
             "value > 5");
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
@@ -94,7 +94,7 @@ public sealed class SymbolicQueryWitnessTests
             File.WriteAllText(sourcePath, source);
             var fileProof = service.Prove(new SymbolicQueryContext(
                 SymbolicSourceInput.FromFile(sourcePath),
-                SymbolicQueryTarget.Point(line, FindColumn(source, position)),
+                SharpProofTarget.Point(line, FindColumn(source, position)),
                 options), "value > 5");
             Assert.That(fileProof.TruthValue, Is.EqualTo(proof.TruthValue));
             Assert.That(fileProof.CounterexampleWitness.IsAvailable, Is.True);
@@ -120,7 +120,7 @@ public sealed class SymbolicQueryWitnessTests
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "HazardWitness.cs"),
-            SymbolicQueryTarget.AllLines(),
+            SharpProofTarget.AllLines(),
             new SymbolicQueryOptions(
                 AnalyzerTestHost.GetTrustedPlatformReferences(),
                 smtAnalysis)),

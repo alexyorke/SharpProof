@@ -7,12 +7,12 @@ internal static class SymbolicSourceInputDispatcher
 {
     internal static TResult Execute<TResult>(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions? options,
         SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
-        Func<SyntaxTree, Compilation, SymbolicQueryTarget, CancellationToken, TResult> querySyntaxTree,
-        Func<SyntaxNode, SemanticModel, SymbolicQueryTarget, CancellationToken, TResult> queryNode,
+        Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
+        Func<SyntaxNode, SemanticModel, SharpProofTarget, CancellationToken, TResult> queryNode,
         CancellationToken cancellationToken)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
@@ -57,11 +57,11 @@ internal static class SymbolicSourceInputDispatcher
     private static TResult QuerySource<TResult>(
         string sourceText,
         string filePath,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicSourceCompilationKind compilationKind,
-        Func<SyntaxTree, Compilation, SymbolicQueryTarget, CancellationToken, TResult> querySyntaxTree,
+        Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
         CancellationToken cancellationToken)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
@@ -79,7 +79,7 @@ internal static class SymbolicMethodLikeQueryDispatcher
 {
     internal static TResult Execute<TResult, TTarget>(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
@@ -103,7 +103,7 @@ internal static class SymbolicMethodLikeQueryDispatcher
         TResult QuerySyntaxTree(
             SyntaxTree syntaxTree,
             Compilation compilation,
-            SymbolicQueryTarget queryTarget,
+            SharpProofTarget queryTarget,
             CancellationToken queryCancellationToken)
         {
             if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
@@ -124,12 +124,12 @@ internal static class SymbolicMethodLikeQueryDispatcher
         TResult QueryNode(
             SyntaxNode node,
             SemanticModel semanticModel,
-            SymbolicQueryTarget queryTarget,
+            SharpProofTarget queryTarget,
             CancellationToken queryCancellationToken)
         {
             if (node == null) throw new ArgumentNullException(nameof(node));
             if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-            if (queryTarget.Kind != SymbolicQueryTargetKind.Node)
+            if (queryTarget.Kind != SharpProofTargetKind.Node)
                 throw new NotSupportedException(nodeTargetMessage);
 
             var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
@@ -148,7 +148,7 @@ internal static class SymbolicMethodLikeTargetResolver
     internal static TTarget Resolve<TTarget>(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         string unsupportedTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
         Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
@@ -157,11 +157,11 @@ internal static class SymbolicMethodLikeTargetResolver
         var root = syntaxTree.GetRoot(cancellationToken);
         switch (target.Kind)
         {
-            case SymbolicQueryTargetKind.Point:
+            case SharpProofTargetKind.Point:
                 var position = SymbolicSourceLocation.GetPosition(
                     syntaxTree,
-                    target.LineNumber!.Value,
-                    target.ColumnNumber ?? 1,
+                    target.Line!.Value,
+                    target.Column ?? 1,
                     cancellationToken);
                 return ResolvePosition(
                     root,
@@ -171,21 +171,21 @@ internal static class SymbolicMethodLikeTargetResolver
                     isMethodLikeDeclaration,
                     createTarget,
                     cancellationToken);
-            case SymbolicQueryTargetKind.Position:
+            case SharpProofTargetKind.Position:
                 return ResolvePosition(
                     root,
                     syntaxTree,
                     semanticModel,
-                    target.PositionOffset!.Value,
+                    target.Position!.Value,
                     isMethodLikeDeclaration,
                     createTarget,
                     cancellationToken);
-            case SymbolicQueryTargetKind.Line:
+            case SharpProofTargetKind.Line:
                 return ResolveLine(
                     root,
                     syntaxTree,
                     semanticModel,
-                    target.LineNumber!.Value,
+                    target.Line!.Value,
                     isMethodLikeDeclaration,
                     createTarget,
                     cancellationToken);

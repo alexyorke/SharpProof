@@ -42,7 +42,7 @@ internal sealed class SymbolicMethodAnalysisInput
     }
 
     internal SymbolicQueryContext CreateNodeQuery(SymbolicQueryOptions? options = null) =>
-        new(Source, SymbolicQueryTarget.Node(), options);
+        new(Source, SharpProofTarget.Node(), options);
 
     internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtNode(
         SymbolicQueryService queryService,

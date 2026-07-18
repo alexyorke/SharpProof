@@ -8,7 +8,7 @@ internal sealed class SymbolicQueryContext
 {
     public SymbolicQueryContext(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions? options = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
@@ -18,7 +18,7 @@ internal sealed class SymbolicQueryContext
 
     public SymbolicSourceInput Source { get; }
 
-    public SymbolicQueryTarget Target { get; }
+    public SharpProofTarget Target { get; }
 
     public SymbolicQueryOptions Options { get; }
 }

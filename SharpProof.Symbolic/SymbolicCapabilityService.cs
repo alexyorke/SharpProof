@@ -21,7 +21,7 @@ internal sealed class SymbolicCapabilityService
 
     public SymbolicCapabilityResult Query(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {

@@ -1005,54 +1005,54 @@ internal sealed class SymbolicCliOptions
             GetAnalysisLimit("guard-facts-per-target-per-state", defaults.MaxGuardFactsPerTargetPerState));
     }
 
-    public SymbolicQueryTarget CreateQueryTarget()
+    public SharpProofTarget CreateQueryTarget()
     {
-        if (AllLines) return SymbolicQueryTarget.AllLines();
+        if (AllLines) return SharpProofTarget.AllLines();
 
         if (LineInvariants)
             return HasColumn
-                ? SymbolicQueryTarget.Point(Line, Column)
-                : SymbolicQueryTarget.Line(Line);
+                ? SharpProofTarget.Point(Line, Column)
+                : SharpProofTarget.LineNumber(Line);
 
         if (IsAnySpanQuery)
             return IsLineColumnSpanQuery
-                ? SymbolicQueryTarget.LineSpan(
+                ? SharpProofTarget.LineSpan(
                     SpanStartLine!.Value,
                     SpanStartColumn!.Value,
                     SpanEndLine!.Value,
                     SpanEndColumn!.Value)
-                : SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value);
+                : SharpProofTarget.Span(SpanStart!.Value, SpanEnd!.Value);
 
         return Position.HasValue
-            ? SymbolicQueryTarget.Position(Position.Value)
-            : SymbolicQueryTarget.Point(Line, Column);
+            ? SharpProofTarget.AtPosition(Position.Value)
+            : SharpProofTarget.Point(Line, Column);
     }
 
-    public SymbolicQueryTarget CreateRuntimeHazardTarget()
+    public SharpProofTarget CreateRuntimeHazardTarget()
     {
-        if (AllLines) return SymbolicQueryTarget.AllLines();
+        if (AllLines) return SharpProofTarget.AllLines();
 
         return IsSpanQuery
-            ? SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value)
-            : SymbolicQueryTarget.Line(Line);
+            ? SharpProofTarget.Span(SpanStart!.Value, SpanEnd!.Value)
+            : SharpProofTarget.LineNumber(Line);
     }
 
-    public SymbolicQueryTarget CreateComplexityTarget()
+    public SharpProofTarget CreateComplexityTarget()
     {
         return Position.HasValue
-            ? SymbolicQueryTarget.Position(Position.Value)
+            ? SharpProofTarget.AtPosition(Position.Value)
             : HasColumn
-                ? SymbolicQueryTarget.Point(Line, Column)
-                : SymbolicQueryTarget.Line(Line);
+                ? SharpProofTarget.Point(Line, Column)
+                : SharpProofTarget.LineNumber(Line);
     }
 
-    public SymbolicQueryTarget CreateCapabilityTarget()
+    public SharpProofTarget CreateCapabilityTarget()
     {
         return Position.HasValue
-            ? SymbolicQueryTarget.Position(Position.Value)
+            ? SharpProofTarget.AtPosition(Position.Value)
             : HasColumn
-                ? SymbolicQueryTarget.Point(Line, Column)
-                : SymbolicQueryTarget.Line(Line);
+                ? SharpProofTarget.Point(Line, Column)
+                : SharpProofTarget.LineNumber(Line);
     }
 
     public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()

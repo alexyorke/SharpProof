@@ -5,7 +5,7 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicQueryTargetTests
+public sealed class SharpProofTargetTests
 {
     [Test]
     public void QueryOptions_TrimsImpliedConditions()
@@ -41,7 +41,7 @@ public sealed class SymbolicQueryTargetTests
     [Test]
     public void LineSpan_EndLineBeforeStartLine_Throws()
     {
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SymbolicQueryTarget.LineSpan(3, 1, 2, 1));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTarget.LineSpan(3, 1, 2, 1));
 
         Assert.That(exception!.ParamName, Is.EqualTo("endLine"));
     }
@@ -49,7 +49,7 @@ public sealed class SymbolicQueryTargetTests
     [Test]
     public void LineSpan_EndColumnBeforeStartColumnOnSameLine_Throws()
     {
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SymbolicQueryTarget.LineSpan(3, 5, 3, 4));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTarget.LineSpan(3, 5, 3, 4));
 
         Assert.That(exception!.ParamName, Is.EqualTo("endColumn"));
     }
@@ -57,9 +57,9 @@ public sealed class SymbolicQueryTargetTests
     [Test]
     public void LineSpan_SameLocation_IsAllowed()
     {
-        var target = SymbolicQueryTarget.LineSpan(3, 5, 3, 5);
+        var target = SharpProofTarget.LineSpan(3, 5, 3, 5);
 
-        Assert.That(target.Kind, Is.EqualTo(SymbolicQueryTargetKind.LineSpan));
+        Assert.That(target.Kind, Is.EqualTo(SharpProofTargetKind.LineSpan));
         Assert.That(target.StartLine, Is.EqualTo(3));
         Assert.That(target.StartColumn, Is.EqualTo(5));
         Assert.That(target.EndLine, Is.EqualTo(3));

@@ -137,25 +137,6 @@ public sealed record SharpProofTarget
     internal static SharpProofTarget Node(bool includeNestedCallables = false) =>
         new(SharpProofTargetKind.Node, includeNestedCallables: includeNestedCallables);
 
-    internal SymbolicQueryTarget ToSymbolicTarget()
-    {
-        return Kind switch
-        {
-            SharpProofTargetKind.Point => SymbolicQueryTarget.Point(Line!.Value, Column ?? 1),
-            SharpProofTargetKind.Position => SymbolicQueryTarget.Position(Position!.Value),
-            SharpProofTargetKind.Line => SymbolicQueryTarget.Line(Line!.Value),
-            SharpProofTargetKind.Span => SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value),
-            SharpProofTargetKind.LineSpan => SymbolicQueryTarget.LineSpan(
-                StartLine!.Value,
-                StartColumn!.Value,
-                EndLine!.Value,
-                EndColumn!.Value),
-            SharpProofTargetKind.AllLines => SymbolicQueryTarget.AllLines(),
-            SharpProofTargetKind.Node => SymbolicQueryTarget.Node(IncludeNestedCallables),
-            _ => throw new ArgumentOutOfRangeException(nameof(Kind))
-        };
-    }
-
     private static void ValidatePositive(int value, string parameterName)
     {
         if (value <= 0) throw new ArgumentOutOfRangeException(parameterName);
@@ -704,7 +685,7 @@ public sealed class SharpProofAnalysisSession : IDisposable
     {
         try
         {
-            var context = new SymbolicQueryContext(_source, query.Target.ToSymbolicTarget(), _options);
+            var context = new SymbolicQueryContext(_source, query.Target, _options);
             return query switch
             {
                 ConditionQuery condition => FromPayload(

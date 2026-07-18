@@ -6,7 +6,7 @@ internal sealed class ValidatedSymbolicQueryRequest
 {
     private ValidatedSymbolicQueryRequest(
         SymbolicSourceInput source,
-        SymbolicQueryTarget target,
+        SharpProofTarget target,
         SymbolicQueryOptions options)
     {
         Source = source;
@@ -16,7 +16,7 @@ internal sealed class ValidatedSymbolicQueryRequest
 
     internal SymbolicSourceInput Source { get; }
 
-    internal SymbolicQueryTarget Target { get; }
+    internal SharpProofTarget Target { get; }
 
     internal SymbolicQueryOptions Options { get; }
 
@@ -32,7 +32,7 @@ internal sealed class ValidatedSymbolicQueryRequest
     }
 
     internal void RequireTarget(
-        Func<SymbolicQueryTargetKind, bool> predicate,
+        Func<SharpProofTargetKind, bool> predicate,
         string message)
     {
         if (predicate == null) throw new ArgumentNullException(nameof(predicate));

@@ -472,7 +472,7 @@ public sealed class TestClass
         return new SymbolicQueryService().QueryCapabilities(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "CapabilityTests.cs"),
-                SymbolicQueryTarget.Position(position)));
+                SharpProofTarget.AtPosition(position)));
     }
 
     [Test]
@@ -481,7 +481,7 @@ public sealed class TestClass
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryCapabilities(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "CapabilityTests.cs"),
-                SymbolicQueryTarget.AllLines())));
+                SharpProofTarget.AllLines())));
 
         Assert.That(ex!.Message, Is.EqualTo("Capability queries support point, position, line, or node targets only."));
     }

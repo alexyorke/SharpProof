@@ -65,10 +65,10 @@ internal sealed class SymbolicErrorModelTests
 
         var success = service.TryQuery(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
-            SymbolicQueryTarget.Point(1, 1)));
+            SharpProofTarget.Point(1, 1)));
         var failure = service.TryQuery(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
-            SymbolicQueryTarget.Point(99, 1)));
+            SharpProofTarget.Point(99, 1)));
 
         Assert.That(success.IsSuccess, Is.True);
         Assert.That(success.Value, Is.Not.Null);
@@ -84,7 +84,7 @@ internal sealed class SymbolicErrorModelTests
     {
         var context = new SymbolicQueryContext(
             SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "TryProve.cs"),
-            SymbolicQueryTarget.Point(1, 1),
+            SharpProofTarget.Point(1, 1),
             SymbolicQueryOptions.Default);
 
         var result = new SymbolicQueryService().TryProve(context, "value >= 0");
@@ -123,7 +123,7 @@ internal sealed class SymbolicErrorModelTests
         var result = new SymbolicQueryService().TryQuery(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "Canceled.cs"),
-                SymbolicQueryTarget.Point(1, 1)),
+                SharpProofTarget.Point(1, 1)),
             cancellation.Token);
 
         Assert.That(result.IsSuccess, Is.False);

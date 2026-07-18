@@ -42,8 +42,8 @@ internal sealed record SymbolicCliExplainReport(
         var source = inputContext.SourceInput;
         var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
         var requestedTarget = options.Position.HasValue
-            ? SymbolicQueryTarget.Position(options.Position.Value)
-            : SymbolicQueryTarget.Point(options.Line, options.Column);
+            ? SharpProofTarget.AtPosition(options.Position.Value)
+            : SharpProofTarget.Point(options.Line, options.Column);
         var executor = new SymbolicQueryExecutor();
         var invariant = executor.Query(new SymbolicQueryContext(source, requestedTarget, queryOptions),
             cancellationToken);
@@ -58,7 +58,7 @@ internal sealed record SymbolicCliExplainReport(
 
         var point = invariant.ProgramPoints[0];
         var hazardResult = executor.QueryRuntimeHazards(
-            new SymbolicQueryContext(source, SymbolicQueryTarget.Point(point.Line, point.Column), queryOptions),
+            new SymbolicQueryContext(source, SharpProofTarget.Point(point.Line, point.Column), queryOptions),
             options.CreateRuntimeHazardOptions(),
             cancellationToken);
         var hazards = hazardResult.Hazards.Take(options.ReportMaxHazards).ToArray();
