@@ -207,14 +207,21 @@ Tests are excluded from the metric and must not be deleted.
   domain dictionaries, consolidated raw-reason precedence, and condensed the
   related immutable proof/result metadata. Exhaustive enum, stable-code, JSON,
   retry/configuration, and architecture tests preserve conservative fallbacks.
+- [x] Replaced 164 manually enumerated Span/MemoryMarshal, DateTime, and
+  DateTimeOffset effect-summary roots with five family prefixes plus one
+  specialized exclusion. Full callee analysis preserves all 325 preexisting
+  generated catalog entries exactly and now infers 589 additional entries; the
+  narrow `System.Type` list remains explicit because broadening it changed
+  reflection diagnostics. A repository test prevents the three migrated
+  families from returning to member-by-member maintenance.
 
 ## Current evidence
 
-- Maintained production: 101,789 lines (97,714 C#, 3,189 scripts, and 886
-  specifications); net reduction: 5,837 lines; remaining reduction: 14,163.
-  This tranche removed 207 maintained lines without deleting tests.
+- Maintained production: 101,633 lines (97,714 C#, 3,189 scripts, and 730
+  specifications); net reduction: 5,993 lines; remaining reduction: 14,007.
+  This tranche removed 156 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,177 passing tests and two documented skips.
+- Six lanes: 6,178 passing tests and two documented skips.
 
 ## Milestones
 

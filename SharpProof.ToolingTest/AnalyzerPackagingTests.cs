@@ -619,6 +619,44 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void BuiltInEffectSummarySpec_ShouldInferSelectedRuntimeFamilies_InsteadOfEnumeratingMembers()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var specificationPath = Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "BuiltInEffectSummaryArtifactSpec.json");
+        using var specification = JsonDocument.Parse(File.ReadAllText(specificationPath));
+        var artifacts = specification.RootElement
+            .GetProperty("Artifacts")
+            .EnumerateArray()
+            .ToDictionary(
+                artifact => artifact.GetProperty("OutputPath").GetString()!,
+                artifact => artifact,
+                StringComparer.Ordinal);
+
+        Assert.That(ReadFamilyPrefixes("SpanMemoryMarshal.SharpProof.EffectSummary.json"), Is.EqualTo(new[]
+        {
+            "System.ReadOnlySpan`1",
+            "System.Span",
+            "System.Runtime.InteropServices.MemoryMarshal"
+        }));
+        Assert.That(ReadFamilyPrefixes("datetime-runtime.SharpProof.EffectSummary.json"),
+            Is.EqualTo(new[] { "System.DateTime." }));
+        Assert.That(ReadFamilyPrefixes("datetimeoffset-runtime.SharpProof.EffectSummary.json"),
+            Is.EqualTo(new[] { "System.DateTimeOffset." }));
+
+        string?[] ReadFamilyPrefixes(string outputPath)
+        {
+            var artifact = artifacts[outputPath];
+            return artifact.GetProperty("SymbolPrefixes")
+                .EnumerateArray()
+                .Select(prefix => prefix.GetString())
+                .ToArray();
+        }
+    }
+
+    [Test]
     public void AnalyzerAssembly_ShouldEmbedEveryGeneratedEffectSummaryResource_WhenBuilt()
     {
         var repositoryRoot = FindRepositoryRoot();
