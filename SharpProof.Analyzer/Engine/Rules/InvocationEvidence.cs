@@ -6,7 +6,7 @@ internal static class InvocationEvidence
 {
     internal static string GetCatalogHitCategory(ISymbol symbol)
     {
-        return PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(symbol, true);
+        return ImpurityCatalog.GetKnownImpureCatalogHitCategory(symbol, true);
     }
 
     internal static bool IsContractGuardInvocation(IMethodSymbol methodSymbol)

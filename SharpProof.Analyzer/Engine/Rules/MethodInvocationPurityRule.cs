@@ -306,7 +306,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                                          && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
                                          && policy.Decision != PurityPolicyDecision.Pure
                                          && !isImmutableHashSetCreateRangeWithComparer
-                                         && !PurityCatalogSemantics.IsKnownPureBCLMember(
+                                         && !ImpurityCatalog.IsKnownPureBCLMember(
                                              originalDefinitionSymbol,
                                              context.SemanticModel.Compilation))
         {
@@ -340,7 +340,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 if (argument.Parameter.RefKind == RefKind.Out &&
                     (hasTrustedGeneratedPurity ||
                      (allowsKnownPureFallback &&
-                      PurityCatalogSemantics.IsKnownPureBCLMember(
+                      ImpurityCatalog.IsKnownPureBCLMember(
                           originalDefinitionSymbol,
                           context.SemanticModel.Compilation)) ||
                      IsSemanticallyPureOutArgumentMethod(originalDefinitionSymbol) ||

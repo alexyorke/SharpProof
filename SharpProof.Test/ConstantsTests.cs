@@ -150,9 +150,9 @@ public partial class ConstantsTests
     }
 
     [Test]
-    public void TimerMembers_AreSourcedFromKnownImpureTypeFallback_NotStaticCatalogs()
+    public void TimerMembers_AreSourcedFromInference_NotStaticCatalogs()
     {
-        Assert.That(Constants.KnownImpureTypeNames, Does.Contain("System.Timers.Timer"));
+        Assert.That(Constants.KnownImpureTypeNames, Does.Not.Contain("System.Timers.Timer"));
         AssertNotInManualCatalogs("System.Timers.Timer.Start()");
         AssertNotInManualCatalogs("System.Timers.Timer.Stop()");
     }

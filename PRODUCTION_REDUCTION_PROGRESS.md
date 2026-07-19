@@ -185,12 +185,18 @@ Tests are excluded from the metric and must not be deleted.
   the duplicate engine limit class and manual truncation-code table are deleted.
   Unknown limit kinds remain explicit and architecture coverage prevents the
   parallel model from returning.
+- [x] Removed the remaining built-in impurity namespace, type, and member tables.
+  Generated purity summaries, configured overrides, semantic classifiers, and
+  the conservative BCL shape fallback now own metadata classification. Deleted
+  the `PurityCatalogSemantics` forwarding layer; SP0002 diagnostics remain
+  present while evidence identifies the inferred fallback instead of a manual
+  catalog hit, and architecture coverage prevents the tables from returning.
 
 ## Current evidence
 
-- Maintained production: 102,605 lines (98,530 C#, 3,189 scripts, and 886
-  specifications); net reduction: 5,021 lines; remaining reduction: 14,979.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 102,405 lines (98,330 C#, 3,189 scripts, and 886
+  specifications); net reduction: 5,221 lines; remaining reduction: 14,779.
+  This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,162 passing tests and two documented skips.
 

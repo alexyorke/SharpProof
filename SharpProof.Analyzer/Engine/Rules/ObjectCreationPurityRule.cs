@@ -187,7 +187,7 @@ internal class ObjectCreationPurityRule : IPurityRule
 
 
         if (objectCreationOperation.Type != null &&
-            PurityCatalogSemantics.IsInImpureNamespaceOrType(objectCreationOperation.Type))
+            ImpurityCatalog.IsInImpureNamespaceOrType(objectCreationOperation.Type))
         {
             if (constructorWasProvenPure) return PurityAnalysisResult.Pure;
 

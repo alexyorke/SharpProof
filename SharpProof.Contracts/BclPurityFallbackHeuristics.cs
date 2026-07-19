@@ -26,7 +26,7 @@ internal static class BclPurityFallbackHeuristics
             return true;
         }
 
-        if (IsAmbientNamespaceOrType(shape.NamespaceName, shape.TypeName))
+        if (IsAmbientType(shape.TypeName))
         {
             classification = ProbablyImpureBecause("ambient_namespace_or_type");
             return true;
@@ -167,13 +167,8 @@ internal static class BclPurityFallbackHeuristics
         return ProbablyPureBecause("readonly_metadata_field_value_like");
     }
 
-    private static bool IsAmbientNamespaceOrType(string namespaceName, string typeName)
+    private static bool IsAmbientType(string typeName)
     {
-        if (Constants.KnownImpureNamespaces.Any(known =>
-                namespaceName.Equals(known, StringComparison.Ordinal) ||
-                namespaceName.StartsWith(known + ".", StringComparison.Ordinal)))
-            return true;
-
         return typeName is
             "System.Console" or
             "System.Environment" or

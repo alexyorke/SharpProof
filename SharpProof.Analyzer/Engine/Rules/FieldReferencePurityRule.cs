@@ -28,7 +28,7 @@ internal class FieldReferencePurityRule : IPurityRule
 
         if (fieldSymbol.IsConst) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityCatalogSemantics.IsConfiguredKnownPureMember(fieldSymbol))
+        if (ImpurityCatalog.IsConfiguredKnownPureMember(fieldSymbol))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
@@ -142,7 +142,7 @@ internal class FieldReferencePurityRule : IPurityRule
 
                 if (fieldSymbol.IsReadOnly) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-                if (PurityCatalogSemantics.IsStrictPurityProfile)
+                if (ImpurityCatalog.IsStrictPurityProfile)
                     return ImpureFieldRead(fieldReferenceOperation, "strict_profile");
 
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -168,7 +168,7 @@ internal class FieldReferencePurityRule : IPurityRule
 
 
             var fieldPureSig = fieldSymbol.OriginalDefinition.ToDisplayString();
-            var fieldKnownPure = PurityCatalogSemantics.IsKnownPureBCLMember(
+            var fieldKnownPure = ImpurityCatalog.IsKnownPureBCLMember(
                 fieldSymbol,
                 context.SemanticModel.Compilation);
 

@@ -133,7 +133,7 @@ internal sealed class ListPatternPurityRule : IPurityRule
                 context,
                 nameof(ListPatternPurityRule));
 
-        if (PurityCatalogSemantics.IsKnownImpure(member))
+        if (ImpurityCatalog.IsKnownImpure(member))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 operation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(

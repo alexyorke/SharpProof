@@ -99,8 +99,8 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        if (PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) ||
-            (getterSymbol != null && PurityCatalogSemantics.IsConfiguredKnownPureMember(getterSymbol)))
+        if (ImpurityCatalog.IsConfiguredKnownPureMember(propertySymbol) ||
+            (getterSymbol != null && ImpurityCatalog.IsConfiguredKnownPureMember(getterSymbol)))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (getterSymbol != null &&
@@ -131,9 +131,9 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                 propertyReferenceOperation,
                 knownImpureMemberSource ?? "reflection_environment_source");
 
-        if (PurityCatalogSemantics.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
-            !PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) &&
-            (getterSymbol == null || !PurityCatalogSemantics.IsConfiguredKnownPureMember(getterSymbol)))
+        if (ImpurityCatalog.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
+            !ImpurityCatalog.IsConfiguredKnownPureMember(propertySymbol) &&
+            (getterSymbol == null || !ImpurityCatalog.IsConfiguredKnownPureMember(getterSymbol)))
             return CreateImpureResult(
                 propertyReferenceOperation,
                 propertySymbol,
@@ -192,7 +192,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
 
             var staticKnownPure = allowsKnownPureFallback &&
-                                  PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
+                                  ImpurityCatalog.IsKnownPureBCLMember(propertySymbol,
                                       context.SemanticModel.Compilation);
 
             if (staticKnownPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -252,7 +252,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var instanceKnownPure = allowsKnownPureFallback &&
-                                PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
+                                ImpurityCatalog.IsKnownPureBCLMember(propertySymbol,
                                     context.SemanticModel.Compilation);
 
         if (instanceKnownPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;

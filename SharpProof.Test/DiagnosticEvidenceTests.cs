@@ -84,7 +84,7 @@ namespace System.Experimental
 ";
 
     [Test]
-    public async Task Sp0002_KnownImpureCatalogHit_IncludesStructuredEvidence()
+    public async Task Sp0002_InferredImpurity_IncludesStructuredEvidence()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -104,9 +104,9 @@ public class TestClass
 
         AssertSp0002Evidence(
             diagnostic,
-            "catalog_hit",
+            "bcl_fallback_probably_impure",
             "MethodInvocationPurityRule",
-            "known_impure_namespace_or_type",
+            "bcl_heuristic_fallback",
             "System.Diagnostics.Debug.WriteLine",
             "Invocation");
     }
@@ -9650,7 +9650,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task Sp0002_TimerStart_UsesTypeFallbackAfterMemberCatalogRemoval()
+    public async Task Sp0002_TimerStart_UsesInferredFallbackAfterCatalogRemoval()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System.Timers;
@@ -9667,17 +9667,18 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+            Is.EqualTo("bcl_fallback_probably_impure"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("known_impure_namespace_or_type"));
+            Is.EqualTo("bcl_heuristic_fallback"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Timers.Timer.Start"));
     }
 
     [Test]
-    public async Task Sp0002_TimerStop_UsesTypeFallbackAfterMemberCatalogRemoval()
+    public async Task Sp0002_TimerStop_UsesInferredFallbackAfterCatalogRemoval()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System.Timers;
@@ -9694,17 +9695,18 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+            Is.EqualTo("bcl_fallback_probably_impure"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("known_impure_namespace_or_type"));
+            Is.EqualTo("bcl_heuristic_fallback"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Timers.Timer.Stop"));
     }
 
     [Test]
-    public async Task Sp0002_SafeHandleDispose_UsesNamespaceFallbackAfterMemberCatalogRemoval()
+    public async Task Sp0002_SafeHandleDispose_UsesInferredFallbackAfterCatalogRemoval()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -9739,13 +9741,13 @@ public class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("known_impure_namespace_or_type"));
+            Is.EqualTo("bcl_heuristic_fallback"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Runtime.InteropServices.SafeHandle.Dispose"));
     }
 
     [Test]
-    public async Task Sp0002_AssemblyNameGetAssemblyName_UsesNamespaceFallbackAfterMemberCatalogRemoval()
+    public async Task Sp0002_AssemblyNameGetAssemblyName_UsesConservativeFallbackAfterCatalogRemoval()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System.Reflection;
@@ -9764,11 +9766,11 @@ public class TestClass
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("reflection_environment_source"));
+            Is.EqualTo("bcl_fallback_probably_pure"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("known_impure_namespace_or_type"));
+            Is.EqualTo("bcl_heuristic_fallback"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Reflection.AssemblyName.GetAssemblyName"));
     }
@@ -11586,7 +11588,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task Sp0002_ReflectionCall_IncludesReflectionEnvironmentCategory()
+    public async Task Sp0002_ReflectionCall_UsesConservativeFallbackCategory()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -11604,7 +11606,7 @@ public class TestClass
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("reflection_environment_source"));
+            Is.EqualTo("bcl_fallback_probably_pure"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],

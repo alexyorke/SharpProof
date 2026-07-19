@@ -65,8 +65,8 @@ internal static class PurityPolicyResolver
         AddDirectAttributeCandidates(method, attributePolicy, candidates);
         AddAssemblyAttributeCandidates(method, attributePolicy, candidates);
 
-        if (PurityCatalogSemantics.IsInConfiguredImpureNamespaceOrType(method) &&
-            !PurityCatalogSemantics.IsConfiguredKnownPureMember(method))
+        if (ImpurityCatalog.IsInConfiguredImpureNamespaceOrType(method) &&
+            !ImpurityCatalog.IsConfiguredKnownPureMember(method))
             candidates.Add(Impure(
                 "configured_impure_namespace_or_type",
                 30,
@@ -102,7 +102,7 @@ internal static class PurityPolicyResolver
             candidates.Add(Impure(
                 "built_in_impure_catalog",
                 ShouldPreferSemanticImpurityEvidence(metadata.KnownImpureMemberSource) ? 24 : 50,
-                PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(method, true),
+                ImpurityCatalog.GetKnownImpureCatalogHitCategory(method, true),
                 metadata.KnownImpureMemberSource));
 
         if (Rules.AwaitableRuntimeMemberClassifier.IsKnownPureAwaitInfrastructureMethod(method))
@@ -113,18 +113,18 @@ internal static class PurityPolicyResolver
                 "await_infrastructure"));
 
         if (method.DeclaringSyntaxReferences.Length == 0 &&
-            PurityCatalogSemantics.IsInImpureNamespaceOrType(method) &&
-            !PurityCatalogSemantics.IsConfiguredKnownPureMember(method) &&
-            !PurityCatalogSemantics.IsKnownPureBCLMember(method, compilation) &&
+            ImpurityCatalog.IsInImpureNamespaceOrType(method) &&
+            !ImpurityCatalog.IsConfiguredKnownPureMember(method) &&
+            !ImpurityCatalog.IsKnownPureBCLMember(method, compilation) &&
             !Rules.AwaitableRuntimeMemberClassifier.IsKnownPureAwaitInfrastructureMethod(method))
             candidates.Add(Impure(
                 "built_in_impure_namespace_or_type",
                 50,
-                PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(method, true),
+                ImpurityCatalog.GetKnownImpureCatalogHitCategory(method, true),
                 "known_impure_namespace_or_type"));
 
         if (!metadata.HasTrustedGeneratedPurity &&
-            PurityCatalogSemantics.IsKnownPureBCLMember(method, compilation))
+            ImpurityCatalog.IsKnownPureBCLMember(method, compilation))
             candidates.Add(Pure("built_in_pure_catalog", 50, "known_pure", "built_in_purity_catalog"));
 
         var ordered = candidates

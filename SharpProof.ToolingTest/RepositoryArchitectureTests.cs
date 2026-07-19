@@ -222,6 +222,25 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void MetadataImpurity_UsesInferenceInsteadOfBuiltInCatalogTables()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var constants = File.ReadAllText(Path.Combine(root, "SharpProof.Contracts", "Constants.cs"));
+        var analyzerEngine = string.Join("\n", Directory.EnumerateFiles(
+            Path.Combine(root, "SharpProof.Analyzer", "Engine"), "*.cs", SearchOption.AllDirectories)
+            .Select(File.ReadAllText));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(constants, Does.Not.Contain("System.IO"));
+            Assert.That(constants, Does.Not.Contain("System.Timers.Timer"));
+            Assert.That(constants, Does.Not.Contain("JsonSerializer.Deserialize"));
+            Assert.That(analyzerEngine, Does.Not.Contain("PurityCatalogSemantics"));
+            Assert.That(analyzerEngine, Does.Contain("TryGetGeneratedMethodPurity"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

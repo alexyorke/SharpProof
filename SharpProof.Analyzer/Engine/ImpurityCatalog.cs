@@ -50,10 +50,16 @@ internal static partial class ImpurityCatalog
             generatedClassification.IsPure)
             return true;
 
-        if (IsSemanticallyPureMathMember(symbol)) return true;
-
-        return false;
+        return IsSemanticallyPureMathMember(symbol) || IsTriviallyPureObjectConstructor(symbol);
     }
+
+    private static bool IsTriviallyPureObjectConstructor(ISymbol symbol) =>
+        symbol is IMethodSymbol
+        {
+            MethodKind: MethodKind.Constructor,
+            Parameters.Length: 0,
+            ContainingType.SpecialType: SpecialType.System_Object
+        };
 
     internal static bool IsConfiguredKnownPureMember(ISymbol symbol)
     {
@@ -116,49 +122,7 @@ internal static partial class ImpurityCatalog
 
         if (IsImmutableInterlockedMember(symbol)) return "known_impure";
 
-        if (symbol is IMethodSymbol objectEqualsMethodSymbol &&
-            objectEqualsMethodSymbol.ContainingType?.SpecialType == SpecialType.System_Object &&
-            objectEqualsMethodSymbol.Name == nameof(object.Equals) &&
-            objectEqualsMethodSymbol.Parameters.Length == 1)
-            return "known_impure";
-
-        if (symbol is IMethodSymbol staticObjectEqualsSymbol &&
-            staticObjectEqualsSymbol.ContainingType?.SpecialType == SpecialType.System_Object &&
-            staticObjectEqualsSymbol.Name == nameof(object.Equals) &&
-            staticObjectEqualsSymbol.IsStatic &&
-            staticObjectEqualsSymbol.Parameters.Length == 2)
-            return "known_impure";
-
-        if (symbol is IMethodSymbol staticTypeGetTypeSymbol &&
-            staticTypeGetTypeSymbol.IsStatic &&
-            staticTypeGetTypeSymbol.ContainingType?.ToDisplayString().Equals("System.Type", StringComparison.Ordinal) ==
-            true &&
-            staticTypeGetTypeSymbol.Name == nameof(Type.GetType) &&
-            staticTypeGetTypeSymbol.Parameters.Length >= 1 &&
-            staticTypeGetTypeSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
-            return "known_impure";
-
         if (TryGetConfiguredKnownImpureMember(symbol, out _)) return "config_known_impure";
-
-        var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (symbol.Kind == SymbolKind.Property)
-            if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
-                signature += ".get";
-
-        if (Constants.KnownImpureMethods.Contains(signature)) return "known_impure";
-
-
-        if (symbol.ContainingType != null)
-        {
-            var simplifiedName = $"{symbol.ContainingType.Name}.{symbol.Name}";
-            if (Constants.KnownImpureMethods.Contains(simplifiedName)) return "known_impure";
-        }
-
-        if (symbol is IMethodSymbol genericMethodSymbol && genericMethodSymbol.IsGenericMethod)
-        {
-            signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
-            if (Constants.KnownImpureMethods.Contains(signature)) return "known_impure";
-        }
 
         return null;
     }
@@ -244,17 +208,10 @@ internal static partial class ImpurityCatalog
 
     public static bool IsInImpureNamespaceOrType(ISymbol symbol)
     {
-        return IsInImpureNamespaceOrType(symbol, includeBuiltInBoundaries: true);
+        return IsInConfiguredImpureNamespaceOrType(symbol);
     }
 
     public static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol)
-    {
-        return IsInImpureNamespaceOrType(symbol, includeBuiltInBoundaries: false);
-    }
-
-    private static bool IsInImpureNamespaceOrType(
-        ISymbol symbol,
-        bool includeBuiltInBoundaries)
     {
         if (symbol == null) return false;
 
@@ -262,16 +219,14 @@ internal static partial class ImpurityCatalog
         while (containingType != null)
         {
             var typeName = containingType.OriginalDefinition.ToDisplayString();
-            if (ExtraImpureTypes.Contains(typeName) ||
-                includeBuiltInBoundaries && Constants.KnownImpureTypeNames.Contains(typeName))
+            if (ExtraImpureTypes.Contains(typeName))
                 return true;
 
             var ns = containingType.ContainingNamespace;
             while (ns != null && !ns.IsGlobalNamespace)
             {
                 var namespaceName = ns.ToDisplayString();
-                if (ExtraImpureNamespaces.Contains(namespaceName) ||
-                    includeBuiltInBoundaries && Constants.KnownImpureNamespaces.Contains(namespaceName))
+                if (ExtraImpureNamespaces.Contains(namespaceName))
                     return true;
 
                 ns = ns.ContainingNamespace;
