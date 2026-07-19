@@ -764,7 +764,8 @@ public sealed class RepositoryArchitectureTests
             ("SharpProof.Symbolic/SymbolicCapabilityModels.cs", "record SymbolicCapabilityResult("),
             ("SharpProof.Symbolic/SymbolicComplexityModels.cs", "record SymbolicComplexityResult("),
             ("SharpProof.Symbolic/SymbolicInputWitness.cs", "record SymbolicInputWitness("),
-            ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicSmtDiagnosticsSnapshot("),
+            ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicProgramPointAnalysis("),
+            ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicSmtDiagnostics("),
             ("SharpProof.Symbolic/SymbolicMethodResult.cs", "record SymbolicMethodResult("),
             ("SharpProof.Symbolic/SymbolicProgramPointResult.cs", "record SymbolicInvariantResult("),
             ("SharpProof.Symbolic/SymbolicPublicModels.cs", "record SymbolicInvariantInfo("),
@@ -780,6 +781,10 @@ public sealed class RepositoryArchitectureTests
             var source = File.ReadAllText(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
             Assert.That(source, Does.Contain(declaration), relativePath);
         }
+
+        var invariantService = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicInvariantService.cs"));
+        Assert.That(invariantService, Does.Not.Contain("record SymbolicSmtDiagnosticsSnapshot("));
     }
 
     [Test]

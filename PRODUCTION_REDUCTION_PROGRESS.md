@@ -447,12 +447,19 @@ Tests are excluded from the metric and must not be deleted.
   diagnostic-property adapter, the Symbolic evidence-schema facade, and the
   remaining generic JSON property reader while preserving baseline JSON, SARIF,
   suppression, validation-error, and CLI behavior.
+- [x] Made `SymbolicSmtDiagnostics` the immutable SMT diagnostics snapshot
+  instead of forwarding every property through a second snapshot record, and
+  converted program-point analysis to one immutable record with explicit JSON
+  exclusions for engine-only state. Focused lifecycle, hazard, limit, and
+  program-point tests preserve solver health, evidence, truncation, and query
+  behavior; architecture coverage prevents the duplicate snapshot type from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 94,284 lines (90,365 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,342 lines; remaining reduction: 6,658.
-  This tranche removed 202 maintained lines without deleting tests.
+- Maintained production: 94,250 lines (90,331 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,376 lines; remaining reduction: 6,624.
+  This tranche removed 34 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,205 passing tests and two documented Main skips.
 

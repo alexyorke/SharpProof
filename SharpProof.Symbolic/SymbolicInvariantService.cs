@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicInvariantService
@@ -124,8 +126,8 @@ internal sealed class SymbolicInvariantService
                 stateProof.Reason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 sourceNode,
-                stateProof.RawResult,
-                truncation);
+                truncation,
+                stateProof.RawResult);
 
         if (formulas.Count == 0)
         {
@@ -138,8 +140,8 @@ internal sealed class SymbolicInvariantService
                     stateProof.Reason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis),
                     sourceNode,
-                    stateProof.RawResult,
-                    truncation);
+                    truncation,
+                    stateProof.RawResult);
 
             return new SymbolicProgramPointAnalysis(
                 spanStart,
@@ -149,7 +151,7 @@ internal sealed class SymbolicInvariantService
                 "no_path_conditions",
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 sourceNode,
-                truncation: truncation);
+                truncation);
         }
 
         return new SymbolicProgramPointAnalysis(
@@ -160,8 +162,8 @@ internal sealed class SymbolicInvariantService
             stateProof?.Reason ?? "reachability_not_checked",
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
             sourceNode,
-            stateProof?.RawResult,
-            truncation);
+            truncation,
+            stateProof?.RawResult);
     }
 
     private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas)
@@ -247,44 +249,51 @@ internal sealed class SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
     }
 }
 
-internal sealed class SymbolicProgramPointAnalysis(
-    int spanStart,
-    IReadOnlyList<SmtFormula> pathConditions,
-    SymbolicState? pathState,
-    SymbolicReachability reachability,
-    string reachabilityReason,
-    SymbolicSmtDiagnostics? smtDiagnostics,
-    SyntaxNode sourceNode,
-    PurityProofResult? reachabilityProof = null,
-    SymbolicAnalysisTruncationInfo? truncation = null)
+internal sealed record SymbolicProgramPointAnalysis(
+    int SpanStart,
+    [property: JsonIgnore] IReadOnlyList<SmtFormula> PathConditions,
+    SymbolicState PathState,
+    SymbolicReachability Reachability,
+    string ReachabilityReason,
+    SymbolicSmtDiagnostics SmtDiagnostics,
+    [property: JsonIgnore] SyntaxNode SourceNode,
+    [property: JsonIgnore] SymbolicAnalysisTruncationInfo AnalysisTruncation,
+    [property: JsonIgnore] PurityProofResult? ReachabilityProof = null)
 {
-    public int SpanStart { get; } = spanStart;
+    internal SymbolicProgramPointAnalysis(
+        int spanStart,
+        IReadOnlyList<SmtFormula> pathConditions,
+        SymbolicState pathState,
+        SymbolicReachability reachability,
+        string reachabilityReason,
+        SymbolicSmtDiagnostics smtDiagnostics,
+        SyntaxNode sourceNode)
+        : this(spanStart, pathConditions, pathState, reachability, reachabilityReason, smtDiagnostics, sourceNode,
+            SymbolicAnalysisTruncationInfo.None)
+    {
+    }
 
-    internal IReadOnlyList<SmtFormula> PathConditions { get; } = pathConditions;
+    public IReadOnlyList<string> Facts { get; } = PathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
 
-    public SymbolicState PathState { get; } = pathState ?? new SymbolicState();
+    public string MergedInvariantText { get; } = SymbolicFormulaDisplay.FormatMergedInvariant(PathConditions);
 
-    internal SyntaxNode SourceNode { get; } = sourceNode ?? throw new ArgumentNullException(nameof(sourceNode));
+    public SymbolicAnalysisTruncationInfo Truncation => AnalysisTruncation;
 
-    public IReadOnlyList<string> Facts { get; } = pathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
-
-    public string MergedInvariantText { get; } = SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);
-
-    public SymbolicReachability Reachability { get; } = reachability;
-
-    public string ReachabilityReason { get; } = reachabilityReason;
-
-    internal PurityProofResult? ReachabilityProof { get; } = reachabilityProof;
-
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-
-    public SymbolicAnalysisTruncationInfo Truncation { get; } = truncation ?? SymbolicAnalysisTruncationInfo.None;
 }
 
-internal sealed class SymbolicSmtDiagnostics
+internal sealed record SymbolicSmtDiagnostics(
+    bool IsConfigured,
+    SmtAnalysisMode Mode,
+    bool IsEnabled,
+    int QueryTimeoutMs,
+    int MethodBudgetMs,
+    int MaxPathConditions,
+    int MaxExpressionNodes,
+    int ExecutedQueryCount,
+    int CacheEntryCount,
+    SmtAnalysisHealth Health,
+    SmtSolverLifecycleOptions Lifecycle)
 {
-    private readonly SymbolicSmtDiagnosticsSnapshot snapshot;
-
     public static readonly SymbolicSmtDiagnostics NotConfigured = new(
         false,
         SmtAnalysisMode.Off,
@@ -294,74 +303,24 @@ internal sealed class SymbolicSmtDiagnostics
         0,
         0,
         0,
-        0);
+        0,
+        new SmtAnalysisHealth(
+            SmtAnalysisHealthState.Disabled,
+            string.Empty,
+            0,
+            0,
+            0,
+            0,
+            0),
+        SmtSolverLifecycleOptions.Default);
 
-    public SymbolicSmtDiagnostics(
-        bool isConfigured,
-        SmtAnalysisMode mode,
-        bool isEnabled,
-        int queryTimeoutMs,
-        int methodBudgetMs,
-        int maxPathConditions,
-        int maxExpressionNodes,
-        int executedQueryCount,
-        int cacheEntryCount)
-        : this(new SymbolicSmtDiagnosticsSnapshot(
-            isConfigured,
-            mode,
-            isEnabled,
-            queryTimeoutMs,
-            methodBudgetMs,
-            maxPathConditions,
-            maxExpressionNodes,
-            executedQueryCount,
-            cacheEntryCount,
-            new SmtAnalysisHealth(
-                isConfigured && isEnabled ? SmtAnalysisHealthState.Ready : SmtAnalysisHealthState.Disabled,
-                string.Empty,
-                0,
-                0,
-                0,
-                0,
-                0),
-            SmtSolverLifecycleOptions.Default))
-    {
-    }
-
-    private SymbolicSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
-    {
-        this.snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
-    }
-
-    public bool IsConfigured => snapshot.IsConfigured;
-
-    public SmtAnalysisMode Mode => snapshot.Mode;
-
-    public bool IsEnabled => snapshot.IsEnabled;
-
-    public int QueryTimeoutMs => snapshot.QueryTimeoutMs;
-
-    public int MethodBudgetMs => snapshot.MethodBudgetMs;
-
-    public int MaxPathConditions => snapshot.MaxPathConditions;
-
-    public int MaxExpressionNodes => snapshot.MaxExpressionNodes;
-
-    public int ExecutedQueryCount => snapshot.ExecutedQueryCount;
-
-    public int CacheEntryCount => snapshot.CacheEntryCount;
-
-    public SmtAnalysisHealth Health => snapshot.Health;
-
-    public SmtSolverLifecycleOptions Lifecycle => snapshot.Lifecycle;
-
-    internal SymbolicSmtDiagnosticsSnapshot Snapshot => snapshot;
+    internal SymbolicSmtDiagnostics Snapshot => this;
 
     public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
     {
         if (smtAnalysis == null) return NotConfigured;
 
-        return new SymbolicSmtDiagnostics(new SymbolicSmtDiagnosticsSnapshot(
+        return new SymbolicSmtDiagnostics(
             true,
             smtAnalysis.Options.Mode,
             smtAnalysis.Options.IsEnabled,
@@ -372,7 +331,7 @@ internal sealed class SymbolicSmtDiagnostics
             smtAnalysis.ExecutedQueryCount,
             smtAnalysis.CacheEntryCount,
             smtAnalysis.Health,
-            smtAnalysis.Options.Lifecycle));
+            smtAnalysis.Options.Lifecycle);
     }
 
     internal static int ToBoundedMilliseconds(TimeSpan value)
@@ -386,19 +345,6 @@ internal sealed class SymbolicSmtDiagnostics
     }
 
 }
-
-internal sealed record SymbolicSmtDiagnosticsSnapshot(
-    bool IsConfigured,
-    SmtAnalysisMode Mode,
-    bool IsEnabled,
-    int QueryTimeoutMs,
-    int MethodBudgetMs,
-    int MaxPathConditions,
-    int MaxExpressionNodes,
-    int ExecutedQueryCount,
-    int CacheEntryCount,
-    SmtAnalysisHealth Health,
-    SmtSolverLifecycleOptions Lifecycle);
 
 internal enum SymbolicReachability
 {
