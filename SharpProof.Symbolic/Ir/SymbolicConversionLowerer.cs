@@ -163,7 +163,7 @@ internal static class SymbolicConversionLowerer
         if (sourceType?.IsReferenceType != true ||
             targetType?.IsReferenceType != true ||
             !SymbolicPatternLowerer.TryLowerTypeTestCondition(
-                asExpression.Left,
+                operand,
                 targetTypeSyntax,
                 asExpression,
                 false,

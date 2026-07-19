@@ -589,6 +589,30 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void SymbolicPatternLowering_HasOneTypedDispatcher()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var symbolicIrRoot = Path.Combine(root, "SharpProof.Symbolic", "Ir");
+        var dispatcher = File.ReadAllText(Path.Combine(symbolicIrRoot, "SymbolicIrLowerer.cs"));
+        var patterns = File.ReadAllText(Path.Combine(symbolicIrRoot, "SymbolicPatternLowerer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dispatcher, Does.Contain("TryLowerPatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerBinaryPatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerNullPatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerConstantPatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerRelationalPatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerEmptyRecursivePatternCondition("));
+            Assert.That(dispatcher, Does.Not.Contain("TryLowerTypePatternCondition("));
+            Assert.That(patterns, Does.Not.Contain("TryLowerBinaryPatternCondition("));
+            Assert.That(patterns, Does.Not.Contain("TryLowerUnaryPatternCondition("));
+            Assert.That(patterns.Split("IsPatternExpressionSyntax expression", StringSplitOptions.None),
+                Has.Length.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

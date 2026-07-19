@@ -409,14 +409,21 @@ Tests are excluded from the metric and must not be deleted.
   Representative pure, impure, prefix, and predicate runtime slices preserve
   their classifications, and architecture coverage prevents inline tables from
   returning.
+- [x] Made the typed symbolic pattern dispatcher the only `is`-pattern lowering
+  route. Deleted seven expression-level retry paths and their binary, unary,
+  null, constant, relational, recursive, type, and type-test adapters; the
+  retained term-level matchers still own normalized relation construction.
+  General unary composition now runs after specialized negation matchers so
+  direct inverted facts and declaration bindings remain unchanged. The full
+  177-test pattern slice and an architecture guard characterize the boundary.
 
 ## Current evidence
 
-- Maintained production: 95,278 lines (91,359 C#, 3,189 scripts, and 730
-  specifications); net reduction: 12,348 lines; remaining reduction: 7,652.
-  This tranche removed 173 maintained lines without deleting tests.
+- Maintained production: 95,077 lines (91,158 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,549 lines; remaining reduction: 7,451.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,202 passing tests and two documented Main skips.
+- Six lanes: 6,203 passing tests and two documented Main skips.
 
 ## Milestones
 

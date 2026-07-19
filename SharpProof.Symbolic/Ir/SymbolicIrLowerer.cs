@@ -56,7 +56,8 @@ internal static partial class SymbolicIrLowerer
         {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax typeSyntax &&
-                SymbolicPatternLowerer.TryLowerTypeTestCondition(binaryExpression.Left, typeSyntax, binaryExpression, false, context,
+                TryLowerTerm(binaryExpression.Left, context, out var typeTestValue) &&
+                SymbolicPatternLowerer.TryLowerTypeTestCondition(typeTestValue, typeSyntax, binaryExpression, false, context,
                     out condition))
                 return true;
 
@@ -137,15 +138,7 @@ internal static partial class SymbolicIrLowerer
                   isPatternExpression.Pattern,
                   isPatternExpression,
                   context,
-                  out condition)) ||
-             SymbolicPatternLowerer.TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerTypePatternCondition(isPatternExpression, context, out condition) ||
-             SymbolicPatternLowerer.TryLowerUnaryPatternCondition(isPatternExpression.Expression, isPatternExpression.Pattern, context,
-                 out condition)))
+                  out condition))))
             return true;
 
         if (SymbolicRegexLowerer.TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
