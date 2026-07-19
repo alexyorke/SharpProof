@@ -574,3 +574,25 @@ both characterized `Replace` overloads from `pure` to `impure`. Generic
 fixed-point call classification does not yet track that the callee's memory
 writes target the caller's freshly allocated string, so these rules must remain
 until ownership evidence is propagated across calls.
+
+The test wrapper and impacted-test selector are complementary rather than
+duplicate orchestration owners. `Invoke-SharpProofTests.ps1` owns lane
+partitioning, worker limits, runsettings, process isolation, and execution;
+`Invoke-SharpProofImpactedTests.ps1` owns changed-file evidence, generated
+inventory closure, conservative fallback, and command projection. Their only
+overlap is small filter/argument formatting, well below the tranche threshold,
+so do not extract a shared framework unless a new caller creates real reuse.
+
+The preview public Symbolic boundary is already the requested
+`SharpProofAnalysisSession`/`SharpProofQuery`/`SharpProofQueryResult` model.
+Its typed payload projection is not a retained service-specific compatibility
+API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
+Do not remove that projection merely because breaking API changes are allowed.
+
+Analyzer configuration's declarative option catalog owns documentation,
+validation metadata, defaults, aliases, scopes, and policy impact, while the
+strongly typed configuration reader owns runtime composition and tree fallback.
+The remaining handwritten mapping is not a parallel rule catalog; converting
+it to a generic property bag or generated indirection would add complexity for
+less than a 200-line net reduction. Revisit only if the option registry gains
+typed destination/accessor metadata that can delete the runtime mapping.
