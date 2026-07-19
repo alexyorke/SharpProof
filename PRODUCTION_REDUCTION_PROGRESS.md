@@ -343,14 +343,21 @@ Tests are excluded from the metric and must not be deleted.
   severities, enabled defaults, descriptions, help links, and tags to the
   pre-refactor assembly, while release-table and architecture tests replace
   the syntax-only RS2002/RS2003 discovery that cannot inspect data resources.
+- [x] Made one embedded schema the runtime and documentation owner for all 45
+  analyzer configuration options. Removed the constructor-heavy C# option
+  table, three parallel documentation switches, and the single-use SMT mode
+  registry; project configuration retains an explicit conservative parser at
+  its boundary. The schema validates duplicate keys and enum metadata, its LF
+  resource hash is locked, and the generated configuration reference remains
+  byte-identical to the pre-refactor document.
 
 ## Current evidence
 
-- Maintained production: 96,823 lines (92,904 C#, 3,189 scripts, and 730
-  specifications); net reduction: 10,803 lines; remaining reduction: 9,197.
-  This tranche removed 252 maintained lines without deleting tests.
+- Maintained production: 96,608 lines (92,689 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,018 lines; remaining reduction: 8,982.
+  This tranche removed 215 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,194 passing tests and two documented Main skips.
+- Six lanes: 6,195 passing tests and two documented Main skips.
 
 ## Milestones
 

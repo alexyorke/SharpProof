@@ -35,9 +35,9 @@ internal static class ConfigurationReferenceCommand
         foreach (var option in options)
             builder.Append("| `").Append(option.Key).Append("` | ")
                 .Append(GetScope(option.Scope)).Append(" | ")
-                .Append(GetValueDescription(option)).Append(" | `")
+                .Append(option.ValueDescription).Append(" | `")
                 .Append(option.DefaultValue).Append("` | ")
-                .Append(GetRelatedDiagnostics(option.Key)).Append(" | ")
+                .Append(option.RelatedDiagnostics).Append(" | ")
                 .Append(option.Description.Replace("|", "\\|", StringComparison.Ordinal)).AppendLine(" |");
 
         AppendExample(builder, "Global AnalyzerConfig example",
@@ -60,7 +60,7 @@ internal static class ConfigurationReferenceCommand
         builder.AppendLine().Append("## ").AppendLine(heading).AppendLine()
             .AppendLine(description).AppendLine().AppendLine("```ini").AppendLine(preamble);
         foreach (var option in options)
-            builder.Append(option.Key).Append(" = ").AppendLine(GetSampleValue(option));
+            builder.Append(option.Key).Append(" = ").AppendLine(option.SampleValue);
         builder.AppendLine("```");
     }
 
@@ -72,53 +72,4 @@ internal static class ConfigurationReferenceCommand
         _ => throw new ArgumentOutOfRangeException(nameof(scope))
     };
 
-    private static string GetValueDescription(AnalyzerConfigurationOption option) => option.ValueKind switch
-    {
-        AnalyzerConfigurationValueKind.Bool => "boolean (`true` or `false`)",
-        AnalyzerConfigurationValueKind.StringList => "`;`, `,`, or newline-delimited values",
-        AnalyzerConfigurationValueKind.StructuralMemberKeyList =>
-            "canonical `spm1\\|...` keys delimited by `;`, `,`, or newlines; property keys end in `.get` or `.set`",
-        AnalyzerConfigurationValueKind.NonNegativeInteger => "non-negative integer",
-        AnalyzerConfigurationValueKind.PositiveInteger => "positive integer",
-        _ when option.AllowedValues.Length != 0 => string.Join(", ", option.AllowedValues.Select(static value => $"`{value}`")),
-        _ => "value accepted by the analyzer parser"
-    };
-
-    private static string GetRelatedDiagnostics(string key)
-    {
-        var feature = key switch
-        {
-            ConfigKeys.KnownImpureMethods or ConfigKeys.KnownPureMethods or
-            ConfigKeys.KnownImpureNamespaces or ConfigKeys.KnownImpureTypes or ConfigKeys.PurityProfile
-                => "SP0002",
-            ConfigKeys.TrustedBoundaryReviewMode => "SP0040",
-            ConfigKeys.EmitExplanations => "SP0009",
-            ConfigKeys.ReportBclFallbackGuesses => "SP0012",
-            ConfigKeys.RuntimeHazardMode => "SP0010, SP0011, SP0033",
-            ConfigKeys.SuppressProvenDiagnostics or ConfigKeys.SuppressionDiagnosticIds => "SPS0001-SPS0018",
-            ConfigKeys.ReportExceptions => "SP0010",
-            ConfigKeys.CheckedExceptions => "SP0011",
-            ConfigKeys.EnableEffectSummaryJson => "SP0002, SP0010, SP0011",
-            _ when key.StartsWith(ConfigKeys.SuggestMissingEnforcePure, StringComparison.Ordinal) => "SP0004",
-            _ when key.StartsWith("sharpproof_smt_", StringComparison.Ordinal) => "SMT-backed proof results",
-            _ => "configuration consumers"
-        };
-        return feature + "; SP0025 for invalid values";
-    }
-
-    private static string GetSampleValue(AnalyzerConfigurationOption option) => option.ValueKind switch
-    {
-        AnalyzerConfigurationValueKind.StringList when option.Key == ConfigKeys.AttributeStubNamespaces =>
-            "SharpProof.Attributes; My.Contracts",
-        AnalyzerConfigurationValueKind.StringList => "Demo.Namespace.Member",
-        AnalyzerConfigurationValueKind.StructuralMemberKeyList =>
-            "spm1|RGVtby5OYW1lc3BhY2UuVHlwZQ==|b3JkaW5hcnk=|TWVtYmVy|0|0|bm9uZQ==|bmFtZWQ6U3lzdGVtLlZvaWQ=",
-        AnalyzerConfigurationValueKind.NonNegativeInteger => "3",
-        AnalyzerConfigurationValueKind.PositiveInteger => "1000",
-        AnalyzerConfigurationValueKind.PurityProfile => "balanced",
-        AnalyzerConfigurationValueKind.MissingPuritySuggestionScope => "public",
-        AnalyzerConfigurationValueKind.RuntimeHazardMode => "all",
-        AnalyzerConfigurationValueKind.SmtMode => "deep",
-        _ => option.DefaultValue
-    };
 }

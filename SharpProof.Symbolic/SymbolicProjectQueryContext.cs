@@ -68,7 +68,13 @@ internal sealed class SymbolicProjectConfiguration(
         if (!AnalyzerConfigurationValueReader.TryGetGlobalOption(
                 options, "sharpproof_smt_mode", out var value)) return fallback;
 
-        return SmtConfigurationValueRegistry.TryParseMode(value, out var mode) ? mode : fallback;
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "disabled" => SmtAnalysisMode.Off,
+            "bounded" => SmtAnalysisMode.Bounded,
+            "deep" => SmtAnalysisMode.Deep,
+            _ => fallback
+        };
     }
 
     private static bool GetBool(AnalyzerOptions options, string key, bool fallback)

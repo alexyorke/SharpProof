@@ -414,6 +414,30 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ConfigurationCatalog_OwnsRuntimeAndDocumentationMetadata()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
+        var catalogPath = Path.Combine(analyzerRoot, "Configuration", "AnalyzerConfigurationOptions.json");
+        var registry = File.ReadAllText(Path.Combine(
+            analyzerRoot, "Configuration", "AnalyzerConfigurationOptionRegistry.cs"));
+        var renderer = File.ReadAllText(Path.Combine(
+            root, "Tools", "SharpProof.SymbolicCli", "ConfigurationReferenceCommand.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(catalogPath))),
+                Is.EqualTo("725E718C118CFDBE51699D51B15BF1954F472D24A6B29E35E3DEAFA603664E9D"));
+            Assert.That(registry, Does.Contain("SharpProof.Analyzer.Configuration.Options.json"));
+            Assert.That(registry, Does.Not.Contain("GlobalOption(ConfigKeys."));
+            Assert.That(renderer, Does.Not.Contain("GetRelatedDiagnostics("));
+            Assert.That(renderer, Does.Not.Contain("GetSampleValue("));
+            Assert.That(renderer, Does.Not.Contain("GetValueDescription("));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
