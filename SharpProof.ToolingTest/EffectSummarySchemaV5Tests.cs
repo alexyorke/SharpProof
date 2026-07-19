@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Identity;
+using SharpProof.Schema;
 
 namespace SharpProof.Test;
 
@@ -56,8 +57,9 @@ public sealed class EffectSummarySchemaV5Tests
                 StringComparison.Ordinal));
         Assert.That(outer.TryGetProperty("Symbol", out _), Is.False);
         Assert.That(outer.TryGetProperty("ExactSymbolKey", out _), Is.False);
-        Assert.That(StructuralMethodIdentityJson.TryReadMethod(outer, out var outerIdentity, out var outerKey),
-            Is.True);
+        Assert.That(EffectSummaryContractReader.TryReadMethod(outer, out var outerContract), Is.True);
+        var outerIdentity = outerContract.Identity!;
+        var outerKey = outerContract.CanonicalKey!;
         Assert.That(outerKey, Does.StartWith(StructuralMethodIdentity.KeyPrefix + "|"));
         Assert.That(outerIdentity.ContainingMetadataType, Is.EqualTo("V5Fixture"));
 
@@ -65,10 +67,9 @@ public sealed class EffectSummarySchemaV5Tests
         Assert.That(edge.GetProperty("ExceptionType").GetString(), Is.EqualTo("System.InvalidOperationException"));
         Assert.That(edge.TryGetProperty("SourcePath", out _), Is.False);
         Assert.That(edge.GetProperty("CallChain").GetArrayLength(), Is.EqualTo(2));
-        Assert.That(StructuralMethodIdentityJson.TryReadIdentity(
-            edge.GetProperty("CalleeIdentity"),
-            out var calleeIdentity), Is.True);
-        Assert.That(calleeIdentity.Name, Is.EqualTo("Leaf"));
+        var calleeIdentity = edge.GetProperty("CalleeIdentity").Deserialize<StructuralMethodIdentity>();
+        Assert.That(calleeIdentity, Is.Not.Null);
+        Assert.That(calleeIdentity!.Name, Is.EqualTo("Leaf"));
 
         var generatedEntry = root.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
@@ -79,7 +80,7 @@ public sealed class EffectSummarySchemaV5Tests
                 StringComparison.Ordinal));
         Assert.That(generatedEntry.TryGetProperty("Symbol", out _), Is.False);
         Assert.That(generatedEntry.TryGetProperty("ExactSymbolKey", out _), Is.False);
-        Assert.That(StructuralMethodIdentityJson.TryReadMethod(generatedEntry, out _, out _), Is.True);
+        Assert.That(EffectSummaryContractReader.TryReadMethod(generatedEntry, out _), Is.True);
 
         var methods = root.GetProperty("Assemblies")[0].GetProperty("Methods").EnumerateArray().ToArray();
         var echoContracts = methods.Single(method => string.Equals(

@@ -135,8 +135,7 @@ internal static class AnalyzerAdditionalFileValidator
 
                 assemblyCount++;
                 foreach (var method in methods.EnumerateArray())
-                    if (method.ValueKind == JsonValueKind.Object &&
-                        StructuralMethodIdentityJson.TryReadMethod(method, out _, out _))
+                    if (EffectSummaryContractReader.TryReadMethod(method, out _))
                         validMethodCount++;
                     else
                         invalidMethodCount++;
@@ -179,12 +178,8 @@ internal static class AnalyzerAdditionalFileValidator
         var invalidCount = 0;
         foreach (var entry in entries.EnumerateArray())
         {
-            var hasSymbol = entry.ValueKind == JsonValueKind.Object &&
-                            StructuralMethodIdentityJson.TryReadMethod(entry, out _, out _);
-            var hasClassification = entry.ValueKind == JsonValueKind.Object &&
-                                    entry.TryGetProperty("Classification", out var classification) &&
-                                    classification.ValueKind == JsonValueKind.String &&
-                                    !string.IsNullOrWhiteSpace(classification.GetString());
+            var hasSymbol = EffectSummaryContractReader.TryReadMethod(entry, out var method);
+            var hasClassification = !string.IsNullOrWhiteSpace(method?.Classification);
 
             if (hasSymbol && hasClassification)
                 validCount++;

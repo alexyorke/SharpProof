@@ -501,14 +501,20 @@ Tests are excluded from the metric and must not be deleted.
   one immutable positional record, and diagnostic counts share one keyed
   accumulator. Focused manifest, deterministic corpus, smoke-fuzz, JSON
   round-trip, and architecture tests preserve coverage artifacts and output.
+- [x] Made Contracts own the current EffectSummary method, purity, exception,
+  artifact-source, and assembly DTOs plus structural-identity validation.
+  Analyzer catalog loading and additional-file validation now consume that
+  typed boundary; deleted both analyzer-local JSON property/identity walkers
+  while preserving per-entry malformed-input isolation, trust metadata, and
+  serialized schema behavior.
 
 ## Current evidence
 
-- Maintained production: 92,985 lines (89,066 C#, 3,189 scripts, and 730
-  specifications); net reduction: 14,641 lines; remaining reduction: 5,359.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 92,866 lines (88,947 C#, 3,189 scripts, and 730
+  specifications); net reduction: 14,760 lines; remaining reduction: 5,240.
+  This tranche removed 119 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,210 passing tests and two documented Main skips.
+- Six lanes: 6,211 passing tests and two documented Main skips.
 
 ## Milestones
 

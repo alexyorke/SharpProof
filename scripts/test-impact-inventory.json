@@ -1756,17 +1756,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/AnalyzerJsonElementReader.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "AnalyzerJsonElementReader"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/AnalyzerSession.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3618,17 +3607,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/StructuralMethodIdentityJson.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "StructuralMethodIdentityJson"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "StructuralMethodIdentityJson"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/SymbolAttributeTraversal.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3917,11 +3895,21 @@
                             "path":  "SharpProof.Contracts/EffectSummarySchemaContract.cs",
                             "module":  "Contracts",
                             "declaredTypes":  [
+                                                  "EffectSummaryArtifactSourceContract",
+                                                  "EffectSummaryAssemblyContract",
+                                                  "EffectSummaryContractReader",
+                                                  "EffectSummaryExceptionEdgeContract",
+                                                  "EffectSummaryExceptionProvenanceContract",
+                                                  "EffectSummaryMethodContract",
+                                                  "EffectSummaryPurityContract",
                                                   "EffectSummarySchemaContract"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
-
+                                                     "EffectSummaryArtifactSourceContract",
+                                                     "EffectSummaryContractReader",
+                                                     "EffectSummaryMethodContract",
+                                                     "EffectSummarySchemaContract"
                                                  ]
                         },
                         {
@@ -8600,17 +8588,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/StructuralMethodIdentityJson.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "EffectSummarySchemaV5Tests"
-                                                             ],
-                                    "tokens":  [
-                                                   "StructuralMethodIdentityJson"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
@@ -8901,6 +8878,22 @@
                                                    "EcmaStructuralMethodIdentity"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Contracts/EffectSummarySchemaContract.cs",
+                                    "module":  "Contracts",
+                                    "selectedTestFixtures":  [
+                                                                 "EffectSummaryArtifactSourceTests",
+                                                                 "EffectSummarySchemaV5Tests",
+                                                                 "RepositoryArchitectureTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryArtifactSourceContract",
+                                                   "EffectSummaryContractReader",
+                                                   "EffectSummaryMethodContract",
+                                                   "EffectSummarySchemaContract"
+                                               ],
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Contracts/InferredMethodSummary.cs",

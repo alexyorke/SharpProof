@@ -371,11 +371,11 @@ internal sealed class SummaryAssemblyIdentity(
         return EffectSummaryCompatibility.Compatible;
     }
 
-    public static SummaryAssemblyIdentity? FromJson(JsonElement assemblyElement)
+    public static SummaryAssemblyIdentity? FromContract(
+        string? assemblyName,
+        string? assemblySha256,
+        string? moduleVersionId)
     {
-        var assemblyName = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "AssemblyName");
-        var assemblySha256 = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "AssemblySha256");
-        var moduleVersionId = AnalyzerJsonElementReader.GetTrimmedStringProperty(assemblyElement, "ModuleVersionId");
         if (string.IsNullOrWhiteSpace(assemblyName) &&
             string.IsNullOrWhiteSpace(assemblySha256) &&
             string.IsNullOrWhiteSpace(moduleVersionId))
@@ -437,10 +437,8 @@ internal sealed class SummaryMethodIdentity(string? metadataToken, string? metho
         return EffectSummaryCompatibility.Compatible;
     }
 
-    public static SummaryMethodIdentity? FromJson(JsonElement methodElement)
+    public static SummaryMethodIdentity? FromContract(string? metadataToken, string? methodBodySha256)
     {
-        var metadataToken = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "MetadataToken");
-        var methodBodySha256 = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "MethodBodySha256");
         if (string.IsNullOrWhiteSpace(metadataToken) && string.IsNullOrWhiteSpace(methodBodySha256)) return null;
 
         return new SummaryMethodIdentity(metadataToken?.Trim(), methodBodySha256?.Trim());

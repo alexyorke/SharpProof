@@ -976,6 +976,29 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void EffectSummarySchema_OwnsTypedIdentityAndExceptionParsing()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var contracts = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Contracts", "EffectSummarySchemaContract.cs"));
+        var catalog = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "EffectSummaryCatalog.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contracts, Does.Contain("EffectSummaryContractReader"));
+            Assert.That(contracts, Does.Contain("EffectSummaryMethodContract"));
+            Assert.That(catalog, Does.Contain("EffectSummaryContractReader.TryReadMethod"));
+            Assert.That(catalog, Does.Not.Contain("ReadBooleanProperty"));
+            Assert.That(catalog, Does.Not.Contain("EnumerateObjectArrayProperty"));
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "StructuralMethodIdentityJson.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "AnalyzerJsonElementReader.cs")), Is.False);
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

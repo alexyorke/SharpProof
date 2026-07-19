@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Schema;
 
 namespace SharpProof.Test;
 
@@ -64,7 +65,7 @@ public sealed class EffectSummaryArtifactSourceTests
 
     private static EffectSummaryArtifactSource CreateSource(string sourceJson)
     {
-        using var document = JsonDocument.Parse("{\"ArtifactSource\":" + sourceJson + "}");
-        return EffectSummaryArtifactSource.FromJson(document.RootElement)!;
+        var contract = JsonSerializer.Deserialize<EffectSummaryArtifactSourceContract>(sourceJson);
+        return EffectSummaryArtifactSource.FromContract(contract)!;
     }
 }

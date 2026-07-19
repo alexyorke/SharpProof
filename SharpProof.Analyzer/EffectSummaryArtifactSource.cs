@@ -17,21 +17,17 @@ internal sealed class EffectSummaryArtifactSource(
 
     private string? PackageAssemblyRelativePath { get; } = packageAssemblyRelativePath;
 
-    internal static EffectSummaryArtifactSource? FromJson(JsonElement element)
+    internal static EffectSummaryArtifactSource? FromContract(EffectSummaryArtifactSourceContract? source)
     {
-        if (!element.TryGetProperty("ArtifactSource", out var sourceElement) ||
-            sourceElement.ValueKind != JsonValueKind.Object)
-            return null;
-
-        var kind = AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "Kind");
+        var kind = source?.Kind?.Trim();
         if (string.IsNullOrWhiteSpace(kind)) return null;
 
         return new EffectSummaryArtifactSource(
             kind!,
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "Framework"),
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageId"),
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageVersion"),
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(sourceElement, "PackageAssemblyRelativePath"));
+            source!.Framework?.Trim(),
+            source.PackageId?.Trim(),
+            source.PackageVersion?.Trim(),
+            source.PackageAssemblyRelativePath?.Trim());
     }
 
     internal EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity actualAssemblyIdentity)

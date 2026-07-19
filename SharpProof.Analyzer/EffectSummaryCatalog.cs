@@ -476,21 +476,21 @@ internal sealed class EffectSummaryCatalog
         {
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
-                if (entryElement.ValueKind != JsonValueKind.Object ||
-                    !StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
-                    !TryCreatePurityEntry(entryElement, out var purityEntry))
+                if (!EffectSummaryContractReader.TryReadMethod(entryElement, out var entry) ||
+                    !TryCreatePurityEntry(entry.FlatPurity, out var purityEntry))
                     continue;
-                var displayName = AnalyzerJsonElementReader.GetTrimmedStringProperty(entryElement, "DisplayName") ??
-                                  canonicalKey;
+                var canonicalKey = entry.CanonicalKey!.Trim();
+                var displayName = Normalize(entry.DisplayName) ?? canonicalKey;
 
                 yield return new SummaryEntry(
                     canonicalKey,
                     displayName,
                     purityEntry,
                     ImmutableArray<SummaryExceptionInfo>.Empty,
-                    SummaryAssemblyIdentity.FromJson(entryElement),
-                    SummaryMethodIdentity.FromJson(entryElement),
-                    EffectSummaryArtifactSource.FromJson(entryElement),
+                    SummaryAssemblyIdentity.FromContract(entry.AssemblyName, entry.AssemblySha256,
+                        entry.ModuleVersionId),
+                    SummaryMethodIdentity.FromContract(entry.MetadataToken, entry.MethodBodySha256),
+                    EffectSummaryArtifactSource.FromContract(entry.ArtifactSource),
                     sourcePriority,
                     sourcePath,
                     compatibilityReporter);
@@ -503,31 +503,29 @@ internal sealed class EffectSummaryCatalog
 
         foreach (var assemblyElement in assemblies.EnumerateArray())
         {
-            if (assemblyElement.ValueKind != JsonValueKind.Object ||
-                !assemblyElement.TryGetProperty("Methods", out var methods) ||
-                methods.ValueKind != JsonValueKind.Array)
+            if (!EffectSummaryContractReader.TryReadAssembly(assemblyElement, out var assembly))
                 continue;
 
-            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
-            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
-            foreach (var methodElement in methods.EnumerateArray())
+            var assemblyIdentity = SummaryAssemblyIdentity.FromContract(
+                assembly.AssemblyName,
+                assembly.AssemblySha256,
+                assembly.ModuleVersionId);
+            var artifactSource = EffectSummaryArtifactSource.FromContract(assembly.ArtifactSource);
+            foreach (var methodElement in Values(assembly.Methods))
             {
-                if (methodElement.ValueKind != JsonValueKind.Object ||
-                    !StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
+                if (!EffectSummaryContractReader.TryReadMethod(methodElement, out var method))
                     continue;
+                var canonicalKey = method.CanonicalKey!.Trim();
 
                 PurityEntry? purityEntry = null;
-                if (!hasGeneratedPurity &&
-                    methodElement.TryGetProperty("PurityClassification", out var purityElement) &&
-                    purityElement.ValueKind == JsonValueKind.Object &&
-                    TryCreatePurityEntry(purityElement, out var parsedPurity))
+                if (!hasGeneratedPurity && method.PurityClassification != null &&
+                    TryCreatePurityEntry(method.PurityClassification, out var parsedPurity))
                     purityEntry = parsedPurity;
 
-                var exceptionInfos = ReadExceptionInfos(methodElement);
+                var exceptionInfos = ReadExceptionInfos(method);
                 if (!purityEntry.HasValue && exceptionInfos.IsDefaultOrEmpty) continue;
 
-                var displayName = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "DisplayName") ??
-                                  canonicalKey;
+                var displayName = Normalize(method.DisplayName) ?? canonicalKey;
 
                 yield return new SummaryEntry(
                     canonicalKey,
@@ -535,7 +533,7 @@ internal sealed class EffectSummaryCatalog
                     purityEntry,
                     exceptionInfos,
                     assemblyIdentity,
-                    SummaryMethodIdentity.FromJson(methodElement),
+                    SummaryMethodIdentity.FromContract(method.MetadataToken, method.MethodBodySha256),
                     artifactSource,
                     sourcePriority,
                     sourcePath,
@@ -544,23 +542,33 @@ internal sealed class EffectSummaryCatalog
         }
     }
 
-    private static ImmutableArray<SummaryExceptionInfo> ReadExceptionInfos(JsonElement methodElement)
+    private static ImmutableArray<SummaryExceptionInfo> ReadExceptionInfos(EffectSummaryMethodContract method)
     {
         var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
         var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
         var exceptionEdges =
             new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
                 StringComparer.Ordinal);
-        exceptionTypes.UnionWith(EnumerateTrimmedStringArrayValues(methodElement, "ThrownExceptionTypes"));
-        exceptionTypes.UnionWith(EnumerateTrimmedStringArrayValues(methodElement, "TransitiveThrownExceptionTypes"));
-        AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
-        AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionProvenance");
-        AddExceptionEdges(
-            exceptionTypes,
-            exceptionSources,
-            exceptionEdges,
-            methodElement,
-            "TransitiveThrownExceptionEdges");
+        exceptionTypes.UnionWith(Normalize(method.ThrownExceptionTypes));
+        exceptionTypes.UnionWith(Normalize(method.TransitiveThrownExceptionTypes));
+        foreach (var provenance in Values(method.ThrownExceptionProvenance)
+                     .Concat(Values(method.TransitiveThrownExceptionProvenance)))
+            AddExceptionSource(exceptionTypes, exceptionSources, provenance.ExceptionType, provenance.SourcePath);
+        foreach (var edge in Values(method.TransitiveThrownExceptionEdges))
+        {
+            var exceptionType = Normalize(edge.ExceptionType);
+            if (exceptionType == null) continue;
+            AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, edge.SourcePath);
+            if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
+                exceptionEdges.Add(exceptionType, edgeMap = new(
+                    SummaryExceptionEdgeInfoComparer.Instance));
+            var value = new SummaryExceptionEdgeInfo(
+                Normalize(edge.SourcePath),
+                edge.CallChain.IsDefault ? ImmutableArray<StructuralMethodIdentity>.Empty : edge.CallChain,
+                edge.CalleeIdentity,
+                edge.Depth);
+            edgeMap[value] = value;
+        }
         return exceptionTypes
             .Select(exceptionType => new SummaryExceptionInfo(
                 exceptionType,
@@ -573,29 +581,21 @@ internal sealed class EffectSummaryCatalog
             .ToImmutableArray();
     }
 
-    private static bool TryCreatePurityEntry(JsonElement element, out PurityEntry purityEntry)
+    private static bool TryCreatePurityEntry(EffectSummaryPurityContract contract, out PurityEntry purityEntry)
     {
         purityEntry = default;
-
-        var classification = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "Classification");
-        if (string.IsNullOrWhiteSpace(classification)) return false;
-
-        var categories = ReadStringArray(element, "Categories");
-        var primaryCategory = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "PrimaryCategory");
-        var freshnessClassification =
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
-        var effectVisibilityClassification =
-            AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "EffectVisibilityClassification") ?? "unknown";
+        var classification = Normalize(contract.Classification);
+        if (classification == null) return false;
+        var categories = Normalize(contract.Categories);
+        var primaryCategory = Normalize(contract.PrimaryCategory);
         purityEntry = new PurityEntry(
-            classification!.Trim(),
+            classification,
             categories,
-            string.IsNullOrWhiteSpace(primaryCategory)
-                ? PrimaryCategoryFallback(categories)
-                : primaryCategory!.Trim(),
-            ReadBooleanProperty(element, "HasFreshArrayAllocationEvidence"),
-            freshnessClassification,
-            ReadBooleanProperty(element, "HasUnsupportedEffects"),
-            effectVisibilityClassification);
+            primaryCategory ?? PrimaryCategoryFallback(categories),
+            contract.HasFreshArrayAllocationEvidence,
+            Normalize(contract.FreshnessClassification) ?? "none",
+            contract.HasUnsupportedEffects,
+            Normalize(contract.EffectVisibilityClassification) ?? "unknown");
         return true;
     }
 
@@ -606,34 +606,16 @@ internal sealed class EffectSummaryCatalog
             : "generated_purity_summary";
     }
 
-    private static bool ReadBooleanProperty(JsonElement element, string propertyName)
-    {
-        return element.TryGetProperty(propertyName, out var valueElement) &&
-               valueElement.ValueKind == JsonValueKind.True;
-    }
+    private static ImmutableArray<string> Normalize(ImmutableArray<string> values) => values.IsDefault
+        ? ImmutableArray<string>.Empty
+        : values.Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim()).Distinct(StringComparer.Ordinal).ToImmutableArray();
 
-    private static ImmutableArray<string> ReadStringArray(JsonElement element, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out var valuesElement) ||
-            valuesElement.ValueKind != JsonValueKind.Array)
-            return ImmutableArray<string>.Empty;
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
 
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var builder = ImmutableArray.CreateBuilder<string>();
-        foreach (var valueElement in valuesElement.EnumerateArray())
-        {
-            if (valueElement.ValueKind != JsonValueKind.String) continue;
-
-            var value = valueElement.GetString();
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                var trimmedValue = value!.Trim();
-                if (seen.Add(trimmedValue)) builder.Add(trimmedValue);
-            }
-        }
-
-        return builder.ToImmutable();
-    }
+    private static IEnumerable<T> Values<T>(ImmutableArray<T> values) =>
+        values.IsDefault ? Enumerable.Empty<T>() : values;
 
     private static ImmutableArray<SummaryExceptionEdgeInfo> OrderExceptionEdges(
         IEnumerable<SummaryExceptionEdgeInfo> edges) => edges
@@ -644,65 +626,16 @@ internal sealed class EffectSummaryCatalog
         .ThenBy(static edge => edge.SourcePath, StringComparer.Ordinal)
         .ToImmutableArray();
 
-    private static void AddExceptionSources(
-        ImmutableSortedSet<string>.Builder exceptionTypes,
-        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
-        JsonElement methodElement,
-        string propertyName)
-    {
-        foreach (var element in EnumerateObjectArrayProperty(methodElement, propertyName))
-            if (TryGetExceptionType(element, out var exceptionType))
-                AddExceptionSource(
-                    exceptionTypes,
-                    exceptionSources,
-                    exceptionType,
-                    AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath"));
-    }
-
-    private static void AddExceptionEdges(
-        ImmutableSortedSet<string>.Builder exceptionTypes,
-        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
-        Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>> exceptionEdges,
-        JsonElement methodElement,
-        string propertyName)
-    {
-        foreach (var element in EnumerateObjectArrayProperty(methodElement, propertyName))
-        {
-            if (!TryGetExceptionType(element, out var exceptionType)) continue;
-
-            var sourcePath = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath");
-            AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, sourcePath);
-            if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
-            {
-                edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
-                    SummaryExceptionEdgeInfoComparer.Instance);
-                exceptionEdges.Add(exceptionType, edgeMap);
-            }
-
-            var calleeIdentity = element.TryGetProperty("CalleeIdentity", out var identityElement) &&
-                                 StructuralMethodIdentityJson.TryReadIdentity(identityElement, out var identity)
-                ? identity
-                : null;
-            int? depth = element.TryGetProperty("Depth", out var depthElement) &&
-                         depthElement.ValueKind == JsonValueKind.Number && depthElement.TryGetInt32(out var value)
-                ? value
-                : null;
-            var edge = new SummaryExceptionEdgeInfo(
-                sourcePath,
-                StructuralMethodIdentityJson.ReadCallChain(element),
-                calleeIdentity,
-                depth);
-            edgeMap[edge] = edge;
-        }
-    }
-
     private static void AddExceptionSource(
         ImmutableSortedSet<string>.Builder exceptionTypes,
         Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
-        string exceptionType,
+        string? exceptionType,
         string? sourcePath)
     {
+        exceptionType = Normalize(exceptionType);
+        if (exceptionType == null) return;
         exceptionTypes.Add(exceptionType);
+        sourcePath = Normalize(sourcePath);
         if (sourcePath == null) return;
 
         if (!exceptionSources.TryGetValue(exceptionType, out var sources))
@@ -712,50 +645,6 @@ internal sealed class EffectSummaryCatalog
         }
 
         sources.Add(sourcePath);
-    }
-
-    private static IEnumerable<string> EnumerateTrimmedStringArrayValues(
-        JsonElement element,
-        string propertyName)
-    {
-        if (!TryGetArrayProperty(element, propertyName, out var valuesElement)) yield break;
-
-        foreach (var valueElement in valuesElement.EnumerateArray())
-        {
-            if (valueElement.ValueKind != JsonValueKind.String) continue;
-            var value = valueElement.GetString();
-            if (!string.IsNullOrWhiteSpace(value)) yield return value!.Trim();
-        }
-    }
-
-    private static IEnumerable<JsonElement> EnumerateObjectArrayProperty(
-        JsonElement element,
-        string propertyName)
-    {
-        if (!TryGetArrayProperty(element, propertyName, out var valuesElement)) yield break;
-
-        foreach (var valueElement in valuesElement.EnumerateArray())
-            if (valueElement.ValueKind == JsonValueKind.Object)
-                yield return valueElement;
-    }
-
-    private static bool TryGetArrayProperty(
-        JsonElement element,
-        string propertyName,
-        out JsonElement valuesElement)
-    {
-        if (element.TryGetProperty(propertyName, out valuesElement) &&
-            valuesElement.ValueKind == JsonValueKind.Array)
-            return true;
-
-        valuesElement = default;
-        return false;
-    }
-
-    private static bool TryGetExceptionType(JsonElement element, out string exceptionType)
-    {
-        exceptionType = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "ExceptionType")!;
-        return exceptionType != null;
     }
 
     private bool TryGetTrustedPurityByMethodKeys(
