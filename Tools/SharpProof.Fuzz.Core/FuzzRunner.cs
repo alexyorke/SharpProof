@@ -69,25 +69,7 @@ public static class FuzzRunner
             : startedUtc + duration;
     }
 
-    public static async Task<FuzzRunSummary> RunCasesAsync(
-        IEnumerable<FuzzCase> fuzzCases,
-        FuzzOptions options,
-        CancellationToken cancellationToken = default)
-    {
-        var cases = fuzzCases.ToImmutableArray();
-        var startedUtc = DateTimeOffset.UtcNow;
-
-        return await RunCoreAsync(
-            options,
-            startedUtc,
-            index => cases[index],
-            "explicit_cases",
-            cases.Length,
-            null,
-            cancellationToken);
-    }
-
-    private static async Task<FuzzRunSummary> RunCoreAsync(
+    internal static async Task<FuzzRunSummary> RunCoreAsync(
         FuzzOptions options,
         DateTimeOffset startedUtc,
         Func<int, FuzzCase> createCase,
@@ -171,18 +153,7 @@ public static class FuzzRunner
         return summary;
     }
 
-    public static Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesAsync(
-        IEnumerable<FuzzCase> fuzzCases,
-        bool repeatAnalyzer = true,
-        int? parallelism = null,
-        CancellationToken cancellationToken = default)
-    {
-        var cases = fuzzCases.ToImmutableArray();
-        var degreeOfParallelism = parallelism is > 0 ? parallelism.Value : FuzzOptions.DefaultParallelism;
-        return AnalyzeCasesCoreAsync(cases, repeatAnalyzer, degreeOfParallelism, cancellationToken);
-    }
-
-    private static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesCoreAsync(
+    internal static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesCoreAsync(
         ImmutableArray<FuzzCase> fuzzCases,
         bool repeatAnalyzer,
         int parallelism,

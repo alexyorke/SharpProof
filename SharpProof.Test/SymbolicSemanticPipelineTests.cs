@@ -143,21 +143,13 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void ListPatternElementPosition_RejectsOutOfRangeIndexes()
+    public void ListPatternElementPosition_TestOnlyAdapterIsAbsent()
     {
-        var expression = SyntaxFactory.ParseExpression("values is [1, .., 3]");
-        var listPattern = expression.DescendantNodesAndSelf().OfType<ListPatternSyntax>().Single();
-
         Assert.That(
-            CSharpSyntaxFacts.TryGetListPatternElementPosition(listPattern, -1, out _, out _),
-            Is.False);
-        Assert.That(
-            CSharpSyntaxFacts.TryGetListPatternElementPosition(
-                listPattern,
-                listPattern.Patterns.Count,
-                out _,
-                out _),
-            Is.False);
+            typeof(CSharpSyntaxFacts).GetMethod(
+                "TryGetListPatternElementPosition",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static),
+            Is.Null);
     }
 
     [Test]

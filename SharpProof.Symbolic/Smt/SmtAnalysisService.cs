@@ -3,8 +3,8 @@ namespace SharpProof.Symbolic.Smt;
 internal sealed class SmtAnalysisService : IDisposable
 {
     private const int PreNormalizationFormulaDepthLimit = 1024;
-    private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
-        static () => new ProofCoreProofSearchSession();
+    private static readonly Func<IPurityProofSearchSession> s_defaultProofSearchFactory =
+        static () => new PurityProofSearch();
 
     private readonly SmtAnalysisBudget _budget;
     private readonly SmtProofResultCache _proofResults = new();
@@ -27,7 +27,7 @@ internal sealed class SmtAnalysisService : IDisposable
 
     internal SmtAnalysisService(
         SmtAnalysisOptions options,
-        Func<ISmtProofSearchSession> proofSearchFactory)
+        Func<IPurityProofSearchSession> proofSearchFactory)
     {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
@@ -92,31 +92,31 @@ internal sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    public SmtSolverContextRecycleResult RecycleCurrentThreadSolverContext()
+    public SmtSolverContextRecycleResult RecycleSolverContext(SmtSolverContextRecycleScope scope)
     {
         lock (_solverLock)
         {
-            var disposed = _proofSearchSessions.RecycleCurrentThread();
+            bool disposed;
+            long generation;
+            if (scope == SmtSolverContextRecycleScope.CurrentThread)
+            {
+                disposed = _proofSearchSessions.RecycleCurrentThread();
+                generation = SmtProofSearchSessionPool.GlobalGeneration;
+            }
+            else if (scope == SmtSolverContextRecycleScope.AllThreadsOnNextUse)
+            {
+                generation = _proofSearchSessions.RequestGlobalRecycle(out disposed);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(scope));
+            }
+
             if (disposed) Interlocked.Increment(ref _contextRecycleCount);
 
             ResetDegradedHealth();
             return CreateRecycleResult(
-                SmtSolverContextRecycleScope.CurrentThread,
-                disposed,
-                SmtProofSearchSessionPool.GlobalGeneration);
-        }
-    }
-
-    public SmtSolverContextRecycleResult RequestGlobalSolverContextRecycle()
-    {
-        lock (_solverLock)
-        {
-            var generation = _proofSearchSessions.RequestGlobalRecycle(out var disposed);
-            if (disposed) Interlocked.Increment(ref _contextRecycleCount);
-
-            ResetDegradedHealth();
-            return CreateRecycleResult(
-                SmtSolverContextRecycleScope.AllThreadsOnNextUse,
+                scope,
                 disposed,
                 generation);
         }
@@ -321,7 +321,11 @@ internal sealed class SmtAnalysisService : IDisposable
 
     private static PurityProofResult Unknown(string reason)
     {
-        return PurityProofResultFactory.Unknown(reason);
+        return new PurityProofResult(
+            PurityProofOutcome.Unknown,
+            new ProofCheckInfo(false, Feasibility.Unknown),
+            new ProofCheckInfo(false, Feasibility.Unknown),
+            reason);
     }
 
     private static bool IsTransientSolverFailure(Exception ex)

@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -285,21 +286,21 @@ public sealed class NotNullIfNotNullIndexer
         (ConditionPredicateDelegate)Delegate.CreateDelegate(
             typeof(ConditionPredicateDelegate),
             ExecutionVisibilityType
-                .GetMethod("IsConditionAlwaysFalse",
+                .GetMethod("IsConditionAlwaysFalseUsingSmt",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
     private static readonly ConditionPredicateDelegate IsConditionAlwaysTrueFunc =
         (ConditionPredicateDelegate)Delegate.CreateDelegate(
             typeof(ConditionPredicateDelegate),
             ExecutionVisibilityType
-                .GetMethod("IsConditionAlwaysTrue",
+                .GetMethod("IsConditionAlwaysTrueUsingSmt",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
     private static readonly ReachabilityPredicateDelegate IsInStaticallyUnreachableBranchFunc =
         (ReachabilityPredicateDelegate)Delegate.CreateDelegate(
             typeof(ReachabilityPredicateDelegate),
             ExecutionVisibilityType
-                .GetMethod("IsInStaticallyUnreachableBranch",
+                .GetMethod("IsInStaticallyUnreachableBranchUsingSmt",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
     protected static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
@@ -315,14 +316,14 @@ public sealed class NotNullIfNotNullIndexer
         string extraSource = "")
     {
         var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-        return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None);
+        return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None, null);
     }
 
     protected static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression,
         string extraSource = "")
     {
         var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-        return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None);
+        return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None, null);
     }
 
     protected static bool IsStatementUnreachable(string source, string statementText)
@@ -336,7 +337,7 @@ public sealed class NotNullIfNotNullIndexer
             .OfType<StatementSyntax>()
             .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
 
-        return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None);
+        return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None, null);
     }
 
     protected static bool IsExpressionUnreachable(string source, string expressionText)
@@ -352,7 +353,7 @@ public sealed class NotNullIfNotNullIndexer
             .OrderBy(static node => node.Span.Length)
             .First();
 
-        return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None);
+        return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None, null);
     }
 
     protected static string[] CollectProgramPointFacts(string source, string statementPrefix)
@@ -438,10 +439,10 @@ public sealed class NotNullIfNotNullIndexer
     }
 
     private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, SmtAnalysisService? smtAnalysis);
 
     private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, SmtAnalysisService? smtAnalysis);
 
     protected readonly record struct SmtOptionsSnapshot(
         string Mode,

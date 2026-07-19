@@ -238,7 +238,7 @@ public class SmtAnalysisServiceTests
             });
 
         var first = firstService.Classify(query);
-        var recycle = firstService.RequestGlobalSolverContextRecycle();
+        var recycle = firstService.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
         var localCached = firstService.Classify(query);
         var secondFactoryCalls = 0;
         using var secondService = new SmtAnalysisService(
@@ -305,7 +305,7 @@ public class SmtAnalysisServiceTests
 
         using (var controller = new SmtAnalysisService(options))
         {
-            var recycle = controller.RequestGlobalSolverContextRecycle();
+            var recycle = controller.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
             Assert.That(recycle.Scope, Is.EqualTo(SmtSolverContextRecycleScope.AllThreadsOnNextUse));
         }
 
@@ -348,7 +348,7 @@ public class SmtAnalysisServiceTests
         _ = firstService.Classify(CreateSolverQuery("first_service_session"));
         _ = secondService.Classify(CreateSolverQuery("second_service_session_before_recycle"));
 
-        var recycle = firstService.RequestGlobalSolverContextRecycle();
+        var recycle = firstService.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
         _ = secondService.Classify(CreateSolverQuery("second_service_session_after_recycle"));
 
         Assert.That(recycle.DisposedCurrentThreadContext, Is.True);
@@ -2475,7 +2475,7 @@ public class SmtAnalysisServiceTests
             "impure_call_reachable");
     }
 
-    private sealed class StubProofSearchSession : ISmtProofSearchSession
+    private sealed class StubProofSearchSession : IPurityProofSearchSession
     {
         private readonly Func<PurityProofQuery, TimeSpan, PurityProofResult> _classify;
         private readonly Action? _dispose;

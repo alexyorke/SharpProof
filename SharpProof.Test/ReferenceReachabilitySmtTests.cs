@@ -148,13 +148,14 @@ public class TestClass
         var method = typeof(SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
             .GetMethod(
-                "IsInStaticallyUnreachableBranch",
+                "IsInStaticallyUnreachableBranchUsingSmt",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
                 null,
-                new[] { typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken) },
+                new[] { typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken),
+                    typeof(SharpProof.Symbolic.Smt.SmtAnalysisService) },
                 null)!;
 
-        return (bool)method.Invoke(null, new object[] { node, semanticModel, CancellationToken.None })!;
+        return (bool)method.Invoke(null, new object?[] { node, semanticModel, CancellationToken.None, null })!;
     }
 
     private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source)

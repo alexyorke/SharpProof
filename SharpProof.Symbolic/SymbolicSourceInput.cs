@@ -77,16 +77,7 @@ internal sealed record SymbolicSourceInput(
 
     public SymbolicSourceInput WithSourceMap(SymbolicSourceMap sourceMap)
     {
-        return new SymbolicSourceInput(
-            Kind,
-            FilePath,
-            SourceText,
-            SyntaxTree,
-            Compilation,
-            Node,
-            SemanticModel,
-            CompilationProfile,
-            sourceMap ?? throw new ArgumentNullException(nameof(sourceMap)));
+        return this with { SourceMap = sourceMap ?? throw new ArgumentNullException(nameof(sourceMap)) };
     }
 }
 

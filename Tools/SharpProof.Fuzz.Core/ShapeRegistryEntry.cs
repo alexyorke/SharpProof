@@ -50,9 +50,6 @@ public sealed record FuzzExpectation(
     public static FuzzExpectation DefinitelyPure() => Create(
         Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.Ignore);
 
-    public static FuzzExpectation DefinitelyImpure() => Create(
-        Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.Ignore);
-
     public static FuzzExpectation Conservative() => Create(
         Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.Ignore);
 

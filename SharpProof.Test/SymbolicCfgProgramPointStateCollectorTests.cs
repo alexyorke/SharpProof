@@ -436,7 +436,8 @@ static class C
             nameof(SeededCompletedStatementTrace_PreservesSeedAndBypassesCache));
         var statement = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single();
         var seed = CreateSeed(fixture, statement, "input", SeedKind.Numeric, 17);
-        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
+        var cached = SymbolicReachabilityService.CollectPathStateAt(
+            statement, fixture.SemanticModel, CancellationToken.None);
 
         var actual = SymbolicCfgStatementCompletion.CollectCompletedStatementState(
             statement,
@@ -449,9 +450,8 @@ static class C
         Assert.That(actual.Provenance.Single().Stage, Is.EqualTo("cfg-program-point"));
         Assert.That(actual.Provenance.Single().SourceSpan, Is.EqualTo(statement.Span));
         Assert.That(actual.Provenance.Single().Detail, Is.EqualTo("exact"));
-        AssertCacheInfo(
-            SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel),
-            before);
+        Assert.That(SymbolicReachabilityService.CollectPathStateAt(
+            statement, fixture.SemanticModel, CancellationToken.None), Is.SameAs(cached));
     }
 
     [Test]
@@ -463,7 +463,8 @@ static class C
             source,
             nameof(SeededCompletedStatementTrace_TruncationIsAtomicAndBypassesCache));
         var statement = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single();
-        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
+        var cached = SymbolicReachabilityService.CollectPathStateAt(
+            statement, fixture.SemanticModel, CancellationToken.None);
         using var scope = SymbolicAnalysisLimitContext.Push(
             SharpProofAnalysisBudget.Default with { MaxMergedIfElseFacts = 1 });
 
@@ -483,9 +484,9 @@ static class C
             Assert.That(provenance.SourceSpan, Is.EqualTo(statement.Span));
             Assert.That(provenance.Detail, Is.EqualTo("trace.truncation"));
         });
-        AssertCacheInfo(
-            SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel),
-            before);
+        scope.Dispose();
+        Assert.That(SymbolicReachabilityService.CollectPathStateAt(
+            statement, fixture.SemanticModel, CancellationToken.None), Is.SameAs(cached));
     }
 
     [TestCase(
@@ -610,11 +611,10 @@ static class C
             source,
             nameof(ExecutionRootTrace_CustomLimitsBypassWarmDefaultCache));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
-        _ = SymbolicReachabilityService.CollectPathStateAt(
+        var cached = SymbolicReachabilityService.CollectPathStateAt(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
-        var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
 
         using var scope = SymbolicAnalysisLimitContext.Push(
             SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
@@ -625,7 +625,9 @@ static class C
         var expected = CollectStructuralState(fixture, site);
 
         AssertStateParity(actual, expected);
-        AssertCacheInfo(SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel), before);
+        scope.Dispose();
+        Assert.That(SymbolicReachabilityService.CollectPathStateAt(
+            site, fixture.SemanticModel, CancellationToken.None), Is.SameAs(cached));
     }
 
     [Test]
@@ -803,7 +805,6 @@ static class C
                 CancellationToken.None);
         }
 
-        var cacheBeforeSeeds = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
         var seededStates = new List<SymbolicState>();
         foreach (var value in new long[] { 1, 2 })
         {
@@ -817,27 +818,18 @@ static class C
             Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(value)));
         }
 
-        var afterSeeds = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
-        AssertCacheInfo(afterSeeds, cacheBeforeSeeds);
         Assert.That(seededStates[0].NormalizedProofKey, Is.Not.EqualTo(seededStates[1].NormalizedProofKey));
 
         unseeded ??= SymbolicReachabilityService.CollectPathStateAt(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
-        var warmCache = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
         Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(unseeded, parameter, out _), Is.False);
 
         var cachedUnseeded = SymbolicReachabilityService.CollectPathStateAt(
             site, fixture.SemanticModel, CancellationToken.None);
         AssertStateParity(cachedUnseeded, unseeded);
-        AssertCacheInfo(
-            SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel),
-            new SymbolicCacheInfo(
-                warmCache.Hits + 1,
-                warmCache.Misses,
-                warmCache.Entries,
-                warmCache.Evictions));
+        Assert.That(cachedUnseeded, Is.SameAs(unseeded));
     }
 
     [Test]
@@ -1852,14 +1844,6 @@ static class C
         Assert.That(actual.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
         Assert.That(CreateEvidenceKey(actual), Is.EqualTo(CreateEvidenceKey(expected)));
         Assert.That(CreateVersionKey(actual), Is.EqualTo(CreateVersionKey(expected)));
-    }
-
-    private static void AssertCacheInfo(SymbolicCacheInfo actual, SymbolicCacheInfo expected)
-    {
-        Assert.That(actual.Hits, Is.EqualTo(expected.Hits));
-        Assert.That(actual.Misses, Is.EqualTo(expected.Misses));
-        Assert.That(actual.Entries, Is.EqualTo(expected.Entries));
-        Assert.That(actual.Evictions, Is.EqualTo(expected.Evictions));
     }
 
     private static void AssertLoopTargetMatchesStructural(

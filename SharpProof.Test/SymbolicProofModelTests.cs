@@ -135,17 +135,19 @@ internal class SymbolicProofModelTests
         var model = compilation.GetSemanticModel(tree);
         var sites = tree.GetRoot().DescendantNodes().OfType<ExpressionStatementSyntax>().ToArray();
 
-        foreach (var site in sites)
-            SymbolicReachabilityService.CollectPathStateAt(site, model, CancellationToken.None);
+        var first = SymbolicReachabilityService.CollectPathStateAt(sites[0], model, CancellationToken.None);
+        SymbolicState? last = null;
+        foreach (var site in sites.Skip(1))
+            last = SymbolicReachabilityService.CollectPathStateAt(site, model, CancellationToken.None);
 
-        SymbolicReachabilityService.CollectPathStateAt(sites[^1], model, CancellationToken.None);
-        var cache = SymbolicReachabilityService.GetStructuralPathCacheInfo(sites[^1], model);
+        var cachedLast = SymbolicReachabilityService.CollectPathStateAt(
+            sites[^1], model, CancellationToken.None);
+        var recomputedFirst = SymbolicReachabilityService.CollectPathStateAt(
+            sites[0], model, CancellationToken.None);
 
         Assert.That(sites, Has.Length.EqualTo(520));
-        Assert.That(cache.Entries, Is.EqualTo(512));
-        Assert.That(cache.Evictions, Is.EqualTo(8));
-        Assert.That(cache.Misses, Is.EqualTo(520));
-        Assert.That(cache.Hits, Is.EqualTo(1));
+        Assert.That(cachedLast, Is.SameAs(last));
+        Assert.That(recomputedFirst, Is.Not.SameAs(first));
     }
 
     private static SymbolicState CreateUnsupportedState(int index)
@@ -158,7 +160,7 @@ internal class SymbolicProofModelTests
         return new SymbolicState(new[] { fact });
     }
 
-    private sealed class SequencedProofSearchSession : ISmtProofSearchSession
+    private sealed class SequencedProofSearchSession : IPurityProofSearchSession
     {
         private readonly Queue<string> _reasons;
 

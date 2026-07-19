@@ -78,7 +78,17 @@ public sealed class InferredMethodSummaryTests
             ["System.InvalidOperationException", "System.Exception"],
             ["A", "B"]);
 
-        Assert.That(first.HasSameSemanticsAs(second), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Identity, Is.EqualTo(second.Identity));
+            Assert.That(first.Purity, Is.EqualTo(second.Purity));
+            Assert.That(first.Effects, Is.EqualTo(second.Effects));
+            Assert.That(first.Freshness, Is.EqualTo(second.Freshness));
+            Assert.That(first.EffectVisibility, Is.EqualTo(second.EffectVisibility));
+            Assert.That(first.UnknownReason, Is.EqualTo(second.UnknownReason));
+            Assert.That(first.ThrownExceptionTypes, Is.EqualTo(second.ThrownExceptionTypes));
+            Assert.That(first.BlockingCallChain, Is.EqualTo(second.BlockingCallChain));
+        });
     }
 
     [Test]

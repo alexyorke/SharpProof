@@ -24,18 +24,13 @@ internal sealed class SmtSolverLifecycleOptions(
 {
     public static readonly SmtSolverLifecycleOptions Default = new();
 
-    public int MaxTransientRetries { get; } = ValidateRetryCount(maxTransientRetries);
+    public int MaxTransientRetries { get; } = maxTransientRetries >= 0
+        ? maxTransientRetries
+        : throw new ArgumentOutOfRangeException(
+            nameof(maxTransientRetries), "Transient retry count cannot be negative.");
     public bool RecycleContextOnTransientFailure { get; } = recycleContextOnTransientFailure;
     public bool DisposeCurrentThreadContextOnServiceDispose { get; } = disposeCurrentThreadContextOnServiceDispose;
 
-    private static int ValidateRetryCount(int value)
-    {
-        if (value < 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(maxTransientRetries),
-                "Transient retry count cannot be negative.");
-        return value;
-    }
 }
 
 internal sealed record SmtAnalysisHealth(
@@ -60,27 +55,3 @@ internal sealed record SmtSolverContextRecycleResult(
     long RequestedGeneration,
     int LocalCacheEntryCount,
     int SharedCacheEntryCount);
-
-internal interface ISmtProofSearchSession : IDisposable
-{
-    long ConsumedResourceCount { get; }
-
-    PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout);
-}
-
-internal sealed class ProofCoreProofSearchSession : ISmtProofSearchSession
-{
-    private readonly PurityProofSearch _search = new();
-
-    public long ConsumedResourceCount => _search.ConsumedResourceCount;
-
-    public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
-    {
-        return _search.Classify(query, timeout);
-    }
-
-    public void Dispose()
-    {
-        _search.Dispose();
-    }
-}

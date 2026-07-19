@@ -522,14 +522,21 @@ Tests are excluded from the metric and must not be deleted.
   nine-argument copy adapter. Focused cache, SMT, purity-state, diagnostic-
   evidence, and architecture coverage preserves semantics and prevents the
   instrumentation paths from returning.
+- [x] Removed test-only proof, reachability-cache, condition-truth, list-pattern,
+  invariant-filter, corpus, and fuzz entry points from production assemblies.
+  Tests now use canonical typed queries, observable cache identity/eviction,
+  direct ProofCore sessions, and test-owned orchestration. The duplicate
+  Symbolic proof-session interface/forwarder, result factory, and source-file
+  facade are deleted; immutable source and SMT option carriers use native
+  record copies. Architecture coverage prevents the retired seams from returning.
 
 ## Current evidence
 
-- Maintained production: 92,596 lines (88,677 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,030 lines; remaining reduction: 4,970.
-  This tranche removed 69 maintained lines without deleting tests.
+- Maintained production: 92,395 lines (88,476 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,231 lines; remaining reduction: 4,769.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,211 passing tests and two documented Main skips.
+- Six lanes: 6,212 passing tests and two documented Main skips.
 
 ## Milestones
 

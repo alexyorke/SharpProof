@@ -21,7 +21,7 @@ internal static class ToolingFuzzAnalysisCache
         var cases = FuzzCaseGenerator.RegistryEntries
             .Select((entry, index) => generator.GenerateForRegistryEntry(entry, index))
             .ToImmutableArray();
-        var analyses = await FuzzRunner.AnalyzeCasesAsync(
+        var analyses = await ToolingFuzzTestRunner.AnalyzeCasesAsync(
             cases,
             false,
             AnalysisParallelism);

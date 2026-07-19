@@ -70,7 +70,7 @@ internal class ProofCorePurityProofTests
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.Reason, Is.EqualTo("impurity_unreachable"));
+        Assert.That(result.Reason, Is.EqualTo("impure_call_unreachable"));
     }
 
     [Test]
@@ -83,7 +83,7 @@ internal class ProofCorePurityProofTests
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
-        Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
+        Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
     }
 
     [Test]
@@ -118,7 +118,7 @@ internal class ProofCorePurityProofTests
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
-        Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
+        Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
         Assert.That(result.PathCheck.Witness, Is.Not.Null);
         Assert.That(result.ImpurityCheck.Witness, Is.Not.Null);
         Assert.That(result.ImpurityCheck.Witness!.Assignments.Single().IntegerValue, Is.EqualTo(0));
@@ -323,4 +323,28 @@ internal class ProofCorePurityProofTests
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("branch_reachable"));
     }
+}
+
+internal static class PurityProofSearchTestExtensions
+{
+    internal static PurityProofResult Classify(
+        this PurityProofSearch search,
+        SmtFormula impurityCondition,
+        TimeSpan timeout) =>
+        search.Classify(
+            new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.ImpureCallReachability, impurityCondition)),
+            timeout);
+
+    internal static PurityProofResult Classify(
+        this PurityProofSearch search,
+        IEnumerable<SmtFormula> pathConditions,
+        SmtFormula impurityCondition,
+        TimeSpan timeout) =>
+        search.Classify(
+            new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(PurityHazardKind.ImpureCallReachability, impurityCondition)),
+            timeout);
 }

@@ -4003,22 +4003,12 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.ProofCore/PurityProofResultFactory.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "PurityProofResultFactory"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.ProofCore/PurityProofSearch.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "HazardClassificationMode",
                                                   "HazardDescriptor",
+                                                  "IPurityProofSearchSession",
                                                   "ProofCheckInfo",
                                                   "PurityProofOutcome",
                                                   "PurityProofResult",
@@ -4026,6 +4016,7 @@
                                               ],
                             "referencingFixtureCount":  7,
                             "referencedTokens":  [
+                                                     "IPurityProofSearchSession",
                                                      "ProofCheckInfo",
                                                      "PurityProofOutcome",
                                                      "PurityProofResult",
@@ -4388,7 +4379,7 @@
                                                   "ExecutionRootPolicy",
                                                   "ExpressionCastUnwrapPolicy"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpSyntaxFacts",
                                                      "ExecutionRootPolicy"
@@ -5241,17 +5232,14 @@
                             "path":  "SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "ISmtProofSearchSession",
-                                                  "ProofCoreProofSearchSession",
                                                   "SmtAnalysisHealth",
                                                   "SmtAnalysisHealthState",
                                                   "SmtSolverContextRecycleResult",
                                                   "SmtSolverContextRecycleScope",
                                                   "SmtSolverLifecycleOptions"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
-                                                     "ISmtProofSearchSession",
                                                      "SmtAnalysisHealth",
                                                      "SmtAnalysisHealthState",
                                                      "SmtSolverContextRecycleScope",
@@ -5277,7 +5265,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  21,
+                            "referencingFixtureCount":  22,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -5930,7 +5918,6 @@
                                               ],
                             "referencingFixtureCount":  10,
                             "referencedTokens":  [
-                                                     "SymbolicCacheInfo",
                                                      "SymbolicFactInfo",
                                                      "SymbolicInvariantInfo",
                                                      "SymbolicProofBackend",
@@ -6162,17 +6149,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicSourceCompilationProfile"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicSourceFile.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicSourceFile"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -7050,7 +7026,7 @@
                                                   "DiagnosticExpectationPolicy",
                                                   "FuzzRunner"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "FuzzRunner"
                                                  ]
@@ -8968,6 +8944,7 @@
                                                                  "SymbolicProofModelTests"
                                                              ],
                                     "tokens":  [
+                                                   "IPurityProofSearchSession",
                                                    "ProofCheckInfo",
                                                    "PurityProofOutcome",
                                                    "PurityProofResult",
@@ -9193,13 +9170,14 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "CSharpSyntaxFactsTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "SymbolicSemanticPipelineTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpSyntaxFacts",
                                                    "ExecutionRootPolicy"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicCfgProgramPointStateCollector.cs",
@@ -9650,17 +9628,15 @@
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerHostConcurrencyStressTests",
                                                                  "RepositoryArchitectureTests",
-                                                                 "SmtAnalysisServiceTests",
-                                                                 "SymbolicProofModelTests"
+                                                                 "SmtAnalysisServiceTests"
                                                              ],
                                     "tokens":  [
-                                                   "ISmtProofSearchSession",
                                                    "SmtAnalysisHealth",
                                                    "SmtAnalysisHealthState",
                                                    "SmtSolverContextRecycleScope",
                                                    "SmtSolverLifecycleOptions"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisOptions.cs",
@@ -9707,6 +9683,7 @@
                                                                  "OperationBlockPipelineTests",
                                                                  "PathFactExpressionReachabilityTests",
                                                                  "PathSensitiveSmtInvariantTests",
+                                                                 "ReferenceReachabilitySmtTests",
                                                                  "RepositoryArchitectureTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
@@ -9724,7 +9701,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  21
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaStructuralKey.cs",
@@ -10098,7 +10075,6 @@
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicCacheInfo",
                                                    "SymbolicFactInfo",
                                                    "SymbolicInvariantInfo",
                                                    "SymbolicProofBackend",
@@ -10597,7 +10573,7 @@
                                     "module":  "CorpusReportCore",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
-                                                                 "RoslynConstructCoverageTests"
+                                                                 "RepositoryArchitectureTests"
                                                              ],
                                     "tokens":  [
                                                    "SarifCorpusInput",
@@ -10761,12 +10737,13 @@
                                     "path":  "Tools/SharpProof.Fuzz.Core/FuzzRunner.cs",
                                     "module":  "FuzzCore",
                                     "selectedTestFixtures":  [
-                                                                 "FuzzToolTests"
+                                                                 "FuzzToolTests",
+                                                                 "RepositoryArchitectureTests"
                                                              ],
                                     "tokens":  [
                                                    "FuzzRunner"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "Tools/SharpProof.Fuzz.Core/FuzzShapeRegistry.cs",

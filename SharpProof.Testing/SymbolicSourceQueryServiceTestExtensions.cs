@@ -207,16 +207,20 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => service.QuerySource(
-            sourceText,
-            sourcePath,
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path is required.", nameof(filePath));
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Source file does not exist.", filePath);
+        return service.QuerySource(
+            File.ReadAllText(filePath),
+            Path.GetFullPath(filePath),
             line,
             column,
             references,
             cancellationToken,
             smtAnalysis,
             impliedConditions,
-            compilationProfile));
+            compilationProfile);
     }
 
     internal static SymbolicProgramPointResult QuerySource(

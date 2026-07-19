@@ -18,14 +18,15 @@ internal sealed record PurityProofResult(
     ProofCheckInfo ImpurityCheck,
     string Reason);
 
-internal sealed class PurityProofSearch : IDisposable
+internal interface IPurityProofSearchSession : IDisposable
 {
-    private static readonly HazardDescriptor GenericImpurityDescriptor =
-        HazardDescriptor.Triggered(
-            "impurity_unreachable",
-            "impurity_reachable",
-            "impurity_feasibility_unknown");
+    long ConsumedResourceCount { get; }
 
+    PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout);
+}
+
+internal sealed class PurityProofSearch : IPurityProofSearchSession
+{
     private static readonly IReadOnlyDictionary<PurityHazardKind, HazardDescriptor> HazardDescriptors =
         new Dictionary<PurityHazardKind, HazardDescriptor>
         {
@@ -68,19 +69,6 @@ internal sealed class PurityProofSearch : IDisposable
     public void Dispose()
     {
         _solver.Dispose();
-    }
-
-    public PurityProofResult Classify(SmtFormula impurityCondition, TimeSpan timeout)
-    {
-        return Classify(Array.Empty<SmtFormula>(), impurityCondition, timeout);
-    }
-
-    public PurityProofResult Classify(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula impurityCondition,
-        TimeSpan timeout)
-    {
-        return ClassifyTriggeredHazard(pathConditions, impurityCondition, timeout, GenericImpurityDescriptor);
     }
 
     public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)

@@ -24,10 +24,12 @@ public sealed class SymbolicInvariantTargetFilterTests
         Assert.Multiple(() =>
         {
             Assert.That(
-                SymbolicInvariantTargetFilter.ApplyToProofResults(results, filters).Select(static item => item.Target),
+                SymbolicInvariantTargetFilter.ApplyToTargets(results, filters, static item => item.Target)
+                    .Select(static item => item.Target),
                 Is.EqualTo(new[] { "field" }));
             Assert.That(
-                SymbolicInvariantTargetFilter.ApplyToConditions(conditions, filters).Select(static item => item.Target),
+                SymbolicInvariantTargetFilter.ApplyToTargets(conditions, filters, static item => item.Target)
+                    .Select(static item => item.Target),
                 Is.EqualTo(new[] { "field" }));
         });
     }
@@ -43,9 +45,11 @@ public sealed class SymbolicInvariantTargetFilterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(SymbolicInvariantTargetFilter.ApplyToProofResults(results, Array.Empty<string>()),
+            Assert.That(SymbolicInvariantTargetFilter.ApplyToTargets(
+                    results, Array.Empty<string>(), static item => item.Target),
                 Is.SameAs(results));
-            Assert.That(SymbolicInvariantTargetFilter.ApplyToConditions(conditions, Array.Empty<string>()),
+            Assert.That(SymbolicInvariantTargetFilter.ApplyToTargets(
+                    conditions, Array.Empty<string>(), static item => item.Target),
                 Is.SameAs(conditions));
         });
     }

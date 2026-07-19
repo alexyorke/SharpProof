@@ -1960,14 +1960,16 @@ internal class TestClass
 
         var filters = new[] { " copy " };
         var pointProofs = result.ProgramPoints
-            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToProofResults(point.ConditionProofs, filters))
+            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToTargets(
+                point.ConditionProofs, filters, static proof => proof.Target))
             .ToArray();
         Assert.That(pointProofs, Is.Not.Empty);
         Assert.That(pointProofs.Select(static proof => proof.Target), Is.All.EqualTo("copy"));
         Assert.That(pointProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
 
         var pointConditions = result.ProgramPoints
-            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToConditions(point.Invariant.Conditions, filters))
+            .SelectMany(point => SymbolicInvariantTargetFilter.ApplyToTargets(
+                point.Invariant.Conditions, filters, static condition => condition.Target))
             .ToArray();
         Assert.That(pointConditions.Select(static condition => condition.Target), Does.Contain("copy"));
         Assert.That(pointConditions.Select(static condition => condition.Target), Does.Not.Contain("other"));

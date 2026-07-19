@@ -668,9 +668,10 @@ public class TestClass
         var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
         var method = typeof(SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
-            .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+            .GetMethod("IsConditionAlwaysFalseUsingSmt",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
 
         return (bool)method.Invoke(null,
-            new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+            new object?[] { context.Expression, context.SemanticModel, CancellationToken.None, null })!;
     }
 }

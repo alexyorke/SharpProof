@@ -7,14 +7,14 @@ internal enum SmtAnalysisMode
     Deep
 }
 
-internal sealed class SmtAnalysisOptions(
-    SmtAnalysisMode mode,
-    TimeSpan queryTimeout,
-    TimeSpan methodBudget,
-    int maxPathConditions,
-    int maxExpressionNodes,
-    bool useSharedResultCache,
-    SmtSolverLifecycleOptions lifecycle)
+internal sealed record SmtAnalysisOptions(
+    SmtAnalysisMode Mode,
+    TimeSpan QueryTimeout,
+    TimeSpan MethodBudget,
+    int MaxPathConditions,
+    int MaxExpressionNodes,
+    bool UseSharedResultCache,
+    SmtSolverLifecycleOptions Lifecycle)
 {
     public static readonly SmtAnalysisOptions Default = ForMode(SmtAnalysisMode.Bounded);
 
@@ -36,13 +36,6 @@ internal sealed class SmtAnalysisOptions(
     {
     }
 
-    public SmtAnalysisMode Mode { get; } = mode;
-    public TimeSpan QueryTimeout { get; } = queryTimeout;
-    public TimeSpan MethodBudget { get; } = methodBudget;
-    public int MaxPathConditions { get; } = maxPathConditions;
-    public int MaxExpressionNodes { get; } = maxExpressionNodes;
-    public bool UseSharedResultCache { get; } = useSharedResultCache;
-    public SmtSolverLifecycleOptions Lifecycle { get; } = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
     public bool IsEnabled => Mode != SmtAnalysisMode.Off;
 
     public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode)
@@ -81,25 +74,15 @@ internal sealed class SmtAnalysisOptions(
         int? maxPathConditions = null,
         int? maxExpressionNodes = null)
     {
-        return new SmtAnalysisOptions(
-            Mode,
-            queryTimeout ?? QueryTimeout,
-            methodBudget ?? MethodBudget,
-            maxPathConditions ?? MaxPathConditions,
-            maxExpressionNodes ?? MaxExpressionNodes,
-            UseSharedResultCache,
-            Lifecycle);
+        return this with
+        {
+            QueryTimeout = queryTimeout ?? QueryTimeout,
+            MethodBudget = methodBudget ?? MethodBudget,
+            MaxPathConditions = maxPathConditions ?? MaxPathConditions,
+            MaxExpressionNodes = maxExpressionNodes ?? MaxExpressionNodes
+        };
     }
 
-    public SmtAnalysisOptions WithLifecycle(SmtSolverLifecycleOptions lifecycle)
-    {
-        return new SmtAnalysisOptions(
-            Mode,
-            QueryTimeout,
-            MethodBudget,
-            MaxPathConditions,
-            MaxExpressionNodes,
-            UseSharedResultCache,
-            lifecycle);
-    }
+    public SmtAnalysisOptions WithLifecycle(SmtSolverLifecycleOptions lifecycle) =>
+        this with { Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle)) };
 }

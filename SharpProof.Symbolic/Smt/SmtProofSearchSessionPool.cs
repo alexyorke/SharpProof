@@ -4,18 +4,18 @@ internal sealed class SmtProofSearchSessionPool
 {
     private static long s_globalGeneration;
 
-    private readonly Func<ISmtProofSearchSession> _sessionFactory;
+    private readonly Func<IPurityProofSearchSession> _sessionFactory;
     private readonly ThreadLocal<SessionContext?> _sessions = new(trackAllValues: true);
     private bool _disposed;
 
-    public SmtProofSearchSessionPool(Func<ISmtProofSearchSession> sessionFactory)
+    public SmtProofSearchSessionPool(Func<IPurityProofSearchSession> sessionFactory)
     {
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
     }
 
     public static long GlobalGeneration => Interlocked.Read(ref s_globalGeneration);
 
-    public ISmtProofSearchSession GetOrCreate(out bool recycledStaleSession)
+    public IPurityProofSearchSession GetOrCreate(out bool recycledStaleSession)
     {
         ThrowIfDisposed();
 
@@ -78,7 +78,7 @@ internal sealed class SmtProofSearchSessionPool
         return disposedCount;
     }
 
-    private static void DisposeSession(ISmtProofSearchSession session)
+    private static void DisposeSession(IPurityProofSearchSession session)
     {
         try
         {
@@ -96,6 +96,6 @@ internal sealed class SmtProofSearchSessionPool
     }
 
     private sealed record SessionContext(
-        ISmtProofSearchSession Session,
+        IPurityProofSearchSession Session,
         long Generation);
 }

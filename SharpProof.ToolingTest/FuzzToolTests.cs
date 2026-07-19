@@ -21,7 +21,7 @@ public class FuzzToolTests
             "AnalyzerFailure",
             "public class C { }",
             false,
-            FuzzExpectation.DefinitelyImpure());
+            FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.Ignore));
 
         var findings = FuzzRunner.Evaluate(
             fuzzCase,
@@ -261,7 +261,7 @@ public class FuzzToolTests
             "KnownImpureConsole",
             source,
             false,
-            FuzzExpectation.DefinitelyImpure()));
+            FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.Ignore)));
 
         Assert.That(analysis.CompilationErrors, Is.Empty);
         Assert.That(analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -319,7 +319,7 @@ public class FuzzToolTests
                 new FuzzCase("CompileFailB", "CompileFail", repeatedSource, false, FuzzExpectation.Conservative()),
                 new FuzzCase("CompileFailC", "CompileFail", distinctSource, false, FuzzExpectation.Conservative()));
 
-            var summary = await FuzzRunner.RunCasesAsync(
+            var summary = await ToolingFuzzTestRunner.RunCasesAsync(
                 cases,
                 new FuzzOptions
                 {
@@ -745,7 +745,7 @@ public class FuzzToolTests
             var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
             var exceptionDiagnostic =
                 analysis.Diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId);
-            var summary = await FuzzRunner.RunCasesAsync(
+            var summary = await ToolingFuzzTestRunner.RunCasesAsync(
                 ImmutableArray.Create(fuzzCase),
                 new FuzzOptions
                 {

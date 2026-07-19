@@ -151,20 +151,6 @@ internal sealed class InferredMethodSummary
 
     internal InferredSummaryUnknownReason UnknownReason { get; }
 
-    internal bool HasSameSemanticsAs(InferredMethodSummary other)
-    {
-        if (other == null) throw new ArgumentNullException(nameof(other));
-
-        return Identity.Equals(other.Identity) &&
-               Purity == other.Purity &&
-               Effects == other.Effects &&
-               Freshness == other.Freshness &&
-               EffectVisibility == other.EffectVisibility &&
-               UnknownReason == other.UnknownReason &&
-               ThrownExceptionTypes.SequenceEqual(other.ThrownExceptionTypes, StringComparer.Ordinal) &&
-               BlockingCallChain.SequenceEqual(other.BlockingCallChain, StringComparer.Ordinal);
-    }
-
     internal static InferredMethodSummary FromEffectSummary(
         StructuralMethodIdentity identity,
         string? classification,

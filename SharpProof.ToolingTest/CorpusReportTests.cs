@@ -11,7 +11,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_AggregatesSharpProofCountsAndEvidence()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -81,7 +81,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_AggregatesExceptionFlowEvidence()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -145,7 +145,7 @@ public class CorpusReportTests
                                  [{"ExceptionType":"System.InvalidOperationException","Category":"source_callee","SourcePath":"VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw","CalleeExactSymbolKey":"Voucher.get_AcceptedDocument()","Depth":2}]
                                  """;
 
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", $$"""
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", $$"""
                                                                              {
                                                                                "version": "2.1.0",
                                                                                "runs": [
@@ -246,7 +246,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_IdentifiesCatalogMissesAndFalsePositiveCandidates()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -285,7 +285,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_PreservesCatalogMissCategoriesForSameSymbol()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -321,7 +321,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_AggregatesUnknownOperationKinds()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -355,7 +355,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_NormalizesEvidencePropertiesBeforeAggregating()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [
@@ -415,7 +415,7 @@ public class CorpusReportTests
     [Test]
     public void CreateFromSarifJson_DoesNotDoubleCountExplanationEvidence()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("sample.sarif", """
                                                                            {
                                                                              "version": "2.1.0",
                                                                              "runs": [

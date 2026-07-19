@@ -2,14 +2,6 @@ namespace SharpProof.Analyzer.Engine;
 
 internal static partial class ExecutionVisibility
 {
-    public static bool IsInStaticallyUnreachableBranch(
-        SyntaxNode syntaxNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return IsInStaticallyUnreachableBranchUsingSmt(syntaxNode, semanticModel, cancellationToken, null);
-    }
-
     public static bool IsInStaticallyUnreachableBranchUsingSmt(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,

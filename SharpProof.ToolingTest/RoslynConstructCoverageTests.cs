@@ -211,7 +211,7 @@ public class RoslynConstructCoverageTests
     [Test]
     public void CorpusReportAggregatesCoverage()
     {
-        var report = SarifCorpusReport.CreateFromSarifJson("coverage.sarif", """
+        var report = CorpusReportTestData.CreateFromSarifJson("coverage.sarif", """
                                                                              {
                                                                                "version": "2.1.0",
                                                                                "runs": [

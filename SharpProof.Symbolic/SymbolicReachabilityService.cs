@@ -83,24 +83,6 @@ internal static class SymbolicReachabilityService
                 cancellationToken);
     }
 
-    internal static SymbolicCacheInfo GetStructuralPathCacheInfo(
-        SyntaxNode site,
-        SemanticModel semanticModel)
-    {
-        if (!s_structuralPathStateCache.TryGetValue(semanticModel, out var methodCaches))
-            return new SymbolicCacheInfo(0, 0, 0, 0);
-
-        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
-        if (!methodCaches.ByExecutionRoot.TryGetValue(executionRoot, out var cache))
-            return new SymbolicCacheInfo(0, 0, 0, 0);
-
-        return new SymbolicCacheInfo(
-            cache.HitCount,
-            cache.MissCount,
-            cache.Count,
-            cache.EvictionCount);
-    }
-
     private static SymbolicState BuildStructuralPathStateSnapshot(
         SyntaxNode site,
         SemanticModel semanticModel,

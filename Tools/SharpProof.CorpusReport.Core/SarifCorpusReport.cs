@@ -39,13 +39,6 @@ public static class SarifCorpusReport
         return builder.Build();
     }
 
-    public static CorpusReportSummary CreateFromSarifJson(string inputName, string sarifJson)
-    {
-        var builder = new SummaryBuilder();
-        builder.AddSarifJson(inputName, sarifJson);
-        return builder.Build();
-    }
-
     private sealed class SummaryBuilder
     {
         private readonly Dictionary<(string Category, string Value), int> _catalogMisses = new();

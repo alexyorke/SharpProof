@@ -2,20 +2,6 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicInvariantTargetFilter
 {
-    internal static IReadOnlyList<SymbolicConditionProofResult> ApplyToProofResults(
-        IReadOnlyList<SymbolicConditionProofResult> proofs,
-        IReadOnlyList<string> invariantTargets)
-    {
-        return ApplyToTargets(proofs, invariantTargets, static proof => proof.Target);
-    }
-
-    internal static IReadOnlyList<SymbolicInvariantCondition> ApplyToConditions(
-        IReadOnlyList<SymbolicInvariantCondition> conditions,
-        IReadOnlyList<string> invariantTargets)
-    {
-        return ApplyToTargets(conditions, invariantTargets, static condition => condition.Target);
-    }
-
     internal static IReadOnlyList<TTarget> ApplyToTargets<TTarget>(
         IReadOnlyList<TTarget> targets,
         IReadOnlyList<string> invariantTargets,

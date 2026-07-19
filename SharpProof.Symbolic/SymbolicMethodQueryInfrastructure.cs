@@ -19,15 +19,19 @@ internal static class SymbolicSourceInputDispatcher
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                return SymbolicSourceFile.WithFile(source.FilePath!, (sourceText, sourcePath) => QuerySource(
-                    sourceText,
-                    sourcePath,
+                if (string.IsNullOrWhiteSpace(source.FilePath))
+                    throw new ArgumentException("File path is required.", nameof(source));
+                if (!File.Exists(source.FilePath))
+                    throw new FileNotFoundException("Source file does not exist.", source.FilePath);
+                return QuerySource(
+                    File.ReadAllText(source.FilePath),
+                    Path.GetFullPath(source.FilePath),
                     target,
                     options,
                     source.CompilationProfile,
                     compilationKind,
                     querySyntaxTree,
-                    cancellationToken));
+                    cancellationToken);
             case SymbolicSourceInputKind.Text:
                 return QuerySource(
                     source.SourceText!,

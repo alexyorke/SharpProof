@@ -910,6 +910,29 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ProductionAssemblies_DoNotRestoreTestOnlyAnalysisAdapters()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        string Read(string relativePath) => File.ReadAllText(Path.Combine(
+            root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Read("SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs"),
+                Does.Not.Contain("ISmtProofSearchSession").And.Not.Contain("ProofCoreProofSearchSession"));
+            Assert.That(Read("SharpProof.Symbolic/SymbolicReachabilityService.cs"),
+                Does.Not.Contain("GetStructuralPathCacheInfo"));
+            Assert.That(Read("SharpProof.Symbolic/CSharpSyntaxFacts.cs"),
+                Does.Not.Contain("TryGetListPatternElementPosition"));
+            Assert.That(Read("Tools/SharpProof.Fuzz.Core/FuzzRunner.cs"),
+                Does.Not.Contain("RunCasesAsync(").And.Not.Contain("AnalyzeCasesAsync("));
+            Assert.That(Read("Tools/SharpProof.CorpusReport.Core/SarifCorpusReport.cs"),
+                Does.Not.Contain("CreateFromSarifJson("));
+            Assert.That(File.Exists(Path.Combine(root, "SharpProof.Symbolic", "SymbolicSourceFile.cs")), Is.False);
+        });
+    }
+
+    [Test]
     public void CommandTools_ShareArgumentCursorAndDispatchOwnership()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

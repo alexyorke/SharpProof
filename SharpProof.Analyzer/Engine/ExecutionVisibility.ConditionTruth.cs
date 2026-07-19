@@ -207,14 +207,6 @@ internal static partial class ExecutionVisibility
         return truth;
     }
 
-    public static bool IsConditionAlwaysTrue(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return IsConditionAlwaysTrueUsingSmt(expression, semanticModel, cancellationToken, null);
-    }
-
     public static bool IsConditionAlwaysTrueUsingSmt(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -227,14 +219,6 @@ internal static partial class ExecutionVisibility
             semanticModel,
             cancellationToken,
             smtAnalysis);
-    }
-
-    public static bool IsConditionAlwaysFalse(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return IsConditionAlwaysFalseUsingSmt(expression, semanticModel, cancellationToken, null);
     }
 
     public static bool IsConditionAlwaysFalseUsingSmt(
