@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Text.Json;
 using static SharpProof.Tools.Shared.SarifJsonFacts;
 using System.Text.Json.Serialization;
@@ -47,13 +46,10 @@ public sealed record BaselineExplanation(
 public sealed record BaselinePruneResult(
     BaselineDocument Baseline,
     int Kept,
-    int Pruned,
-    ImmutableArray<BaselineExplanation> Explanations);
+    int Pruned);
 
 public static class SharpProofBaseline
 {
-    private const int LegacyEvidenceSchemaVersion = 1;
-    private const string LegacyEvidenceCompatibility = "additive-v1";
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselinePathProperty = "sharpproof.baseline.path";
     public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
@@ -75,6 +71,12 @@ public static class SharpProofBaseline
         WriteIndented = true
     };
 
+    private static readonly JsonSerializerOptions InputJsonOptions = new()
+    {
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip
+    };
+
     public static BaselineDocument GenerateFromSarifJson(string sarifJson)
     {
         ArgumentNullException.ThrowIfNull(sarifJson);
@@ -94,15 +96,28 @@ public static class SharpProofBaseline
     {
         ArgumentNullException.ThrowIfNull(json);
 
-        var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
         using var document = JsonDocument.Parse(json, JsonOptions);
-        ValidateEvidenceSchemas(
+        ValidateEvidenceSchema(
             document.RootElement,
             "evidenceSchemaVersion",
             "evidenceSchemaCompatibility",
-            "baseline");
-        AddBaselineEntries(document.RootElement, entries);
-        return new BaselineDocument(Deduplicate(entries));
+            "baseline",
+            required: true);
+        if (document.RootElement.TryGetProperty("diagnostics", out var diagnostics) &&
+            diagnostics.ValueKind == JsonValueKind.Array)
+            foreach (var diagnostic in diagnostics.EnumerateArray())
+                ValidateEvidenceSchema(
+                    diagnostic,
+                    "evidenceSchemaVersion",
+                    "evidenceSchemaCompatibility",
+                    "baseline diagnostic",
+                    required: true);
+        var baseline = JsonSerializer.Deserialize<BaselineDocument>(json, InputJsonOptions) ??
+                       throw new JsonException("Baseline JSON did not contain a document.");
+        return new BaselineDocument(Deduplicate(
+            baseline.Diagnostics.IsDefault
+                ? ImmutableArray<BaselineEntry>.Empty
+                : baseline.Diagnostics));
     }
 
     public static BaselineDocument Merge(IEnumerable<BaselineDocument> documents)
@@ -116,70 +131,50 @@ public static class SharpProofBaseline
         BaselineDocument baseline,
         BaselineDocument current)
     {
-        var currentIds = current.Diagnostics
-            .Select(entry => entry.Id)
-            .ToImmutableHashSet(StringComparer.Ordinal);
-        var currentSymbolsById = current.Diagnostics
-            .GroupBy(entry => entry.Id, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(entry => entry.Symbol).ToImmutableHashSet(StringComparer.Ordinal),
-                StringComparer.Ordinal);
-        var currentPathsByIdAndSymbol = current.Diagnostics
-            .GroupBy(entry => (entry.Id, entry.Symbol))
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(entry => NormalizePath(entry.Path))
-                    .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase));
-        var currentByIdentity = current.Diagnostics
-            .GroupBy(BaselineIdentityKey.FromEntry)
-            .ToDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray());
-
         var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
         foreach (var entry in baseline.Diagnostics)
         {
             var normalizedPath = NormalizePath(entry.Path);
-            var bucketKey = new BaselineIdentityKey(entry.Id, entry.Symbol, normalizedPath);
-            if (currentByIdentity.TryGetValue(bucketKey, out var matchingBucket) &&
-                matchingBucket.Any(currentEntry => EntryMatchesOptionalIdentity(entry, currentEntry)))
-            {
-                explanations.Add(new BaselineExplanation(entry, true, GetMatchedReason(entry)));
-                continue;
-            }
-
-            if (!currentIds.Contains(entry.Id))
+            var idMatches = current.Diagnostics
+                .Where(currentEntry => string.Equals(currentEntry.Id, entry.Id, StringComparison.Ordinal))
+                .ToArray();
+            if (idMatches.Length == 0)
             {
                 explanations.Add(new BaselineExplanation(entry, false,
                     "no current diagnostic with id '" + entry.Id + "'"));
                 continue;
             }
 
-            if (!currentSymbolsById.TryGetValue(entry.Id, out var symbols) ||
-                !symbols.Contains(entry.Symbol))
+            var symbolMatches = idMatches
+                .Where(currentEntry => string.Equals(currentEntry.Symbol, entry.Symbol, StringComparison.Ordinal))
+                .ToArray();
+            if (symbolMatches.Length == 0)
             {
                 explanations.Add(new BaselineExplanation(entry, false, "diagnostic id matched but symbol did not"));
                 continue;
             }
 
-            var idAndSymbol = (entry.Id, entry.Symbol);
-            if (currentPathsByIdAndSymbol.TryGetValue(idAndSymbol, out var paths) &&
-                !paths.Contains(normalizedPath))
+            var pathMatches = symbolMatches
+                .Where(currentEntry => string.Equals(
+                    NormalizePath(currentEntry.Path),
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (pathMatches.Length == 0)
             {
                 explanations.Add(new BaselineExplanation(entry, false,
                     "diagnostic id and symbol matched but path did not"));
                 continue;
             }
 
-            if (currentPathsByIdAndSymbol.ContainsKey(idAndSymbol))
+            if (pathMatches.Any(currentEntry => EntryMatchesOptionalIdentity(entry, currentEntry)))
             {
-                explanations.Add(new BaselineExplanation(entry, false,
-                    "diagnostic id, symbol, and path matched but instance identity did not"));
+                explanations.Add(new BaselineExplanation(entry, true, GetMatchedReason(entry)));
                 continue;
             }
 
-            explanations.Add(new BaselineExplanation(entry, false, "no matching current diagnostic"));
+            explanations.Add(new BaselineExplanation(entry, false,
+                "diagnostic id, symbol, and path matched but instance identity did not"));
         }
 
         return explanations.ToImmutable();
@@ -251,8 +246,7 @@ public static class SharpProofBaseline
         return new BaselinePruneResult(
             new BaselineDocument(kept),
             kept.Length,
-            baseline.Diagnostics.Length - kept.Length,
-            explanations);
+            baseline.Diagnostics.Length - kept.Length);
     }
 
     public static string ToJson(BaselineDocument baseline)
@@ -319,11 +313,12 @@ public static class SharpProofBaseline
             properties.ValueKind != JsonValueKind.Object)
             return null;
 
-        ValidateEvidenceSchemas(
+        ValidateEvidenceSchema(
             properties,
             EvidenceSchemaVersionProperty,
             EvidenceSchemaCompatibilityProperty,
-            "SARIF diagnostic");
+            "SARIF diagnostic",
+            required: false);
 
         var symbol = GetEvidenceProperty(properties, BaselineSymbolProperty, includeCustomProperties: true);
         if (string.IsNullOrWhiteSpace(symbol)) return null;
@@ -343,90 +338,6 @@ public static class SharpProofBaseline
             GetEvidenceProperty(properties, BaselineContractProperty, includeCustomProperties: true),
             GetEvidenceProperty(properties, BaselineOperationKindProperty, includeCustomProperties: true),
             GetEvidenceProperty(properties, BaselineEvidenceKeyProperty, includeCustomProperties: true));
-    }
-
-    private static void AddBaselineEntries(
-        JsonElement element,
-        ImmutableArray<BaselineEntry>.Builder entries)
-    {
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray()) AddBaselineEntries(item, entries);
-
-            return;
-        }
-
-        if (element.ValueKind != JsonValueKind.Object) return;
-
-        TryAddBaselineEntry(element, entries);
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind == JsonValueKind.Array ||
-                property.Value.ValueKind == JsonValueKind.Object)
-                AddBaselineEntries(property.Value, entries);
-    }
-
-    private static void TryAddBaselineEntry(
-        JsonElement element,
-        ImmutableArray<BaselineEntry>.Builder entries)
-    {
-        string? id = null;
-        string? symbol = null;
-        string? path = null;
-        string? message = null;
-        string? contract = null;
-        string? operationKind = null;
-        string? evidenceKey = null;
-        int? line = null;
-        int? column = null;
-
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind == JsonValueKind.String)
-            {
-                var value = property.Value.GetString()?.Trim();
-                if (string.IsNullOrWhiteSpace(value)) continue;
-
-                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
-                    id = value;
-                else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
-                    symbol = value;
-                else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
-                    path = value;
-                else if (string.Equals(property.Name, "message", StringComparison.OrdinalIgnoreCase))
-                    message = value;
-                else if (string.Equals(property.Name, "contract", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "contractText", StringComparison.OrdinalIgnoreCase))
-                    contract = value;
-                else if (string.Equals(property.Name, "operationKind", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "operation_kind", StringComparison.OrdinalIgnoreCase))
-                    operationKind = value;
-                else if (string.Equals(property.Name, "evidenceKey", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "evidence_key", StringComparison.OrdinalIgnoreCase))
-                    evidenceKey = value;
-            }
-            else if (property.Value.ValueKind == JsonValueKind.Number)
-            {
-                if (string.Equals(property.Name, "line", StringComparison.OrdinalIgnoreCase) &&
-                    property.Value.TryGetInt32(out var parsedLine))
-                    line = parsedLine;
-                else if (string.Equals(property.Name, "column", StringComparison.OrdinalIgnoreCase) &&
-                         property.Value.TryGetInt32(out var parsedColumn))
-                    column = parsedColumn;
-            }
-
-        if (!string.IsNullOrWhiteSpace(id) &&
-            !string.IsNullOrWhiteSpace(symbol) &&
-            !string.IsNullOrWhiteSpace(path))
-            entries.Add(new BaselineEntry(
-                id!,
-                symbol!,
-                NormalizePath(path!),
-                message,
-                line,
-                column,
-                contract,
-                operationKind,
-                evidenceKey));
     }
 
     private static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries)
@@ -450,76 +361,50 @@ public static class SharpProofBaseline
             : null;
     }
 
-    private static void ValidateEvidenceSchemas(
+    private static void ValidateEvidenceSchema(
         JsonElement element,
         string versionPropertyName,
         string compatibilityPropertyName,
-        string surfaceName)
+        string surfaceName,
+        bool required)
     {
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-                ValidateEvidenceSchemas(item, versionPropertyName, compatibilityPropertyName, surfaceName);
-            return;
-        }
-
-        if (element.ValueKind != JsonValueKind.Object) return;
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new NotSupportedException(surfaceName + " must be a JSON object.");
 
         var (hasVersion, versionElement, hasCompatibility, compatibilityElement) =
             JsonElementPropertyReader.ReadEvidenceSchemaProperties(
                 element,
                 versionPropertyName,
                 compatibilityPropertyName);
+        if (required && (!hasVersion || !hasCompatibility))
+            throw new NotSupportedException(surfaceName + " must declare the current evidence schema.");
+
         if (hasVersion || hasCompatibility)
         {
-            if (!hasVersion || !TryReadSchemaVersion(versionElement, out var version))
+            if (!hasVersion || !IsCurrentSchemaVersion(versionElement))
                 throw new NotSupportedException(surfaceName + " has an invalid " + versionPropertyName + ".");
 
-            var isCurrent = ProofEvidenceSchemaContract.IsReadCompatible(version);
-            var isLegacyV1 = version == LegacyEvidenceSchemaVersion;
-            var isLegacyUnversioned = version == 0;
-            if (!isCurrent && !isLegacyV1 && !isLegacyUnversioned)
-                throw new NotSupportedException(
-                    $"Unsupported {surfaceName} {versionPropertyName} '{version}'; migration supports legacy " +
-                    $"versions 0-1 and current version {ProofEvidenceSchemaContract.CurrentVersion}.");
-
-            var expectedCompatibility = isCurrent
-                ? ProofEvidenceSchemaContract.CompatibilityPolicy
-                : isLegacyV1
-                    ? LegacyEvidenceCompatibility
-                    : null;
-            if (expectedCompatibility != null &&
-                (!hasCompatibility ||
+            if (!hasCompatibility ||
                  compatibilityElement.ValueKind != JsonValueKind.String ||
-                 !string.Equals(compatibilityElement.GetString(), expectedCompatibility, StringComparison.Ordinal)))
+                 !string.Equals(
+                     compatibilityElement.GetString(),
+                     ProofEvidenceSchemaContract.CompatibilityPolicy,
+                     StringComparison.Ordinal))
                 throw new NotSupportedException(
                     surfaceName + " " + compatibilityPropertyName + " must be '" +
-                    expectedCompatibility + "'.");
+                    ProofEvidenceSchemaContract.CompatibilityPolicy + "'.");
         }
-
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
-                ValidateEvidenceSchemas(
-                    property.Value,
-                    versionPropertyName,
-                    compatibilityPropertyName,
-                    surfaceName);
     }
 
-    private static bool TryReadSchemaVersion(JsonElement element, out int version)
-    {
-        if (element.ValueKind == JsonValueKind.Number) return element.TryGetInt32(out version);
-
-        if (element.ValueKind == JsonValueKind.String)
-            return int.TryParse(
-                element.GetString(),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out version);
-
-        version = default;
-        return false;
-    }
+    private static bool IsCurrentSchemaVersion(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Number &&
+        value.TryGetInt32(out var number) &&
+        number == ProofEvidenceSchemaContract.CurrentVersion ||
+        value.ValueKind == JsonValueKind.String &&
+        string.Equals(
+            value.GetString(),
+            ProofEvidenceSchemaContract.CurrentVersion.ToString(),
+            StringComparison.Ordinal);
 
     private static string? GetResultPath(JsonElement result)
     {

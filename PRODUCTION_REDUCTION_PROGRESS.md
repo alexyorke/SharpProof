@@ -226,14 +226,21 @@ Tests are excluded from the metric and must not be deleted.
   needed to validate .NET regex semantics conservatively; focused regex and
   string tests preserve all outcomes, and architecture coverage prevents the
   duplicate shape engine from returning.
+- [x] Removed the pre-release baseline migration and recursive compatibility
+  readers from both the Baseline tool and analyzer. Current version-2 documents
+  now use one canonical `diagnostics` array and exact entry field names;
+  unversioned, additive-v1, nested-group, alias, and arbitrary-object traversal
+  paths are rejected. The `migrate` command remains as a current-schema
+  validator/normalizer, and focused analyzer, CLI, documentation, and
+  architecture coverage preserves current SARIF and baseline behavior.
 
 ## Current evidence
 
-- Maintained production: 100,896 lines (96,977 C#, 3,189 scripts, and 730
-  specifications); net reduction: 6,730 lines; remaining reduction: 13,270.
-  This tranche removed 226 maintained lines without deleting tests.
+- Maintained production: 100,695 lines (96,776 C#, 3,189 scripts, and 730
+  specifications); net reduction: 6,931 lines; remaining reduction: 13,069.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,179 passing tests and two documented skips.
+- Six lanes: 6,180 passing tests and two documented skips.
 
 ## Milestones
 

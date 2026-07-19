@@ -32,9 +32,9 @@ version even when a containing format is otherwise unchanged.
 - Analyzer readers accept only version `2` with the exact `exact-v2` token.
   Unversioned and version `1` evidence is rejected with `SP0032`; it is never
   interpreted as current evidence.
-- `SharpProof.Baseline migrate` accepts legacy unversioned and
-  `additive-v1` baseline files and rewrites both document and entry evidence to
-  version `2`. Migration is explicit tooling behavior, not analyzer compatibility.
+- `SharpProof.Baseline migrate` validates and normalizes current version `2`
+  baseline files. Pre-release unversioned and `additive-v1` inputs are rejected;
+  regenerate them from current SARIF instead of carrying a migration parser.
 - Version `2` readers must ignore unknown optional JSON fields and diagnostic
   properties, but required field names, value types, and meanings cannot be
   removed, renamed, or reinterpreted within version `2`.

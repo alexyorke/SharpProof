@@ -479,11 +479,11 @@ public sealed class TestClass
 
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
-            Does.Contain("partially ignored"));
+            Does.Contain("baseline entry is missing required evidenceSchemaVersion"));
     }
 
     [Test]
-    public async Task BaselineEvidenceSchemaPropertyCasing_IsAcceptedConsistently()
+    public async Task BaselineStructuralPropertyCasing_IsRejected()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             "public sealed class TestClass { }",
@@ -495,9 +495,9 @@ public sealed class TestClass
                     "\"Path\":\"input.cs\",\"EvidenceSchemaVersion\":2," +
                     "\"EvidenceSchemaCompatibility\":\"exact-v2\"}]}")));
 
-        Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAdditionalFileId),
-            Is.False);
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("baseline contains no diagnostic entries"));
     }
 
     [Test]
@@ -534,7 +534,7 @@ public sealed class TestClass
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
         Assert.That(
             diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
-            Does.Contain("baseline entry is missing required evidenceSchemaVersion"));
+            Does.Contain("baseline contains no diagnostic entries"));
     }
 
     [Test]

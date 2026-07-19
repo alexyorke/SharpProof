@@ -111,7 +111,7 @@ public class TestClass
   ""evidenceSchemaCompatibility"": ""exact-v2"",
   ""diagnostics"": [
     {
-      ""diagnosticId"": ""SP0002"",
+      ""id"": ""SP0002"",
       ""symbol"": ""M:TestClass.\u0049mpure"",
       ""path"": ""src/ProductionCode.cs"",
       ""evidenceSchemaVersion"": 2,

@@ -14,27 +14,35 @@ internal static class BaselineJsonReader
 
     internal static bool TryValidateBaselineEvidenceSchemaTree(
         JsonElement element,
-        bool requireRootSchema,
         out EvidenceSchemaValidationFailure failure)
     {
-        return TryValidateEvidenceSchemaTree(
-            element,
+        if (!TryValidateEvidenceSchema(
+                element,
             "evidenceSchemaVersion",
             "evidenceSchemaCompatibility",
-            requireRootSchema,
-            static candidate =>
-                HasPropertyIgnoreCase(candidate, "diagnostics") ||
-                (HasPropertyIgnoreCase(candidate, "id") &&
-                 HasPropertyIgnoreCase(candidate, "symbol") &&
-                 HasPropertyIgnoreCase(candidate, "path")),
-            out failure);
-    }
+            required: true,
+                out failure))
+        {
+            failure = failure with { IsRoot = true };
+            return false;
+        }
 
-    internal static bool VisitJsonTree(
-        JsonElement element,
-        Func<JsonElement, bool, bool> visit)
-    {
-        return VisitJsonTree(element, isRoot: true, visit);
+        if (!element.TryGetProperty("diagnostics", out var diagnostics) ||
+            diagnostics.ValueKind != JsonValueKind.Array)
+            return true;
+
+        foreach (var entry in diagnostics.EnumerateArray())
+            if (entry.ValueKind == JsonValueKind.Object &&
+                !TryValidateEvidenceSchema(
+                    entry,
+                    "evidenceSchemaVersion",
+                    "evidenceSchemaCompatibility",
+                    required: true,
+                    out failure))
+                return false;
+
+        failure = default;
+        return true;
     }
 
     internal static bool TryValidateEvidenceSchema(
@@ -92,137 +100,30 @@ internal static class BaselineJsonReader
         return true;
     }
 
-    internal static bool HasPropertyIgnoreCase(JsonElement element, string propertyName)
-    {
-        return JsonElementPropertyReader.TryGetPropertyIgnoreCase(element, propertyName, out _);
-    }
-
     internal static BaselineEntryJsonFields ReadEntryFields(JsonElement element)
     {
-        string? id = null;
-        string? symbol = null;
-        string? path = null;
-        string? contractText = null;
-        string? operationKind = null;
-        string? evidenceKey = null;
-        int? line = null;
-        int? column = null;
-        var hasCandidateProperty = false;
-
-        foreach (var property in element.EnumerateObject())
-        {
-            var isId = IsProperty(property, "id") || IsProperty(property, "diagnosticId");
-            var isSymbol = IsProperty(property, "symbol");
-            var isPath = IsProperty(property, "path");
-            if (isId || isSymbol || isPath) hasCandidateProperty = true;
-
-            if (property.Value.ValueKind == JsonValueKind.String)
-            {
-                var value = property.Value.GetString();
-                if (string.IsNullOrWhiteSpace(value)) continue;
-
-                value = value!.Trim();
-                if (isId)
-                    id = value;
-                else if (isSymbol)
-                    symbol = value;
-                else if (isPath)
-                    path = value;
-                else if (IsProperty(property, "contract") || IsProperty(property, "contractText"))
-                    contractText = value;
-                else if (IsProperty(property, "operationKind") || IsProperty(property, "operation_kind"))
-                    operationKind = value;
-                else if (IsProperty(property, "evidenceKey") || IsProperty(property, "evidence_key"))
-                    evidenceKey = value;
-            }
-            else if (property.Value.ValueKind == JsonValueKind.Number)
-            {
-                if (IsProperty(property, "line") && property.Value.TryGetInt32(out var parsedLine))
-                    line = parsedLine;
-                else if (IsProperty(property, "column") && property.Value.TryGetInt32(out var parsedColumn))
-                    column = parsedColumn;
-            }
-        }
-
         return new BaselineEntryJsonFields(
-            hasCandidateProperty,
-            id,
-            symbol,
-            path,
-            contractText,
-            operationKind,
-            evidenceKey,
-            line,
-            column);
+            HasAnyProperty(element, "id", "symbol", "path"),
+            ReadString(element, "id"),
+            ReadString(element, "symbol"),
+            ReadString(element, "path"),
+            ReadString(element, "contract"),
+            ReadString(element, "operationKind"),
+            ReadString(element, "evidenceKey"),
+            ReadInt32(element, "line"),
+            ReadInt32(element, "column"));
     }
 
-    private static bool TryValidateEvidenceSchemaTree(
-        JsonElement element,
-        string versionPropertyName,
-        string compatibilityPropertyName,
-        bool requireRootSchema,
-        Func<JsonElement, bool> requiresNestedSchema,
-        out EvidenceSchemaValidationFailure failure)
-    {
-        var validationFailure = default(EvidenceSchemaValidationFailure);
-        var valid = VisitJsonTree(element, (candidate, isRoot) =>
-        {
-            if (candidate.ValueKind == JsonValueKind.Array)
-            {
-                if (!isRoot || !requireRootSchema) return true;
+    private static bool HasAnyProperty(JsonElement element, params string[] names) =>
+        names.Any(name => element.TryGetProperty(name, out _));
 
-                validationFailure = new EvidenceSchemaValidationFailure(
-                    EvidenceSchemaValidationFailureKind.Missing,
-                    IsRoot: true);
-                return false;
-            }
+    private static string? ReadString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()?.Trim() is { Length: > 0 } text ? text : null
+            : null;
 
-            if (candidate.ValueKind != JsonValueKind.Object) return true;
-
-            var required = isRoot ? requireRootSchema : requiresNestedSchema(candidate);
-            if (TryValidateEvidenceSchema(
-                    candidate,
-                    versionPropertyName,
-                    compatibilityPropertyName,
-                    required,
-                    out validationFailure))
-                return true;
-
-            validationFailure = validationFailure.WithRoot(isRoot);
-            return false;
-        });
-
-        failure = validationFailure;
-        return valid;
-    }
-
-    private static bool VisitJsonTree(
-        JsonElement element,
-        bool isRoot,
-        Func<JsonElement, bool, bool> visit)
-    {
-        if (!visit(element, isRoot)) return false;
-
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-                if (!VisitJsonTree(item, isRoot: false, visit))
-                    return false;
-        }
-        else if (element.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var property in element.EnumerateObject())
-                if (!VisitJsonTree(property.Value, isRoot: false, visit))
-                    return false;
-        }
-
-        return true;
-    }
-
-    private static bool IsProperty(JsonProperty property, string propertyName)
-    {
-        return string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase);
-    }
+    private static int? ReadInt32(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : null;
 }
 
 internal readonly record struct BaselineEntryJsonFields(
@@ -242,13 +143,7 @@ internal readonly record struct BaselineEntryJsonFields(
 internal readonly record struct EvidenceSchemaValidationFailure(
     EvidenceSchemaValidationFailureKind Kind,
     int Version = 0,
-    bool IsRoot = false)
-{
-    internal EvidenceSchemaValidationFailure WithRoot(bool isRoot)
-    {
-        return new EvidenceSchemaValidationFailure(Kind, Version, isRoot);
-    }
-}
+    bool IsRoot = false);
 
 internal enum EvidenceSchemaValidationFailureKind
 {

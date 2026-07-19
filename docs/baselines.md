@@ -5,10 +5,9 @@ named `SharpProof.Baseline.json`. The baseline workflow tool creates and
 maintains that file from current diagnostics.
 
 Generated documents and entries carry the shared
-[`evidenceSchemaVersion` compatibility contract](evidence-schema.md). Legacy
-unversioned and version `1` entries are rejected by the analyzer. Upgrade them
-explicitly with the baseline migration command; analyzer reads never interpret
-legacy evidence as version `2`.
+[`evidenceSchemaVersion` compatibility contract](evidence-schema.md). Pre-release
+unversioned and version `1` files must be regenerated from current SARIF;
+neither the baseline tool nor analyzer interprets legacy evidence as version `2`.
 
 ```powershell
 dotnet run --project Tools/SharpProof.Baseline -- migrate --baseline SharpProof.Baseline.json --output SharpProof.Baseline.json

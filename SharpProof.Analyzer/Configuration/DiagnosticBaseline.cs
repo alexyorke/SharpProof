@@ -99,29 +99,19 @@ internal sealed class DiagnosticBaseline
             using var document = JsonDocument.Parse(json, BaselineJsonReader.DocumentOptions);
             if (!BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
                     document.RootElement,
-                    requireRootSchema: true,
                     out _))
                 return builder.ToImmutable();
-            AddEntries(document.RootElement, baseDirectory, builder);
+            if (document.RootElement.TryGetProperty("diagnostics", out var diagnostics) &&
+                diagnostics.ValueKind == JsonValueKind.Array)
+                foreach (var entry in diagnostics.EnumerateArray())
+                    if (entry.ValueKind == JsonValueKind.Object)
+                        TryAddEntry(entry, baseDirectory, builder);
         }
         catch (JsonException)
         {
         }
 
         return builder.ToImmutable();
-    }
-
-    private static void AddEntries(
-        JsonElement element,
-        string baseDirectory,
-        ImmutableArray<BaselineEntry>.Builder builder)
-    {
-        BaselineJsonReader.VisitJsonTree(element, (candidate, _) =>
-        {
-            if (candidate.ValueKind == JsonValueKind.Object)
-                TryAddEntry(candidate, baseDirectory, builder);
-            return true;
-        });
     }
 
     private static void TryAddEntry(

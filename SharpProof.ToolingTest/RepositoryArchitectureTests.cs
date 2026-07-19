@@ -307,6 +307,27 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void BaselineTool_ReadsOnlyTheCurrentDocumentSchema()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Tools", "SharpProof.Baseline.Core", "SharpProofBaseline.cs"));
+        var analyzerReader = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Configuration", "BaselineJsonReader.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source, Does.Contain("Deserialize<BaselineDocument>"));
+            Assert.That(source, Does.Not.Contain("LegacyEvidenceSchemaVersion"));
+            Assert.That(source, Does.Not.Contain("AddBaselineEntries"));
+            Assert.That(source, Does.Not.Contain("TryAddBaselineEntry"));
+            Assert.That(analyzerReader, Does.Not.Contain("VisitJsonTree"));
+            Assert.That(analyzerReader, Does.Not.Contain("diagnosticId"));
+            Assert.That(analyzerReader, Does.Not.Contain("operation_kind"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

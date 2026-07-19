@@ -24,9 +24,9 @@ Migrate an existing diagnostic baseline explicitly:
 dotnet run --project Tools/SharpProof.Baseline -- migrate --baseline SharpProof.Baseline.json --output SharpProof.Baseline.json
 ```
 
-The migration command accepts legacy unversioned and additive-v1 baselines.
-It rewrites document and entry evidence to version 2. This compatibility is
-limited to the migration tool; it is not available in analyzer reads.
+The retained migration command validates and normalizes current version `2`
+baselines. Pre-release unversioned and additive-v1 inputs must be regenerated
+from current SARIF; neither the tool nor analyzer carries legacy readers.
 
 ## Effect-summary schema 5
 

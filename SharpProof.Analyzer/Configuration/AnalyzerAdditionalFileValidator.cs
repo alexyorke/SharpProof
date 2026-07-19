@@ -179,7 +179,6 @@ internal static class AnalyzerAdditionalFileValidator
     {
         if (BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
                 element,
-                requireRootSchema: true,
                 out var failure))
             return true;
 
@@ -278,9 +277,17 @@ internal static class AnalyzerAdditionalFileValidator
     private static BaselineEntryCounts CountBaselineEntries(JsonElement element)
     {
         var counts = new BaselineEntryCounts();
-        BaselineJsonReader.VisitJsonTree(element, (candidate, _) =>
+        if (!element.TryGetProperty("diagnostics", out var diagnostics) ||
+            diagnostics.ValueKind != JsonValueKind.Array)
+            return counts;
+
+        foreach (var candidate in diagnostics.EnumerateArray())
         {
-            if (candidate.ValueKind != JsonValueKind.Object) return true;
+            if (candidate.ValueKind != JsonValueKind.Object)
+            {
+                counts.InvalidCount++;
+                continue;
+            }
 
             var fields = BaselineJsonReader.ReadEntryFields(candidate);
             if (fields.HasCandidateProperty)
@@ -291,9 +298,7 @@ internal static class AnalyzerAdditionalFileValidator
                 else
                     counts.InvalidCount++;
             }
-
-            return true;
-        });
+        }
         return counts;
     }
 

@@ -59,32 +59,29 @@ public sealed class BaselineWorkflowTests
     }
 
     [Test]
-    public void ParseBaselineJson_UpgradesLegacyEvidenceAndRejectsFutureSchema()
+    public void ParseBaselineJson_RejectsLegacyAndFutureEvidenceSchemas()
     {
         const string legacy =
             "{\"version\":1,\"diagnostics\":[{\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"}]}";
-        var parsed = SharpProofBaseline.ParseBaselineJson(legacy);
-
-        Assert.That(parsed.Diagnostics, Has.Length.EqualTo(1));
-        Assert.That(parsed.Diagnostics[0].EvidenceSchemaVersion,
-            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(
+            () => SharpProofBaseline.ParseBaselineJson(legacy),
+            Throws.TypeOf<NotSupportedException>());
 
         const string legacyV1 =
             "{\"version\":1,\"evidenceSchemaVersion\":1," +
             "\"evidenceSchemaCompatibility\":\"additive-v1\",\"diagnostics\":[{" +
             "\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"," +
             "\"evidenceSchemaVersion\":1,\"evidenceSchemaCompatibility\":\"additive-v1\"}]}";
-        var migratedV1 = SharpProofBaseline.ParseBaselineJson(legacyV1);
-        Assert.That(migratedV1.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(migratedV1.Diagnostics.Single().EvidenceSchemaVersion,
-            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(
+            () => SharpProofBaseline.ParseBaselineJson(legacyV1),
+            Throws.TypeOf<NotSupportedException>());
 
         const string future =
             "{\"evidenceSchemaVersion\":99,\"evidenceSchemaCompatibility\":\"future\"," +
             "\"diagnostics\":[{\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"}]}";
         Assert.That(
             () => SharpProofBaseline.ParseBaselineJson(future),
-            Throws.TypeOf<NotSupportedException>().With.Message.Contains("evidenceSchemaVersion '99'"));
+            Throws.TypeOf<NotSupportedException>());
     }
 
     [Test]
@@ -208,8 +205,8 @@ public sealed class BaselineWorkflowTests
             ""sharpproof.baseline.operation_kind"": ""Invocation"",
             ""sharpproof.baseline.contract"": ""[EnforcePure]"",
             ""sharpproof.baseline.evidence_key"": ""impure-call"",
-            ""sharpproof.evidence.schema_version"": ""1"",
-            ""sharpproof.evidence.schema_compatibility"": ""additive-v1""
+            ""sharpproof.evidence.schema_version"": ""2"",
+            ""sharpproof.evidence.schema_compatibility"": ""exact-v2""
           }
         }
       ]
