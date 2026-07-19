@@ -86,7 +86,7 @@ internal class AnalyzerConfiguration(
             GetBoolOrDefault(optionSource, ConfigKeys.SuppressProvenDiagnostics, false),
             GetSuppressionDiagnosticIds(
                 optionSource,
-                ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds));
+                SharpProofDiagnosticSuppressor.SupportedDiagnosticIds));
         var reportExceptions = GetBoolOrDefault(optionSource, ConfigKeys.ReportExceptions, false);
         var checkedExceptions = GetBoolOrDefault(optionSource, ConfigKeys.CheckedExceptions, false);
         var enableEffectSummaryJson = GetBoolOrDefault(optionSource, ConfigKeys.EnableEffectSummaryJson, false);
@@ -322,7 +322,7 @@ internal class AnalyzerConfiguration(
             var normalized = token.ToUpperInvariant();
             if (normalized == "NONE") return ImmutableHashSet<string>.Empty;
 
-            if (ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.Contains(normalized))
+            if (SharpProofDiagnosticSuppressor.SupportedDiagnosticIds.Contains(normalized))
                 builder.Add(normalized);
         }
 
@@ -766,7 +766,11 @@ internal enum InferredContractConfidence
     High = 2
 }
 
-internal sealed class InferredContractSuggestionOptions
+internal sealed class InferredContractSuggestionOptions(
+    bool enabled,
+    MissingPuritySuggestionScope scope,
+    ImmutableHashSet<string> kinds,
+    InferredContractConfidence minimumConfidence)
 {
     internal static readonly ImmutableHashSet<string> AllKinds =
         ImmutableHashSet.Create(
@@ -779,22 +783,10 @@ internal sealed class InferredContractSuggestionOptions
             "requires",
             "nullability");
 
-    public InferredContractSuggestionOptions(
-        bool enabled,
-        MissingPuritySuggestionScope scope,
-        ImmutableHashSet<string> kinds,
-        InferredContractConfidence minimumConfidence)
-    {
-        Enabled = enabled;
-        Scope = scope;
-        Kinds = kinds;
-        MinimumConfidence = minimumConfidence;
-    }
-
-    public bool Enabled { get; }
-    public MissingPuritySuggestionScope Scope { get; }
-    public ImmutableHashSet<string> Kinds { get; }
-    public InferredContractConfidence MinimumConfidence { get; }
+    public bool Enabled { get; } = enabled;
+    public MissingPuritySuggestionScope Scope { get; } = scope;
+    public ImmutableHashSet<string> Kinds { get; } = kinds;
+    public InferredContractConfidence MinimumConfidence { get; } = minimumConfidence;
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off && Kinds.Count > 0;
 
     public bool Includes(string kind, InferredContractConfidence confidence)
@@ -803,41 +795,13 @@ internal sealed class InferredContractSuggestionOptions
     }
 }
 
-internal sealed class ProvenDiagnosticSuppressionOptions
+internal sealed class ProvenDiagnosticSuppressionOptions(
+    bool enabled,
+    ImmutableHashSet<string> diagnosticIds)
 {
-    internal static readonly ImmutableHashSet<string> AllSupportedDiagnosticIds =
-        ImmutableHashSet.Create(
-            StringComparer.OrdinalIgnoreCase,
-            "CS8509",
-            "CS8524",
-            "CS8602",
-            "CS8605",
-            "CS8629",
-            "CS8655",
-            "CS8670",
-            "CS8846",
-            "CS8847",
-            "S2259",
-            "S3655",
-            "V3064",
-            "V3080",
-            "V3095",
-            "V3106",
-            "V3151",
-            "V3152",
-            "V3218");
+    public bool Enabled { get; } = enabled;
 
-    public ProvenDiagnosticSuppressionOptions(
-        bool enabled,
-        ImmutableHashSet<string> diagnosticIds)
-    {
-        Enabled = enabled;
-        DiagnosticIds = diagnosticIds;
-    }
-
-    public bool Enabled { get; }
-
-    public ImmutableHashSet<string> DiagnosticIds { get; }
+    public ImmutableHashSet<string> DiagnosticIds { get; } = diagnosticIds;
 
     public bool Includes(string diagnosticId)
     {

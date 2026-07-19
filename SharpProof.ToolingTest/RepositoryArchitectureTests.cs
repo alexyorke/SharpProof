@@ -257,6 +257,24 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void DiagnosticCatalog_DerivesDescriptorsAndSuppressionIdsFromTheirOwners()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
+        var catalog = File.ReadAllText(Path.Combine(analyzerRoot, "AnalyzerDiagnosticCatalog.cs"));
+        var configuration = File.ReadAllText(Path.Combine(
+            analyzerRoot, "Configuration", "AnalyzerConfiguration.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(catalog, Does.Contain("GetFields(BindingFlags.Public | BindingFlags.Static)"));
+            Assert.That(catalog, Does.Not.Contain("AnalyzerDiagnosticDefinition"));
+            Assert.That(configuration, Does.Not.Contain("AllSupportedDiagnosticIds"));
+            Assert.That(configuration, Does.Contain("SharpProofDiagnosticSuppressor.SupportedDiagnosticIds"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

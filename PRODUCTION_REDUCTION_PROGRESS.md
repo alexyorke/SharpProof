@@ -197,14 +197,19 @@ Tests are excluded from the metric and must not be deleted.
   fixable diagnostic set, titles, equivalence keys, and family behavior through
   direct dispatch; architecture coverage prevents both adapter files from
   returning.
+- [x] Derived analyzer diagnostics from their descriptor fields and suppression
+  configuration from the suppressor specifications. Deleted the manual
+  descriptor list, test-only feature/configuration metadata, and two duplicate
+  suppression-ID lists; focused descriptor, configuration, and suppression
+  tests preserve discovery, ordering, documentation, and proof-backed behavior.
 
 ## Current evidence
 
-- Maintained production: 102,201 lines (98,126 C#, 3,189 scripts, and 886
-  specifications); net reduction: 5,425 lines; remaining reduction: 14,575.
-  This tranche removed 204 maintained lines without deleting tests.
+- Maintained production: 101,996 lines (97,921 C#, 3,189 scripts, and 886
+  specifications); net reduction: 5,630 lines; remaining reduction: 14,370.
+  This tranche removed 205 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,164 passing tests and two documented skips.
+- Six lanes: 6,165 passing tests and two documented skips.
 
 ## Milestones
 

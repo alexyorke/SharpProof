@@ -97,30 +97,15 @@ internal static class AnalyzerConfigurationOptionRegistry
         TreeBool(ConfigKeys.SuppressProvenDiagnostics, "false",
             "Controls opt-in suppression of allowlisted external diagnostics backed by exact SharpProof proofs."),
         TreeOption(ConfigKeys.SuppressionDiagnosticIds, AnalyzerConfigurationValueKind.AllowedValueList,
-            string.Join(", ", ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.OrderBy(
+            string.Join(", ", SharpProofDiagnosticSuppressor.SupportedDiagnosticIds.OrderBy(
                 static id => id,
                 StringComparer.Ordinal)),
             "Restricts exact-proof suppression to supported external diagnostic IDs.",
-            ImmutableArray.Create(
-                "none",
-                "cs8509",
-                "cs8524",
-                "cs8602",
-                "cs8605",
-                "cs8629",
-                "cs8655",
-                "cs8670",
-                "cs8846",
-                "cs8847",
-                "s2259",
-                "s3655",
-                "v3064",
-                "v3080",
-                "v3095",
-                "v3106",
-                "v3151",
-                "v3152",
-                "v3218")),
+            SharpProofDiagnosticSuppressor.SupportedDiagnosticIds
+                .OrderBy(static id => id, StringComparer.Ordinal)
+                .Select(static id => id.ToLowerInvariant())
+                .Prepend("none")
+                .ToImmutableArray()),
         TreeBool(ConfigKeys.ReportExceptions, "false",
             "Emits optional SP0010 exception summary diagnostics."),
         TreeBool(ConfigKeys.ReportNullableInconclusive, "false",

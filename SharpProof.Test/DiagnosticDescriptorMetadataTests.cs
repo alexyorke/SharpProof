@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Test;
 
@@ -53,35 +52,15 @@ public sealed class DiagnosticDescriptorMetadataTests
     }
 
     [Test]
-    public void DiagnosticCatalog_OwnsSupportedDescriptorsAndTypedMetadata()
+    public void DiagnosticCatalog_DiscoversEverySupportedDescriptor()
     {
-        var definitions = AnalyzerDiagnosticCatalog.All;
+        var descriptors = AnalyzerDiagnosticCatalog.SupportedDiagnostics;
 
-        Assert.That(
-            definitions.Select(static definition => definition.Descriptor),
-            Is.EqualTo(new SharpProofAnalyzer().SupportedDiagnostics));
-        Assert.That(
-            definitions.Select(static definition => definition.Descriptor.Id),
-            Is.Unique);
+        Assert.That(descriptors, Is.EqualTo(new SharpProofAnalyzer().SupportedDiagnostics));
         Assert.Multiple(() =>
         {
-            Assert.That(definitions, Has.All.Property(nameof(AnalyzerDiagnosticDefinition.OwningFeature))
-                .Not.EqualTo(AnalyzerFeatures.None));
-            Assert.That(definitions, Has.All.Property(nameof(AnalyzerDiagnosticDefinition.DocumentationUri))
-                .Not.Empty);
-            Assert.That(
-                definitions,
-                Has.All.Matches<AnalyzerDiagnosticDefinition>(definition =>
-                    string.Equals(
-                        definition.DocumentationUri,
-                        definition.Descriptor.HelpLinkUri,
-                        StringComparison.Ordinal)));
-            Assert.That(
-                definitions
-                    .Select(static definition => definition.ConfigurationKey)
-                    .Where(static key => key != null)
-                    .Distinct(StringComparer.Ordinal),
-                Is.SubsetOf(AnalyzerConfigurationOptionRegistry.All.Select(static option => option.Key)));
+            Assert.That(descriptors.Select(static descriptor => descriptor.Id), Is.Unique);
+            Assert.That(descriptors, Has.All.Property(nameof(DiagnosticDescriptor.HelpLinkUri)).Not.Empty);
         });
     }
 

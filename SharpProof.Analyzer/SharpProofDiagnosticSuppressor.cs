@@ -76,6 +76,11 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
     private static readonly ImmutableArray<SuppressionDescriptor> SuppressionDescriptors =
         SuppressionSpecs.Select(static spec => spec.Descriptor).ToImmutableArray();
 
+    internal static readonly ImmutableHashSet<string> SupportedDiagnosticIds =
+        SuppressionSpecs
+            .Select(static spec => spec.Descriptor.SuppressedDiagnosticId)
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
     private static readonly ImmutableDictionary<string, SuppressionSpec> SpecsByDiagnosticId =
         SuppressionSpecs.ToImmutableDictionary(
             static spec => spec.Descriptor.SuppressedDiagnosticId,
