@@ -350,12 +350,19 @@ Tests are excluded from the metric and must not be deleted.
   its boundary. The schema validates duplicate keys and enum metadata, its LF
   resource hash is locked, and the generated configuration reference remains
   byte-identical to the pre-refactor document.
+- [x] Finished the preview session API's immutable query projection shape.
+  `SharpProofTarget` and all five typed payloads are positional records, while
+  one internal projector owns conversion from engine results and common
+  metadata. The intentional breaking snapshot now describes the construction
+  surface directly; all eight query kinds, concurrent caching, typed failures,
+  cancellation retry, and package consumers retain their characterized
+  behavior.
 
 ## Current evidence
 
-- Maintained production: 96,608 lines (92,689 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,018 lines; remaining reduction: 8,982.
-  This tranche removed 215 maintained lines without deleting tests.
+- Maintained production: 96,565 lines (92,646 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,061 lines; remaining reduction: 8,939.
+  This tranche removed 43 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,195 passing tests and two documented Main skips.
 

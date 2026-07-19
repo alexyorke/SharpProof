@@ -899,3 +899,54 @@ SharpProof.Symbolic.ComplexityQueryPayload.Kind.get -> string!
 SharpProof.Symbolic.ComplexityQueryPayload.UnknownCount.get -> int
 SharpProof.Symbolic.SourceQueryPayload.ConservativeUnknownCount.get -> int
 SharpProof.Symbolic.SourceQueryPayload.ReachabilityUnknownCount.get -> int
+SharpProof.Symbolic.SharpProofTarget.SharpProofTarget(SharpProof.Symbolic.SharpProofTargetKind Kind, int? Line = null, int? Column = null, int? Position = null, int? SpanStart = null, int? SpanEnd = null, int? StartLine = null, int? StartColumn = null, int? EndLine = null, int? EndColumn = null, bool IncludeNestedCallables = false) -> void
+SharpProof.Symbolic.SharpProofTarget.Deconstruct(out SharpProof.Symbolic.SharpProofTargetKind Kind, out int? Line, out int? Column, out int? Position, out int? SpanStart, out int? SpanEnd, out int? StartLine, out int? StartColumn, out int? EndLine, out int? EndColumn, out bool IncludeNestedCallables) -> void
+SharpProof.Symbolic.SharpProofTarget.Kind.init -> void
+SharpProof.Symbolic.SharpProofTarget.Line.init -> void
+SharpProof.Symbolic.SharpProofTarget.Column.init -> void
+SharpProof.Symbolic.SharpProofTarget.Position.init -> void
+SharpProof.Symbolic.SharpProofTarget.SpanStart.init -> void
+SharpProof.Symbolic.SharpProofTarget.SpanEnd.init -> void
+SharpProof.Symbolic.SharpProofTarget.StartLine.init -> void
+SharpProof.Symbolic.SharpProofTarget.StartColumn.init -> void
+SharpProof.Symbolic.SharpProofTarget.EndLine.init -> void
+SharpProof.Symbolic.SharpProofTarget.EndColumn.init -> void
+SharpProof.Symbolic.SharpProofTarget.IncludeNestedCallables.init -> void
+SharpProof.Symbolic.SourceQueryPayload.SourceQueryPayload(int ProgramPointCount, string! Invariant, int ConditionProofCount, int UnknownProofCount, bool AllConditionsHold, int ConservativeUnknownCount, int ReachabilityUnknownCount, SharpProof.Symbolic.SharpProofSmtMetadata! Smt) -> void
+SharpProof.Symbolic.SourceQueryPayload.Deconstruct(out int ProgramPointCount, out string! Invariant, out int ConditionProofCount, out int UnknownProofCount, out bool AllConditionsHold, out int ConservativeUnknownCount, out int ReachabilityUnknownCount, out SharpProof.Symbolic.SharpProofSmtMetadata! Smt) -> void
+SharpProof.Symbolic.SourceQueryPayload.ProgramPointCount.init -> void
+SharpProof.Symbolic.SourceQueryPayload.Invariant.init -> void
+SharpProof.Symbolic.SourceQueryPayload.ConditionProofCount.init -> void
+SharpProof.Symbolic.SourceQueryPayload.UnknownProofCount.init -> void
+SharpProof.Symbolic.SourceQueryPayload.AllConditionsHold.init -> void
+SharpProof.Symbolic.SourceQueryPayload.ConservativeUnknownCount.init -> void
+SharpProof.Symbolic.SourceQueryPayload.ReachabilityUnknownCount.init -> void
+SharpProof.Symbolic.SourceQueryPayload.Smt.init -> void
+SharpProof.Symbolic.ConditionQueryPayload.ConditionQueryPayload(string! Condition, string! Truth, string! Reason, bool IsSolverBacked) -> void
+SharpProof.Symbolic.ConditionQueryPayload.Deconstruct(out string! Condition, out string! Truth, out string! Reason, out bool IsSolverBacked) -> void
+SharpProof.Symbolic.ConditionQueryPayload.Condition.init -> void
+SharpProof.Symbolic.ConditionQueryPayload.Truth.init -> void
+SharpProof.Symbolic.ConditionQueryPayload.Reason.init -> void
+SharpProof.Symbolic.ConditionQueryPayload.IsSolverBacked.init -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.RuntimeHazardQueryPayload(System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard!> Hazards, SharpProof.Symbolic.SharpProofSmtMetadata! Smt) -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Deconstruct(out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard!> Hazards, out SharpProof.Symbolic.SharpProofSmtMetadata! Smt) -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Hazards.init -> void
+SharpProof.Symbolic.RuntimeHazardQueryPayload.Smt.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.CapabilityQueryPayload(string! Method, string! Capabilities, System.Collections.Immutable.ImmutableArray<string!> Sites, bool HasUnknowns, int UnknownCount) -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Deconstruct(out string! Method, out string! Capabilities, out System.Collections.Immutable.ImmutableArray<string!> Sites, out bool HasUnknowns, out int UnknownCount) -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Method.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Capabilities.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.Sites.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.HasUnknowns.init -> void
+SharpProof.Symbolic.CapabilityQueryPayload.UnknownCount.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.ComplexityQueryPayload(string! Method, string! Complexity, string! Kind, bool IsConservative, bool IsUnknown, bool IsRecursiveUnknown, int UnknownCount, System.Collections.Immutable.ImmutableArray<string!> Drivers, System.Collections.Immutable.ImmutableArray<string!> CalleeSummaries) -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Deconstruct(out string! Method, out string! Complexity, out string! Kind, out bool IsConservative, out bool IsUnknown, out bool IsRecursiveUnknown, out int UnknownCount, out System.Collections.Immutable.ImmutableArray<string!> Drivers, out System.Collections.Immutable.ImmutableArray<string!> CalleeSummaries) -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Method.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Complexity.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Kind.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.IsConservative.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.IsUnknown.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.IsRecursiveUnknown.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.UnknownCount.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.Drivers.init -> void
+SharpProof.Symbolic.ComplexityQueryPayload.CalleeSummaries.init -> void

@@ -31,80 +31,43 @@ public enum SharpProofTargetKind
     Node
 }
 
-public sealed record SharpProofTarget
+public sealed record SharpProofTarget(
+    SharpProofTargetKind Kind,
+    int? Line = null,
+    int? Column = null,
+    int? Position = null,
+    int? SpanStart = null,
+    int? SpanEnd = null,
+    int? StartLine = null,
+    int? StartColumn = null,
+    int? EndLine = null,
+    int? EndColumn = null,
+    bool IncludeNestedCallables = false)
 {
-    private SharpProofTarget(
-        SharpProofTargetKind kind,
-        int? line = null,
-        int? column = null,
-        int? position = null,
-        int? spanStart = null,
-        int? spanEnd = null,
-        int? startLine = null,
-        int? startColumn = null,
-        int? endLine = null,
-        int? endColumn = null,
-        bool includeNestedCallables = false)
-    {
-        Kind = kind;
-        Line = line;
-        Column = column;
-        Position = position;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-        IncludeNestedCallables = includeNestedCallables;
-    }
-
-    public SharpProofTargetKind Kind { get; }
-
-    public int? Line { get; }
-
-    public int? Column { get; }
-
-    public int? Position { get; }
-
-    public int? SpanStart { get; }
-
-    public int? SpanEnd { get; }
-
-    public int? StartLine { get; }
-
-    public int? StartColumn { get; }
-
-    public int? EndLine { get; }
-
-    public int? EndColumn { get; }
-
-    public bool IncludeNestedCallables { get; }
-
     public static SharpProofTarget Point(int line, int column = 1)
     {
         ValidatePositive(line, nameof(line));
         ValidatePositive(column, nameof(column));
-        return new SharpProofTarget(SharpProofTargetKind.Point, line: line, column: column);
+        return new SharpProofTarget(SharpProofTargetKind.Point, Line: line, Column: column);
     }
 
     public static SharpProofTarget AtPosition(int position)
     {
         ValidateNonNegative(position, nameof(position));
-        return new SharpProofTarget(SharpProofTargetKind.Position, position: position);
+        return new SharpProofTarget(SharpProofTargetKind.Position, Position: position);
     }
 
     public static SharpProofTarget LineNumber(int line)
     {
         ValidatePositive(line, nameof(line));
-        return new SharpProofTarget(SharpProofTargetKind.Line, line: line);
+        return new SharpProofTarget(SharpProofTargetKind.Line, Line: line);
     }
 
     public static SharpProofTarget Span(int start, int end)
     {
         ValidateNonNegative(start, nameof(start));
         if (end < start) throw new ArgumentOutOfRangeException(nameof(end));
-        return new SharpProofTarget(SharpProofTargetKind.Span, spanStart: start, spanEnd: end);
+        return new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: start, SpanEnd: end);
     }
 
     public static SharpProofTarget LineSpan(
@@ -122,16 +85,16 @@ public sealed record SharpProofTarget
             throw new ArgumentOutOfRangeException(nameof(endColumn));
         return new SharpProofTarget(
             SharpProofTargetKind.LineSpan,
-            startLine: startLine,
-            startColumn: startColumn,
-            endLine: endLine,
-            endColumn: endColumn);
+            StartLine: startLine,
+            StartColumn: startColumn,
+            EndLine: endLine,
+            EndColumn: endColumn);
     }
 
     public static SharpProofTarget AllLines() => new(SharpProofTargetKind.AllLines);
 
     internal static SharpProofTarget Node(bool includeNestedCallables = false) =>
-        new(SharpProofTargetKind.Node, includeNestedCallables: includeNestedCallables);
+        new(SharpProofTargetKind.Node, IncludeNestedCallables: includeNestedCallables);
 
     private static void ValidatePositive(int value, string parameterName)
     {
@@ -318,56 +281,24 @@ public sealed record SharpProofBudgetMetadata(
 
 public abstract record SharpProofQueryPayload
 {
-    internal abstract SharpProofPayloadMetadata Metadata { get; }
+    internal SharpProofPayloadMetadata Metadata { get; init; } = null!;
 }
 
-public sealed record SourceQueryPayload : SharpProofQueryPayload
-{
-    internal SourceQueryPayload(SymbolicQueryResult value)
-    {
-        var proofs = value.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
-        Metadata = SharpProofPayloadMetadata.From(value);
-        ProgramPointCount = value.ProgramPointCount;
-        Invariant = value.InvariantInfo.MergedText;
-        ConditionProofCount = proofs.Select(static proof => proof.Condition).Distinct(StringComparer.Ordinal).Count();
-        UnknownProofCount = value.Metrics.ProofUnknownCount;
-        AllConditionsHold = proofs.GroupBy(static proof => proof.Condition, StringComparer.Ordinal).All(static group =>
-            group.Any(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue) &&
-            group.All(static proof => proof.TruthValue is
-                SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable));
-        ConservativeUnknownCount = value.MergedPathFacts.ConservativeUnknownCount;
-        ReachabilityUnknownCount = value.Metrics.ReachabilityUnknownCount;
-        Smt = SharpProofSmtMetadata.From(value.SmtDiagnostics);
-    }
+public sealed record SourceQueryPayload(
+    int ProgramPointCount,
+    string Invariant,
+    int ConditionProofCount,
+    int UnknownProofCount,
+    bool AllConditionsHold,
+    int ConservativeUnknownCount,
+    int ReachabilityUnknownCount,
+    SharpProofSmtMetadata Smt) : SharpProofQueryPayload;
 
-    internal override SharpProofPayloadMetadata Metadata { get; }
-    public int ProgramPointCount { get; }
-    public string Invariant { get; }
-    public int ConditionProofCount { get; }
-    public int UnknownProofCount { get; }
-    public bool AllConditionsHold { get; }
-    public int ConservativeUnknownCount { get; }
-    public int ReachabilityUnknownCount { get; }
-    public SharpProofSmtMetadata Smt { get; }
-}
-
-public sealed record ConditionQueryPayload : SharpProofQueryPayload
-{
-    internal ConditionQueryPayload(SymbolicConditionProofResult value)
-    {
-        Metadata = SharpProofPayloadMetadata.From(value);
-        Condition = value.Condition;
-        Truth = value.TruthValue.ToString();
-        Reason = value.Reason;
-        IsSolverBacked = value.IsSolverBacked;
-    }
-
-    internal override SharpProofPayloadMetadata Metadata { get; }
-    public string Condition { get; }
-    public string Truth { get; }
-    public string Reason { get; }
-    public bool IsSolverBacked { get; }
-}
+public sealed record ConditionQueryPayload(
+    string Condition,
+    string Truth,
+    string Reason,
+    bool IsSolverBacked) : SharpProofQueryPayload;
 
 public sealed record SharpProofHazard(
     string Kind,
@@ -377,75 +308,88 @@ public sealed record SharpProofHazard(
     string Operation,
     SharpProofLocation Location);
 
-public sealed record RuntimeHazardQueryPayload : SharpProofQueryPayload
+public sealed record RuntimeHazardQueryPayload(
+    ImmutableArray<SharpProofHazard> Hazards,
+    SharpProofSmtMetadata Smt) : SharpProofQueryPayload;
+
+public sealed record CapabilityQueryPayload(
+    string Method,
+    string Capabilities,
+    ImmutableArray<string> Sites,
+    bool HasUnknowns,
+    int UnknownCount) : SharpProofQueryPayload;
+
+public sealed record ComplexityQueryPayload(
+    string Method,
+    string Complexity,
+    string Kind,
+    bool IsConservative,
+    bool IsUnknown,
+    bool IsRecursiveUnknown,
+    int UnknownCount,
+    ImmutableArray<string> Drivers,
+    ImmutableArray<string> CalleeSummaries) : SharpProofQueryPayload;
+
+internal static class SharpProofPayloadProjector
 {
-    internal RuntimeHazardQueryPayload(SymbolicRuntimeHazardQueryResult value)
+    internal static SourceQueryPayload From(SymbolicQueryResult value)
     {
-        Metadata = SharpProofPayloadMetadata.From(value);
-        Hazards = value.Hazards.Select(static hazard => new SharpProofHazard(
+        var proofs = value.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
+        return new(
+            value.ProgramPointCount,
+            value.InvariantInfo.MergedText,
+            proofs.Select(static proof => proof.Condition).Distinct(StringComparer.Ordinal).Count(),
+            value.Metrics.ProofUnknownCount,
+            proofs.GroupBy(static proof => proof.Condition, StringComparer.Ordinal).All(static group =>
+                group.Any(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue) &&
+                group.All(static proof => proof.TruthValue is
+                    SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable)),
+            value.MergedPathFacts.ConservativeUnknownCount,
+            value.Metrics.ReachabilityUnknownCount,
+            SharpProofSmtMetadata.From(value.SmtDiagnostics))
+        { Metadata = SharpProofPayloadMetadata.From(value) };
+    }
+
+    internal static ConditionQueryPayload From(SymbolicConditionProofResult value) => new(
+        value.Condition,
+        value.TruthValue.ToString(),
+        value.Reason,
+        value.IsSolverBacked)
+    { Metadata = SharpProofPayloadMetadata.From(value) };
+
+    internal static RuntimeHazardQueryPayload From(SymbolicRuntimeHazardQueryResult value) => new(
+        value.Hazards.Select(static hazard => new SharpProofHazard(
             hazard.Kind.ToString(),
             hazard.Status.ToString(),
             hazard.StatusReason,
             hazard.ExceptionType,
             hazard.OperationText,
             new SharpProofLocation(hazard.FilePath, hazard.Line, hazard.Column, null,
-                hazard.SpanStart, hazard.SpanEnd))).ToImmutableArray();
-        Smt = SharpProofSmtMetadata.From(value.SmtDiagnostics);
-    }
+                hazard.SpanStart, hazard.SpanEnd))).ToImmutableArray(),
+        SharpProofSmtMetadata.From(value.SmtDiagnostics))
+    { Metadata = SharpProofPayloadMetadata.From(value) };
 
-    internal override SharpProofPayloadMetadata Metadata { get; }
-    public ImmutableArray<SharpProofHazard> Hazards { get; }
-    public SharpProofSmtMetadata Smt { get; }
-}
+    internal static CapabilityQueryPayload From(SymbolicCapabilityResult value) => new(
+        value.MethodDisplayName,
+        value.CapabilityText,
+        value.Sites.Select(static site => site.OperationText).ToImmutableArray(),
+        value.HasUnknowns,
+        Math.Max(value.UnknownReasons.Count, value.Sites.Count(static site => site.IsUnknown)))
+    { Metadata = SharpProofPayloadMetadata.From(value) };
 
-public sealed record CapabilityQueryPayload : SharpProofQueryPayload
-{
-    internal CapabilityQueryPayload(SymbolicCapabilityResult value)
-    {
-        Metadata = SharpProofPayloadMetadata.From(value);
-        Method = value.MethodDisplayName;
-        Capabilities = value.CapabilityText;
-        Sites = value.Sites.Select(static site => site.OperationText).ToImmutableArray();
-        HasUnknowns = value.HasUnknowns;
-        UnknownCount = Math.Max(value.UnknownReasons.Count, value.Sites.Count(static site => site.IsUnknown));
-    }
-
-    internal override SharpProofPayloadMetadata Metadata { get; }
-    public string Method { get; }
-    public string Capabilities { get; }
-    public ImmutableArray<string> Sites { get; }
-    public bool HasUnknowns { get; }
-    public int UnknownCount { get; }
-}
-
-public sealed record ComplexityQueryPayload : SharpProofQueryPayload
-{
-    internal ComplexityQueryPayload(SymbolicComplexityResult value)
-    {
-        Metadata = SharpProofPayloadMetadata.From(value);
-        Method = value.MethodDisplayName;
-        Complexity = value.Complexity.Text;
-        Kind = value.Complexity.Kind.ToString();
-        IsConservative = value.Complexity.IsConservative;
-        IsUnknown = value.Complexity.IsUnknown;
-        IsRecursiveUnknown = value.Complexity.IsRecursiveUnknown;
-        UnknownCount = Math.Max(value.UnknownReasons.Count,
-            value.Complexity.IsUnknown || value.Complexity.IsRecursiveUnknown ? 1 : 0);
-        Drivers = value.Drivers.Select(static driver => driver.Description).ToImmutableArray();
-        CalleeSummaries = value.CalleeSummaries.Select(static callee =>
-            $"{callee.MethodDisplayName}: {callee.ComplexityText}").ToImmutableArray();
-    }
-
-    internal override SharpProofPayloadMetadata Metadata { get; }
-    public string Method { get; }
-    public string Complexity { get; }
-    public string Kind { get; }
-    public bool IsConservative { get; }
-    public bool IsUnknown { get; }
-    public bool IsRecursiveUnknown { get; }
-    public int UnknownCount { get; }
-    public ImmutableArray<string> Drivers { get; }
-    public ImmutableArray<string> CalleeSummaries { get; }
+    internal static ComplexityQueryPayload From(SymbolicComplexityResult value) => new(
+        value.MethodDisplayName,
+        value.Complexity.Text,
+        value.Complexity.Kind.ToString(),
+        value.Complexity.IsConservative,
+        value.Complexity.IsUnknown,
+        value.Complexity.IsRecursiveUnknown,
+        Math.Max(value.UnknownReasons.Count,
+            value.Complexity.IsUnknown || value.Complexity.IsRecursiveUnknown ? 1 : 0),
+        value.Drivers.Select(static driver => driver.Description).ToImmutableArray(),
+        value.CalleeSummaries.Select(static callee =>
+            $"{callee.MethodDisplayName}: {callee.ComplexityText}").ToImmutableArray())
+    { Metadata = SharpProofPayloadMetadata.From(value) };
 }
 
 internal sealed record SharpProofPayloadMetadata(
@@ -663,20 +607,21 @@ public sealed class SharpProofAnalysisSession : IDisposable
             {
                 SharpProofQuery.ConditionQuery condition => FromPayload(
                     query,
-                    new ConditionQueryPayload(_executor.Prove(context, condition.ConditionText, cancellationToken))),
+                    SharpProofPayloadProjector.From(
+                        _executor.Prove(context, condition.ConditionText, cancellationToken))),
                 SharpProofQuery.RuntimeHazardQuery hazards => FromPayload(
                     query,
-                    new RuntimeHazardQueryPayload(
+                    SharpProofPayloadProjector.From(
                         _executor.QueryRuntimeHazards(context, hazards.Options.ToEngineOptions(), cancellationToken))),
                 { Kind: SharpProofQueryKind.Capabilities } => FromPayload(
                     query,
-                    new CapabilityQueryPayload(_executor.QueryCapabilities(context, cancellationToken))),
+                    SharpProofPayloadProjector.From(_executor.QueryCapabilities(context, cancellationToken))),
                 { Kind: SharpProofQueryKind.Complexity } => FromPayload(
                     query,
-                    new ComplexityQueryPayload(_executor.QueryComplexity(context, cancellationToken))),
+                    SharpProofPayloadProjector.From(_executor.QueryComplexity(context, cancellationToken))),
                 _ => FromPayload(
                     query,
-                    new SourceQueryPayload(_executor.Query(context, cancellationToken)))
+                    SharpProofPayloadProjector.From(_executor.Query(context, cancellationToken)))
             };
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
