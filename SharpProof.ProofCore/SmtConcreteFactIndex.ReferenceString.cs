@@ -1,9 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static partial class SmtSyntacticClassifier
+internal sealed partial class SmtConcreteFactIndex
 {
-    internal sealed partial class SyntacticFactSet
-    {
         private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction)
         {
             hasContradiction = false;
@@ -294,5 +292,4 @@ internal static partial class SmtSyntacticClassifier
             return false;
         }
 
-    }
 }

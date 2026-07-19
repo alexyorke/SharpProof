@@ -1,9 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static partial class SmtSyntacticClassifier
+internal sealed partial class SmtConcreteFactIndex
 {
-    internal sealed partial class SyntacticFactSet
-    {
         internal bool TryGetKnownInteger(SmtFormula formula, out long value)
         {
             formula = NormalizeAliases(formula);
@@ -403,5 +401,4 @@ internal static partial class SmtSyntacticClassifier
                 out affine);
         }
 
-    }
 }

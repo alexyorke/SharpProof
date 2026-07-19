@@ -463,15 +463,22 @@ Tests are excluded from the metric and must not be deleted.
   trust, exception-edge, packaging, and architecture tests preserve tolerant
   malformed-input behavior and prevent all three superseded catalog paths from
   returning.
+- [x] Replaced ProofCore's broad syntactic proof classifier with the canonical
+  concrete-fact preprocessor already used before Z3 encoding. The retained
+  `SmtConcreteFactIndex` owns only bounded alias, interval, Boolean, string, and
+  reference facts; the parallel hazard classifier, its separate node budget,
+  classifier-only branch probes, and the one-consumer conditional simplifier
+  are deleted. Direct solver/preprocessor tests and all four SMT-heavy lanes
+  preserve contradiction, zero-timeout, opaque-operation, hazard-reason, and
+  conservative fallback behavior.
 
 ## Current evidence
 
-- Maintained production: 93,974 lines (90,055 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,652 lines; remaining reduction: 6,348.
-  This tranche removed 276 maintained lines without deleting tests.
+- Maintained production: 93,772 lines (89,853 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,854 lines; remaining reduction: 6,146.
+  This tranche removed 202 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,204 passing tests and two documented Main skips. The catalog-map
-  unit test was retained as an equivalent unified-catalog isolation test.
+- Six lanes: 6,205 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -491,11 +498,10 @@ complete; otherwise preserve the explicit owner. Require focused parity before
 deleting the old path in the same tranche, and do not revisit the independently
 required string-hash, type-identity, CFG/loop-transfer, EffectSummary
 assembly-reader, generated-purity override catalog, remaining semantic-wrapper
-groups, syntactic proof classifier, or impacted-test orchestration owners
-without new call-site ownership or generic-instantiation evidence. Removing the
-syntactic classifier caused 48 focused regressions, including proven results
-becoming unknown for formulas outside the current Z3 encoding and zero-budget
-proofs that intentionally avoid solver work.
+groups, concrete-fact index, or impacted-test orchestration owners without new
+call-site ownership or generic-instantiation evidence. The fact index remains
+necessary for C#-sound division/remainder preprocessing, regex validation, and
+solver-free contradictions; it is no longer a parallel hazard proof engine.
 
 The analyzer's remaining BCL invocation overrides are also characterized as
 semantic owners, not adapters. Removing the Type, StringComparer,

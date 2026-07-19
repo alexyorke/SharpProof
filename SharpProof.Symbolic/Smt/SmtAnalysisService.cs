@@ -166,7 +166,7 @@ internal sealed class SmtAnalysisService : IDisposable
             return Unknown("smt_expression_budget_exceeded");
 
         var pathConditions = NormalizePathConditions(query.PathConditions);
-        if (TryClassifySyntactically(query, pathConditions, out var syntacticResult)) return syntacticResult;
+        if (TryClassifyConcreteFacts(query, pathConditions, out var concreteResult)) return concreteResult;
 
         if (Options.QueryTimeout <= TimeSpan.Zero) return Unknown("smt_timeout");
 
@@ -492,13 +492,56 @@ internal sealed class SmtAnalysisService : IDisposable
                                       ":" + key));
     }
 
-    private static bool TryClassifySyntactically(
+    private static bool TryClassifyConcreteFacts(
         PurityProofQuery query,
         ImmutableArray<SmtFormula> pathConditions,
         out PurityProofResult result)
     {
-        return SmtSyntacticClassifier.TryClassify(query, pathConditions, out result);
+        var preprocessor = new SmtConcreteFactPreprocessor();
+        var pathStatus = preprocessor.Prepare(pathConditions.ToArray(), out _);
+        if (pathStatus == SmtConcreteFactPreparationStatus.Unsatisfiable)
+        {
+            result = new PurityProofResult(
+                PurityProofOutcome.ProvablyPure,
+                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
+                new ProofCheckInfo(false, Feasibility.Unknown),
+                "path_unsatisfiable");
+            return true;
+        }
+
+        var pureReason = GetConcreteTriggerPureReason(query.Hazard);
+        if (pureReason.Length != 0)
+        {
+            var combined = new SmtFormula[pathConditions.Length + 1];
+            pathConditions.CopyTo(combined);
+            combined[combined.Length - 1] = query.Hazard.TriggerCondition;
+            if (preprocessor.Prepare(combined, out _) == SmtConcreteFactPreparationStatus.Unsatisfiable)
+            {
+                result = new PurityProofResult(
+                    PurityProofOutcome.ProvablyPure,
+                    new ProofCheckInfo(false, Feasibility.Unknown),
+                    new ProofCheckInfo(true, Feasibility.Unsatisfiable),
+                    pureReason);
+                return true;
+            }
+        }
+
+        result = Unknown("smt_concrete_fact_no_match");
+        return false;
     }
+
+    private static string GetConcreteTriggerPureReason(PurityHazard hazard) =>
+        hazard.Visibility == PurityEffectVisibility.InternalOnly
+            ? string.Empty
+            : hazard.Kind switch
+            {
+                PurityHazardKind.BranchReachability => "branch_unreachable",
+                PurityHazardKind.ImpureCallReachability => "impure_call_unreachable",
+                PurityHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
+                PurityHazardKind.NullDereference => "null_dereference_unreachable",
+                PurityHazardKind.DivideByZero => "divide_by_zero_unreachable",
+                _ => string.Empty
+            };
 
     private static bool IsWithinFormulaNodeBudget(
         IEnumerable<SmtFormula> pathConditions,
@@ -519,25 +562,19 @@ internal sealed class SmtAnalysisService : IDisposable
         int maxDepth)
     {
         foreach (var formula in pathConditions)
-            if (!IsWithinFormulaDepthBudget(formula, maxDepth))
+            if (!SmtFormulaTraversal.IsWithinDepth(formula, maxDepth))
                 return false;
 
-        return IsWithinFormulaDepthBudget(triggerCondition, maxDepth);
-    }
-
-    private static bool IsWithinFormulaDepthBudget(SmtFormula root, int maxDepth)
-    {
-        return SmtFormulaTraversal.IsWithinDepth(root, maxDepth);
+        return SmtFormulaTraversal.IsWithinDepth(triggerCondition, maxDepth);
     }
 
     private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining)
     {
         foreach (var formula in SmtFormulaTraversal.Enumerate(root))
         {
-            var weight = formula is SmtRegexMatchFormula regexMatch
+            remaining -= formula is SmtRegexMatchFormula regexMatch
                 ? 1 + Math.Max(1, regexMatch.Pattern.Length / 8)
                 : 1;
-            remaining -= weight;
             if (remaining < 0) return false;
         }
 

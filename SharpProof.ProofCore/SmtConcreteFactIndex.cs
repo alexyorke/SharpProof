@@ -1,185 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static partial class SmtSyntacticClassifier
+internal sealed partial class SmtConcreteFactIndex
 {
-    private const int MaxSyntacticFormulaNodes = 2048;
-
-    public static bool TryClassify(
-        PurityProofQuery query,
-        IReadOnlyList<SmtFormula> pathConditions,
-        out PurityProofResult result)
-    {
-        var exceedsNodeBudget = SmtFormulaTraversal.ExceedsNodeBudget(
-            query.Hazard.TriggerCondition,
-            pathConditions,
-            MaxSyntacticFormulaNodes,
-            out var containsOpaqueIntegerOperation);
-        if (containsOpaqueIntegerOperation || exceedsNodeBudget)
-        {
-            result = PurityProofResultFactory.Unknown(containsOpaqueIntegerOperation
-                ? "smt_syntactic_opaque_integer_operation"
-                : "smt_syntactic_budget_exhausted");
-            return false;
-        }
-
-        if (ContainsSyntacticContradiction(pathConditions))
-        {
-            result = new PurityProofResult(
-                PurityProofOutcome.ProvablyPure,
-                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
-                new ProofCheckInfo(false, Feasibility.Unknown),
-                "path_unsatisfiable");
-            return true;
-        }
-
-        if (IsHazardTriggerSyntacticallyUnreachable(query, pathConditions, out var pureReason))
-        {
-            result = new PurityProofResult(
-                PurityProofOutcome.ProvablyPure,
-                new ProofCheckInfo(false, Feasibility.Unknown),
-                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
-                pureReason);
-            return true;
-        }
-
-        result = PurityProofResultFactory.Unknown("smt_syntactic_no_match");
-        return false;
-    }
-
-    private static bool ContainsSyntacticContradiction(IReadOnlyList<SmtFormula> pathConditions)
-    {
-        var seen = new List<SmtFormula>(pathConditions.Count);
-        var facts = new SyntacticFactSet();
-        var conjuncts = new List<SmtFormula>();
-        foreach (var pathCondition in pathConditions)
-            foreach (var conjunct in SmtFormulaTraversal.EnumerateConjuncts(pathCondition))
-            {
-                conjuncts.Add(conjunct);
-                if (conjunct is SmtBooleanConstant { Value: false }) return true;
-
-                foreach (var existing in seen)
-                    if (SmtComparisonOperatorFacts.AreComplements(conjunct, existing))
-                        return true;
-
-                if (facts.Add(conjunct, out var hasContradiction) &&
-                    hasContradiction)
-                    return true;
-
-                seen.Add(conjunct);
-            }
-
-        facts.AddAll(conjuncts, out var inferredContradiction);
-        if (inferredContradiction) return true;
-
-        foreach (var conjunct in conjuncts)
-            if (facts.TryEvaluateBoolean(conjunct, out var value) &&
-                !value)
-                return true;
-
-        foreach (var condition in SmtFormulaTraversal.EnumerateConditionalConditions(conjuncts))
-            if (facts.IsContradictoryForBothBooleanBranches(condition))
-                return true;
-
-        return false;
-    }
-
-    private static bool IsHazardTriggerSyntacticallyUnreachable(
-        PurityProofQuery query,
-        IReadOnlyList<SmtFormula> pathConditions,
-        out string pureReason)
-    {
-        pureReason = string.Empty;
-        if (!TryGetTriggerBasedPureReason(query.Hazard, out pureReason)) return false;
-
-        if (query.Hazard.TriggerCondition is SmtBooleanConstant { Value: false }) return true;
-
-        if (query.Hazard.TriggerCondition is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negatedTrigger &&
-            IsFormulaSyntacticallyEntailed(negatedTrigger.Operand, pathConditions))
-            return true;
-
-        foreach (var pathCondition in pathConditions)
-            if (SmtComparisonOperatorFacts.AreComplements(pathCondition, query.Hazard.TriggerCondition))
-                return true;
-
-        if (ContainsSyntacticContradiction(Append(pathConditions, query.Hazard.TriggerCondition))) return true;
-
-        pureReason = string.Empty;
-        return false;
-    }
-
-    private static bool IsFormulaSyntacticallyEntailed(
-        SmtFormula formula,
-        IReadOnlyList<SmtFormula> pathConditions)
-    {
-        var pathConjuncts = pathConditions
-            .SelectMany(SmtFormulaTraversal.EnumerateConjuncts)
-            .ToArray();
-        return IsFormulaSyntacticallyEntailed(formula, pathConditions, pathConjuncts);
-    }
-
-    private static bool IsFormulaSyntacticallyEntailed(
-        SmtFormula formula,
-        IReadOnlyList<SmtFormula> pathConditions,
-        IReadOnlyList<SmtFormula> pathConjuncts)
-    {
-        var facts = SyntacticFactSet.Create(pathConjuncts);
-        if (formula is SmtBooleanConstant booleanConstant) return booleanConstant.Value;
-
-        if (facts.TryEvaluateBoolean(formula, out var value)) return value;
-
-        if (facts.TryClassifyBooleanFromFacts(formula, out value)) return value;
-
-        foreach (var pathConjunct in pathConjuncts)
-            if (pathConjunct.Equals(formula))
-                return true;
-
-        if (formula is SmtBinaryFormula binary)
-        {
-            if (binary.Operator == SmtBinaryOperator.And)
-                return IsFormulaSyntacticallyEntailed(binary.Left, pathConditions, pathConjuncts) &&
-                       IsFormulaSyntacticallyEntailed(binary.Right, pathConditions, pathConjuncts);
-
-            if (binary.Operator == SmtBinaryOperator.Or)
-                return IsFormulaSyntacticallyEntailed(binary.Left, pathConditions, pathConjuncts) ||
-                       IsFormulaSyntacticallyEntailed(binary.Right, pathConditions, pathConjuncts);
-        }
-
-        if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
-            return ContainsSyntacticContradiction(Append(pathConditions, negated.Operand));
-
-        return ContainsSyntacticContradiction(Append(
-            pathConditions,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, formula)));
-    }
-
-    private static SmtFormula[] Append(IReadOnlyList<SmtFormula> source, SmtFormula value)
-    {
-        var result = new SmtFormula[source.Count + 1];
-        for (var index = 0; index < source.Count; index++) result[index] = source[index];
-        result[source.Count] = value;
-        return result;
-    }
-
-    private static bool TryGetTriggerBasedPureReason(PurityHazard hazard, out string reason)
-    {
-        reason = string.Empty;
-        if (hazard.Visibility == PurityEffectVisibility.InternalOnly) return false;
-
-        reason = hazard.Kind switch
-        {
-            PurityHazardKind.BranchReachability => "branch_unreachable",
-            PurityHazardKind.ImpureCallReachability => "impure_call_unreachable",
-            PurityHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
-            PurityHazardKind.NullDereference => "null_dereference_unreachable",
-            PurityHazardKind.DivideByZero => "divide_by_zero_unreachable",
-            _ => string.Empty
-        };
-
-        return reason.Length != 0;
-    }
-
-    internal sealed partial class SyntacticFactSet
-    {
         private const int MaxAffineExpansionDepth = 8;
         private const int MaxBooleanEvaluationDepth = 64;
         private const int MaxBooleanFactInferenceDepth = 16;
@@ -202,12 +24,12 @@ internal static partial class SmtSyntacticClassifier
         internal Dictionary<SmtFormula, string> StringEqualities => _exactStrings;
         internal Dictionary<SmtFormula, SmtIntegerInterval> IntegerIntervals => _integerIntervals;
 
-        internal SyntacticFactSet()
+        internal SmtConcreteFactIndex()
         {
             _workBudget = new SyntacticWorkBudget(MaxSyntacticWorkItems);
         }
 
-        private SyntacticFactSet(SyntacticFactSet source)
+        private SmtConcreteFactIndex(SmtConcreteFactIndex source)
         {
             _integerIntervals = new Dictionary<SmtFormula, SmtIntegerInterval>(source._integerIntervals);
             _exactStrings = new Dictionary<SmtFormula, string>(source._exactStrings);
@@ -224,43 +46,31 @@ internal static partial class SmtSyntacticClassifier
             _conditionalBranchEvaluationDepth = source._conditionalBranchEvaluationDepth;
         }
 
-        internal static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
-        {
-            return Create(formulas, out _);
-        }
-
-        internal static SyntacticFactSet Create(
+        internal static SmtConcreteFactIndex Create(
             IEnumerable<SmtFormula> formulas,
             out bool hasContradiction)
         {
-            var facts = new SyntacticFactSet();
+            var facts = new SmtConcreteFactIndex();
             facts.AddAll(formulas, out hasContradiction);
             return facts;
         }
 
-        internal bool AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
+        private void AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
         {
             hasContradiction = false;
             var formulaArray = formulas as SmtFormula[] ?? formulas.ToArray();
-            var anyAdded = false;
             for (var pass = 0; pass < 4; pass++)
             {
                 var addedThisPass = false;
                 foreach (var formula in formulaArray)
                 {
-                    if (Add(formula, out var formulaContradiction))
-                    {
-                        addedThisPass = true;
-                        anyAdded = true;
-                    }
+                    if (Add(formula, out var formulaContradiction)) addedThisPass = true;
 
                     hasContradiction |= formulaContradiction;
                 }
 
                 if (hasContradiction || !addedThisPass) break;
             }
-
-            return anyAdded;
         }
 
         internal bool Add(SmtFormula formula, out bool hasContradiction)
@@ -727,14 +537,9 @@ internal static partial class SmtSyntacticClassifier
                 : normalized;
         }
 
-        private sealed class SyntacticWorkBudget
+        private sealed class SyntacticWorkBudget(int remaining)
         {
-            private int _remaining;
-
-            internal SyntacticWorkBudget(int remaining)
-            {
-                _remaining = remaining;
-            }
+            private int _remaining = remaining;
 
             internal bool TryConsume()
             {
@@ -751,5 +556,4 @@ internal static partial class SmtSyntacticClassifier
                    SmtFormulaTraversal.Contains(formula, candidate.Equals);
         }
 
-    }
 }

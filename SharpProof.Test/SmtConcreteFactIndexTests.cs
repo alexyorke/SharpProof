@@ -2,14 +2,13 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SmtSyntacticClassifierTests
+public sealed class SmtConcreteFactIndexTests
 {
     [TestCase(0, (int)SmtBinaryOperator.Equal)]
     [TestCase(1, (int)SmtBinaryOperator.NotEqual)]
@@ -58,19 +57,14 @@ public sealed class SmtSyntacticClassifierTests
         var pathConditions = ImmutableArray.Create<SmtFormula>(
             equality,
             new SmtUnaryFormula(SmtUnaryOperator.Not, equality));
-        var query = new PurityProofQuery(
-            pathConditions,
-            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
 
     [Test]
-    public void SyntacticFactSetCopy_PreservesDepthAndSharesWorkBudget()
+    public void ConcreteFactSetCopy_PreservesDepthAndSharesWorkBudget()
     {
         var factSetType = typeof(SmtFormula).Assembly
-            .GetType("SharpProof.ProofCore.Smt.SmtSyntacticClassifier+SyntacticFactSet", true)!;
+            .GetType("SharpProof.ProofCore.Smt.SmtConcreteFactIndex", true)!;
         var defaultConstructor = factSetType.GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
             null,
@@ -98,7 +92,7 @@ public sealed class SmtSyntacticClassifierTests
     }
 
     [Test]
-    public void AffineClassifier_NormalizesLongMinValueCoefficientWithoutLosingContradiction()
+    public void AffineConcreteFacts_NormalizeLongMinValueCoefficientWithoutLosingContradiction()
     {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var scaled = new SmtIntegerBinaryTerm(
@@ -114,46 +108,29 @@ public sealed class SmtSyntacticClassifierTests
                 SmtBinaryOperator.GreaterThanOrEqual,
                 scaled,
                 new SmtIntegerConstant(0)));
-        var query = new PurityProofQuery(
-            pathConditions,
-            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
-        Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
 
     [Test]
-    public void AffineClassifier_NegativeCoefficientPreservesAdjustedConstantSign()
+    public void AffineConcreteFacts_NegativeCoefficientPreservesAdjustedConstantSign()
     {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var negated = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, value);
         var pathConditions = ImmutableArray.Create<SmtFormula>(
             new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0)),
             new SmtBinaryFormula(SmtBinaryOperator.LessThan, negated, new SmtIntegerConstant(5)));
-        var query = new PurityProofQuery(
-            pathConditions,
-            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out _), Is.False);
+        AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Ready);
     }
 
     [Test]
-    public void AffineClassifier_NegativeCoefficientStillFindsRealContradiction()
+    public void AffineConcreteFacts_NegativeCoefficientStillFindsRealContradiction()
     {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var negated = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, value);
         var pathConditions = ImmutableArray.Create<SmtFormula>(
             new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0)),
             new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, negated, new SmtIntegerConstant(5)));
-        var query = new PurityProofQuery(
-            pathConditions,
-            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
 
     [Test]
@@ -231,7 +208,7 @@ public sealed class SmtSyntacticClassifierTests
     }
 
     [Test]
-    public void OpaqueIntegerOperation_FallsThroughToSolver()
+    public void OpaqueIntegerOperation_RemainsAvailableForSolverEncoding()
     {
         var opaque = new SmtOpaqueIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Multiply,
@@ -242,13 +219,7 @@ public sealed class SmtSyntacticClassifierTests
                 SmtBinaryOperator.Equal,
                 opaque,
                 new SmtIntegerConstant(0)));
-        var query = new PurityProofQuery(
-            pathConditions,
-            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.False);
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
-        Assert.That(result.Reason, Is.EqualTo("smt_syntactic_opaque_integer_operation"));
+        AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Ready);
     }
 
     [Test]
@@ -279,5 +250,13 @@ public sealed class SmtSyntacticClassifierTests
         {
             CultureInfo.CurrentCulture = previousCulture;
         }
+    }
+
+    private static void AssertPreparationStatus(
+        ImmutableArray<SmtFormula> conditions,
+        SmtConcreteFactPreparationStatus expected)
+    {
+        var status = new SmtConcreteFactPreprocessor().Prepare(conditions.ToArray(), out _);
+        Assert.That(status, Is.EqualTo(expected));
     }
 }

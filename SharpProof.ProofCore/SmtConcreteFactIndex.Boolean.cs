@@ -1,9 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static partial class SmtSyntacticClassifier
+internal sealed partial class SmtConcreteFactIndex
 {
-    internal sealed partial class SyntacticFactSet
-    {
         internal bool TryEvaluateBoolean(SmtFormula formula, out bool value)
         {
             return TryEvaluateBoolean(formula, out value, 0);
@@ -12,18 +10,6 @@ internal static partial class SmtSyntacticClassifier
         internal bool TryEvaluateDerivedBoolean(SmtFormula formula, out bool value)
         {
             return TryEvaluateBoolean(formula, out value, 0, false);
-        }
-
-        internal bool IsContradictoryForBothBooleanBranches(SmtFormula condition)
-        {
-            return IsContradictoryForBooleanBranch(condition, true) &&
-                   IsContradictoryForBooleanBranch(condition, false);
-        }
-
-        private bool IsContradictoryForBooleanBranch(SmtFormula condition, bool value)
-        {
-            ForkWithBooleanAssumption(condition, value, out var hasContradiction);
-            return hasContradiction;
         }
 
         private bool TryEvaluateBoolean(
@@ -695,12 +681,12 @@ internal static partial class SmtSyntacticClassifier
             return branchFacts.TryClassifyBooleanFromFacts(formula, out value, conditionalBranchDepth);
         }
 
-        private SyntacticFactSet ForkWithBooleanAssumption(
+        private SmtConcreteFactIndex ForkWithBooleanAssumption(
             SmtFormula formula,
             bool value,
             out bool hasContradiction)
         {
-            var fork = new SyntacticFactSet(this);
+            var fork = new SmtConcreteFactIndex(this);
             fork.TryAddBooleanFact(formula, value, out hasContradiction);
             if (hasContradiction) return fork;
 
@@ -745,7 +731,7 @@ internal static partial class SmtSyntacticClassifier
         {
             if (TryEvaluateBoolean(formula, out value, conditionalBranchDepth)) return true;
 
-            var falseProbe = new SyntacticFactSet(this);
+            var falseProbe = new SmtConcreteFactIndex(this);
             falseProbe.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), out var falseContradiction);
             if (falseContradiction)
             {
@@ -753,7 +739,7 @@ internal static partial class SmtSyntacticClassifier
                 return true;
             }
 
-            var trueProbe = new SyntacticFactSet(this);
+            var trueProbe = new SmtConcreteFactIndex(this);
             trueProbe.Add(formula, out var trueContradiction);
             if (trueContradiction)
             {
@@ -763,11 +749,6 @@ internal static partial class SmtSyntacticClassifier
 
             value = false;
             return false;
-        }
-
-        internal bool TryClassifyBooleanFromFacts(SmtFormula formula, out bool value)
-        {
-            return TryClassifyBooleanFromFacts(formula, out value, 0);
         }
 
         private bool TryEvaluateBooleanEquivalenceComparison(SmtBinaryFormula binary, out bool value)
@@ -793,5 +774,4 @@ internal static partial class SmtSyntacticClassifier
             return true;
         }
 
-    }
 }

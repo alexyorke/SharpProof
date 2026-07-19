@@ -713,6 +713,24 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ProofCore_UsesConcreteFactPreprocessingInsteadOfAParallelProofClassifier()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var proofCore = Path.Combine(root, "SharpProof.ProofCore");
+        var service = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "Smt", "SmtAnalysisService.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(proofCore, "SmtSyntacticClassifier.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(proofCore, "SmtConditionalFactSimplifier.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(proofCore, "SmtConcreteFactIndex.cs")), Is.True);
+            Assert.That(service, Does.Contain("TryClassifyConcreteFacts"));
+            Assert.That(service, Does.Not.Contain("TryClassifySyntactically"));
+        });
+    }
+
+    [Test]
     public void BaselineTool_ReadsOnlyTheCurrentDocumentSchema()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

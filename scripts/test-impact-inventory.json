@@ -1346,16 +1346,16 @@
                              "path":  "SharpProof.Test/SmtAnalysisServiceTests.cs"
                          },
                          {
+                             "name":  "SmtConcreteFactIndexTests",
+                             "path":  "SharpProof.Test/SmtConcreteFactIndexTests.cs"
+                         },
+                         {
                              "name":  "SmtFormulaVersionRewriterTests",
                              "path":  "SharpProof.Test/SmtFormulaVersionRewriterTests.cs"
                          },
                          {
                              "name":  "SmtResourceBudgetTests",
                              "path":  "SharpProof.Test/SmtResourceBudgetTests.cs"
-                         },
-                         {
-                             "name":  "SmtSyntacticClassifierTests",
-                             "path":  "SharpProof.Test/SmtSyntacticClassifierTests.cs"
                          },
                          {
                              "name":  "Sp0004ConfigurationTests",
@@ -4040,7 +4040,7 @@
                                                   "PurityHazardKind",
                                                   "PurityProofQuery"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityEffectVisibility",
                                                      "PurityHazard",
@@ -4070,7 +4070,7 @@
                                                   "PurityProofResult",
                                                   "PurityProofSearch"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  7,
                             "referencedTokens":  [
                                                      "ProofCheckInfo",
                                                      "PurityProofOutcome",
@@ -4102,26 +4102,61 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.Boolean.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtConcreteFactIndex"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SmtConcreteFactIndex"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtConcreteFactIndex",
+                                                  "SyntacticWorkBudget"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SmtConcreteFactIndex"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.Numeric.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtConcreteFactIndex"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SmtConcreteFactIndex"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.ReferenceString.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtConcreteFactIndex"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "SmtConcreteFactIndex"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "SmtConcreteFactPreparationStatus",
                                                   "SmtConcreteFactPreprocessor"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
+                                                     "SmtConcreteFactPreparationStatus",
                                                      "SmtConcreteFactPreprocessor"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtConditionalFactSimplifier.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtConditionalFactSimplifier"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -4271,63 +4306,10 @@
                                                   "PreparedSmtQuery",
                                                   "SmtSolver"
                                               ],
-                            "referencingFixtureCount":  6,
+                            "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "Feasibility",
                                                      "SmtSolver"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Boolean.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet",
-                                                  "SyntacticWorkBudget"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Numeric.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.ReferenceString.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "SmtSyntacticClassifier",
-                                                  "SyntacticFactSet"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SmtSyntacticClassifier",
-                                                     "SyntacticFactSet"
                                                  ]
                         },
                         {
@@ -5341,7 +5323,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  21,
+                            "referencingFixtureCount":  22,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -9030,7 +9012,6 @@
                                                                  "ProofCorePurityProofTests",
                                                                  "ProofCoreZ3SmokeTests",
                                                                  "SmtAnalysisServiceTests",
-                                                                 "SmtSyntacticClassifierTests",
                                                                  "SymbolicProofModelTests"
                                                              ],
                                     "tokens":  [
@@ -9039,7 +9020,7 @@
                                                    "PurityHazardKind",
                                                    "PurityProofQuery"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/PurityProofSearch.cs",
@@ -9051,7 +9032,6 @@
                                                                  "RepositoryArchitectureTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
-                                                                 "SmtSyntacticClassifierTests",
                                                                  "SymbolicProofModelTests"
                                                              ],
                                     "tokens":  [
@@ -9060,13 +9040,13 @@
                                                    "PurityProofResult",
                                                    "PurityProofSearch"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  7
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtAffineIntegerTerm.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
+                                                                 "SmtConcreteFactIndexTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtAffineIntegerTerm"
@@ -9077,7 +9057,7 @@
                                     "path":  "SharpProof.ProofCore/SmtComparisonOperatorFacts.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
+                                                                 "SmtConcreteFactIndexTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtComparisonOperatorFacts"
@@ -9085,15 +9065,65 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.Boolean.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SmtConcreteFactIndexTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConcreteFactIndex"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SmtConcreteFactIndexTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConcreteFactIndex"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.Numeric.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SmtConcreteFactIndexTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConcreteFactIndex"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtConcreteFactIndex.ReferenceString.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SmtConcreteFactIndexTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConcreteFactIndex"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
                                     "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
-                                                                 "RepositoryArchitectureTests"
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SmtConcreteFactIndexTests"
                                                              ],
                                     "tokens":  [
+                                                   "SmtConcreteFactPreparationStatus",
                                                    "SmtConcreteFactPreprocessor"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtFormula.cs",
@@ -9106,8 +9136,8 @@
                                                                  "ProofCoreZ3SmokeTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
+                                                                 "SmtConcreteFactIndexTests",
                                                                  "SmtFormulaVersionRewriterTests",
-                                                                 "SmtSyntacticClassifierTests",
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicInputWitnessTests",
@@ -9163,7 +9193,7 @@
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
                                                                  "RepositoryArchitectureTests",
-                                                                 "SmtSyntacticClassifierTests"
+                                                                 "SmtConcreteFactIndexTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtIntegerInterval"
@@ -9189,62 +9219,13 @@
                                                                  "ProofCoreZ3SmokeTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
-                                                                 "SmtSyntacticClassifierTests",
                                                                  "SymbolicProofModelTests"
                                                              ],
                                     "tokens":  [
                                                    "Feasibility",
                                                    "SmtSolver"
                                                ],
-                                    "fixtureCount":  6
-                                },
-                                {
-                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Boolean.cs",
-                                    "module":  "ProofCore",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.cs",
-                                    "module":  "ProofCore",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.Numeric.cs",
-                                    "module":  "ProofCore",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.ProofCore/SmtSyntacticClassifier.ReferenceString.cs",
-                                    "module":  "ProofCore",
-                                    "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SmtSyntacticClassifier",
-                                                   "SyntacticFactSet"
-                                               ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtWitness.cs",
@@ -9794,6 +9775,7 @@
                                                                  "OperationBlockPipelineTests",
                                                                  "PathFactExpressionReachabilityTests",
                                                                  "PathSensitiveSmtInvariantTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "StringLengthSmtTests",
@@ -9811,13 +9793,13 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  21
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaStructuralKey.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "SmtSyntacticClassifierTests"
+                                                                 "SmtConcreteFactIndexTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtFormulaStructuralKey"

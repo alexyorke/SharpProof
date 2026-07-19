@@ -1,4 +1,4 @@
-using ConcreteFactContext = SharpProof.ProofCore.Smt.SmtSyntacticClassifier.SyntacticFactSet;
+using ConcreteFactContext = SharpProof.ProofCore.Smt.SmtConcreteFactIndex;
 
 namespace SharpProof.ProofCore.Smt;
 
@@ -29,17 +29,14 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         var factConditions = normalizedConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts).ToArray();
-        var facts = SmtSyntacticClassifier.SyntacticFactSet.Create(factConditions, out var hasContradiction);
+        var facts = SmtConcreteFactIndex.Create(factConditions, out var hasContradiction);
         if (hasContradiction)
         {
             preparedConditions = Array.Empty<SmtFormula>();
             return ValidateContradictoryConditions(normalizedConditions, facts);
         }
 
-        var conditionalStatus = SmtConditionalFactSimplifier.Simplify(
-            normalizedConditions,
-            facts,
-            ref changed);
+        var conditionalStatus = SimplifyConditionals(normalizedConditions, facts, ref changed);
         if (conditionalStatus != SmtConcreteFactPreparationStatus.Ready)
         {
             preparedConditions = Array.Empty<SmtFormula>();
@@ -47,7 +44,7 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         factConditions = normalizedConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts).ToArray();
-        facts = SmtSyntacticClassifier.SyntacticFactSet.Create(factConditions, out hasContradiction);
+        facts = SmtConcreteFactIndex.Create(factConditions, out hasContradiction);
         if (hasContradiction)
         {
             preparedConditions = Array.Empty<SmtFormula>();
@@ -105,6 +102,32 @@ internal sealed class SmtConcreteFactPreprocessor
         return SmtConcreteFactPreparationStatus.Ready;
     }
 
+    private static SmtConcreteFactPreparationStatus SimplifyConditionals(
+        IList<SmtFormula> conditions,
+        ConcreteFactContext facts,
+        ref bool changed)
+    {
+        for (var index = 0; index < conditions.Count; index++)
+        {
+            var simplified = SmtFormulaTraversal.RewriteBottomUp(
+                conditions[index],
+                candidate => candidate is SmtConditionalFormula conditional
+                    ? SmtFormulaTraversal.AreStructurallyEqual(conditional.WhenTrue, conditional.WhenFalse)
+                        ? conditional.WhenTrue
+                        : facts.TryEvaluateBoolean(conditional.Condition, out var selected)
+                            ? selected ? conditional.WhenTrue : conditional.WhenFalse
+                            : candidate
+                    : candidate,
+                out var conditionChanged);
+            changed |= conditionChanged;
+            if (simplified is SmtBooleanConstant { Value: false })
+                return SmtConcreteFactPreparationStatus.Unsatisfiable;
+            conditions[index] = simplified;
+        }
+
+        return SmtConcreteFactPreparationStatus.Ready;
+    }
+
     private static SmtConcreteFactPreparationStatus ValidateContradictoryConditions(
         IEnumerable<SmtFormula> conditions,
         ConcreteFactContext facts)
@@ -123,7 +146,7 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         var safeFacts = safeConditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts);
-        SmtSyntacticClassifier.SyntacticFactSet.Create(safeFacts, out var safeContradiction);
+        SmtConcreteFactIndex.Create(safeFacts, out var safeContradiction);
         return safeContradiction || unsafeStatus == SmtConcreteFactPreparationStatus.Ready
             ? SmtConcreteFactPreparationStatus.Unsatisfiable
             : unsafeStatus;
