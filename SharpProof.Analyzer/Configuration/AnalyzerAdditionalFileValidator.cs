@@ -67,7 +67,7 @@ internal static class AnalyzerAdditionalFileValidator
     {
         if (!TryGetText(additionalFile, cancellationToken, issues, out var text)) return;
 
-        if (!EffectSummaryJsonDocument.TryParse(text, out var document, out var parseFailure))
+        if (!EffectSummaryJsonParser.TryParse(text, out var document, out var parseFailure))
         {
             var reason = parseFailure.Kind switch
             {
@@ -87,7 +87,7 @@ internal static class AnalyzerAdditionalFileValidator
 
         using (document)
         {
-            var root = document.Root;
+            var root = document.RootElement;
 
             if (!BaselineSchemaContract.TryValidate(
                     root,

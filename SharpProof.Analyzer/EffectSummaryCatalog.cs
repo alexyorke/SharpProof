@@ -438,11 +438,12 @@ internal sealed class EffectSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _)) return;
+        if (!EffectSummaryJsonParser.TryParse(json, out var document, out _)) return;
 
         using (document)
         {
-            foreach (var entry in ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter))
+            var root = document.RootElement;
+            foreach (var entry in ParseEntries(root, sourcePriority, sourcePath, compatibilityReporter))
             {
                 if (!entriesBySymbol.TryGetValue(entry.Symbol, out var entries))
                 {
@@ -456,12 +457,21 @@ internal sealed class EffectSummaryCatalog
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
-        EffectSummaryJsonDocument document,
+        JsonElement root,
         int sourcePriority,
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        var hasGeneratedPurity = document.TryGetGeneratedPurityEntries(out var entriesElement);
+        JsonElement entriesElement = default;
+        var hasGeneratedPurity =
+            root.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalog) &&
+            generatedCatalog.ValueKind == JsonValueKind.Object &&
+            generatedCatalog.TryGetProperty("SchemaVersion", out var generatedSchemaVersionElement) &&
+            generatedSchemaVersionElement.ValueKind == JsonValueKind.Number &&
+            generatedSchemaVersionElement.TryGetInt32(out var generatedSchemaVersion) &&
+            generatedSchemaVersion == EffectSummarySchemaContract.CurrentVersion &&
+            generatedCatalog.TryGetProperty("Entries", out entriesElement) &&
+            entriesElement.ValueKind == JsonValueKind.Array;
         if (hasGeneratedPurity)
         {
             foreach (var entryElement in entriesElement.EnumerateArray())
@@ -487,13 +497,24 @@ internal sealed class EffectSummaryCatalog
             }
         }
 
-        foreach (var assembly in document.EnumerateLegacyAssemblies())
+        if (!root.TryGetProperty("Assemblies", out var assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array)
+            yield break;
+
+        foreach (var assemblyElement in assemblies.EnumerateArray())
         {
-            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
-            var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
-            foreach (var methodElement in assembly.EnumerateMethods())
+            if (assemblyElement.ValueKind != JsonValueKind.Object ||
+                !assemblyElement.TryGetProperty("Methods", out var methods) ||
+                methods.ValueKind != JsonValueKind.Array)
+                continue;
+
+            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
+            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
+            foreach (var methodElement in methods.EnumerateArray())
             {
-                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey)) continue;
+                if (methodElement.ValueKind != JsonValueKind.Object ||
+                    !StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
+                    continue;
 
                 PurityEntry? purityEntry = null;
                 if (!hasGeneratedPurity &&

@@ -478,14 +478,24 @@ Tests are excluded from the metric and must not be deleted.
   identity gained an exact immutable JSON constructor, while explicit property
   ordering preserves existing summary bytes. Focused schema, artifact-spec,
   resume, reviewed-category, sharding, and architecture tests cover the boundary.
+- [x] Removed the analyzer's disposable EffectSummary JSON document facade and
+  its separate assembly/method layout model. A focused parser now owns only
+  current-schema validation and structured validation failures; the unified
+  `EffectSummaryCatalog` directly owns tolerant purity and exception-evidence
+  traversal. Architecture coverage prevents both forwarding layout types from
+  returning.
+- [x] Re-characterized invariant TextInfo casing and length-checked string
+  concatenation independently against their runtime slices. Generic fixed-point
+  inference currently changes each from pure to impure when its rule is removed,
+  so both remain explicit semantic owners rather than legacy deletion debt.
 
 ## Current evidence
 
-- Maintained production: 93,670 lines (89,751 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,956 lines; remaining reduction: 6,044.
-  This tranche removed 102 maintained lines without deleting tests.
+- Maintained production: 93,636 lines (89,717 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,990 lines; remaining reduction: 6,010.
+  This tranche removed 34 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,207 passing tests and two documented Main skips.
+- Six lanes: 6,208 passing tests and two documented Main skips.
 
 ## Milestones
 

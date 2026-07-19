@@ -291,6 +291,21 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void AnalyzerEffectSummaryJson_UsesParserAndCatalogLayoutOwners()
+    {
+        var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonParser", true), Is.Not.Null);
+            Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonDocument"), Is.Null,
+                "JSON lifetime and layout traversal must not regain a forwarding document facade.");
+            Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonAssembly"), Is.Null,
+                "Assembly/method layout traversal belongs to EffectSummaryCatalog.");
+        });
+    }
+
+    [Test]
     public void SymbolicQueries_UseOneAggregateMetricsOwner()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
