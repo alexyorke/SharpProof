@@ -1,7 +1,5 @@
 using PotentialTargets = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PotentialTargets;
 using PurityAnalysisResult = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisResult;
-using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
-using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvidence;
 
 namespace SharpProof.Analyzer.Engine;
 

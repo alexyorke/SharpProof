@@ -1,7 +1,3 @@
-using SharpProof.Analyzer.Engine;
-using SharpProof.Identity;
-using SharpProof.Schema;
-
 internal static class BclFallbackInventoryBuilder
 {
     public static BclFallbackInventoryReport Build(AssemblyEffectReport[] assemblies)

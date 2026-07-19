@@ -1,6 +1,3 @@
-using System.Runtime.CompilerServices;
-using SharpProof.ProofCore.Collections;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicProofCacheStore

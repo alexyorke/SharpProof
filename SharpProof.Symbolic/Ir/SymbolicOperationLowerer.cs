@@ -1,7 +1,3 @@
-using System.Globalization;
-using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal enum SymbolicAssignmentPostconditionProfile

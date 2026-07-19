@@ -1,5 +1,3 @@
-using SharpProof.Analyzer.Engine.Rules;
-
 namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer

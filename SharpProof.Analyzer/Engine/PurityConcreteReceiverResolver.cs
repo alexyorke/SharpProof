@@ -1,6 +1,3 @@
-using SharpProof.Analyzer.Engine.Rules;
-using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityConcreteReceiverResolver

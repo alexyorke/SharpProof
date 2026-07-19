@@ -1,6 +1,5 @@
 namespace SharpProof.Tools.Fuzz;
 
-using SharpProof.Tools.Shared;
 
 public static class Program
 {

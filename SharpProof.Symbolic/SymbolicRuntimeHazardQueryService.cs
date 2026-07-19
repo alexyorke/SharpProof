@@ -1,8 +1,3 @@
-using Microsoft.CodeAnalysis.Text;
-using SharpProof.ProofCore.Purity;
-using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicRuntimeHazardQueryService

@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SharpProof.Analyzer;
 
 internal static class NullableContractAnalyzer

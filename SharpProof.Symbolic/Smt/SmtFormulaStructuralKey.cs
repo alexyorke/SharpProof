@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal static class SmtFormulaStructuralKey

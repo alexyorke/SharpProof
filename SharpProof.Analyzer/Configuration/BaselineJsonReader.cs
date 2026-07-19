@@ -1,6 +1,3 @@
-using System.Text.Json;
-using SharpProof.Schema;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class BaselineJsonReader

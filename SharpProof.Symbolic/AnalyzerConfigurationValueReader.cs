@@ -1,6 +1,3 @@
-using System.Globalization;
-using Microsoft.CodeAnalysis.Diagnostics;
-
 namespace SharpProof.Symbolic;
 
 internal static class AnalyzerConfigurationValueReader

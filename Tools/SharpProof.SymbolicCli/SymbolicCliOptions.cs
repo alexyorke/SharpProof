@@ -1,5 +1,3 @@
-using SharpProof.Tools.Shared;
-
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """

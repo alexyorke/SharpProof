@@ -1,5 +1,3 @@
-using System;
-
 namespace SharpProof.Attributes;
 
 [AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]

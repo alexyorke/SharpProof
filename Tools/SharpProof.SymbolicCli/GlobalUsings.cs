@@ -1,0 +1,9 @@
+global using System.Globalization;
+global using System.Text;
+global using System.Text.Json;
+global using System.Text.Json.Serialization;
+global using Microsoft.CodeAnalysis;
+global using SharpProof.Analyzer;
+global using SharpProof.Analyzer.Configuration;
+global using SharpProof.Symbolic;
+global using SharpProof.Tools.Shared;

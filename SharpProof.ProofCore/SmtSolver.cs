@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
-using Microsoft.Z3;
 
 namespace SharpProof.ProofCore.Smt;
 

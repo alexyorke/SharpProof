@@ -1,4 +1,3 @@
-
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicOperationTransferKernel

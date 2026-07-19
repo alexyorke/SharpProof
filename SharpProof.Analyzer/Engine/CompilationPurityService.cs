@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal sealed class CompilationPurityService : IDisposable

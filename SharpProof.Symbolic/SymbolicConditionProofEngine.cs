@@ -2,11 +2,11 @@ namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicConditionProofEngine
 {
-    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer;
+    private readonly SymbolicInvariantService _invariantService;
 
-    internal SymbolicConditionProofEngine(SymbolicProgramPointAnalyzer programPointAnalyzer)
+    internal SymbolicConditionProofEngine(SymbolicInvariantService invariantService)
     {
-        _programPointAnalyzer = programPointAnalyzer ?? throw new ArgumentNullException(nameof(programPointAnalyzer));
+        _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
     internal SymbolicConditionProofResult ProveAtSyntaxTree(
@@ -26,7 +26,7 @@ internal sealed class SymbolicConditionProofEngine
         var root = syntaxTree.GetRoot(cancellationToken);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
         var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        var query = _programPointAnalyzer.Analyze(
+        var query = _invariantService.Analyze(
             semanticModel, position, node, null, cancellationToken);
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
@@ -40,7 +40,7 @@ internal sealed class SymbolicConditionProofEngine
         CancellationToken cancellationToken = default)
     {
         ValidateRequest(semanticModel, node, conditionText, smtAnalysis);
-        var query = _programPointAnalyzer.Analyze(
+        var query = _invariantService.Analyze(
             semanticModel,
             node.SpanStart,
             node,
@@ -85,7 +85,7 @@ internal sealed class SymbolicConditionProofEngine
         if (symbolicCondition == null) throw new ArgumentNullException(nameof(symbolicCondition));
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
 
-        var query = _programPointAnalyzer.Analyze(
+        var query = _invariantService.Analyze(
             semanticModel,
             node.SpanStart,
             node,

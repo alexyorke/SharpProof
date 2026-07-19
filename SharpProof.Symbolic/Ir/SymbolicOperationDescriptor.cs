@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal enum SymbolicAssignmentOperationKind

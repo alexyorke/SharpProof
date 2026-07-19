@@ -1,6 +1,3 @@
-using System.Globalization;
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.Analyzer;
 
 internal static class MethodCapabilityAnalyzer

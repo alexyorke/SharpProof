@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtAnalysisBudget

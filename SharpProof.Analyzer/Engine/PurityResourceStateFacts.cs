@@ -1,7 +1,3 @@
-using SharpProof.Analyzer.Engine.Rules;
-using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
-using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvidence;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal static partial class PurityResourceStateFacts

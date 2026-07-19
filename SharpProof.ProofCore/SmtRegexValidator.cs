@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal sealed class SmtRegexValidator

@@ -1,6 +1,3 @@
-using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-
 namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowEngine

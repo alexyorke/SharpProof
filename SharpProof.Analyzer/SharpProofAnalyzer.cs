@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]

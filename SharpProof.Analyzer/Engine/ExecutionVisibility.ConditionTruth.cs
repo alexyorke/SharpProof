@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using SharpProof.ProofCore.Collections;
 
 namespace SharpProof.Analyzer.Engine;

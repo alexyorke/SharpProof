@@ -1,5 +1,3 @@
-using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityOperationTransfer

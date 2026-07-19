@@ -1,5 +1,3 @@
-using SharpProof.Identity;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class ConfiguredMemberKey

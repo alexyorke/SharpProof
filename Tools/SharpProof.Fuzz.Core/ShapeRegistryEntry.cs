@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using SharpProof.Analyzer;
-
 namespace SharpProof.Tools.Fuzz;
 
 public enum Sp0002ExpectationKind

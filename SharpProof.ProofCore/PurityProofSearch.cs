@@ -1,5 +1,3 @@
-using SharpProof.ProofCore.Smt;
-
 namespace SharpProof.ProofCore.Purity;
 
 internal enum PurityProofOutcome

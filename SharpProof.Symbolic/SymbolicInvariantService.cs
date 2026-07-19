@@ -1,9 +1,29 @@
-using SharpProof.ProofCore.Purity;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicInvariantService
 {
+    internal SymbolicProgramPointQueryContext Analyze(
+        SemanticModel semanticModel,
+        int position,
+        SyntaxNode node,
+        SmtAnalysisService? smtAnalysis,
+        CancellationToken cancellationToken,
+        bool includeCurrentStatementCompletionFacts = false,
+        SymbolicState? initialState = null) =>
+        new(
+            semanticModel,
+            position,
+            node,
+            node is ForStatementSyntax forStatement
+            ? AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
+            : AnalyzeAt(
+                node,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts,
+                initialState));
+
     public SymbolicProgramPointAnalysis AnalyzeAt(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -191,17 +211,11 @@ internal sealed class SymbolicInvariantService
         SymbolicAnalysisTruncationInfo Truncation);
 }
 
-internal sealed class SymbolicInvariantFactSummary
+internal sealed class SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
 {
-    public SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
-    {
-        Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-        MergedInvariantText = FormatMergedInvariantFacts(facts);
-    }
+    public IReadOnlyList<string> Facts { get; } = facts ?? throw new ArgumentNullException(nameof(facts));
 
-    public IReadOnlyList<string> Facts { get; }
-
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText { get; } = FormatMergedInvariantFacts(facts!);
 
     internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets)
     {

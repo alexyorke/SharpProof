@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis.FlowAnalysis;
 using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
 
 namespace SharpProof.Symbolic.Ir;

@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Symbolic;
 
 public enum SharpProofQueryKind

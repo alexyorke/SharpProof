@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal static class SmtRegexSemantics

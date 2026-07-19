@@ -1,6 +1,3 @@
-using System.Globalization;
-using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSourceCandidateFactory;
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
 

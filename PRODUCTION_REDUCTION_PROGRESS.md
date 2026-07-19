@@ -308,12 +308,22 @@ Tests are excluded from the metric and must not be deleted.
   directives from 314 production files without changing any code statement;
   architecture coverage prevents those project-wide imports from returning to
   individual files.
+- [x] Completed project-level import ownership across Analyzer, Attributes,
+  Contracts, ProofCore, Symbolic, Symbolic CLI, CorpusReport, EffectSummary,
+  and Fuzz. Removed another 227 repeated namespace and alias directives from
+  157 production files while keeping static imports local to avoid changing
+  name binding. The architecture test now derives each project's owned imports
+  from its global-using file and rejects local duplicates. Also deleted the
+  `SymbolicProgramPointAnalyzer` forwarding adapter: `SymbolicInvariantService`
+  now owns program-point analysis directly, and source/proof consumers bind to
+  that canonical service. Source-map and invariant-summary initialization were
+  consolidated without changing locations, evidence, or unknown behavior.
 
 ## Current evidence
 
-- Maintained production: 97,692 lines (93,773 C#, 3,189 scripts, and 730
-  specifications); net reduction: 9,934 lines; remaining reduction: 10,066.
-  This tranche removed 1,084 maintained lines without deleting tests.
+- Maintained production: 97,492 lines (93,573 C#, 3,189 scripts, and 730
+  specifications); net reduction: 10,134 lines; remaining reduction: 9,866.
+  This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,191 passing tests and two documented Main skips.
 

@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace SharpProof.Analyzer.Engine;
 
 public static class Constants

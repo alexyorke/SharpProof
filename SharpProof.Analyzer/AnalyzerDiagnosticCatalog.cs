@@ -1,5 +1,3 @@
-using System.Reflection;
-
 #pragma warning disable RS2001 // Disabled-by-default rules are preserved exactly; release tracking reports them as severity changes.
 #pragma warning disable RS1037 // Compilation-end reporting policy is separate from descriptor boundary metadata.
 

@@ -1,11 +1,7 @@
-using System.Collections.Concurrent;
-using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
-using System.Text.Json;
-using SharpProof.Identity;
 
 // RS1035 exception: Roslyn exposes metadata references but not the PE method-body
 // bytes or full-image hashes required to validate generated effect summaries.

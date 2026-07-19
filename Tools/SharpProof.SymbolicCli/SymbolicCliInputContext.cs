@@ -1,10 +1,6 @@
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.MSBuild;
-using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
-using SharpProof.Symbolic;
 
 internal sealed class SymbolicCliInputContext : IDisposable
 {

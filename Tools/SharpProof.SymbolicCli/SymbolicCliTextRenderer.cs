@@ -1,5 +1,3 @@
-using System.Globalization;
-
 internal static class SymbolicCliTextRenderer
 {
     internal static void PrintFileResult(SymbolicQueryResult result, SymbolicCliOptions options)

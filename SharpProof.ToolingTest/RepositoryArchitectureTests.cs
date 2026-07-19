@@ -83,53 +83,44 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
-    public void AnalyzerAndSymbolic_CommonImportsHaveOneProjectOwner()
+    public void ProductionProjects_CommonImportsHaveOneProjectOwner()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
-        var projects = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        var expectedProjects = new[]
         {
-            ["SharpProof.Symbolic"] =
-            [
-                "System.Collections.Immutable",
-                "Microsoft.CodeAnalysis",
-                "Microsoft.CodeAnalysis.CSharp",
-                "Microsoft.CodeAnalysis.CSharp.Syntax",
-                "Microsoft.CodeAnalysis.Operations",
-                "SharpProof.ProofCore.Smt",
-                "SharpProof.Symbolic.Ir",
-                "SharpProof.Symbolic.Smt"
-            ],
-            ["SharpProof.Analyzer"] =
-            [
-                "System.Collections.Immutable",
-                "Microsoft.CodeAnalysis",
-                "Microsoft.CodeAnalysis.CSharp",
-                "Microsoft.CodeAnalysis.CSharp.Syntax",
-                "Microsoft.CodeAnalysis.Diagnostics",
-                "Microsoft.CodeAnalysis.FlowAnalysis",
-                "Microsoft.CodeAnalysis.Operations",
-                "SharpProof.Analyzer.Configuration",
-                "SharpProof.Analyzer.Engine",
-                "SharpProof.Analyzer.Engine.Analysis",
-                "SharpProof.Symbolic",
-                "SharpProof.Symbolic.Ir",
-                "SharpProof.Symbolic.Smt"
-            ]
+            "SharpProof.Analyzer",
+            "SharpProof.Attributes",
+            "SharpProof.Contracts",
+            "SharpProof.ProofCore",
+            "SharpProof.Symbolic",
+            "Tools/SharpProof.CorpusReport.Core",
+            "Tools/SharpProof.EffectSummary",
+            "Tools/SharpProof.Fuzz.Core",
+            "Tools/SharpProof.SymbolicCli"
         };
+        var globalUsingsPaths = Directory.EnumerateFiles(root, "GlobalUsings.cs", SearchOption.AllDirectories)
+            .Where(path => !IsIgnored(path, root))
+            .ToArray();
+        var actualProjects = globalUsingsPaths
+            .Select(path => Path.GetRelativePath(root, Path.GetDirectoryName(path)!).Replace('\\', '/'))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+        Assert.That(actualProjects, Is.EqualTo(expectedProjects));
 
-        foreach (var project in projects)
+        foreach (var globalUsingsPath in globalUsingsPaths)
         {
-            var projectRoot = Path.Combine(root, project.Key);
-            var globalUsingsPath = Path.Combine(projectRoot, "GlobalUsings.cs");
-            Assert.That(File.Exists(globalUsingsPath), Is.True, project.Key);
-            var globalUsings = File.ReadAllText(globalUsingsPath);
-            foreach (var import in project.Value)
+            var projectRoot = Path.GetDirectoryName(globalUsingsPath)!;
+            var globalDirectives = File.ReadLines(globalUsingsPath)
+                .Where(static line => line.StartsWith("global using ", StringComparison.Ordinal))
+                .Select(static line => line.Substring("global ".Length))
+                .ToArray();
+            Assert.That(globalDirectives, Is.Not.Empty, globalUsingsPath);
+            foreach (var directive in globalDirectives)
             {
-                var directive = "global using " + import + ";";
-                Assert.That(globalUsings, Does.Contain(directive), project.Key);
                 var duplicate = Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
                     .Where(path => !string.Equals(path, globalUsingsPath, StringComparison.OrdinalIgnoreCase))
-                    .FirstOrDefault(path => File.ReadLines(path).Contains("using " + import + ";"));
+                    .Where(path => !IsIgnored(path, root))
+                    .FirstOrDefault(path => File.ReadLines(path).Contains(directive));
                 Assert.That(duplicate, Is.Null, $"{directive} is duplicated by {duplicate}");
             }
         }
@@ -274,6 +265,11 @@ public sealed class RepositoryArchitectureTests
             Assert.That(queryResult, Does.Contain("class SymbolicQueryResult("));
             Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazardQueryResult("));
             Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazard("));
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Symbolic", "SymbolicProgramPointAnalyzer.cs")), Is.False);
+            Assert.That(File.ReadAllText(Path.Combine(
+                    root, "SharpProof.Symbolic", "SymbolicInvariantService.cs")),
+                Does.Contain("SymbolicProgramPointQueryContext Analyze("));
         });
     }
 

@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class EvidenceSchemaDiagnosticProperties

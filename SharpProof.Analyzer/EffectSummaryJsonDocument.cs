@@ -1,6 +1,3 @@
-using System.Text.Json;
-using SharpProof.Schema;
-
 namespace SharpProof.Analyzer;
 
 internal enum EffectSummaryJsonFailureKind

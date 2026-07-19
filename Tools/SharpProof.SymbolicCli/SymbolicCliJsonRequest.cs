@@ -1,7 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using SharpProof.Symbolic;
-
 internal sealed class SymbolicCliJsonRequest
 {
     public int SchemaVersion { get; init; }

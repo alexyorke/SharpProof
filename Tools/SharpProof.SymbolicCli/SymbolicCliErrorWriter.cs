@@ -1,6 +1,3 @@
-using System.Text.Json;
-using SharpProof.Symbolic;
-
 internal static class SymbolicCliErrorWriter
 {
     public static int Write(Exception exception, IReadOnlyList<string> arguments)

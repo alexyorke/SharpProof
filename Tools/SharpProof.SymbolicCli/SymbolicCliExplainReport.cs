@@ -1,9 +1,3 @@
-using System.Globalization;
-using System.Text;
-using System.Text.Json.Serialization;
-using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer;
-using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 internal sealed record SymbolicCliExplainReport(

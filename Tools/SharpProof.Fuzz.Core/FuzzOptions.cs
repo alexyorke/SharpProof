@@ -1,5 +1,3 @@
-using SharpProof.Tools.Shared;
-
 namespace SharpProof.Tools.Fuzz;
 
 public sealed record FuzzOptions

@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine

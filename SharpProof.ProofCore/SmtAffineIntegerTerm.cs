@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal delegate bool TryResolveSmtIntegerValue(SmtFormula formula, out long value);

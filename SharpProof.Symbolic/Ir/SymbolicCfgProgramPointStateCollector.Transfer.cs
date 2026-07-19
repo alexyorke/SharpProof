@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis.FlowAnalysis;
 using static SharpProof.Symbolic.Ir.SymbolicStatefulAssignmentTransfer;
 
 namespace SharpProof.Symbolic.Ir;

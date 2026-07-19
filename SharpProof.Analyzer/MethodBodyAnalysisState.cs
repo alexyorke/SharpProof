@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Analyzer;
 
 internal sealed class MethodBodyAnalysisState

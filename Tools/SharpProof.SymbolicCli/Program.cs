@@ -1,5 +1,3 @@
-using SharpProof.Tools.Shared;
-
 if (ConfigurationReferenceCommand.TryRun(args, out var configurationReferenceExitCode))
     return configurationReferenceExitCode;
 

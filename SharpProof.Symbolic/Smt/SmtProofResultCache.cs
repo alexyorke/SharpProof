@@ -1,7 +1,3 @@
-using System.Collections.Concurrent;
-using SharpProof.ProofCore.Collections;
-using SharpProof.ProofCore.Purity;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtProofResultCache

@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicSourceCompilation

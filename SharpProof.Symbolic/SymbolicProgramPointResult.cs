@@ -1,7 +1,4 @@
-using System.Globalization;
 using System.Text.Json.Serialization;
-using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.Symbolic;
 

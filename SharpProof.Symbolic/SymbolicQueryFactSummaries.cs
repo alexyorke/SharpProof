@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicCompactProjection

@@ -1,6 +1,3 @@
-using System.Text;
-using SharpProof.Analyzer.Configuration;
-
 internal static class ConfigurationReferenceCommand
 {
     private const string Command = "--generate-configuration-reference";

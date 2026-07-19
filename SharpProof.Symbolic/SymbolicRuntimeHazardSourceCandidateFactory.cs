@@ -1,5 +1,3 @@
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardSourceCandidateFactory

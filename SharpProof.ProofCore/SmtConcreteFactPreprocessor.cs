@@ -1,5 +1,3 @@
-using System.Numerics;
-using System.Text.RegularExpressions;
 using ConcreteFactContext = SharpProof.ProofCore.Smt.SmtSyntacticClassifier.SyntacticFactSet;
 
 namespace SharpProof.ProofCore.Smt;

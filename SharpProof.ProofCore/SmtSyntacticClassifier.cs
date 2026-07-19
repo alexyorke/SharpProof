@@ -1,5 +1,3 @@
-using SharpProof.ProofCore.Purity;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier

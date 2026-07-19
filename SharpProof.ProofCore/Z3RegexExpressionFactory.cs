@@ -1,5 +1,3 @@
-using Microsoft.Z3;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal sealed class Z3RegexExpressionFactory

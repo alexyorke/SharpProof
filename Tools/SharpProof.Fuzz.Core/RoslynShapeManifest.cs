@@ -1,7 +1,5 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Tools.Fuzz;

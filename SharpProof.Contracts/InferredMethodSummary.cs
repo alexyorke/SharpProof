@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using SharpProof.Identity;
 
 namespace SharpProof.Inference;

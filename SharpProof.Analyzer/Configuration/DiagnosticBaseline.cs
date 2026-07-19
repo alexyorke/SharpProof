@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal sealed class DiagnosticBaseline

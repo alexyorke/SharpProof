@@ -1,5 +1,3 @@
-using SharpProof.ProofCore.Purity;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicIrProofResult

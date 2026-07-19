@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace SharpProof.Analyzer;
 
 internal static class AnalyzerJsonElementReader

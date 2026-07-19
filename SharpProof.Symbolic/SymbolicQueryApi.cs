@@ -13,10 +13,9 @@ internal sealed partial class SymbolicQueryExecutor
     internal SymbolicQueryExecutor()
     {
         _invariantService = new SymbolicInvariantService();
-        var programPointAnalyzer = new SymbolicProgramPointAnalyzer(_invariantService);
-        _conditionProofEngine = new SymbolicConditionProofEngine(programPointAnalyzer);
+        _conditionProofEngine = new SymbolicConditionProofEngine(_invariantService);
         _programPointExecutor = new SymbolicSourceProgramPointExecutor(
-            programPointAnalyzer,
+            _invariantService,
             _conditionProofEngine);
         _rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(_programPointExecutor);
         _runtimeHazardService = new SymbolicRuntimeHazardQueryService(_invariantService);

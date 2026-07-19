@@ -1,9 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json.Serialization;
-using SharpProof.Analyzer.Engine;
-using SharpProof.Identity;
-using SharpProof.Schema;
 
 internal static class PurityClassificationEngine
 {

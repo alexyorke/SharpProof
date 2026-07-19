@@ -1,7 +1,3 @@
-using System.Diagnostics;
-using System.Text.RegularExpressions;
-using SharpProof.ProofCore.Purity;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtAnalysisService : IDisposable

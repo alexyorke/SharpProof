@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 internal static class SymbolicCliOutputPolicy
 {
     public const string ErrorJson = "--error-json";

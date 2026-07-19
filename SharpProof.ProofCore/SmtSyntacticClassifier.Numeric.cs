@@ -1,4 +1,3 @@
-using System.Numerics;
 namespace SharpProof.ProofCore.Smt;
 
 internal static partial class SmtSyntacticClassifier

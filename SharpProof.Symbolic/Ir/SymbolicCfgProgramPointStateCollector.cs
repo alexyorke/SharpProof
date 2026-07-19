@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.FlowAnalysis;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicCfgProgramPointStateCollector

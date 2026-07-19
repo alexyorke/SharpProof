@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 [assembly: InternalsVisibleTo("SharpProof.SymbolicCli")]
 [assembly: InternalsVisibleTo("SharpProof.SymbolicCli.Core")]
 [assembly: InternalsVisibleTo("SharpProof.Test")]

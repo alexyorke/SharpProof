@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
-using Microsoft.CodeAnalysis.Text;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal enum SymbolicFactConfidence

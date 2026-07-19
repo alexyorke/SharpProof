@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.Diagnostics;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicProjectConfiguration(

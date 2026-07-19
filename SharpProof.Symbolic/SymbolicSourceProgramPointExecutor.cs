@@ -1,11 +1,11 @@
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicSourceProgramPointExecutor(
-    SymbolicProgramPointAnalyzer programPointAnalyzer,
+    SymbolicInvariantService invariantService,
     SymbolicConditionProofEngine conditionProofEngine)
 {
-    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer =
-        programPointAnalyzer ?? throw new ArgumentNullException(nameof(programPointAnalyzer));
+    private readonly SymbolicInvariantService _invariantService =
+        invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     private readonly SymbolicConditionProofEngine _conditionProofEngine =
         conditionProofEngine ?? throw new ArgumentNullException(nameof(conditionProofEngine));
 
@@ -23,7 +23,7 @@ internal sealed class SymbolicSourceProgramPointExecutor(
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _programPointAnalyzer.Analyze(
+        return _invariantService.Analyze(
             semanticModel, position, node, options.SmtAnalysis, cancellationToken);
     }
 
@@ -39,7 +39,7 @@ internal sealed class SymbolicSourceProgramPointExecutor(
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null)
     {
-        var query = _programPointAnalyzer.Analyze(
+        var query = _invariantService.Analyze(
             semanticModel,
             node.SpanStart,
             node,

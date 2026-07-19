@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicFactFactory

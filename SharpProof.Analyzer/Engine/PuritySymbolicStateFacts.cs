@@ -1,4 +1,3 @@
-using SharpProof.ProofCore.Smt;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;

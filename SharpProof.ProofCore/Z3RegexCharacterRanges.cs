@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using SharpProof.ProofCore.Collections;
 
 namespace SharpProof.ProofCore.Smt;

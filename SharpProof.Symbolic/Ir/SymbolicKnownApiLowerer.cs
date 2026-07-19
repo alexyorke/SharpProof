@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicKnownApiLowerer

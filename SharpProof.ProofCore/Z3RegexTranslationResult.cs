@@ -1,5 +1,3 @@
-using Microsoft.Z3;
-
 namespace SharpProof.ProofCore.Smt;
 
 internal readonly record struct Z3RegexTranslationResult(

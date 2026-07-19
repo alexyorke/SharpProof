@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis.FlowAnalysis;
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic.Ir;
