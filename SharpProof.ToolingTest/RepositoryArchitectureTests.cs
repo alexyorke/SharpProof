@@ -467,6 +467,26 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ReachabilityCache_DoesNotReintroduceASecondCfgExecutionTrace()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var trace = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "Ir", "SymbolicCfgStatementCompletion.cs"));
+        var reachability = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicReachabilityService.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(trace, Does.Not.Contain("CollectExecutionTrace"));
+            Assert.That(trace, Does.Not.Contain("CollectStateFromExecutionTrace"));
+            Assert.That(trace, Does.Not.Contain("TraceCacheEntry"));
+            Assert.That(trace, Does.Not.Contain("RecordObservation"));
+            Assert.That(reachability, Does.Not.Contain("TryCollectCachedExecutionTraceState"));
+            Assert.That(reachability, Does.Contain("BoundedConcurrentCache<PathStateCacheKey, SymbolicState>"));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

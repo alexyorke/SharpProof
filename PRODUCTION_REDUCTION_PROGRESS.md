@@ -367,14 +367,22 @@ Tests are excluded from the metric and must not be deleted.
   unused array-enumerator special-case wrapper, and two unused EffectSummary
   freshness/visibility renderers. Architecture coverage prevents these retired
   entry points from returning while the live inference rules remain unchanged.
+- [x] Made the bounded per-program-point reachability cache the sole cached CFG
+  state owner. Deleted the second execution-root trace, observation replay,
+  evidence rebasing, cache holder, and trace-specific fallback adapter while
+  retaining seeded statement completion in the canonical CFG transfer path.
+  Focused state parity covers branches, returns, method-entry evidence,
+  concurrent roots, custom budgets, cancellation, and conservative loop
+  fallback; architecture coverage prevents the duplicate trace cache from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 96,518 lines (92,599 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,108 lines; remaining reduction: 8,892.
-  This tranche removed 48 maintained lines without deleting tests.
+- Maintained production: 96,252 lines (92,333 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,374 lines; remaining reduction: 8,626.
+  This tranche removed 266 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,196 passing tests and two documented Main skips.
+- Six lanes: 6,197 passing tests and two documented Main skips.
 
 ## Milestones
 

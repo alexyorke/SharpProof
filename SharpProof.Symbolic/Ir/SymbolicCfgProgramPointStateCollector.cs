@@ -36,7 +36,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
     {
         if (statement is IfStatementSyntax or SwitchStatementSyntax or
             WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax)
-            return SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+            return SymbolicCfgStatementCompletion.CollectCompletedStatementState(
                 statement,
                 entryState,
                 semanticModel,
@@ -52,7 +52,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(statement, ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(statement, "execution-root");
-        return SymbolicCfgExecutionTrace.TryCreateGraph(
+        return SymbolicCfgStatementCompletion.TryCreateGraph(
             executionRoot,
             semanticModel,
             cancellationToken,

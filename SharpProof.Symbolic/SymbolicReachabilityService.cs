@@ -139,15 +139,6 @@ internal static class SymbolicReachabilityService
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts)
     {
-        if (initialState == null &&
-            !includeCurrentStatementCompletionFacts &&
-            TryCollectCachedExecutionTraceState(
-                site,
-                semanticModel,
-                cancellationToken,
-                out var tracedState))
-            return tracedState;
-
         var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             semanticModel,
@@ -169,23 +160,6 @@ internal static class SymbolicReachabilityService
                 cancellationToken,
                 includeCurrentStatementCompletionFacts,
                 initialState));
-    }
-
-    private static bool TryCollectCachedExecutionTraceState(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicState state)
-    {
-        state = null!;
-        var result = SymbolicCfgExecutionTrace.CollectCachedStateFromExecutionTrace(
-            site,
-            semanticModel,
-            cancellationToken);
-        if (result is not { IsExact: true, Value: { } exactState })
-            return false;
-        state = exactState;
-        return true;
     }
 
     private sealed class StructuralPathStateCaches

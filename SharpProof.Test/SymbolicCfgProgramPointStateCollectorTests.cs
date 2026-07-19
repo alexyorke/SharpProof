@@ -438,7 +438,7 @@ static class C
         var seed = CreateSeed(fixture, statement, "input", SeedKind.Numeric, 17);
         var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
 
-        var actual = SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+        var actual = SymbolicCfgStatementCompletion.CollectCompletedStatementState(
             statement,
             seed,
             fixture.SemanticModel,
@@ -467,7 +467,7 @@ static class C
         using var scope = SymbolicAnalysisLimitContext.Push(
             SharpProofAnalysisBudget.Default with { MaxMergedIfElseFacts = 1 });
 
-        var result = SymbolicCfgExecutionTrace.CollectCompletedStatementState(
+        var result = SymbolicCfgStatementCompletion.CollectCompletedStatementState(
             statement,
             new SymbolicState(),
             fixture.SemanticModel,
@@ -500,13 +500,13 @@ static class C
     [TestCase(
         "sealed class C { int[] M(int length) { var values = new int[length]; if (length < 0) return new int[0]; return values; } }",
         "if (length < 0) return new int[0];")]
-    public void ExecutionRootTrace_BeforeCurrentMatchesPerPointCollector(
+    public void CachedReachability_BeforeCurrentMatchesCanonicalCollector(
         string source,
         string marker)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ExecutionRootTrace_BeforeCurrentMatchesPerPointCollector));
+            nameof(CachedReachability_BeforeCurrentMatchesCanonicalCollector));
         var site = fixture.Root.DescendantNodes()
             .OfType<StatementSyntax>()
             .Single(statement => statement.ToString() == marker);
@@ -514,14 +514,13 @@ static class C
             site,
             fixture.SemanticModel,
             CancellationToken.None);
-        var actual = SymbolicCfgExecutionTrace.CollectStateFromExecutionTrace(
+        var actual = SymbolicReachabilityService.CollectPathStateAt(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
 
         Assert.That(expected.IsExact, Is.True, expected.Provenance.Single().Detail);
-        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
-        AssertStateParity(actual.Value!, expected.Value!);
+        AssertStateParity(actual, expected.Value!);
     }
 
     [Test]
@@ -578,15 +577,15 @@ static class C
         state.NormalizedProofKey + "\n" + CreateEvidenceKey(state) + "\n" + CreateVersionKey(state);
 
     [Test]
-    public void ExecutionRootTrace_UnsupportedLoopFallsBackWithoutPartialState()
+    public void CachedReachability_LoopStateMatchesCanonicalCollectorAndStructuralFallback()
     {
         const string source = "static class C { static int M(int value) { while (value > 0) value--; return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ExecutionRootTrace_UnsupportedLoopFallsBackWithoutPartialState));
+            nameof(CachedReachability_LoopStateMatchesCanonicalCollectorAndStructuralFallback));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
 
-        var trace = SymbolicCfgExecutionTrace.CollectStateFromExecutionTrace(
+        var canonical = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
@@ -596,10 +595,10 @@ static class C
             CancellationToken.None);
         var expected = CollectStructuralState(fixture, site);
 
-        Assert.That(trace.IsUnsupported, Is.True);
-        Assert.That(trace.Value, Is.Null);
-        Assert.That(trace.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
-        Assert.That(trace.Provenance.Single().Detail, Is.EqualTo("trace.control-flow-shape"));
+        Assert.That(canonical.IsUnsupported, Is.True);
+        Assert.That(canonical.Value, Is.Null);
+        Assert.That(canonical.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+        Assert.That(canonical.Provenance.Single().Detail, Is.EqualTo("loop-lowering"));
         AssertStateParity(routed, expected);
     }
 
