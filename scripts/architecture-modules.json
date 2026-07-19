@@ -134,6 +134,12 @@
       "layer": 5,
       "pathPrefixes": [ "scripts/package-consumers/" ],
       "allowedProjectReferences": []
+    },
+    {
+      "name": "TestInfrastructure",
+      "layer": 5,
+      "pathPrefixes": [ "SharpProof.Testing/", "SharpProof.Test/", "SharpProof.ToolingTest/" ],
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "BaselineCore", "CodeFixes", "Contracts", "CorpusReportCore", "FuzzCore", "ProofCore", "Symbolic", "SymbolicCliCore", "ToolingCore" ]
     }
   ]
 }

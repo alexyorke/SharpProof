@@ -4,204 +4,253 @@
     "modules":  [
                     {
                         "name":  "Contracts",
-                        "sourceRoots":  [
-                                            "SharpProof.Contracts/"
-                                        ],
+                        "layer":  0,
+                        "pathPrefixes":  [
+                                             "SharpProof.Contracts/"
+                                         ],
                         "allowedProjectReferences":  [
 
                                                      ]
                     },
                     {
                         "name":  "Attributes",
-                        "sourceRoots":  [
-                                            "SharpProof.Attributes/"
-                                        ],
+                        "layer":  0,
+                        "pathPrefixes":  [
+                                             "SharpProof.Attributes/"
+                                         ],
                         "allowedProjectReferences":  [
 
                                                      ]
                     },
                     {
                         "name":  "ProofCore",
-                        "sourceRoots":  [
-                                            "SharpProof.ProofCore/"
-                                        ],
+                        "layer":  1,
+                        "pathPrefixes":  [
+                                             "SharpProof.ProofCore/"
+                                         ],
                         "allowedProjectReferences":  [
 
                                                      ]
                     },
                     {
                         "name":  "Symbolic",
-                        "sourceRoots":  [
-                                            "SharpProof.Symbolic/"
-                                        ],
+                        "layer":  2,
+                        "pathPrefixes":  [
+                                             "SharpProof.Symbolic/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.Attributes",
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.ProofCore"
+                                                         "Attributes",
+                                                         "Contracts",
+                                                         "ProofCore"
                                                      ]
                     },
                     {
                         "name":  "Analyzer",
-                        "sourceRoots":  [
-                                            "SharpProof.Analyzer/"
-                                        ],
+                        "layer":  3,
+                        "pathPrefixes":  [
+                                             "SharpProof.Analyzer/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.Attributes",
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.Symbolic",
-                                                         "SharpProof.ProofCore"
+                                                         "Attributes",
+                                                         "Contracts",
+                                                         "ProofCore",
+                                                         "Symbolic"
                                                      ]
                     },
                     {
                         "name":  "CodeFixes",
-                        "sourceRoots":  [
-                                            "SharpProof.CodeFixes/"
-                                        ],
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "SharpProof.CodeFixes/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.Analyzer",
-                                                         "SharpProof.Attributes"
+                                                         "Analyzer",
+                                                         "Attributes"
                                                      ]
                     },
                     {
-                        "name":  "ToolingCore",
-                        "sourceRoots":  [
-                                            "SharpProof.Tooling.Core/"
-                                        ],
+                        "name":  "EffectSummary",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.EffectSummary/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "Contracts",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "SymbolicCli",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.SymbolicCli/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "Analyzer",
+                                                         "Attributes",
+                                                         "Symbolic",
+                                                         "SymbolicCliCore",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "SymbolicCliCore",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.SymbolicCli.Core/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "Symbolic"
+                                                     ]
+                    },
+                    {
+                        "name":  "FuzzCore",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.Fuzz.Core/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "Analyzer",
+                                                         "Attributes",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "FuzzCli",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.Fuzz/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "FuzzCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "BaselineCore",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.Baseline.Core/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "Contracts",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "BaselineCli",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.Baseline/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "BaselineCore",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "CorpusReportCore",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.CorpusReport.Core/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "CorpusReportCli",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/SharpProof.CorpusReport/"
+                                         ],
+                        "allowedProjectReferences":  [
+                                                         "CorpusReportCore",
+                                                         "ToolingCore"
+                                                     ]
+                    },
+                    {
+                        "name":  "VsixHarness",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "Tools/VsixHarness/"
+                                         ],
                         "allowedProjectReferences":  [
 
                                                      ]
                     },
                     {
-                        "name":  "EffectSummary",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.EffectSummary/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "SymbolicCliCore",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.SymbolicCli.Core/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Symbolic"
-                                                     ]
-                    },
-                    {
-                        "name":  "SymbolicCli",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.SymbolicCli/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Analyzer",
-                                                         "SharpProof.Attributes",
-                                                         "SharpProof.Symbolic",
-                                                         "SharpProof.SymbolicCli.Core",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "FuzzCore",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.Fuzz.Core/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Analyzer",
-                                                         "SharpProof.Attributes",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "FuzzCli",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.Fuzz/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Fuzz.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "BaselineCore",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.Baseline.Core/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "BaselineCli",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.Baseline/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Baseline.Core",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "CorpusReportCore",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.CorpusReport.Core/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
-                        "name":  "CorpusReportCli",
-                        "sourceRoots":  [
-                                            "Tools/SharpProof.CorpusReport/"
-                                        ],
-                        "allowedProjectReferences":  [
-                                                         "SharpProof.CorpusReport.Core",
-                                                         "SharpProof.Tooling.Core"
-                                                     ]
-                    },
-                    {
                         "name":  "Packaging",
-                        "sourceRoots":  [
-                                            "SharpProof.Package/"
-                                        ],
+                        "layer":  5,
+                        "pathPrefixes":  [
+                                             "SharpProof.Package/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.CodeFixes"
+                                                         "CodeFixes"
                                                      ]
                     },
                     {
                         "name":  "VSIX",
-                        "sourceRoots":  [
-                                            "SharpProof.Vsix/",
-                                            "Tools/VsixHarness/"
-                                        ],
+                        "layer":  5,
+                        "pathPrefixes":  [
+                                             "SharpProof.Vsix/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.CodeFixes",
-                                                         "SharpProof.Analyzer",
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.Symbolic"
+                                                         "Analyzer",
+                                                         "CodeFixes",
+                                                         "Contracts",
+                                                         "Symbolic"
+                                                     ]
+                    },
+                    {
+                        "name":  "ToolingCore",
+                        "layer":  4,
+                        "pathPrefixes":  [
+                                             "SharpProof.Tooling.Core/"
+                                         ],
+                        "allowedProjectReferences":  [
+
+                                                     ]
+                    },
+                    {
+                        "name":  "Samples",
+                        "layer":  5,
+                        "pathPrefixes":  [
+                                             "samples/"
+                                         ],
+                        "allowedProjectReferences":  [
+
+                                                     ]
+                    },
+                    {
+                        "name":  "PackageConsumers",
+                        "layer":  5,
+                        "pathPrefixes":  [
+                                             "scripts/package-consumers/"
+                                         ],
+                        "allowedProjectReferences":  [
+
                                                      ]
                     },
                     {
                         "name":  "TestInfrastructure",
-                        "sourceRoots":  [
-                                            "SharpProof.Testing/",
-                                            "SharpProof.Test/",
-                                            "SharpProof.ToolingTest/"
-                                        ],
+                        "layer":  5,
+                        "pathPrefixes":  [
+                                             "SharpProof.Testing/",
+                                             "SharpProof.Test/",
+                                             "SharpProof.ToolingTest/"
+                                         ],
                         "allowedProjectReferences":  [
-                                                         "SharpProof.CodeFixes",
-                                                         "SharpProof.Attributes",
-                                                         "SharpProof.Analyzer",
-                                                         "SharpProof.Contracts",
-                                                         "SharpProof.Symbolic",
-                                                         "SharpProof.ProofCore",
-                                                         "SharpProof.Tooling.Core",
-                                                         "SharpProof.CorpusReport.Core",
-                                                         "SharpProof.Fuzz.Core",
-                                                         "SharpProof.SymbolicCli.Core"
+                                                         "Analyzer",
+                                                         "Attributes",
+                                                         "BaselineCore",
+                                                         "CodeFixes",
+                                                         "Contracts",
+                                                         "CorpusReportCore",
+                                                         "FuzzCore",
+                                                         "ProofCore",
+                                                         "Symbolic",
+                                                         "SymbolicCliCore",
+                                                         "ToolingCore"
                                                      ]
                     }
                 ],
@@ -352,236 +401,6 @@
                                            ]
                             }
                         ],
-    "projects":  [
-                     {
-                         "name":  "SharpProof.Symbolic.Sample",
-                         "path":  "samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj",
-                         "module":  "Unknown",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Analyzer",
-                         "path":  "SharpProof.Analyzer/SharpProof.Analyzer.csproj",
-                         "module":  "Analyzer",
-                         "projectReferences":  [
-                                                   "SharpProof.Contracts",
-                                                   "SharpProof.ProofCore",
-                                                   "SharpProof.Symbolic"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Attributes",
-                         "path":  "SharpProof.Attributes/SharpProof.Attributes.csproj",
-                         "module":  "Attributes",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.CodeFixes",
-                         "path":  "SharpProof.CodeFixes/SharpProof.CodeFixes.csproj",
-                         "module":  "CodeFixes",
-                         "projectReferences":  [
-                                                   "SharpProof.Analyzer",
-                                                   "SharpProof.Attributes"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Contracts",
-                         "path":  "SharpProof.Contracts/SharpProof.Contracts.csproj",
-                         "module":  "Contracts",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Demo",
-                         "path":  "SharpProof.Demo/SharpProof.Demo.csproj",
-                         "module":  "Unknown",
-                         "projectReferences":  [
-                                                   "SharpProof.CodeFixes"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Package",
-                         "path":  "SharpProof.Package/SharpProof.Package.csproj",
-                         "module":  "Packaging",
-                         "projectReferences":  [
-                                                   "SharpProof.CodeFixes"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.ProofCore",
-                         "path":  "SharpProof.ProofCore/SharpProof.ProofCore.csproj",
-                         "module":  "ProofCore",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Smoke.Net472",
-                         "path":  "SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj",
-                         "module":  "Unknown",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Symbolic",
-                         "path":  "SharpProof.Symbolic/SharpProof.Symbolic.csproj",
-                         "module":  "Symbolic",
-                         "projectReferences":  [
-                                                   "SharpProof.Attributes",
-                                                   "SharpProof.Contracts",
-                                                   "SharpProof.ProofCore"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Test",
-                         "path":  "SharpProof.Test/SharpProof.Test.csproj",
-                         "module":  "TestInfrastructure",
-                         "projectReferences":  [
-                                                   "SharpProof.EffectSummary",
-                                                   "SharpProof.ProofCore",
-                                                   "SharpProof.SymbolicCli.Core",
-                                                   "SharpProof.Testing"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Testing",
-                         "path":  "SharpProof.Testing/SharpProof.Testing.csproj",
-                         "module":  "TestInfrastructure",
-                         "projectReferences":  [
-                                                   "SharpProof.Analyzer",
-                                                   "SharpProof.Attributes",
-                                                   "SharpProof.CodeFixes",
-                                                   "SharpProof.Symbolic"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Tooling.Core",
-                         "path":  "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj",
-                         "module":  "ToolingCore",
-                         "projectReferences":  [
-
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.ToolingTest",
-                         "path":  "SharpProof.ToolingTest/SharpProof.ToolingTest.csproj",
-                         "module":  "TestInfrastructure",
-                         "projectReferences":  [
-                                                   "SharpProof.Baseline.Core",
-                                                   "SharpProof.CorpusReport.Core",
-                                                   "SharpProof.Fuzz.Core",
-                                                   "SharpProof.SymbolicCli.Core",
-                                                   "SharpProof.Testing"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Vsix",
-                         "path":  "SharpProof.Vsix/SharpProof.Vsix.csproj",
-                         "module":  "VSIX",
-                         "projectReferences":  [
-                                                   "SharpProof.Analyzer",
-                                                   "SharpProof.CodeFixes",
-                                                   "SharpProof.Contracts",
-                                                   "SharpProof.Symbolic"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Baseline.Core",
-                         "path":  "Tools/SharpProof.Baseline.Core/SharpProof.Baseline.Core.csproj",
-                         "module":  "BaselineCore",
-                         "projectReferences":  [
-                                                   "SharpProof.Contracts",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Baseline",
-                         "path":  "Tools/SharpProof.Baseline/SharpProof.Baseline.csproj",
-                         "module":  "BaselineCli",
-                         "projectReferences":  [
-                                                   "SharpProof.Baseline.Core",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.CorpusReport.Core",
-                         "path":  "Tools/SharpProof.CorpusReport.Core/SharpProof.CorpusReport.Core.csproj",
-                         "module":  "CorpusReportCore",
-                         "projectReferences":  [
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.CorpusReport",
-                         "path":  "Tools/SharpProof.CorpusReport/SharpProof.CorpusReport.csproj",
-                         "module":  "CorpusReportCli",
-                         "projectReferences":  [
-                                                   "SharpProof.CorpusReport.Core",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.EffectSummary",
-                         "path":  "Tools/SharpProof.EffectSummary/SharpProof.EffectSummary.csproj",
-                         "module":  "EffectSummary",
-                         "projectReferences":  [
-                                                   "SharpProof.Contracts",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Fuzz.Core",
-                         "path":  "Tools/SharpProof.Fuzz.Core/SharpProof.Fuzz.Core.csproj",
-                         "module":  "FuzzCore",
-                         "projectReferences":  [
-                                                   "SharpProof.Analyzer",
-                                                   "SharpProof.Attributes",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.Fuzz",
-                         "path":  "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
-                         "module":  "FuzzCli",
-                         "projectReferences":  [
-                                                   "SharpProof.Fuzz.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.SymbolicCli.Core",
-                         "path":  "Tools/SharpProof.SymbolicCli.Core/SharpProof.SymbolicCli.Core.csproj",
-                         "module":  "SymbolicCliCore",
-                         "projectReferences":  [
-                                                   "SharpProof.Symbolic"
-                                               ]
-                     },
-                     {
-                         "name":  "SharpProof.SymbolicCli",
-                         "path":  "Tools/SharpProof.SymbolicCli/SharpProof.SymbolicCli.csproj",
-                         "module":  "SymbolicCli",
-                         "projectReferences":  [
-                                                   "SharpProof.Analyzer",
-                                                   "SharpProof.Attributes",
-                                                   "SharpProof.Symbolic",
-                                                   "SharpProof.SymbolicCli.Core",
-                                                   "SharpProof.Tooling.Core"
-                                               ]
-                     },
-                     {
-                         "name":  "VsixHarness",
-                         "path":  "Tools/VsixHarness/VsixHarness.csproj",
-                         "module":  "VSIX",
-                         "projectReferences":  [
-
-                                               ]
-                     }
-                 ],
     "testFixtures":  [
                          {
                              "name":  "AmbientStateSoundnessStressTests",
@@ -1930,6 +1749,39 @@
                      ],
     "sourceFiles":  [
                         {
+                            "path":  "samples/SharpProof.Symbolic/Program.cs",
+                            "module":  "Samples",
+                            "declaredTypes":  [
+                                                  "Sample"
+                                              ],
+                            "referencingFixtureCount":  12,
+                            "referencedTokens":  [
+                                                     "Sample"
+                                                 ]
+                        },
+                        {
+                            "path":  "scripts/package-consumers/AnalyzerConsumer.cs",
+                            "module":  "PackageConsumers",
+                            "declaredTypes":  [
+                                                  "AnalyzerNativeSmtProbe"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "scripts/package-consumers/SymbolicConsumer.cs",
+                            "module":  "PackageConsumers",
+                            "declaredTypes":  [
+                                                  "NativeSmtProbe"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/AnalysisTruncationDiagnosticProperties.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2193,7 +2045,7 @@
                                                   "AnalyzerConfigurationValueKind",
                                                   "PurityPolicyImpact"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "AnalyzerConfigurationOption",
                                                      "AnalyzerConfigurationOptionRegistry",
@@ -2280,19 +2132,6 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Configuration/PurityPolicyAuditRegistry.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityBoundaryPolicy",
-                                                  "PurityPolicyAuditRegistry"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "PurityBoundaryPolicy",
-                                                     "PurityPolicyAuditRegistry"
                                                  ]
                         },
                         {
@@ -4708,7 +4547,7 @@
                                                   "PurityHazardKind",
                                                   "PurityProofQuery"
                                               ],
-                            "referencingFixtureCount":  4,
+                            "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "PurityEffectVisibility",
                                                      "PurityHazard",
@@ -5123,7 +4962,7 @@
                                                   "ExecutionRootPolicy",
                                                   "ExpressionCastUnwrapPolicy"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "CSharpSyntaxFacts",
                                                      "ExecutionRootPolicy"
@@ -5902,15 +5741,10 @@
                             "path":  "SharpProof.Symbolic/SharpProofAnalysisApi.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "CapabilityQuery",
                                                   "CapabilityQueryPayload",
-                                                  "ComplexityQuery",
                                                   "ComplexityQueryPayload",
                                                   "ConditionQuery",
                                                   "ConditionQueryPayload",
-                                                  "InvariantQuery",
-                                                  "MethodQuery",
-                                                  "ReachabilityQuery",
                                                   "RuntimeHazardQuery",
                                                   "RuntimeHazardQueryPayload",
                                                   "SharpProofAnalysisBudget",
@@ -5933,10 +5767,10 @@
                                                   "SharpProofTargetKind",
                                                   "SharpProofTruncationReason",
                                                   "SharpProofUnknownReason",
-                                                  "SourceLocationQuery",
+                                                  "SimpleQuery",
                                                   "SourceQueryPayload"
                                               ],
-                            "referencingFixtureCount":  11,
+                            "referencingFixtureCount":  12,
                             "referencedTokens":  [
                                                      "CapabilityQueryPayload",
                                                      "ComplexityQueryPayload",
@@ -6420,8 +6254,9 @@
                                                   "SymbolicFormulaDisplay",
                                                   "SymbolicProgramPointKinds"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
+                                                     "SymbolicFormulaDisplay",
                                                      "SymbolicProgramPointKinds"
                                                  ]
                         },
@@ -6475,18 +6310,16 @@
                             "declaredTypes":  [
                                                   "CollectedProgramPoint",
                                                   "SymbolicInvariantFactSummary",
-                                                  "SymbolicInvariantImplicationResult",
                                                   "SymbolicInvariantService",
-                                                  "SymbolicInvariantSnapshot",
                                                   "SymbolicProgramPointAnalysis",
                                                   "SymbolicReachability",
                                                   "SymbolicSmtDiagnostics",
                                                   "SymbolicSmtDiagnosticsSnapshot"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  7,
                             "referencedTokens":  [
+                                                     "SymbolicInvariantFactSummary",
                                                      "SymbolicInvariantService",
-                                                     "SymbolicInvariantSnapshot",
                                                      "SymbolicProgramPointAnalysis",
                                                      "SymbolicReachability",
                                                      "SymbolicSmtDiagnostics"
@@ -6778,7 +6611,7 @@
                             "declaredTypes":  [
                                                   "SymbolicQueryExecutor"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  14,
                             "referencedTokens":  [
                                                      "SymbolicQueryExecutor"
                                                  ]
@@ -6791,7 +6624,7 @@
                                                   "SymbolicQueryOptionHelpers",
                                                   "SymbolicQueryOptions"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  9,
                             "referencedTokens":  [
                                                      "SymbolicQueryContext",
                                                      "SymbolicQueryOptions"
@@ -6846,17 +6679,6 @@
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicQueryResult"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicQueryService.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicQueryService"
-                                              ],
-                            "referencingFixtureCount":  7,
-                            "referencedTokens":  [
-                                                     "SymbolicQueryService"
                                                  ]
                         },
                         {
@@ -6934,7 +6756,7 @@
                                                   "SymbolicRuntimeHazardQueryService",
                                                   "SymbolicRuntimeHazardStatus"
                                               ],
-                            "referencingFixtureCount":  10,
+                            "referencingFixtureCount":  9,
                             "referencedTokens":  [
                                                      "SymbolicRuntimeHazard",
                                                      "SymbolicRuntimeHazardKind",
@@ -6945,10 +6767,10 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSourceCandidateFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicRuntimeHazardSyntaxCandidateFactory"
+                                                  "SymbolicRuntimeHazardSourceCandidateFactory"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -7018,7 +6840,7 @@
                                                   "SymbolicSourceInput",
                                                   "SymbolicSourceInputKind"
                                               ],
-                            "referencingFixtureCount":  8,
+                            "referencingFixtureCount":  9,
                             "referencedTokens":  [
                                                      "SymbolicSourceInput",
                                                      "SymbolicSourceInputKind"
@@ -7057,17 +6879,6 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicSourceQueryService"
-                                              ],
-                            "referencingFixtureCount":  6,
-                            "referencedTokens":  [
-                                                     "SymbolicSourceQueryService"
                                                  ]
                         },
                         {
@@ -7980,6 +7791,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.SymbolicCli/ConfigurationReferenceCommand.cs",
+                            "module":  "SymbolicCli",
+                            "declaredTypes":  [
+                                                  "ConfigurationReferenceCommand"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ConfigurationReferenceCommand"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliErrorWriter.cs",
                             "module":  "SymbolicCli",
                             "declaredTypes":  [
@@ -8081,19 +7903,8 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliTruncationText.cs",
-                            "module":  "SymbolicCli",
-                            "declaredTypes":  [
-                                                  "SymbolicCliTruncationText"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "Tools/VsixHarness/Program.cs",
-                            "module":  "VSIX",
+                            "module":  "VsixHarness",
                             "declaredTypes":  [
                                                   "AllowSynchronizationAttribute",
                                                   "EnforcePureAttribute",
@@ -8111,6 +7922,28 @@
                         }
                     ],
     "fixtureDependencies":  [
+                                {
+                                    "path":  "samples/SharpProof.Symbolic/Program.cs",
+                                    "module":  "Samples",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalysisTruncationDiagnosticTests",
+                                                                 "BaselineWorkflowTests",
+                                                                 "CommonBugAdditionalAnalyzerTests",
+                                                                 "CommonBugAsyncAnalyzerTests",
+                                                                 "CommonBugCollectionAnalyzerTests",
+                                                                 "CommonBugDataflowAnalyzerTests",
+                                                                 "ConstantsTests",
+                                                                 "NullableContractVerificationTests",
+                                                                 "SharpProofTargetTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicSourceQueryLineTests",
+                                                                 "SymbolMutationFactsTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "Sample"
+                                               ],
+                                    "fixtureCount":  12
+                                },
                                 {
                                     "path":  "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
                                     "module":  "Analyzer",
@@ -8170,7 +8003,8 @@
                                                                  "AnalyzerTestHostConfigurationTests",
                                                                  "ConfigurationProfileTests",
                                                                  "DiagnosticDescriptorMetadataTests",
-                                                                 "PurityPolicyAuditTests"
+                                                                 "PurityPolicyAuditTests",
+                                                                 "ScriptProcessOwnershipTests"
                                                              ],
                                     "tokens":  [
                                                    "AnalyzerConfigurationOption",
@@ -8178,7 +8012,7 @@
                                                    "AnalyzerConfigurationScope",
                                                    "PurityPolicyImpact"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
@@ -8211,18 +8045,6 @@
                                                              ],
                                     "tokens":  [
                                                    "BaselineEntry"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Configuration/PurityPolicyAuditRegistry.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "PurityPolicyAuditTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityBoundaryPolicy",
-                                                   "PurityPolicyAuditRegistry"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9719,6 +9541,7 @@
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
                                                                  "ProofCorePurityProofTests",
+                                                                 "ProofCoreZ3SmokeTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "SmtSyntacticClassifierTests",
                                                                  "SymbolicProofPipelineTests"
@@ -9729,7 +9552,7 @@
                                                    "PurityHazardKind",
                                                    "PurityProofQuery"
                                                ],
-                                    "fixtureCount":  4
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/PurityProofSearch.cs",
@@ -9956,14 +9779,13 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "CSharpSyntaxFactsTests",
-                                                                 "SymbolicOperationTransferModelTests",
                                                                  "SymbolicSemanticPipelineTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpSyntaxFacts",
                                                    "ExecutionRootPolicy"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicCfgExecutionTrace.cs",
@@ -10365,6 +10187,7 @@
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicComplexityTests",
                                                                  "SymbolicErrorModelTests",
+                                                                 "SymbolicInvariantServiceTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -10383,7 +10206,7 @@
                                                    "SharpProofTargetKind",
                                                    "SourceQueryPayload"
                                                ],
-                                    "fixtureCount":  11
+                                    "fixtureCount":  12
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SharpProofEvidenceSchema.cs",
@@ -10627,12 +10450,14 @@
                                     "path":  "SharpProof.Symbolic/SymbolicFormulaDisplay.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "SymbolicInvariantServiceTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
+                                                   "SymbolicFormulaDisplay",
                                                    "SymbolicProgramPointKinds"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",
@@ -10684,19 +10509,18 @@
                                                                  "SemanticOracleSmtTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
-                                                                 "SymbolicInvariantServiceTests",
                                                                  "SymbolicProgramPointFactTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
+                                                   "SymbolicInvariantFactSummary",
                                                    "SymbolicInvariantService",
-                                                   "SymbolicInvariantSnapshot",
                                                    "SymbolicProgramPointAnalysis",
                                                    "SymbolicReachability",
                                                    "SymbolicSmtDiagnostics"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  7
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs",
@@ -10837,12 +10661,24 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "ForeachSmtInvariantTests",
+                                                                 "PathFactExpressionReachabilityTests",
+                                                                 "PathSensitiveSmtInvariantTests",
+                                                                 "SemanticOracleSmtTests",
+                                                                 "StringLengthSmtTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicInvariantServiceTests",
+                                                                 "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicQueryExecutor"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  14
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicQueryContext.cs",
@@ -10854,6 +10690,7 @@
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicComplexityTests",
                                                                  "SymbolicErrorModelTests",
+                                                                 "SymbolicInvariantServiceTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -10861,7 +10698,7 @@
                                                    "SymbolicQueryContext",
                                                    "SymbolicQueryOptions"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  9
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicQueryFactSummaries.cs",
@@ -10892,23 +10729,6 @@
                                                    "SymbolicQueryResult"
                                                ],
                                     "fixtureCount":  2
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/SymbolicQueryService.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "CapabilityContractTests",
-                                                                 "CompactDomainProjectionTests",
-                                                                 "SymbolicAnalysisLimitsTests",
-                                                                 "SymbolicComplexityTests",
-                                                                 "SymbolicErrorModelTests",
-                                                                 "SymbolicQueryWitnessTests",
-                                                                 "SymbolicSourceQueryLineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicQueryService"
-                                               ],
-                                    "fixtureCount":  7
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicQueryTarget.cs",
@@ -10958,7 +10778,6 @@
                                                                  "SymbolicProofPipelineTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
-                                                                 "SymbolicSemanticPipelineTests",
                                                                  "SymbolicSourceQueryLineTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
@@ -10970,7 +10789,7 @@
                                                    "SymbolicRuntimeHazardQueryService",
                                                    "SymbolicRuntimeHazardStatus"
                                                ],
-                                    "fixtureCount":  10
+                                    "fixtureCount":  9
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeTypeFacts.cs",
@@ -11017,6 +10836,7 @@
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicComplexityTests",
                                                                  "SymbolicErrorModelTests",
+                                                                 "SymbolicInvariantServiceTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -11024,7 +10844,7 @@
                                                    "SymbolicSourceInput",
                                                    "SymbolicSourceInputKind"
                                                ],
-                                    "fixtureCount":  8
+                                    "fixtureCount":  9
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicSourceMap.cs",
@@ -11036,22 +10856,6 @@
                                                    "SymbolicSourceMap"
                                                ],
                                     "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ForeachSmtInvariantTests",
-                                                                 "PathFactExpressionReachabilityTests",
-                                                                 "PathSensitiveSmtInvariantTests",
-                                                                 "SemanticOracleSmtTests",
-                                                                 "StringLengthSmtTests",
-                                                                 "SymbolicSourceQueryLineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicSourceQueryService"
-                                               ],
-                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs",
@@ -11400,6 +11204,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "Tools/SharpProof.SymbolicCli/ConfigurationReferenceCommand.cs",
+                                    "module":  "SymbolicCli",
+                                    "selectedTestFixtures":  [
+                                                                 "ScriptProcessOwnershipTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ConfigurationReferenceCommand"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliErrorWriter.cs",
                                     "module":  "SymbolicCli",
                                     "selectedTestFixtures":  [
@@ -11459,7 +11274,7 @@
                                 },
                                 {
                                     "path":  "Tools/VsixHarness/Program.cs",
-                                    "module":  "VSIX",
+                                    "module":  "VsixHarness",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerHostConcurrencyStressTests",
                                                                  "AnalyzerPackagingTests",

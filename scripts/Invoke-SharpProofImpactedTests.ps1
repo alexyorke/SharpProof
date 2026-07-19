@@ -500,7 +500,7 @@ function Get-InventoryModule
     }
 
     return $Inventory.modules | Where-Object {
-        @($_.sourceRoots | Where-Object {
+        @($_.pathPrefixes | Where-Object {
             $Path.StartsWith([string]$_, [StringComparison]::OrdinalIgnoreCase)
         }).Count -gt 0
     } | Select-Object -First 1
@@ -519,10 +519,6 @@ function Get-InventoryReverseModuleClosure
     while ($changed)
     {
         $changed = $false
-        $impactedProjects = @($Modules |
-            Where-Object { $impacted.Contains([string]$_.name) } |
-            ForEach-Object { @($_.sourceRoots) } |
-            ForEach-Object { [System.IO.Path]::GetFileName(([string]$_).TrimEnd('/')) })
         foreach ($module in $Modules)
         {
             if ($impacted.Contains([string]$module.name) -or
@@ -531,7 +527,7 @@ function Get-InventoryReverseModuleClosure
                 continue
             }
 
-            if (@($module.allowedProjectReferences | Where-Object { $impactedProjects -contains [string]$_ }).Count -gt 0)
+            if (@($module.allowedProjectReferences | Where-Object { $impacted.Contains([string]$_) }).Count -gt 0)
             {
                 [void]$impacted.Add([string]$module.name)
                 $changed = $true

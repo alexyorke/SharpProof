@@ -148,14 +148,19 @@ Tests are excluded from the metric and must not be deleted.
   which now explicitly enables VSIX packaging; focused validation produces the
   NuGet and VSIX artifacts with zero warnings. Removed the superseded
   historical LOC reporter and mutable baseline in favor of this enforced ledger.
+- [x] Made `architecture-modules.json` the single module and dependency-graph
+  owner for architecture validation, production metrics, and impacted-test
+  inference. Removed the test-impact generator's duplicate 19-module table and
+  unused generated project graph; selector closure now follows module identities
+  directly, and all 40 selector characterizations preserve conservative routing.
 
 ## Current evidence
 
-- Maintained production: 103,742 lines (99,619 C#, 3,243 scripts, and 880
-  specifications); net reduction: 3,884 lines; remaining reduction: 16,116.
-  This tranche removed 203 maintained script lines without deleting tests.
+- Maintained production: 103,694 lines (99,619 C#, 3,189 scripts, and 886
+  specifications); net reduction: 3,932 lines; remaining reduction: 16,068.
+  This tranche removed 48 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,156 passing tests and two documented skips.
+- Six lanes: 6,157 passing tests and two documented skips.
 
 ## Milestones
 
@@ -167,10 +172,11 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Replace the next complete duplicated semantic or orchestration owner whose
-superseded path repays at least 200 maintained-production lines, preferring
-350-line or larger cuts. Prefer inferred or canonical analysis over manual
-catalogs when characterization proves it is complete; otherwise preserve the
-explicit owner. Require focused parity before deleting the old path in the same
-tranche, and do not revisit the independently required string-hash,
-type-identity, CFG/loop-transfer, or EffectSummary assembly-reader owners.
+Replace the next complete duplicated semantic owner whose superseded path
+repays at least 200 maintained-production lines, preferring 350-line or larger
+cuts in Symbolic, Analyzer, ProofCore, or EffectSummary. Prefer inferred or
+canonical analysis over manual catalogs when characterization proves it is
+complete; otherwise preserve the explicit owner. Require focused parity before
+deleting the old path in the same tranche, and do not revisit the independently
+required string-hash, type-identity, CFG/loop-transfer, EffectSummary
+assembly-reader, or impacted-test orchestration owners.

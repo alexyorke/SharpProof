@@ -3,11 +3,11 @@
 Builds the SharpProof impacted-test dependency inventory.
 
 .DESCRIPTION
-The inventory is intentionally static and conservative. It records module
-boundaries, project references, production type declarations, test fixtures,
-and direct test references to production type names. The impacted-test wrapper
-uses it as explainable evidence, while curated path maps and full-suite
-fallbacks remain the safety net.
+The inventory is intentionally static and conservative. It combines the
+canonical architecture manifest with production type declarations, test
+fixtures, and direct test references to production type names. The
+impacted-test wrapper uses it as explainable evidence, while curated path maps
+and full-suite fallbacks remain the safety net.
 #>
 [CmdletBinding()]
 param(
@@ -43,7 +43,7 @@ function Get-ModuleName
 
     foreach ($module in $script:Modules)
     {
-        foreach ($root in $module.sourceRoots)
+        foreach ($root in $module.pathPrefixes)
         {
             if ($Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase))
             {
@@ -53,13 +53,6 @@ function Get-ModuleName
     }
 
     return 'Unknown'
-}
-
-function Get-ProjectNameFromPath
-{
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    return [System.IO.Path]::GetFileNameWithoutExtension($Path)
 }
 
 function Get-TypeNames
@@ -116,27 +109,8 @@ function Test-TokenReference
 }
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$script:Modules = @(
-    [ordered]@{ name = 'Contracts'; sourceRoots = @('SharpProof.Contracts/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'Attributes'; sourceRoots = @('SharpProof.Attributes/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'ProofCore'; sourceRoots = @('SharpProof.ProofCore/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'Symbolic'; sourceRoots = @('SharpProof.Symbolic/'); allowedProjectReferences = @('SharpProof.Attributes', 'SharpProof.Contracts', 'SharpProof.ProofCore') },
-    [ordered]@{ name = 'Analyzer'; sourceRoots = @('SharpProof.Analyzer/'); allowedProjectReferences = @('SharpProof.Attributes', 'SharpProof.Contracts', 'SharpProof.Symbolic', 'SharpProof.ProofCore') },
-    [ordered]@{ name = 'CodeFixes'; sourceRoots = @('SharpProof.CodeFixes/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes') },
-    [ordered]@{ name = 'ToolingCore'; sourceRoots = @('SharpProof.Tooling.Core/'); allowedProjectReferences = @() },
-    [ordered]@{ name = 'EffectSummary'; sourceRoots = @('Tools/SharpProof.EffectSummary/'); allowedProjectReferences = @('SharpProof.Contracts', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'SymbolicCliCore'; sourceRoots = @('Tools/SharpProof.SymbolicCli.Core/'); allowedProjectReferences = @('SharpProof.Symbolic') },
-    [ordered]@{ name = 'SymbolicCli'; sourceRoots = @('Tools/SharpProof.SymbolicCli/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.SymbolicCli.Core', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'FuzzCore'; sourceRoots = @('Tools/SharpProof.Fuzz.Core/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'FuzzCli'; sourceRoots = @('Tools/SharpProof.Fuzz/'); allowedProjectReferences = @('SharpProof.Fuzz.Core') },
-    [ordered]@{ name = 'BaselineCore'; sourceRoots = @('Tools/SharpProof.Baseline.Core/'); allowedProjectReferences = @('SharpProof.Contracts', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'BaselineCli'; sourceRoots = @('Tools/SharpProof.Baseline/'); allowedProjectReferences = @('SharpProof.Baseline.Core', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'CorpusReportCore'; sourceRoots = @('Tools/SharpProof.CorpusReport.Core/'); allowedProjectReferences = @('SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'CorpusReportCli'; sourceRoots = @('Tools/SharpProof.CorpusReport/'); allowedProjectReferences = @('SharpProof.CorpusReport.Core', 'SharpProof.Tooling.Core') },
-    [ordered]@{ name = 'Packaging'; sourceRoots = @('SharpProof.Package/'); allowedProjectReferences = @('SharpProof.CodeFixes') },
-    [ordered]@{ name = 'VSIX'; sourceRoots = @('SharpProof.Vsix/', 'Tools/VsixHarness/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Analyzer', 'SharpProof.Contracts', 'SharpProof.Symbolic') },
-    [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('SharpProof.Testing/', 'SharpProof.Test/', 'SharpProof.ToolingTest/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Attributes', 'SharpProof.Analyzer', 'SharpProof.Contracts', 'SharpProof.Symbolic', 'SharpProof.ProofCore', 'SharpProof.Tooling.Core', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core', 'SharpProof.SymbolicCli.Core') }
-)
+$architecturePath = Join-Path $PSScriptRoot 'architecture-modules.json'
+$script:Modules = @((Get-Content -LiteralPath $architecturePath -Raw | ConvertFrom-Json).modules)
 $script:IgnoredTypeTokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
 foreach ($token in Get-SharpProofIgnoredImpactTypeTokens)
 {
@@ -147,35 +121,6 @@ $maxInventoryFixtureDependencies = 40
 Push-Location $script:RepoRoot
 try
 {
-    $projectFiles = @(Get-ChildItem -Path $script:RepoRoot -Recurse -Filter '*.csproj' |
-        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' -and (Convert-ToRepoPath $_.FullName) -notmatch '(^|/)\.[^/]+/' } |
-        Sort-Object FullName)
-
-    $projects = foreach ($projectFile in $projectFiles)
-    {
-        [xml]$projectXml = Get-Content -LiteralPath $projectFile.FullName -Raw
-        $projectPath = Convert-ToRepoPath $projectFile.FullName
-        $projectName = Get-ProjectNameFromPath $projectPath
-        $references = foreach ($reference in $projectXml.SelectNodes("//*[local-name()='ProjectReference']"))
-        {
-            $include = [string]$reference.GetAttribute('Include')
-            if ([string]::IsNullOrWhiteSpace($include))
-            {
-                continue
-            }
-
-            $referencePath = [System.IO.Path]::GetFullPath((Join-Path $projectFile.DirectoryName $include))
-            Get-ProjectNameFromPath $referencePath
-        }
-
-        [ordered]@{
-            name = $projectName
-            path = $projectPath
-            module = Get-ModuleName $projectPath
-            projectReferences = @($references | Sort-Object -Unique)
-        }
-    }
-
     $testFiles = @(
         foreach ($testRoot in @('SharpProof.Test', 'SharpProof.ToolingTest'))
         {
@@ -305,7 +250,6 @@ try
         modules = @($script:Modules)
         maxInventoryFixtureDependencies = $maxInventoryFixtureDependencies
         highFanoutFiles = @($highFanoutFiles | Sort-Object { $_['path'] })
-        projects = @($projects)
         testFixtures = @($testFixtures)
         sourceFiles = @($sourceFiles | Sort-Object { $_['path'] })
         fixtureDependencies = @($fixtureDependencies | Sort-Object { $_['path'] })

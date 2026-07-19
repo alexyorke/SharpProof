@@ -523,6 +523,30 @@ public sealed class ImpactedTestSelectionScriptTests
     }
 
     [Test]
+    public void TestImpactInventory_UsesCanonicalArchitectureModules()
+    {
+        var root = FindRepositoryRoot();
+        using var inventory = ReadImpactInventory();
+        using var architecture = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "architecture-modules.json")));
+
+        var inventoryModules = inventory.RootElement.GetProperty("modules").EnumerateArray().ToArray();
+        var architectureModules = architecture.RootElement.GetProperty("modules").EnumerateArray().ToArray();
+        Assert.That(inventoryModules.Select(static module => module.GetProperty("name").GetString()),
+            Is.EqualTo(architectureModules.Select(static module => module.GetProperty("name").GetString())));
+        for (var index = 0; index < inventoryModules.Length; index++)
+        {
+            Assert.That(GetStringArray(inventoryModules[index], "pathPrefixes"),
+                Is.EqualTo(GetStringArray(architectureModules[index], "pathPrefixes")));
+            Assert.That(GetStringArray(inventoryModules[index], "allowedProjectReferences"),
+                Is.EqualTo(GetStringArray(architectureModules[index], "allowedProjectReferences")));
+        }
+        Assert.That(inventory.RootElement.TryGetProperty("projects", out _), Is.False);
+    }
+
+    [Test]
     public void TestImpactInventory_SourceFilesStayWithinKnownModules()
     {
         using var inventory = ReadImpactInventory();
