@@ -1,9 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine.Analysis;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class MethodInvocationPurityRule

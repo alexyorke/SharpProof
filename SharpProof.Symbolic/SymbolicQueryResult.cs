@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicQueryResult(

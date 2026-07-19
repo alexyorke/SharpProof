@@ -1,8 +1,5 @@
-using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using SharpProof.ProofCore.Collections;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 

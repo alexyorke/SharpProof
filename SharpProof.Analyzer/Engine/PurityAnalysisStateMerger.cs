@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using SharpProof.Symbolic.Ir;
 using PotentialTargets = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PotentialTargets;
 using PurityAnalysisResult = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisResult;
 using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;

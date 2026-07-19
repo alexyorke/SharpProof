@@ -1,8 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer;
 
 internal sealed class MethodAnalysisRequest

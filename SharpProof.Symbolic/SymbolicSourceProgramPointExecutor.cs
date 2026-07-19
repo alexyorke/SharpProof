@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicSourceProgramPointExecutor(

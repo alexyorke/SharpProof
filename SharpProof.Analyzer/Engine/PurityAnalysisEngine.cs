@@ -1,14 +1,6 @@
-using System.Collections.Immutable;
 using System.Globalization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine.Rules;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
 

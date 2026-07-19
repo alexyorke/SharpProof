@@ -1,7 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicDispatchFacts

@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed record PurityAnalysisContext(

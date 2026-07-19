@@ -1,5 +1,3 @@
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer;
 
 internal enum ComplexityGrowthClass

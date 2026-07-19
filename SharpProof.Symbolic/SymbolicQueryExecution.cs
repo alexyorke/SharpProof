@@ -1,7 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicQueryExecutor

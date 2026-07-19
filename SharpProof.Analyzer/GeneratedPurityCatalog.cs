@@ -1,7 +1,4 @@
-using System.Collections.Immutable;
 using System.Text.Json;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Identity;
 
 namespace SharpProof.Analyzer;

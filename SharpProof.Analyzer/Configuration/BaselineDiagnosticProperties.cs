@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class BaselineDiagnosticProperties

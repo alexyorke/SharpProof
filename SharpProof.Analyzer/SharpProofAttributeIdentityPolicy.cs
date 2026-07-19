@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-
 namespace SharpProof.Analyzer;
 
 internal sealed class SharpProofAttributeIdentityPolicy

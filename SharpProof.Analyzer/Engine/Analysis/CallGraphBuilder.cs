@@ -1,11 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer.Engine.Analysis;
 
 internal static class CallGraphBuilder

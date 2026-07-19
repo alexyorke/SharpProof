@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal readonly struct RuntimeHazardCandidate(SyntaxNode site, SymbolicHazardOperation operation)

@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal static class SmtConfigurationValueRegistry

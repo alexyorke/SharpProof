@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.ProofCore.Smt;
 using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
 
 namespace SharpProof.Symbolic.Ir;

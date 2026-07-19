@@ -1,9 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer.Engine.Analysis;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
 

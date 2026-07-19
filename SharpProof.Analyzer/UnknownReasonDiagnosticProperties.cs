@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer;
 
 internal static class UnknownReasonDiagnosticProperties

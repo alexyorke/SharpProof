@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 

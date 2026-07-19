@@ -1,9 +1,4 @@
-using System.Collections.Immutable;
 using System.Globalization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-using Microsoft.CodeAnalysis.Diagnostics;
-using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Analyzer;
 

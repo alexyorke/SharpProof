@@ -1,0 +1,13 @@
+global using System.Collections.Immutable;
+global using Microsoft.CodeAnalysis;
+global using Microsoft.CodeAnalysis.CSharp;
+global using Microsoft.CodeAnalysis.CSharp.Syntax;
+global using Microsoft.CodeAnalysis.Diagnostics;
+global using Microsoft.CodeAnalysis.FlowAnalysis;
+global using Microsoft.CodeAnalysis.Operations;
+global using SharpProof.Analyzer.Configuration;
+global using SharpProof.Analyzer.Engine;
+global using SharpProof.Analyzer.Engine.Analysis;
+global using SharpProof.Symbolic;
+global using SharpProof.Symbolic.Ir;
+global using SharpProof.Symbolic.Smt;

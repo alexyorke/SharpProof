@@ -1,9 +1,4 @@
-using System.Collections.Immutable;
 using System.Numerics;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 

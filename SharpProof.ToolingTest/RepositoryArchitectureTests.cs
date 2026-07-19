@@ -83,6 +83,59 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void AnalyzerAndSymbolic_CommonImportsHaveOneProjectOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var projects = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["SharpProof.Symbolic"] =
+            [
+                "System.Collections.Immutable",
+                "Microsoft.CodeAnalysis",
+                "Microsoft.CodeAnalysis.CSharp",
+                "Microsoft.CodeAnalysis.CSharp.Syntax",
+                "Microsoft.CodeAnalysis.Operations",
+                "SharpProof.ProofCore.Smt",
+                "SharpProof.Symbolic.Ir",
+                "SharpProof.Symbolic.Smt"
+            ],
+            ["SharpProof.Analyzer"] =
+            [
+                "System.Collections.Immutable",
+                "Microsoft.CodeAnalysis",
+                "Microsoft.CodeAnalysis.CSharp",
+                "Microsoft.CodeAnalysis.CSharp.Syntax",
+                "Microsoft.CodeAnalysis.Diagnostics",
+                "Microsoft.CodeAnalysis.FlowAnalysis",
+                "Microsoft.CodeAnalysis.Operations",
+                "SharpProof.Analyzer.Configuration",
+                "SharpProof.Analyzer.Engine",
+                "SharpProof.Analyzer.Engine.Analysis",
+                "SharpProof.Symbolic",
+                "SharpProof.Symbolic.Ir",
+                "SharpProof.Symbolic.Smt"
+            ]
+        };
+
+        foreach (var project in projects)
+        {
+            var projectRoot = Path.Combine(root, project.Key);
+            var globalUsingsPath = Path.Combine(projectRoot, "GlobalUsings.cs");
+            Assert.That(File.Exists(globalUsingsPath), Is.True, project.Key);
+            var globalUsings = File.ReadAllText(globalUsingsPath);
+            foreach (var import in project.Value)
+            {
+                var directive = "global using " + import + ";";
+                Assert.That(globalUsings, Does.Contain(directive), project.Key);
+                var duplicate = Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
+                    .Where(path => !string.Equals(path, globalUsingsPath, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(path => File.ReadLines(path).Contains("using " + import + ";"));
+                Assert.That(duplicate, Is.Null, $"{directive} is duplicated by {duplicate}");
+            }
+        }
+    }
+
+    [Test]
     public void ProductionProjects_DoNotOwnAdapterFiles()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

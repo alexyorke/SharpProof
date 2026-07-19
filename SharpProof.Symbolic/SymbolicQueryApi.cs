@@ -1,8 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicQueryExecutor

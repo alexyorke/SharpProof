@@ -1,8 +1,5 @@
-using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 

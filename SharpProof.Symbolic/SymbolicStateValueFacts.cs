@@ -1,7 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicStateValueFacts

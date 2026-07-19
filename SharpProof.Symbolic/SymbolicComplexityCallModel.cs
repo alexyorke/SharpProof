@@ -1,9 +1,4 @@
-using System.Collections.Immutable;
 using System.Globalization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 

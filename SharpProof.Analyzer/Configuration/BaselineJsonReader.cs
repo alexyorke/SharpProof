@@ -1,6 +1,5 @@
 using System.Text.Json;
 using SharpProof.Schema;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 

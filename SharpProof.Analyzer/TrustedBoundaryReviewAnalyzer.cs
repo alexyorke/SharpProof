@@ -1,10 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Configuration;
-using SharpProof.Analyzer.Engine;
-
 namespace SharpProof.Analyzer;
 
 internal static class TrustedBoundaryReviewAnalyzer

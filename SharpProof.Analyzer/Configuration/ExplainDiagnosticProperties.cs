@@ -1,7 +1,5 @@
-using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
-using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer.Configuration;
 

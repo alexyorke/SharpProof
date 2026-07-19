@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal delegate bool KnownApiLoweringHandler<TValue>(

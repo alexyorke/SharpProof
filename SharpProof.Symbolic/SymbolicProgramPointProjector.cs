@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicProgramPointQueryContext

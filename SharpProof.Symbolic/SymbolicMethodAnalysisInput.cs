@@ -1,7 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicMethodAnalysisInput

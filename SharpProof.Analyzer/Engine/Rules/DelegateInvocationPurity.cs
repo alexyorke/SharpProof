@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
 using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;

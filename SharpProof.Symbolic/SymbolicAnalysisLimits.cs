@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicAnalysisLimitKind

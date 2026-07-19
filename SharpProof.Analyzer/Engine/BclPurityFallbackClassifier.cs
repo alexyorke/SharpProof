@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal static class BclPurityFallbackClassifier

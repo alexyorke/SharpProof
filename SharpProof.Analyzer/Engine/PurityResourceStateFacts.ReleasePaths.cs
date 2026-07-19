@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic.Ir;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;

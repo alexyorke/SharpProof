@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionSiteClassifier

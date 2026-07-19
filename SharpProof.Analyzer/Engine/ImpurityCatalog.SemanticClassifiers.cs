@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Symbolic;
-
 namespace SharpProof.Analyzer.Engine;
 
 internal static partial class ImpurityCatalog

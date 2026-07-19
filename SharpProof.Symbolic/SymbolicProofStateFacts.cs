@@ -1,5 +1,3 @@
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicProofStateFacts

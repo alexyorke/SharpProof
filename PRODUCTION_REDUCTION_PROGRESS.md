@@ -302,14 +302,20 @@ Tests are excluded from the metric and must not be deleted.
   validation, diagnostics, exact CLI JSON, and conservative unknown/truncation
   behavior remain unchanged, and architecture coverage prevents the adapter
   and assignment-heavy carrier forms from returning.
+- [x] Made project-level global imports the single owner for stable Roslyn,
+  immutable-collection, symbolic IR, SMT, configuration, and analyzer-engine
+  namespaces shared across Analyzer and Symbolic. Removed 1,105 repeated using
+  directives from 314 production files without changing any code statement;
+  architecture coverage prevents those project-wide imports from returning to
+  individual files.
 
 ## Current evidence
 
-- Maintained production: 98,776 lines (94,857 C#, 3,189 scripts, and 730
-  specifications); net reduction: 8,850 lines; remaining reduction: 11,150.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 97,692 lines (93,773 C#, 3,189 scripts, and 730
+  specifications); net reduction: 9,934 lines; remaining reduction: 10,066.
+  This tranche removed 1,084 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,190 passing tests and two documented Main skips.
+- Six lanes: 6,191 passing tests and two documented Main skips.
 
 ## Milestones
 

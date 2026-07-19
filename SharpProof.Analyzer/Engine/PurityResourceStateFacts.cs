@@ -1,7 +1,4 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
-using SharpProof.Symbolic.Ir;
 using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
 using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvidence;
 

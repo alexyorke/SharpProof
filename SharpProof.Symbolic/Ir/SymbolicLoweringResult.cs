@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.Symbolic.Ir;

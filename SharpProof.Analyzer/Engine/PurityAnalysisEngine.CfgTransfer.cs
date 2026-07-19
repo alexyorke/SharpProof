@@ -1,8 +1,4 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 

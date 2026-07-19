@@ -1,9 +1,6 @@
-using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
-using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 

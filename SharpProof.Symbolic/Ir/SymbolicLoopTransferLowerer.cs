@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal sealed record SymbolicLoopTransferPlan(

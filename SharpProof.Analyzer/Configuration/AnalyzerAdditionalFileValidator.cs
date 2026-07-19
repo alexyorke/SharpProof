@@ -1,9 +1,5 @@
-using System.Collections.Immutable;
 using System.Text.Json;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Schema;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 

@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using SharpProof.Identity;
 
 namespace SharpProof.Analyzer.Configuration;

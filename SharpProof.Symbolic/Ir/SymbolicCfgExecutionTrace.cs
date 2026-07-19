@@ -1,8 +1,5 @@
 using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
 using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
 
 namespace SharpProof.Symbolic.Ir;

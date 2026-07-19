@@ -1,9 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.ProofCore.Smt;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicStringLengthLowerer

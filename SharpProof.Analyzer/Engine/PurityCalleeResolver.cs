@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer.Engine.Rules;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 

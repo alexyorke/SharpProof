@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Microsoft.CodeAnalysis;
 using SharpProof.Identity;
 
 // RS1035 exception: Roslyn exposes metadata references but not the PE method-body

@@ -1,8 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class AssignmentPurityRule : IPurityRule

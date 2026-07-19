@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using SharpProof.ProofCore.Purity;
-using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 

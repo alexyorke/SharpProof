@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using SharpProof.Identity;
 
 namespace SharpProof.Analyzer;

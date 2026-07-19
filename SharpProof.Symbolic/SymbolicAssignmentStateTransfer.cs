@@ -1,9 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal readonly record struct SymbolicThrowGuardedValue(

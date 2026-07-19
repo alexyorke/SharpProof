@@ -1,9 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal static class SwitchPathConditionBuilder

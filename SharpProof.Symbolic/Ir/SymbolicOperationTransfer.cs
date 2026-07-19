@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicOperationTransfer

@@ -1,8 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeTypeFacts

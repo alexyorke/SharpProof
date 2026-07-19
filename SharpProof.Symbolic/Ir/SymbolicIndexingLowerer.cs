@@ -1,9 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.ProofCore.Smt;
 using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
 using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
 

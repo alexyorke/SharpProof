@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-
-using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 

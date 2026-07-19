@@ -1,7 +1,4 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 

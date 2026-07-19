@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Analyzer;
 

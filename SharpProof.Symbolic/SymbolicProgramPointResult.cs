@@ -1,14 +1,7 @@
-using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 

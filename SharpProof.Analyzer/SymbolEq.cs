@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer;
 

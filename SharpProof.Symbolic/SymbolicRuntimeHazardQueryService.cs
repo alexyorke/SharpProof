@@ -1,11 +1,5 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.ProofCore.Purity;
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 

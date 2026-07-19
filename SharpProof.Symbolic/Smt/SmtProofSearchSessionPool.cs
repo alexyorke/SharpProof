@@ -1,5 +1,3 @@
-using SharpProof.ProofCore.Smt;
-
 namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtProofSearchSessionPool

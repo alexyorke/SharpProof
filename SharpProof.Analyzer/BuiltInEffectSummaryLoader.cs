@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.Diagnostics;
-
 namespace SharpProof.Analyzer;
 
 internal static class BuiltInEffectSummaryLoader

@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Analyzer;

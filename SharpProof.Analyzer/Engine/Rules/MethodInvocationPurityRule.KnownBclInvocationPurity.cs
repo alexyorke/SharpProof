@@ -1,8 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic;
 using static SharpProof.Analyzer.Engine.Rules.ComparerInvocationPurity;
 
 namespace SharpProof.Analyzer.Engine.Rules;

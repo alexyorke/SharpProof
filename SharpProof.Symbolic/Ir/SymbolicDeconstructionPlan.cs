@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-
 namespace SharpProof.Symbolic.Ir;
 
 internal readonly record struct SymbolicDeconstructionTarget(IOperation Operation, ISymbol? Symbol)

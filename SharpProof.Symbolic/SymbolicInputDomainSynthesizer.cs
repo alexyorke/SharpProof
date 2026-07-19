@@ -1,6 +1,3 @@
-using SharpProof.ProofCore.Smt;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicInputDomainSynthesizer

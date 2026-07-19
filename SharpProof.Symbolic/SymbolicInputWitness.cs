@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.ProofCore.Smt;
-
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicWitnessStatus

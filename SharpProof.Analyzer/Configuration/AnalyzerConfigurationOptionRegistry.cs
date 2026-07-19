@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerConfigurationOptionRegistry

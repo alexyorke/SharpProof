@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer.Engine.Analysis;
-
 namespace SharpProof.Analyzer;
 
 internal static class MethodContractHierarchy

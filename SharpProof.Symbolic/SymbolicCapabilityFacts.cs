@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicCapabilityFacts

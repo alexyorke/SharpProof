@@ -1,9 +1,4 @@
-using System.Collections.Immutable;
 using System.Globalization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Configuration;
 

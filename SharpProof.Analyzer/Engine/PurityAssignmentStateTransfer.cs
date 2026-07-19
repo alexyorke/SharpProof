@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 

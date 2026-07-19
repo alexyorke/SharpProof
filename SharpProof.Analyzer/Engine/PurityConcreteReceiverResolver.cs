@@ -1,10 +1,4 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Analyzer.Engine.Rules;
-using SharpProof.Symbolic;
 using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
 
 namespace SharpProof.Analyzer.Engine;

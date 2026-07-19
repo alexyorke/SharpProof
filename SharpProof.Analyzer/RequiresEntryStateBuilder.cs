@@ -1,9 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Ir;
-
 namespace SharpProof.Analyzer;
 
 internal static class RequiresEntryStateBuilder

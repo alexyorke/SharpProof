@@ -1,5 +1,4 @@
 using SharpProof.ProofCore.Purity;
-using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic;
 

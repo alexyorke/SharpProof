@@ -1,8 +1,4 @@
-using System.Collections.Immutable;
 using System.Globalization;
-using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer.Configuration;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 

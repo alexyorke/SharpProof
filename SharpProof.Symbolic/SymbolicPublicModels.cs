@@ -1,5 +1,4 @@
 using System.Globalization;
-using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
