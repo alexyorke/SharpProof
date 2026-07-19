@@ -14,81 +14,58 @@ internal enum SymbolicCapabilityUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicCapabilitySite(
-    SymbolicCapability capabilities,
-    string capabilityText,
-    string siteKind,
-    string operationKind,
-    string operationText,
-    string symbolDisplayName,
-    bool isTransitive,
-    bool isUnknown,
-    SymbolicCapabilityUnknownReason unknownReason,
-    int sourceSpanStart,
-    int sourceSpanLength,
-    int sourceLine,
-    int sourceColumn)
+internal sealed record SymbolicCapabilitySite(
+    SymbolicCapability Capabilities,
+    string CapabilityText,
+    string SiteKind,
+    string OperationKind,
+    string OperationText,
+    string SymbolDisplayName,
+    bool IsTransitive,
+    bool IsUnknown,
+    SymbolicCapabilityUnknownReason UnknownReason,
+    int SourceSpanStart,
+    int SourceSpanLength,
+    int SourceLine,
+    int SourceColumn)
 {
-    public SymbolicCapability Capabilities { get; } = capabilities;
-    public string CapabilityText { get; } = capabilityText ?? string.Empty;
-    public string SiteKind { get; } = siteKind ?? string.Empty;
-    public string OperationKind { get; } = operationKind ?? string.Empty;
-    public string OperationText { get; } = operationText ?? string.Empty;
-    public string SymbolDisplayName { get; } = symbolDisplayName ?? string.Empty;
-    public bool IsTransitive { get; } = isTransitive;
-    public bool IsUnknown { get; } = isUnknown;
-    public SymbolicCapabilityUnknownReason UnknownReason { get; } = unknownReason;
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
-        SymbolicUnknownReasonTaxonomy.ForCapability(unknownReason);
-    public int SourceSpanStart { get; } = sourceSpanStart;
-    public int SourceSpanLength { get; } = sourceSpanLength;
-    public int SourceLine { get; } = sourceLine;
-    public int SourceColumn { get; } = sourceColumn;
+        SymbolicUnknownReasonTaxonomy.ForCapability(UnknownReason);
 }
 
-internal sealed class SymbolicCapabilityResult(
-    string filePath,
-    string methodName,
-    string methodDisplayName,
-    string declarationKind,
-    int spanStart,
-    int spanEnd,
-    int startLine,
-    int startColumn,
-    int endLine,
-    int endColumn,
-    SymbolicCapability capabilities,
-    string capabilityText,
-    IReadOnlyList<SymbolicCapabilitySite>? sites = null,
-    IReadOnlyList<SymbolicCapabilityUnknownReason>? unknownReasons = null)
+internal sealed record SymbolicCapabilityResult(
+    string FilePath,
+    string MethodName,
+    string MethodDisplayName,
+    string DeclarationKind,
+    int SpanStart,
+    int SpanEnd,
+    int StartLine,
+    int StartColumn,
+    int EndLine,
+    int EndColumn,
+    SymbolicCapability Capabilities,
+    string CapabilityText,
+    IReadOnlyList<SymbolicCapabilitySite> Sites,
+    IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons)
     : SymbolicMethodResult(
-        filePath,
-        methodName,
-        methodDisplayName,
-        declarationKind,
-        spanStart,
-        spanEnd,
-        startLine,
-        startColumn,
-        endLine,
-        endColumn)
+        FilePath,
+        MethodName,
+        MethodDisplayName,
+        DeclarationKind,
+        SpanStart,
+        SpanEnd,
+        StartLine,
+        StartColumn,
+        EndLine,
+        EndColumn)
 {
-    public SymbolicCapability Capabilities { get; } = capabilities;
-
-    public string CapabilityText { get; } = capabilityText ?? string.Empty;
-
-    public IReadOnlyList<SymbolicCapabilitySite> Sites { get; } = sites ?? Array.Empty<SymbolicCapabilitySite>();
-
-    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; } =
-        unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>();
-
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
-        (unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>())
+        UnknownReasons
         .Select(SymbolicUnknownReasonTaxonomy.ForCapability)
         .ToArray();
 
     public bool HasUnknowns => UnknownReasons.Count != 0 || Sites.Any(static site => site.IsUnknown);
 
     public bool IsConservative => HasUnknowns;
-
 }

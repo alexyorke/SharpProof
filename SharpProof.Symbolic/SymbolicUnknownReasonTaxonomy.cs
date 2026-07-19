@@ -30,20 +30,14 @@ internal enum SymbolicUnknownReasonCategory
     Unknown
 }
 
-internal sealed class SymbolicUnknownReasonInfo(
-    SymbolicUnknownReasonSource source,
-    SymbolicUnknownReasonCategory category,
-    string code,
-    string rawReason,
-    bool isRetryable,
-    bool isConfigurationRelated)
+internal sealed record SymbolicUnknownReasonInfo(
+    SymbolicUnknownReasonSource Source,
+    SymbolicUnknownReasonCategory Category,
+    string Code,
+    string RawReason,
+    bool IsRetryable,
+    bool IsConfigurationRelated)
 {
-    public SymbolicUnknownReasonSource Source { get; } = source;
-    public SymbolicUnknownReasonCategory Category { get; } = category;
-    public string Code { get; } = code ?? string.Empty;
-    public string RawReason { get; } = rawReason ?? string.Empty;
-    public bool IsRetryable { get; } = isRetryable;
-    public bool IsConfigurationRelated { get; } = isConfigurationRelated;
     public bool IsUnknown => Category != SymbolicUnknownReasonCategory.None;
 }
 

@@ -179,7 +179,7 @@ internal sealed class SymbolicQueryResult(
             new SymbolicQueryScope(
                 SymbolicQueryScopeKind.File,
                 filePath,
-                lineCount: lineCount),
+                LineCount: lineCount),
             lines.SelectMany(static line => line.ProgramPoints).ToArray(),
             smtDiagnostics,
             lines);
@@ -214,12 +214,12 @@ internal sealed class SymbolicQueryResult(
             new SymbolicQueryScope(
                 SymbolicQueryScopeKind.Span,
                 filePath,
-                spanStart: spanStart,
-                spanEnd: spanEnd,
-                startLine: startLine,
-                startColumn: startColumn,
-                endLine: endLine,
-                endColumn: endColumn),
+                SpanStart: spanStart,
+                SpanEnd: spanEnd,
+                StartLine: startLine,
+                StartColumn: startColumn,
+                EndLine: endLine,
+                EndColumn: endColumn),
             programPoints,
             smtDiagnostics);
     }

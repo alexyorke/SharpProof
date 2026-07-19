@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicWitnessStatus
@@ -64,20 +66,12 @@ internal enum SymbolicDomainPredicateKind
     Unsupported
 }
 
-internal sealed class SymbolicIntegerRange(
-    long? minimum,
-    bool minimumInclusive,
-    long? maximum,
-    bool maximumInclusive)
+internal sealed record SymbolicIntegerRange(
+    long? Minimum,
+    bool MinimumInclusive,
+    long? Maximum,
+    bool MaximumInclusive)
 {
-    public long? Minimum { get; } = minimum;
-
-    public bool MinimumInclusive { get; } = minimum.HasValue && minimumInclusive;
-
-    public long? Maximum { get; } = maximum;
-
-    public bool MaximumInclusive { get; } = maximum.HasValue && maximumInclusive;
-
     public bool HasLowerBound => Minimum.HasValue;
 
     public bool HasUpperBound => Maximum.HasValue;
@@ -92,129 +86,77 @@ internal sealed class SymbolicIntegerRange(
     public long? ExactValue => IsExact ? Minimum : null;
 }
 
-internal sealed class SymbolicDomainPredicate(
-    SymbolicDomainPredicateKind kind,
-    string text,
-    string? value,
-    bool isNegated,
-    SymbolicWitnessStatus status,
-    string reason)
-{
-    public SymbolicDomainPredicateKind Kind { get; } = kind;
-    public string Text { get; } = text ?? string.Empty;
-    public string? Value { get; } = value;
-    public bool IsNegated { get; } = isNegated;
-    public SymbolicWitnessStatus Status { get; } = status;
-    public string Reason { get; } = reason ?? string.Empty;
-}
+internal sealed record SymbolicDomainPredicate(
+    SymbolicDomainPredicateKind Kind,
+    string Text,
+    string? Value,
+    bool IsNegated,
+    SymbolicWitnessStatus Status,
+    string Reason);
 
-internal sealed class SymbolicSatisfyingAssignment(
-    string symbolicName,
-    string sourceName,
-    SymbolicInputRole role,
-    SymbolicInputValueKind valueKind,
-    string value,
-    bool? booleanValue,
-    long? integerValue,
-    string? stringValue,
-    bool? isNull,
-    SymbolicWitnessStatus status,
-    string reason)
-{
-    public string SymbolicName { get; } = symbolicName ?? string.Empty;
-    public string SourceName { get; } = sourceName ?? string.Empty;
-    public SymbolicInputRole Role { get; } = role;
-    public SymbolicInputValueKind ValueKind { get; } = valueKind;
-    public string Value { get; } = value ?? string.Empty;
-    public bool? BooleanValue { get; } = booleanValue;
-    public long? IntegerValue { get; } = integerValue;
-    public string? StringValue { get; } = stringValue;
-    public bool? IsNull { get; } = isNull;
-    public SymbolicWitnessStatus Status { get; } = status;
-    public string Reason { get; } = reason ?? string.Empty;
-}
+internal sealed record SymbolicSatisfyingAssignment(
+    string SymbolicName,
+    string SourceName,
+    SymbolicInputRole Role,
+    SymbolicInputValueKind ValueKind,
+    string Value,
+    bool? BooleanValue,
+    long? IntegerValue,
+    string? StringValue,
+    bool? IsNull,
+    SymbolicWitnessStatus Status,
+    string Reason);
 
-internal sealed class SymbolicInputDomain(
-    string name,
-    SymbolicInputRole role,
-    SymbolicInputValueKind valueKind,
-    SymbolicInputDomainKind domainKind,
-    SymbolicWitnessStatus status,
-    string reason,
-    IReadOnlyList<string> symbolicNames,
-    SymbolicIntegerRange? integerRange,
-    SymbolicNullness nullness,
-    string? exactString,
-    SymbolicIntegerRange? stringLengthRange,
-    IReadOnlyList<string> requiredPrefixes,
-    IReadOnlyList<string> requiredSuffixes,
-    IReadOnlyList<string> requiredSubstrings,
-    IReadOnlyList<string> regularExpressions,
-    SymbolicIntegerRange? collectionLengthRange,
-    bool isIndex,
-    string? relatedCollection,
-    IReadOnlyList<SymbolicDomainPredicate> predicates,
-    int alternativeCount = 1)
-{
-    public string Name { get; } = name ?? string.Empty;
-    public SymbolicInputRole Role { get; } = role;
-    public SymbolicInputValueKind ValueKind { get; } = valueKind;
-    public SymbolicInputDomainKind DomainKind { get; } = domainKind;
-    public SymbolicWitnessStatus Status { get; } = status;
-    public string Reason { get; } = reason ?? string.Empty;
-    public IReadOnlyList<string> SymbolicNames { get; } = symbolicNames ?? Array.Empty<string>();
-    public SymbolicIntegerRange? IntegerRange { get; } = integerRange;
-    public SymbolicNullness Nullness { get; } = nullness;
-    public string? ExactString { get; } = exactString;
-    public SymbolicIntegerRange? StringLengthRange { get; } = stringLengthRange;
-    public IReadOnlyList<string> RequiredPrefixes { get; } = requiredPrefixes ?? Array.Empty<string>();
-    public IReadOnlyList<string> RequiredSuffixes { get; } = requiredSuffixes ?? Array.Empty<string>();
-    public IReadOnlyList<string> RequiredSubstrings { get; } = requiredSubstrings ?? Array.Empty<string>();
-    public IReadOnlyList<string> RegularExpressions { get; } = regularExpressions ?? Array.Empty<string>();
-    public SymbolicIntegerRange? CollectionLengthRange { get; } = collectionLengthRange;
-    public bool IsIndex { get; } = isIndex;
-    public string? RelatedCollection { get; } = relatedCollection;
-    public IReadOnlyList<SymbolicDomainPredicate> Predicates { get; } = predicates ?? Array.Empty<SymbolicDomainPredicate>();
-    public int AlternativeCount { get; } = alternativeCount;
-}
+internal sealed record SymbolicInputDomain(
+    string Name,
+    SymbolicInputRole Role,
+    SymbolicInputValueKind ValueKind,
+    SymbolicInputDomainKind DomainKind,
+    SymbolicWitnessStatus Status,
+    string Reason,
+    IReadOnlyList<string> SymbolicNames,
+    SymbolicIntegerRange? IntegerRange,
+    SymbolicNullness Nullness,
+    string? ExactString,
+    SymbolicIntegerRange? StringLengthRange,
+    IReadOnlyList<string> RequiredPrefixes,
+    IReadOnlyList<string> RequiredSuffixes,
+    IReadOnlyList<string> RequiredSubstrings,
+    IReadOnlyList<string> RegularExpressions,
+    SymbolicIntegerRange? CollectionLengthRange,
+    bool IsIndex,
+    string? RelatedCollection,
+    IReadOnlyList<SymbolicDomainPredicate> Predicates,
+    int AlternativeCount = 1);
 
-internal sealed class SymbolicInputDomainSummary(
-    SymbolicWitnessStatus status,
-    string reason,
-    IReadOnlyList<SymbolicInputDomain> domains,
-    int alternativeCount)
+internal sealed record SymbolicInputDomainSummary(
+    [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
+    [property: JsonPropertyOrder(1)] string Reason,
+    [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicInputDomain> Domains,
+    [property: JsonPropertyOrder(4)] int AlternativeCount)
 {
-    [System.Text.Json.Serialization.JsonPropertyOrder(0)] public SymbolicWitnessStatus Status { get; } = status;
-    [System.Text.Json.Serialization.JsonPropertyOrder(1)] public string Reason { get; } = reason ?? string.Empty;
-    [System.Text.Json.Serialization.JsonPropertyOrder(2)] public IReadOnlyList<SymbolicInputDomain> Domains { get; } = domains ?? Array.Empty<SymbolicInputDomain>();
-    [System.Text.Json.Serialization.JsonPropertyOrder(3)] public int DomainCount => Domains.Count;
-    [System.Text.Json.Serialization.JsonPropertyOrder(4)] public int AlternativeCount { get; } = alternativeCount;
+    [JsonPropertyOrder(3)] public int DomainCount => Domains.Count;
 
-    [System.Text.Json.Serialization.JsonPropertyOrder(5)] public bool HasApproximation =>
+    [JsonPropertyOrder(5)] public bool HasApproximation =>
         Status == SymbolicWitnessStatus.Approximate ||
         Domains.Any(static domain =>
             domain.Status == SymbolicWitnessStatus.Approximate ||
             domain.Predicates.Any(static predicate => predicate.Status == SymbolicWitnessStatus.Approximate));
 
-    [System.Text.Json.Serialization.JsonPropertyOrder(6)] public bool HasUnsupportedDomains =>
+    [JsonPropertyOrder(6)] public bool HasUnsupportedDomains =>
         Status == SymbolicWitnessStatus.Unsupported ||
         Domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported);
 }
 
-internal sealed class SymbolicInputWitness(
-    SymbolicWitnessStatus status,
-    string reason,
-    IReadOnlyList<SymbolicSatisfyingAssignment> assignments,
-    SymbolicInputDomainSummary domainSummary)
+internal sealed record SymbolicInputWitness(
+    [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
+    [property: JsonPropertyOrder(1)] string Reason,
+    [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicSatisfyingAssignment> Assignments,
+    [property: JsonPropertyOrder(4)] SymbolicInputDomainSummary DomainSummary)
 {
-    [System.Text.Json.Serialization.JsonPropertyOrder(0)] public SymbolicWitnessStatus Status { get; } = status;
-    [System.Text.Json.Serialization.JsonPropertyOrder(1)] public string Reason { get; } = reason ?? string.Empty;
-    [System.Text.Json.Serialization.JsonPropertyOrder(2)] public IReadOnlyList<SymbolicSatisfyingAssignment> Assignments { get; } = assignments ?? Array.Empty<SymbolicSatisfyingAssignment>();
-    [System.Text.Json.Serialization.JsonPropertyOrder(3)] public int AssignmentCount => Assignments.Count;
-    [System.Text.Json.Serialization.JsonPropertyOrder(4)] public SymbolicInputDomainSummary DomainSummary { get; } =
-        domainSummary ?? throw new ArgumentNullException(nameof(domainSummary));
+    [JsonPropertyOrder(3)] public int AssignmentCount => Assignments.Count;
 
-    [System.Text.Json.Serialization.JsonPropertyOrder(5)] public bool IsAvailable =>
+    [JsonPropertyOrder(5)] public bool IsAvailable =>
         Status is SymbolicWitnessStatus.Exact or SymbolicWitnessStatus.Approximate;
 }
 

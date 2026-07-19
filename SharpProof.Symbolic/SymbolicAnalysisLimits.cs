@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicAnalysisLimitKind
@@ -15,24 +17,15 @@ internal enum SymbolicAnalysisLimitKind
     GuardFactsPerTargetPerState
 }
 
-internal sealed class SymbolicAnalysisTruncationEvent(
-    SymbolicAnalysisLimitKind kind,
-    int limit,
-    int observed,
-    string provenance,
-    int? sourceSpanStart)
+internal sealed record SymbolicAnalysisTruncationEvent(
+    [property: JsonPropertyOrder(0)] SymbolicAnalysisLimitKind Kind,
+    [property: JsonPropertyOrder(2)] int Limit,
+    [property: JsonPropertyOrder(3)] int Observed,
+    [property: JsonPropertyOrder(4)] string Provenance,
+    [property: JsonPropertyOrder(5)] int? SourceSpanStart)
 {
-    public SymbolicAnalysisLimitKind Kind { get; } = kind;
-
-    public string Code { get; } = GetCode(kind);
-
-    public int Limit { get; } = limit;
-
-    public int Observed { get; } = observed;
-
-    public string Provenance { get; } = provenance ?? string.Empty;
-
-    public int? SourceSpanStart { get; } = sourceSpanStart;
+    [JsonPropertyOrder(1)]
+    public string Code { get; } = GetCode(Kind);
 
     private static string GetCode(SymbolicAnalysisLimitKind value) => "analysis_limit." +
         (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? ToSnakeCase(value.ToString()) : "unknown");
@@ -50,15 +43,13 @@ internal sealed class SymbolicAnalysisTruncationEvent(
     }
 }
 
-internal sealed class SymbolicAnalysisTruncationInfo(
-    IReadOnlyList<SymbolicAnalysisTruncationEvent>? events)
+internal sealed record SymbolicAnalysisTruncationInfo(
+    [property: JsonPropertyOrder(1)] IReadOnlyList<SymbolicAnalysisTruncationEvent> Events)
 {
     public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());
 
+    [JsonPropertyOrder(0)]
     public bool IsTruncated => Events.Count != 0;
-
-    public IReadOnlyList<SymbolicAnalysisTruncationEvent> Events { get; } =
-        events ?? Array.Empty<SymbolicAnalysisTruncationEvent>();
 
     internal static SymbolicAnalysisTruncationInfo Combine(
         IEnumerable<SymbolicAnalysisTruncationInfo> truncations)

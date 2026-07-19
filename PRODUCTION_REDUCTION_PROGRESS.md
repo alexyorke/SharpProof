@@ -416,12 +416,18 @@ Tests are excluded from the metric and must not be deleted.
   General unary composition now runs after specialized negation matchers so
   direct inverted facts and declaration bindings remain unchanged. The full
   177-test pattern slice and an architecture guard characterize the boundary.
+- [x] Converted 26 identity-insensitive Symbolic projection, witness, budget,
+  capability, complexity, lifecycle, and summary DTOs to immutable positional
+  records. Removed duplicated constructor-to-property assignment while keeping
+  derived unknown and truncation metadata. Explicit JSON ordering and ignored
+  internal span coordinates preserve compact, full, and explain output bytes;
+  architecture coverage prevents the assignment-heavy forms from returning.
 
 ## Current evidence
 
-- Maintained production: 95,077 lines (91,158 C#, 3,189 scripts, and 730
-  specifications); net reduction: 12,549 lines; remaining reduction: 7,451.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 94,873 lines (90,954 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,753 lines; remaining reduction: 7,247.
+  This tranche removed 204 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,203 passing tests and two documented Main skips.
 

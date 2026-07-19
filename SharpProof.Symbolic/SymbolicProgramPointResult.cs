@@ -149,25 +149,21 @@ internal sealed class SymbolicProgramPointResult(
 
 }
 
-internal sealed class SymbolicInvariantResult(
-    IReadOnlyList<SymbolicInvariantCondition> conditions,
-    string mergedInvariantText,
-    SymbolicInvariantMergeKind mergeKind)
+internal sealed record SymbolicInvariantResult(
+    [property: JsonPropertyOrder(0)] IReadOnlyList<SymbolicInvariantCondition> Conditions,
+    [property: JsonPropertyOrder(4)] string MergedInvariantText,
+    [property: JsonPropertyOrder(5)] SymbolicInvariantMergeKind MergeKind)
 {
-    public IReadOnlyList<SymbolicInvariantCondition> Conditions { get; } =
-        conditions ?? throw new ArgumentNullException(nameof(conditions));
-
+    [JsonPropertyOrder(1)]
     public int ConditionCount => Conditions.Count;
 
+    [JsonPropertyOrder(2)]
     public int ConservativeUnknownCount => Conditions.Count(static condition => condition.IsConservativeUnknown);
 
+    [JsonPropertyOrder(3)]
     public bool HasConservativeUnknowns => ConservativeUnknownCount != 0;
 
-    public string MergedInvariantText { get; } =
-        mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
-
-    public SymbolicInvariantMergeKind MergeKind { get; } = mergeKind;
-
+    [JsonPropertyOrder(6)]
     public bool IsTrivial =>
         Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
 
@@ -221,31 +217,15 @@ internal sealed class SymbolicInvariantResult(
     }
 }
 
-internal sealed class SymbolicInvariantCondition(
-    int index,
-    string text,
-    string formulaKind,
-    string valueKind,
-    bool isSolverBacked,
-    string target,
-    bool isConservativeUnknown)
+internal sealed record SymbolicInvariantCondition(
+    [property: JsonPropertyOrder(0)] int Index,
+    [property: JsonPropertyOrder(1)] string Text,
+    [property: JsonPropertyOrder(2)] string DisplayKind,
+    [property: JsonPropertyOrder(3)] string ValueKind,
+    [property: JsonPropertyOrder(4)] bool IsSolverBacked,
+    [property: JsonPropertyOrder(5)] string Target,
+    [property: JsonPropertyOrder(6)] bool IsConservativeUnknown)
 {
-    public int Index { get; } = index;
-
-    public string Text { get; } = text ?? throw new ArgumentNullException(nameof(text));
-
-    public string DisplayKind { get; } = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
-
-    public string ValueKind { get; } = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
-
-    public bool IsSolverBacked { get; } = isSolverBacked;
-
-    internal string FormulaKind { get; } = formulaKind;
-
-    public string Target { get; } = target ?? string.Empty;
-
-    public bool IsConservativeUnknown { get; } = isConservativeUnknown;
-
     public static SymbolicInvariantCondition FromText(int index, string text)
     {
         var normalizedText = text ?? string.Empty;

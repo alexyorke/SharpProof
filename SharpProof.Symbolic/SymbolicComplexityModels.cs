@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicComplexityKind
@@ -27,94 +29,62 @@ internal enum SymbolicComplexityUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicComplexityInfo(
-    string text,
-    SymbolicComplexityKind kind,
-    bool isConservative,
-    bool isUnknown,
-    bool isRecursiveUnknown)
-{
-    public string Text { get; } = text ?? string.Empty;
-    public SymbolicComplexityKind Kind { get; } = kind;
-    public bool IsConservative { get; } = isConservative;
-    public bool IsUnknown { get; } = isUnknown;
-    public bool IsRecursiveUnknown { get; } = isRecursiveUnknown;
-}
+internal sealed record SymbolicComplexityInfo(
+    string Text,
+    SymbolicComplexityKind Kind,
+    bool IsConservative,
+    bool IsUnknown,
+    bool IsRecursiveUnknown);
 
-internal sealed class SymbolicComplexityDriverInfo(
-    string kind,
-    string description,
-    int sourceSpanStart,
-    int sourceSpanLength,
-    int sourceLine,
-    int sourceColumn)
-{
-    public string Kind { get; } = kind ?? string.Empty;
-    public string Description { get; } = description ?? string.Empty;
-    public int SourceSpanStart { get; } = sourceSpanStart;
-    public int SourceSpanLength { get; } = sourceSpanLength;
-    public int SourceLine { get; } = sourceLine;
-    public int SourceColumn { get; } = sourceColumn;
-}
+internal sealed record SymbolicComplexityDriverInfo(
+    string Kind,
+    string Description,
+    int SourceSpanStart,
+    int SourceSpanLength,
+    int SourceLine,
+    int SourceColumn);
 
-internal sealed class SymbolicComplexityCalleeInfo(
-    string methodDisplayName,
-    string complexityText,
-    SymbolicComplexityKind kind,
-    bool isConservative,
-    SymbolicComplexityUnknownReason unknownReason)
+internal sealed record SymbolicComplexityCalleeInfo(
+    string MethodDisplayName,
+    string ComplexityText,
+    SymbolicComplexityKind Kind,
+    bool IsConservative,
+    SymbolicComplexityUnknownReason UnknownReason)
 {
-    public string MethodDisplayName { get; } = methodDisplayName ?? string.Empty;
-    public string ComplexityText { get; } = complexityText ?? string.Empty;
-    public SymbolicComplexityKind Kind { get; } = kind;
-    public bool IsConservative { get; } = isConservative;
-    public SymbolicComplexityUnknownReason UnknownReason { get; } = unknownReason;
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
-        SymbolicUnknownReasonTaxonomy.ForComplexity(unknownReason);
+        SymbolicUnknownReasonTaxonomy.ForComplexity(UnknownReason);
 }
 
-internal sealed class SymbolicComplexityResult(
-    string filePath,
-    string methodName,
-    string methodDisplayName,
-    string declarationKind,
-    int spanStart,
-    int spanEnd,
-    int startLine,
-    int startColumn,
-    int endLine,
-    int endColumn,
-    SymbolicComplexityInfo complexity,
-    IReadOnlyList<SymbolicComplexityDriverInfo>? drivers = null,
-    IReadOnlyList<SymbolicComplexityUnknownReason>? unknownReasons = null,
-    IReadOnlyList<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
+internal sealed record SymbolicComplexityResult(
+    string FilePath,
+    string MethodName,
+    string MethodDisplayName,
+    string DeclarationKind,
+    int SpanStart,
+    int SpanEnd,
+    int StartLine,
+    int StartColumn,
+    int EndLine,
+    int EndColumn,
+    [property: JsonPropertyOrder(-5)] SymbolicComplexityInfo Complexity,
+    [property: JsonPropertyOrder(-4)] IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
+    [property: JsonPropertyOrder(-3)] IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
+    [property: JsonPropertyOrder(-1)] IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
     : SymbolicMethodResult(
-        filePath,
-        methodName,
-        methodDisplayName,
-        declarationKind,
-        spanStart,
-        spanEnd,
-        startLine,
-        startColumn,
-        endLine,
-        endColumn)
+        FilePath,
+        MethodName,
+        MethodDisplayName,
+        DeclarationKind,
+        SpanStart,
+        SpanEnd,
+        StartLine,
+        StartColumn,
+        EndLine,
+        EndColumn)
 {
-    public SymbolicComplexityInfo Complexity { get; } =
-        complexity ?? throw new ArgumentNullException(nameof(complexity));
-
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; } =
-        drivers ?? Array.Empty<SymbolicComplexityDriverInfo>();
-
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; } =
-        unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>();
-
+    [JsonPropertyOrder(-2)]
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
-        (unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>())
+        UnknownReasons
         .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)
         .ToArray();
-
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; } =
-        calleeSummaries ?? Array.Empty<SymbolicComplexityCalleeInfo>();
-
 }

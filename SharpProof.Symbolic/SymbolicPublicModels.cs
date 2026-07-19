@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicProofBackend
@@ -253,25 +255,16 @@ internal sealed record SymbolicProofInfo(
     };
 }
 
-internal sealed class SymbolicFactInfo(
-    string kind,
-    string text,
-    string provenance,
-    string confidence,
-    int sourceSpanStart,
-    int sourceSpanLength,
-    string? symbolKey = null,
-    string? evidenceKey = null)
+internal sealed record SymbolicFactInfo(
+    string Kind,
+    string Text,
+    string Provenance,
+    string Confidence,
+    int SourceSpanStart,
+    int SourceSpanLength,
+    string? SymbolKey = null,
+    string? EvidenceKey = null)
 {
-    public string Kind { get; } = kind ?? string.Empty;
-    public string Text { get; } = text ?? string.Empty;
-    public string Provenance { get; } = provenance ?? string.Empty;
-    public string Confidence { get; } = confidence ?? string.Empty;
-    public int SourceSpanStart { get; } = sourceSpanStart;
-    public int SourceSpanLength { get; } = sourceSpanLength;
-    public string? SymbolKey { get; } = symbolKey;
-    public string? EvidenceKey { get; } = evidenceKey;
-
     internal static SymbolicFactInfo FromFact(SymbolicFact fact)
     {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
@@ -367,16 +360,9 @@ internal sealed class SymbolicFactInfo(
     }
 }
 
-internal sealed class SymbolicInvariantInfo(
-    string mergedText,
-    IReadOnlyList<SymbolicFactInfo>? facts = null,
-    IReadOnlyList<SymbolicProofInfo>? proofs = null,
-    SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction,
-    int conditionCount = 0)
-{
-    public string MergedText { get; } = mergedText ?? string.Empty;
-    public SymbolicInvariantMergeKind MergeKind { get; } = mergeKind;
-    public int ConditionCount { get; } = conditionCount;
-    public IReadOnlyList<SymbolicFactInfo> Facts { get; } = facts ?? Array.Empty<SymbolicFactInfo>();
-    public IReadOnlyList<SymbolicProofInfo> Proofs { get; } = proofs ?? Array.Empty<SymbolicProofInfo>();
-}
+internal sealed record SymbolicInvariantInfo(
+    [property: JsonPropertyOrder(0)] string MergedText,
+    [property: JsonPropertyOrder(3)] IReadOnlyList<SymbolicFactInfo> Facts,
+    [property: JsonPropertyOrder(4)] IReadOnlyList<SymbolicProofInfo> Proofs,
+    [property: JsonPropertyOrder(1)] SymbolicInvariantMergeKind MergeKind,
+    [property: JsonPropertyOrder(2)] int ConditionCount);

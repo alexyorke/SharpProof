@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic.Smt;
 
 internal enum SmtAnalysisHealthState
@@ -36,42 +38,28 @@ internal sealed class SmtSolverLifecycleOptions(
     }
 }
 
-internal sealed class SmtAnalysisHealth(
-    SmtAnalysisHealthState state,
-    string lastFailureCode,
-    int consecutiveTransientFailureCount,
-    int transientRetryCount,
-    int recoveredTransientFailureCount,
-    int contextRecycleCount,
-    long contextGeneration)
+internal sealed record SmtAnalysisHealth(
+    [property: JsonPropertyOrder(0)] SmtAnalysisHealthState State,
+    [property: JsonPropertyOrder(3)] string LastFailureCode,
+    [property: JsonPropertyOrder(4)] int ConsecutiveTransientFailureCount,
+    [property: JsonPropertyOrder(5)] int TransientRetryCount,
+    [property: JsonPropertyOrder(6)] int RecoveredTransientFailureCount,
+    [property: JsonPropertyOrder(7)] int ContextRecycleCount,
+    [property: JsonPropertyOrder(8)] long ContextGeneration)
 {
-    public SmtAnalysisHealthState State { get; } = state;
-
+    [JsonPropertyOrder(1)]
     public bool IsAvailable => State == SmtAnalysisHealthState.Ready;
 
+    [JsonPropertyOrder(2)]
     public bool IsPermanentlyUnavailable => State == SmtAnalysisHealthState.PermanentlyUnavailable;
-
-    public string LastFailureCode { get; } = lastFailureCode ?? string.Empty;
-    public int ConsecutiveTransientFailureCount { get; } = consecutiveTransientFailureCount;
-    public int TransientRetryCount { get; } = transientRetryCount;
-    public int RecoveredTransientFailureCount { get; } = recoveredTransientFailureCount;
-    public int ContextRecycleCount { get; } = contextRecycleCount;
-    public long ContextGeneration { get; } = contextGeneration;
 }
 
-internal sealed class SmtSolverContextRecycleResult(
-    SmtSolverContextRecycleScope scope,
-    bool disposedCurrentThreadContext,
-    long requestedGeneration,
-    int localCacheEntryCount,
-    int sharedCacheEntryCount)
-{
-    public SmtSolverContextRecycleScope Scope { get; } = scope;
-    public bool DisposedCurrentThreadContext { get; } = disposedCurrentThreadContext;
-    public long RequestedGeneration { get; } = requestedGeneration;
-    public int LocalCacheEntryCount { get; } = localCacheEntryCount;
-    public int SharedCacheEntryCount { get; } = sharedCacheEntryCount;
-}
+internal sealed record SmtSolverContextRecycleResult(
+    SmtSolverContextRecycleScope Scope,
+    bool DisposedCurrentThreadContext,
+    long RequestedGeneration,
+    int LocalCacheEntryCount,
+    int SharedCacheEntryCount);
 
 internal interface ISmtProofSearchSession : IDisposable
 {

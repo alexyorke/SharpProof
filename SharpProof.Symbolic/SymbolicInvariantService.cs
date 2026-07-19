@@ -387,41 +387,18 @@ internal sealed class SymbolicSmtDiagnostics
 
 }
 
-internal sealed class SymbolicSmtDiagnosticsSnapshot(
-    bool isConfigured,
-    SmtAnalysisMode mode,
-    bool isEnabled,
-    int queryTimeoutMs,
-    int methodBudgetMs,
-    int maxPathConditions,
-    int maxExpressionNodes,
-    int executedQueryCount,
-    int cacheEntryCount,
-    SmtAnalysisHealth health,
-    SmtSolverLifecycleOptions lifecycle)
-{
-    public bool IsConfigured { get; } = isConfigured;
-
-    public SmtAnalysisMode Mode { get; } = mode;
-
-    public bool IsEnabled { get; } = isEnabled;
-
-    public int QueryTimeoutMs { get; } = queryTimeoutMs;
-
-    public int MethodBudgetMs { get; } = methodBudgetMs;
-
-    public int MaxPathConditions { get; } = maxPathConditions;
-
-    public int MaxExpressionNodes { get; } = maxExpressionNodes;
-
-    public int ExecutedQueryCount { get; } = executedQueryCount;
-
-    public int CacheEntryCount { get; } = cacheEntryCount;
-
-    public SmtAnalysisHealth Health { get; } = health ?? throw new ArgumentNullException(nameof(health));
-
-    public SmtSolverLifecycleOptions Lifecycle { get; } = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
-}
+internal sealed record SymbolicSmtDiagnosticsSnapshot(
+    bool IsConfigured,
+    SmtAnalysisMode Mode,
+    bool IsEnabled,
+    int QueryTimeoutMs,
+    int MethodBudgetMs,
+    int MaxPathConditions,
+    int MaxExpressionNodes,
+    int ExecutedQueryCount,
+    int CacheEntryCount,
+    SmtAnalysisHealth Health,
+    SmtSolverLifecycleOptions Lifecycle);
 
 internal enum SymbolicReachability
 {

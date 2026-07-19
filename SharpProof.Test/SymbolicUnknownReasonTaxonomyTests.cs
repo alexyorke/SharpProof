@@ -178,7 +178,8 @@ internal sealed class SymbolicUnknownReasonTaxonomyTests
             2,
             SymbolicCapability.None,
             "None",
-            unknownReasons: new[] { SymbolicCapabilityUnknownReason.DynamicDispatch });
+            Array.Empty<SymbolicCapabilitySite>(),
+            new[] { SymbolicCapabilityUnknownReason.DynamicDispatch });
         var complexity = new SymbolicComplexityResult(
             "Example.cs",
             "M",
@@ -191,7 +192,9 @@ internal sealed class SymbolicUnknownReasonTaxonomyTests
             1,
             2,
             new SymbolicComplexityInfo("unknown", SymbolicComplexityKind.Unknown, true, true, false),
-            unknownReasons: new[] { SymbolicComplexityUnknownReason.UnknownCallee });
+            Array.Empty<SymbolicComplexityDriverInfo>(),
+            new[] { SymbolicComplexityUnknownReason.UnknownCallee },
+            Array.Empty<SymbolicComplexityCalleeInfo>());
         var proof = new SymbolicProofInfo(
             SymbolicProofStatus.Unknown,
             SymbolicProofBackend.Smt,
