@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Globalization;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -11,7 +10,6 @@ using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Attributes;
 using SharpProof.Symbolic.Smt;
-using static SharpProof.Test.TestReflectionFacts;
 
 namespace SharpProof.Test;
 
@@ -245,20 +243,8 @@ public class AnalyzerHostConcurrencyStressTests
         Assert.That(smtResults.Select(result => result.Reason), Has.None.EqualTo("smt_disposed"));
         Assert.That(service.SmtAnalysis.Health.State, Is.Not.EqualTo(SmtAnalysisHealthState.Disposed));
 
-        var serviceType = typeof(CompilationPurityService);
-        var callGraph = serviceType
-            .GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(service);
-        var fixedPoint = serviceType
-            .GetField("_fixedPoint", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(service);
-        var purityCache = serviceType
-            .GetField("_purityCache", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(service)!;
-
-        Assert.That(callGraph, Is.Not.Null);
-        Assert.That(fixedPoint, Is.Not.Null);
-        Assert.That(GetCount(purityCache), Is.EqualTo(methodCount));
+        Assert.That(service.CachedPurityCount, Is.EqualTo(methodCount));
+        Assert.That(service.CachedSemanticModelCount, Is.EqualTo(methodCount));
     }
 
     [Test]

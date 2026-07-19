@@ -39,26 +39,19 @@ internal static class PurityCalleeResolver
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context)
     {
-        PurityAnalysisResult result;
-        if (context.PurityService != null)
-            result = context.PurityService.GetPurity(
-                methodSymbol.OriginalDefinition,
-                context.SemanticModel,
-                context.EnforcePureAttributeSymbol,
-                context.AllowSynchronizationAttributeSymbol,
-                context.CancellationToken);
-        else
-            result = DeterminePurityRecursiveInternal(
-                methodSymbol.OriginalDefinition,
-                context.SemanticModel,
-                context.EnforcePureAttributeSymbol,
-                context.AllowSynchronizationAttributeSymbol,
-                context.VisitedMethods,
-                context.PurityCache,
-                context.SmtAnalysis,
-                context.AttributePolicy,
-                context.CancellationToken,
-                context.PurityService);
+        var calleeSemanticModel = context.SemanticModelResolver?.Invoke(methodSymbol.OriginalDefinition) ??
+                                  context.SemanticModel;
+        var result = DeterminePurityRecursiveInternal(
+            methodSymbol.OriginalDefinition,
+            calleeSemanticModel,
+            context.EnforcePureAttributeSymbol,
+            context.AllowSynchronizationAttributeSymbol,
+            context.VisitedMethods,
+            context.PurityCache,
+            context.SmtAnalysis,
+            context.AttributePolicy,
+            context.CancellationToken,
+            context.SemanticModelResolver);
 
         return IsRecursivePlaceholderImpurity(result)
             ? result.WithEvidence(

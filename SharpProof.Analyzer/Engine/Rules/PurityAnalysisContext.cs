@@ -9,13 +9,12 @@ internal sealed record PurityAnalysisContext(
     Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> PurityCache,
     IMethodSymbol ContainingMethodSymbol,
     CancellationToken CancellationToken,
-    CompilationPurityService? PurityService,
-    SmtAnalysisService? smtAnalysis = null,
-    SharpProofAttributeIdentityPolicy? attributePolicy = null)
+    SmtAnalysisService smtAnalysis,
+    SharpProofAttributeIdentityPolicy? attributePolicy = null,
+    Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null)
 {
-    public SmtAnalysisService SmtAnalysis { get; } = smtAnalysis ?? PurityService?.SmtAnalysis ??
-        throw new ArgumentNullException(nameof(smtAnalysis),
-            "Purity analysis requires a compilation-scoped SMT service.");
+    public SmtAnalysisService SmtAnalysis { get; } = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
     public SharpProofAttributeIdentityPolicy AttributePolicy { get; } = attributePolicy ??
-        PurityService?.AttributePolicy ?? RequiresContractHelpers.OfficialAttributePolicy;
+        RequiresContractHelpers.OfficialAttributePolicy;
+    public Func<IMethodSymbol, SemanticModel?>? SemanticModelResolver { get; } = semanticModelResolver;
 }

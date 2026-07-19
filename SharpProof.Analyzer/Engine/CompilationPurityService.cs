@@ -3,15 +3,11 @@ namespace SharpProof.Analyzer.Engine;
 internal sealed class CompilationPurityService : IDisposable
 {
     private readonly Compilation _compilation;
-    private readonly object _fixedPointLock = new();
 
     private readonly ConcurrentDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> _purityCache =
         new(SymbolEq.Default);
 
     private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> _semanticModelCache = new();
-
-    private ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>? _callGraph;
-    private volatile ImmutableDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>? _fixedPoint;
 
     public CompilationPurityService(Compilation compilation)
         : this(compilation, SmtAnalysisOptions.Default, RequiresContractHelpers.OfficialAttributePolicy)
@@ -45,6 +41,10 @@ internal sealed class CompilationPurityService : IDisposable
 
     public SmtAnalysisService SmtAnalysis { get; }
 
+    internal int CachedPurityCount => _purityCache.Count;
+
+    internal int CachedSemanticModelCount => _semanticModelCache.Count;
+
     public void Dispose()
     {
         SmtAnalysis.Dispose();
@@ -58,44 +58,17 @@ internal sealed class CompilationPurityService : IDisposable
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureFixedPoint(enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, cancellationToken);
-
         return _purityCache.GetOrAdd(methodSymbol, m =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (_fixedPoint!.TryGetValue(m, out var solved)) return solved;
             var methodSemanticModel = GetSemanticModelForMethod(m) ?? semanticModel;
-            var engine = new PurityAnalysisEngine(this);
+            var engine = new PurityAnalysisEngine(SmtAnalysis, AttributePolicy, GetSemanticModelForMethod);
+            using var limits = SymbolicAnalysisLimitContext.Push(
+                AnalysisLimits,
+                m.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken));
             return engine.IsConsideredPure(m, methodSemanticModel, enforcePureAttributeSymbol,
-                allowSynchronizationAttributeSymbol, cancellationToken);
+                allowSynchronizationAttributeSymbol, cancellationToken, _purityCache);
         });
-    }
-
-    private void EnsureFixedPoint(
-        INamedTypeSymbol enforcePureAttributeSymbol,
-        INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-        CancellationToken cancellationToken)
-    {
-        if (_fixedPoint != null) return;
-
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_fixedPointLock)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (_fixedPoint != null) return;
-
-            _callGraph ??= CallGraphBuilder.Build(_compilation, GetSemanticModel, cancellationToken);
-            using (SymbolicAnalysisLimitContext.Push(AnalysisLimits))
-                _fixedPoint = WorklistPuritySolver.Solve(
-                    _callGraph,
-                    _compilation,
-                    enforcePureAttributeSymbol,
-                    allowSynchronizationAttributeSymbol,
-                    SmtAnalysis,
-                    AttributePolicy,
-                    GetSemanticModel,
-                    cancellationToken);
-        }
     }
 
     private SemanticModel GetSemanticModel(SyntaxTree syntaxTree)

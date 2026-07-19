@@ -12,7 +12,7 @@ internal partial class PurityAnalysisEngine
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
-        CompilationPurityService? purityService = null)
+        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var activeSmtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
@@ -162,9 +162,9 @@ internal partial class PurityAnalysisEngine
                 purityCache,
                 methodSymbol,
                 cancellationToken,
-                purityService,
                 activeSmtAnalysis,
-                attributePolicy);
+                attributePolicy,
+                semanticModelResolver);
             var result = PurityAnalysisResult.Pure;
             var mergedNormalExitStateFromCfg = PurityAnalysisState.Pure;
             if (bodySyntaxNode != null)

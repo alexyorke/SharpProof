@@ -679,7 +679,6 @@ internal sealed class SymbolicOperationTransferModelTests
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
             CancellationToken.None,
-            PurityService: null,
             smtAnalysis);
         var created = PurityAssignmentEnvelope.TryCreate(operation, initialState, context, out var envelope);
         var purity = PurityAssignmentTransition.Apply(envelope, initialState, context);
@@ -1260,7 +1259,6 @@ internal sealed class SymbolicOperationTransferModelTests
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
             CancellationToken.None,
-            PurityService: null,
             smtAnalysis);
 
     private static ImmutableArray<SymbolicFact> OwnedFacts(

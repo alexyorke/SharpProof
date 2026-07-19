@@ -518,6 +518,10 @@
                              "path":  "SharpProof.Test/ComparisonDispatchTests.cs"
                          },
                          {
+                             "name":  "CompilationPurityServiceTests",
+                             "path":  "SharpProof.Test/WorklistPuritySolverTests.cs"
+                         },
+                         {
                              "name":  "ComplexPureOperationsTests",
                              "path":  "SharpProof.Test/ComplexPureOperationsTests.cs"
                          },
@@ -1642,10 +1646,6 @@
                              "path":  "SharpProof.Test/WhileLoopTests.cs"
                          },
                          {
-                             "name":  "WorklistPuritySolverTests",
-                             "path":  "SharpProof.Test/WorklistPuritySolverTests.cs"
-                         },
-                         {
                              "name":  "XmlTests",
                              "path":  "SharpProof.Test/XmlTests.cs"
                          },
@@ -2102,17 +2102,16 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/EffectSummaryJsonDocument.cs",
+                            "path":  "SharpProof.Analyzer/EffectSummaryJsonParser.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "EffectSummaryJsonAssembly",
-                                                  "EffectSummaryJsonDocument",
                                                   "EffectSummaryJsonFailure",
-                                                  "EffectSummaryJsonFailureKind"
+                                                  "EffectSummaryJsonFailureKind",
+                                                  "EffectSummaryJsonParser"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "EffectSummaryJsonParser"
                                                  ]
                         },
                         {
@@ -2141,17 +2140,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/Analysis/CallGraphBuilder.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "CallGraphBuilder"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/Analysis/TypeHierarchyEnumeration.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2161,17 +2149,6 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/Analysis/WorklistPuritySolver.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "WorklistPuritySolver"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "WorklistPuritySolver"
                                                  ]
                         },
                         {
@@ -2191,7 +2168,7 @@
                             "declaredTypes":  [
                                                   "CompilationPurityService"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "CompilationPurityService"
                                                  ]
@@ -2304,7 +2281,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2315,7 +2292,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2326,7 +2303,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2338,7 +2315,7 @@
                                                   "CfgFinallyContinuation",
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2353,7 +2330,7 @@
                                                   "PurityAnalysisState",
                                                   "PurityEvidence"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PotentialTargets",
                                                      "PurityAnalysisEngine",
@@ -2368,7 +2345,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2380,7 +2357,7 @@
                                                   "PurityAnalysisEngine",
                                                   "TrustedMethodPurityMetadata"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2391,7 +2368,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -3566,7 +3543,7 @@
                                                   "RequiresContract",
                                                   "RequiresContractHelpers"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "RequiresContractHelpers"
                                                  ]
@@ -3599,7 +3576,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAnalyzer"
                                               ],
-                            "referencingFixtureCount":  34,
+                            "referencingFixtureCount":  33,
                             "referencedTokens":  [
                                                      "SharpProofAnalyzer"
                                                  ]
@@ -5311,7 +5288,7 @@
                                                   "SmtAnalysisMode",
                                                   "SmtAnalysisOptions"
                                               ],
-                            "referencingFixtureCount":  23,
+                            "referencingFixtureCount":  22,
                             "referencedTokens":  [
                                                      "SmtAnalysisMode",
                                                      "SmtAnalysisOptions"
@@ -5323,7 +5300,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  22,
+                            "referencingFixtureCount":  21,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -6541,7 +6518,7 @@
                             "declaredTypes":  [
                                                   "TestReflectionFacts"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "TestReflectionFacts"
                                                  ]
@@ -6723,6 +6700,7 @@
                                                   "ArtifactSpecSymbolFilter",
                                                   "ArtifactSpecSymbolSet",
                                                   "ArtifactSpecSymbolSource",
+                                                  "IEffectSummaryProgressDocument",
                                                   "ShardedEffectSummaryProgressDocument",
                                                   "SourceSummaryMethodEntry"
                                               ],
@@ -6934,9 +6912,10 @@
                                                   "TrackedStackValue",
                                                   "TypeNameProvider"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
-                                                     "EffectSummaryArtifactSource"
+                                                     "EffectSummaryArtifactSource",
+                                                     "EffectSummaryDocument"
                                                  ]
                         },
                         {
@@ -6968,9 +6947,9 @@
                             "declaredTypes":  [
                                                   "EffectSummaryProgressStore"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "EffectSummaryProgressStore"
                                                  ]
                         },
                         {
@@ -7004,9 +6983,9 @@
                             "declaredTypes":  [
                                                   "GeneratedPurityCatalogReader"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "GeneratedPurityCatalogReader"
                                                  ]
                         },
                         {
@@ -7535,6 +7514,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/EffectSummaryJsonParser.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryJsonParser"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/EffectSummaryMetadataSupport.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7554,27 +7544,18 @@
                                     "fixtureCount":  4
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/Analysis/WorklistPuritySolver.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "WorklistPuritySolverTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "WorklistPuritySolver"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/CompilationPurityService.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerHostConcurrencyStressTests",
-                                                                 "CachingTests"
+                                                                 "CachingTests",
+                                                                 "CompilationPurityServiceTests",
+                                                                 "RepositoryArchitectureTests"
                                                              ],
                                     "tokens":  [
                                                    "CompilationPurityService"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.ConditionTruth.cs",
@@ -7700,6 +7681,7 @@
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Cfg.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7709,12 +7691,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgBranchAssumptions.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7724,12 +7707,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgReturnValues.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7739,12 +7723,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgTransfer.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7754,12 +7739,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7773,12 +7759,13 @@
                                                    "PurityAnalysisState",
                                                    "PurityEvidence"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.DelegateTargets.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7788,12 +7775,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7803,12 +7791,13 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Recursive.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "CachingTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "PurityAnalysisStateMergerTests",
                                                                  "RepositoryArchitectureTests",
@@ -7818,7 +7807,7 @@
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
@@ -8513,13 +8502,12 @@
                                     "path":  "SharpProof.Analyzer/RequiresContractHelpers.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
-                                                                 "RequiresContractTests",
-                                                                 "WorklistPuritySolverTests"
+                                                                 "RequiresContractTests"
                                                              ],
                                     "tokens":  [
                                                    "RequiresContractHelpers"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/RequiresEntryStateBuilder.cs",
@@ -8554,7 +8542,6 @@
                                                                  "AnalyzerReleaseTrackingTests",
                                                                  "AnalyzerTestHostConfigurationTests",
                                                                  "AutoDefaultStructsTests",
-                                                                 "CachingTests",
                                                                  "CalculatorTests",
                                                                  "CheckedUserDefinedOperatorsTests",
                                                                  "ComplexPureOperationsTests",
@@ -8586,7 +8573,7 @@
                                     "tokens":  [
                                                    "SharpProofAnalyzer"
                                                ],
-                                    "fixtureCount":  34
+                                    "fixtureCount":  33
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
@@ -8701,6 +8688,7 @@
                                                                  "CachingTests",
                                                                  "CalculatorTests",
                                                                  "CodeDomProviderTests",
+                                                                 "CompilationPurityServiceTests",
                                                                  "CryptographyTests",
                                                                  "DiagnosticEvidenceTests",
                                                                  "ExceptionSummaryCatalogValidationTests",
@@ -8715,8 +8703,7 @@
                                                                  "RoslynConstructCoverageTests",
                                                                  "SharpProofCodeFixTests",
                                                                  "Sp0004ConfigurationTests",
-                                                                 "StaticInterfaceMembersTests",
-                                                                 "WorklistPuritySolverTests"
+                                                                 "StaticInterfaceMembersTests"
                                                              ],
                                     "tokens":  [
                                                    "EnforcePureAttribute"
@@ -9754,14 +9741,13 @@
                                                                  "SymbolicProofModelTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
-                                                                 "SymbolicSourceQueryLineTests",
-                                                                 "WorklistPuritySolverTests"
+                                                                 "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtAnalysisMode",
                                                    "SmtAnalysisOptions"
                                                ],
-                                    "fixtureCount":  23
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
@@ -9787,13 +9773,12 @@
                                                                  "SymbolicProofModelTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
-                                                                 "SymbolicSourceQueryLineTests",
-                                                                 "WorklistPuritySolverTests"
+                                                                 "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  22
+                                    "fixtureCount":  21
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtFormulaStructuralKey.cs",
@@ -10574,14 +10559,12 @@
                                     "path":  "SharpProof.Testing/TestReflectionFacts.cs",
                                     "module":  "TestInfrastructure",
                                     "selectedTestFixtures":  [
-                                                                 "AnalyzerHostConcurrencyStressTests",
-                                                                 "CachingTests",
                                                                  "ExceptionSummaryCatalogValidationTests"
                                                              ],
                                     "tokens":  [
                                                    "TestReflectionFacts"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Testing/Verifiers/CSharpCodeFixVerifier`2.cs",
@@ -10758,10 +10741,23 @@
                                     "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
                                     "module":  "EffectSummary",
                                     "selectedTestFixtures":  [
-                                                                 "EffectSummaryArtifactSourceTests"
+                                                                 "EffectSummaryArtifactSourceTests",
+                                                                 "RepositoryArchitectureTests"
                                                              ],
                                     "tokens":  [
-                                                   "EffectSummaryArtifactSource"
+                                                   "EffectSummaryArtifactSource",
+                                                   "EffectSummaryDocument"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryProgressStore.cs",
+                                    "module":  "EffectSummary",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryProgressStore"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -10773,6 +10769,17 @@
                                                              ],
                                     "tokens":  [
                                                    "EffectSummarySemanticWrapperRules"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/GeneratedPurityCatalogReader.cs",
+                                    "module":  "EffectSummary",
+                                    "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "GeneratedPurityCatalogReader"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -10985,6 +10992,7 @@
                                                                  "CachingTests",
                                                                  "CalculatorTests",
                                                                  "CodeDomProviderTests",
+                                                                 "CompilationPurityServiceTests",
                                                                  "CryptographyTests",
                                                                  "DiagnosticEvidenceTests",
                                                                  "ExceptionSummaryCatalogValidationTests",
@@ -11002,8 +11010,7 @@
                                                                  "Sp0004ConfigurationTests",
                                                                  "StaticInterfaceMembersTests",
                                                                  "TrustedBoundaryReviewTests",
-                                                                 "VolatileFieldTests",
-                                                                 "WorklistPuritySolverTests"
+                                                                 "VolatileFieldTests"
                                                              ],
                                     "tokens":  [
                                                    "AllowSynchronizationAttribute",

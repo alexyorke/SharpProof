@@ -1,10 +1,8 @@
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using SharpProof.Analyzer;
+using SharpProof.Analyzer.Engine;
 using SharpProof.Attributes;
-using static SharpProof.Test.TestReflectionFacts;
 
 namespace SharpProof.Test;
 
@@ -12,398 +10,145 @@ namespace SharpProof.Test;
 public class CachingTests
 {
     [Test]
-    public void CompilationPurityService_DoesNotBuildCallGraphInConstructor()
+    public void CompilationPurityService_StartsWithEmptyCaches()
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText("public class C { public int M() => 1; }");
-        var compilation = CSharpCompilation.Create(
-            "LazyCallGraphTest",
-            new[] { syntaxTree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var fixture = CreateFixture(
+            "EmptyPurityCacheTest",
+            "public class C { public int M() => 1; }");
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-        Assert.That(callGraphField.GetValue(service), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Service.CachedPurityCount, Is.Zero);
+            Assert.That(fixture.Service.CachedSemanticModelCount, Is.Zero);
+        });
     }
 
     [Test]
-    public void CompilationPurityService_CanceledPurityRequest_DoesNotBuildCallGraph()
+    public void CompilationPurityService_CanceledPurityRequest_DoesNotPopulateCaches()
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(@"
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Caller() => Shared();
-
-    private int Shared() => 42;
-}");
-        var compilation = CSharpCompilation.Create(
+        using var fixture = CreateFixture(
             "CanceledPurityRequestTest",
-            new[] { syntaxTree },
-            new[]
+            """
+            using SharpProof.Attributes;
+            public class TestClass
             {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var caller = testClass.GetMembers("Caller").OfType<IMethodSymbol>().Single();
-
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
+                [EnforcePure] public int Caller() => Shared();
+                private int Shared() => 42;
+            }
+            """);
+        var caller = fixture.Method("TestClass", "Caller");
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var exception = Assert.Throws<TargetInvocationException>(() => getPurityMethod.Invoke(service,
-            new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, cancellation.Token }));
-
-        Assert.That(exception!.InnerException, Is.TypeOf<OperationCanceledException>());
-        Assert.That(callGraphField.GetValue(service), Is.Null);
+        Assert.Throws<OperationCanceledException>(() => fixture.GetPurity(caller, cancellation.Token));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Service.CachedPurityCount, Is.Zero);
+            Assert.That(fixture.Service.CachedSemanticModelCount, Is.Zero);
+        });
     }
 
     [Test]
-    public void CompilationPurityService_ReusesLazyCallGraphAcrossRepeatedPurityRequests()
+    public void CompilationPurityService_CachesDistinctPurityRequests()
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(@"
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Caller1() => Shared();
-
-    [EnforcePure]
-    public int Caller2() => Shared();
-
-    private int Shared() => 42;
-}");
-        var compilation = CSharpCompilation.Create(
-            "RepeatedPurityRequestCachingTest",
-            new[] { syntaxTree },
-            new[]
+        using var fixture = CreateFixture(
+            "DistinctPurityRequestCachingTest",
+            """
+            using SharpProof.Attributes;
+            public class TestClass
             {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var caller1 = testClass.GetMembers("Caller1").OfType<IMethodSymbol>().Single();
-        var caller2 = testClass.GetMembers("Caller2").OfType<IMethodSymbol>().Single();
+                [EnforcePure] public int Caller1() => Shared();
+                [EnforcePure] public int Caller2() => Shared();
+                private int Shared() => 42;
+            }
+            """);
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
-
-        Assert.That(callGraphField.GetValue(service), Is.Null);
-
-        var firstResult = getPurityMethod.Invoke(service,
-            new object?[] { caller1, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-        var firstCallGraph = callGraphField.GetValue(service);
-
-        Assert.That(firstResult, Is.Not.Null);
-        Assert.That(firstCallGraph, Is.Not.Null);
-
-        var secondResult = getPurityMethod.Invoke(service,
-            new object?[] { caller2, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(secondResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(firstCallGraph));
+        Assert.That(fixture.GetPurity(fixture.Method("TestClass", "Caller1")).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(1));
+        Assert.That(fixture.GetPurity(fixture.Method("TestClass", "Caller2")).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(2));
     }
 
     [Test]
     public void CompilationPurityService_RepeatedSameMethodRequest_DoesNotGrowPurityCache()
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(@"
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Caller() => Shared();
-
-    private int Shared() => 42;
-}");
-        var compilation = CSharpCompilation.Create(
+        using var fixture = CreateFixture(
             "RepeatedSameMethodPurityCacheTest",
-            new[] { syntaxTree },
-            new[]
+            """
+            using SharpProof.Attributes;
+            public class TestClass
             {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var caller = testClass.GetMembers("Caller").OfType<IMethodSymbol>().Single();
+                [EnforcePure] public int Caller() => Shared();
+                private int Shared() => 42;
+            }
+            """);
+        var caller = fixture.Method("TestClass", "Caller");
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var purityCacheField = serviceType.GetField("_purityCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
-
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
-        Assert.That(callGraphField.GetValue(service), Is.Null);
-
-        var firstResult = getPurityMethod.Invoke(service,
-            new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-        var builtCallGraph = callGraphField.GetValue(service);
-
-        Assert.That(firstResult, Is.Not.Null);
-        Assert.That(builtCallGraph, Is.Not.Null);
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
-
-        var secondResult = getPurityMethod.Invoke(service,
-            new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(secondResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
+        Assert.That(fixture.GetPurity(caller).IsPure, Is.True);
+        Assert.That(fixture.GetPurity(caller).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(1));
     }
 
     [Test]
-    public void CompilationPurityService_ReusesCallGraphAcrossDeepCallChainRequests()
+    public void CompilationPurityService_DeepCallChainUsesMemoizedRootResults()
     {
         var methodBodies = string.Join(
-            Environment.NewLine + Environment.NewLine,
-            Enumerable.Range(0, 25).Select(index =>
-                index == 24
-                    ? "    private int M24() => 24;"
-                    : $"    [EnforcePure] public int M{index}() => M{index + 1}();"));
-
-        var syntaxTree = CSharpSyntaxTree.ParseText($@"
-using SharpProof.Attributes;
-
-public class TestClass
-{{
-{methodBodies}
-}}");
-        var compilation = CSharpCompilation.Create(
+            Environment.NewLine,
+            Enumerable.Range(0, 25).Select(index => index == 24
+                ? "private int M24() => 24;"
+                : $"[EnforcePure] public int M{index}() => M{index + 1}();"));
+        using var fixture = CreateFixture(
             "DeepCallChainCachingTest",
-            new[] { syntaxTree },
-            new[]
-            {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var m0 = testClass.GetMembers("M0").OfType<IMethodSymbol>().Single();
-        var m12 = testClass.GetMembers("M12").OfType<IMethodSymbol>().Single();
+            $"using SharpProof.Attributes; public class TestClass {{ {methodBodies} }}");
+        var root = fixture.Method("TestClass", "M0");
+        var middle = fixture.Method("TestClass", "M12");
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var purityCacheField = serviceType.GetField("_purityCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
-
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
-        Assert.That(callGraphField.GetValue(service), Is.Null);
-
-        var firstResult = getPurityMethod.Invoke(service,
-            new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-        var builtCallGraph = callGraphField.GetValue(service);
-
-        Assert.That(firstResult, Is.Not.Null);
-        Assert.That(builtCallGraph, Is.Not.Null);
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
-
-        var secondResult = getPurityMethod.Invoke(service,
-            new object?[] { m12, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(secondResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(2));
-
-        var thirdResult = getPurityMethod.Invoke(service,
-            new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(thirdResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(2));
+        Assert.That(fixture.GetPurity(root).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(1));
+        Assert.That(fixture.GetPurity(middle).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(2));
+        Assert.That(fixture.GetPurity(root).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(2));
     }
 
     [Test]
-    public void CompilationPurityService_ReusesFixedPointAcrossDispatchHeavyQueries()
+    public void CompilationPurityService_DispatchHeavyQueriesUseMemoizedRootResults()
     {
-        var callerBodies = string.Join(
-            Environment.NewLine + Environment.NewLine,
+        var callers = string.Join(
+            Environment.NewLine,
             Enumerable.Range(0, 20).Select(index =>
-                $"    [EnforcePure] public int Caller{index}() => _provider.Get();"));
-
-        var syntaxTree = CSharpSyntaxTree.ParseText($@"
-using SharpProof.Attributes;
-
-public interface IProvider
-{{
-    int Get();
-}}
-
-public sealed class PureProvider : IProvider
-{{
-    public int Get() => 42;
-}}
-
-public class TestClass
-{{
-    private readonly IProvider _provider = new PureProvider();
-
-{callerBodies}
-}}");
-        var compilation = CSharpCompilation.Create(
+                $"[EnforcePure] public int Caller{index}() => _provider.Get();"));
+        using var fixture = CreateFixture(
             "DispatchHeavyCachingTest",
-            new[] { syntaxTree },
-            new[]
-            {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var caller0 = testClass.GetMembers("Caller0").OfType<IMethodSymbol>().Single();
-        var caller10 = testClass.GetMembers("Caller10").OfType<IMethodSymbol>().Single();
-        var caller19 = testClass.GetMembers("Caller19").OfType<IMethodSymbol>().Single();
+            $$"""
+              using SharpProof.Attributes;
+              public interface IProvider { int Get(); }
+              public sealed class PureProvider : IProvider { public int Get() => 42; }
+              public class TestClass
+              {
+                  private readonly IProvider _provider = new PureProvider();
+                  {{callers}}
+              }
+              """);
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var fixedPointField = serviceType.GetField("_fixedPoint", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var purityCacheField = serviceType.GetField("_purityCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
-
-        Assert.That(callGraphField.GetValue(service), Is.Null);
-        Assert.That(fixedPointField.GetValue(service), Is.Null);
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
-
-        var firstResult = getPurityMethod.Invoke(service,
-            new object?[] { caller0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-        var builtCallGraph = callGraphField.GetValue(service);
-        var builtFixedPoint = fixedPointField.GetValue(service);
-
-        Assert.That(firstResult, Is.Not.Null);
-        Assert.That(builtCallGraph, Is.Not.Null);
-        Assert.That(builtFixedPoint, Is.Not.Null);
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
-
-        var secondResult = getPurityMethod.Invoke(service,
-            new object?[] { caller10, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(secondResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
-        Assert.That(fixedPointField.GetValue(service), Is.SameAs(builtFixedPoint));
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(2));
-
-        var thirdResult = getPurityMethod.Invoke(service,
-            new object?[] { caller19, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(thirdResult, Is.Not.Null);
-        Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
-        Assert.That(fixedPointField.GetValue(service), Is.SameAs(builtFixedPoint));
-        Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(3));
+        foreach (var name in new[] { "Caller0", "Caller10", "Caller19" })
+            Assert.That(fixture.GetPurity(fixture.Method("TestClass", name)).IsPure, Is.True, name);
+        Assert.That(fixture.Service.CachedPurityCount, Is.EqualTo(3));
     }
 
     [Test]
-    public void CompilationPurityService_CachesSemanticModelsDuringFixedPointBuild()
+    public void CompilationPurityService_CachesSemanticModelsForRecursiveCrossTreeAnalysis()
     {
-        var callerTree = CSharpSyntaxTree.ParseText(@"
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int Caller() => Helper.Shared();
-}");
-        var helperTree = CSharpSyntaxTree.ParseText(@"
-public static class Helper
-{
-    public static int Shared() => 42;
-}");
-        var compilation = CSharpCompilation.Create(
+        using var fixture = CreateFixture(
             "SemanticModelCacheTest",
-            new[] { callerTree, helperTree },
-            new[]
-            {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(callerTree);
-        var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        var testClass = compilation.GetTypeByMetadataName("TestClass")!;
-        var caller = testClass.GetMembers("Caller").OfType<IMethodSymbol>().Single();
+            """
+            using SharpProof.Attributes;
+            public class TestClass { [EnforcePure] public int Caller() => Helper.Shared(); }
+            """,
+            "public static class Helper { public static int Shared() => 42; }");
 
-        var serviceType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
-        var service = Activator.CreateInstance(
-            serviceType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new object[] { compilation },
-            null);
-        var semanticModelCacheField =
-            serviceType.GetField("_semanticModelCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
-
-        Assert.That(GetCount(semanticModelCacheField.GetValue(service)!), Is.EqualTo(0));
-
-        var result = getPurityMethod.Invoke(service,
-            new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
-
-        Assert.That(result, Is.Not.Null);
-        Assert.That(GetCount(semanticModelCacheField.GetValue(service)!), Is.EqualTo(2));
+        Assert.That(fixture.GetPurity(fixture.Method("TestClass", "Caller")).IsPure, Is.True);
+        Assert.That(fixture.Service.CachedSemanticModelCount, Is.EqualTo(2));
     }
 
     [Test]
@@ -416,28 +161,50 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public void {|SP0002:ImpureLeaf|}()
-    {
-        Console.WriteLine(""side effect"");
-    }
-
-    [EnforcePure]
-    public void {|SP0002:Caller1|}() => ImpureLeaf();
-
-    [EnforcePure]
-    public void {|SP0002:Caller2|}() => ImpureLeaf();
-
-    [EnforcePure]
-    public void {|SP0002:Caller3|}() => ImpureLeaf();
-
-    [EnforcePure]
-    public void {|SP0002:Caller4|}() => ImpureLeaf();
-
-    [EnforcePure]
-    public void {|SP0002:Caller5|}() => ImpureLeaf();
+    public void {|SP0002:ImpureLeaf|}() => Console.WriteLine(""side effect"");
+    [EnforcePure] public void {|SP0002:Caller1|}() => ImpureLeaf();
+    [EnforcePure] public void {|SP0002:Caller2|}() => ImpureLeaf();
+    [EnforcePure] public void {|SP0002:Caller3|}() => ImpureLeaf();
+    [EnforcePure] public void {|SP0002:Caller4|}() => ImpureLeaf();
+    [EnforcePure] public void {|SP0002:Caller5|}() => ImpureLeaf();
 }";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
 
+    private static PurityFixture CreateFixture(string assemblyName, params string[] sources)
+    {
+        var syntaxTrees = sources
+            .Select((source, index) => CSharpSyntaxTree.ParseText(source, path: $"Source{index}.cs"))
+            .ToArray();
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            syntaxTrees,
+            new[]
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
+            },
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return new PurityFixture(compilation, new CompilationPurityService(compilation));
+    }
+
+    private sealed record PurityFixture(
+        CSharpCompilation Compilation,
+        CompilationPurityService Service) : IDisposable
+    {
+        internal IMethodSymbol Method(string typeName, string methodName) =>
+            Compilation.GetTypeByMetadataName(typeName)!.GetMembers(methodName).OfType<IMethodSymbol>().Single();
+
+        internal PurityAnalysisEngine.PurityAnalysisResult GetPurity(
+            IMethodSymbol method,
+            CancellationToken cancellationToken = default) => Service.GetPurity(
+            method,
+            Compilation.GetSemanticModel(method.DeclaringSyntaxReferences[0].SyntaxTree),
+            Compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!,
+            null,
+            cancellationToken);
+
+        public void Dispose() => Service.Dispose();
+    }
 }

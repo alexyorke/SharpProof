@@ -26,21 +26,23 @@ internal partial class PurityAnalysisEngine
         RuleRegistry.GetDefaultRules();
 
     private readonly SharpProofAttributeIdentityPolicy _attributePolicy;
-    private readonly CompilationPurityService? _purityService;
+    private readonly Func<IMethodSymbol, SemanticModel?>? _semanticModelResolver;
     private readonly SmtAnalysisService _smtAnalysis;
-
-    public PurityAnalysisEngine(CompilationPurityService purityService)
-    {
-        _purityService = purityService ?? throw new ArgumentNullException(nameof(purityService));
-        _smtAnalysis = purityService.SmtAnalysis;
-        _attributePolicy = purityService.AttributePolicy;
-    }
 
 
     internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis, SharpProofAttributeIdentityPolicy attributePolicy)
+        : this(smtAnalysis, attributePolicy, null)
+    {
+    }
+
+    internal PurityAnalysisEngine(
+        SmtAnalysisService smtAnalysis,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver)
     {
         _smtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
         _attributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
+        _semanticModelResolver = semanticModelResolver;
     }
 
     private static SyntaxNode? GetDeclaringSyntax(
@@ -86,7 +88,7 @@ internal partial class PurityAnalysisEngine
     {
         cancellationToken.ThrowIfCancellationRequested();
         var sourceNode = GetDeclaringSyntax(methodSymbol, cancellationToken);
-        var limits = _purityService?.AnalysisLimits ?? SymbolicAnalysisLimitContext.Limits;
+        var limits = SymbolicAnalysisLimitContext.Limits;
         using var limitScope = SymbolicAnalysisLimitContext.Push(limits, sourceNode);
         var visited = new HashSet<IMethodSymbol>(SymbolEq.Default);
         var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEq.Default);
@@ -106,7 +108,7 @@ internal partial class PurityAnalysisEngine
             _smtAnalysis,
             _attributePolicy,
             cancellationToken,
-            _purityService
+            _semanticModelResolver
         );
 
 

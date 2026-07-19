@@ -4,14 +4,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine;
-using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Attributes;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public class WorklistPuritySolverTests
+public class CompilationPurityServiceTests
 {
     [Test]
     public async Task PureRecursiveMethodConvergesWithoutSp0002()
@@ -66,29 +64,20 @@ public sealed class External : IExternal
             .OfType<IMethodSymbol>().Single();
         var implementationMethod = compilation.GetTypeByMetadataName("External")!.GetMembers("Read")
             .OfType<IMethodSymbol>().Single();
-        var graph = ImmutableDictionary.Create<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(
-                SymbolEqualityComparer.Default)
-            .Add(interfaceMethod, ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default))
-            .Add(implementationMethod, ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default));
         var enforcePure = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var results = WorklistPuritySolver.Solve(
-            graph,
-            compilation,
-            enforcePure,
-            allowSynchronizationAttributeSymbol: null,
-            smtAnalysis,
-            RequiresContractHelpers.OfficialAttributePolicy,
-            tree => compilation.GetSemanticModel(tree),
-            CancellationToken.None);
+        var semanticModel = compilation.GetSemanticModel(consumerTree);
+        using var service = new CompilationPurityService(compilation);
+        var interfaceResult = service.GetPurity(
+            interfaceMethod, semanticModel, enforcePure, null, CancellationToken.None);
+        var implementationResult = service.GetPurity(
+            implementationMethod, semanticModel, enforcePure, null, CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(results[interfaceMethod].IsPure, Is.False);
-            Assert.That(results[interfaceMethod].Evidence.Category, Is.EqualTo("unknown_external_call"));
-            Assert.That(results[implementationMethod].IsPure, Is.False);
-            Assert.That(results[implementationMethod].Evidence.Category, Is.EqualTo("unknown_external_call"));
+            Assert.That(interfaceResult.IsPure, Is.False);
+            Assert.That(interfaceResult.Evidence.Category, Is.EqualTo("unknown_external_call"));
+            Assert.That(implementationResult.IsPure, Is.False);
+            Assert.That(implementationResult.Evidence.Category, Is.EqualTo("unknown_external_call"));
         });
     }
 

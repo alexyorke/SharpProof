@@ -274,6 +274,25 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void AnalyzerAssembly_UsesOneMemoizedRecursivePurityPipeline()
+    {
+        var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
+        var service = assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", true)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assembly.GetType("SharpProof.Analyzer.Engine.Analysis.CallGraphBuilder"), Is.Null);
+            Assert.That(assembly.GetType("SharpProof.Analyzer.Engine.Analysis.WorklistPuritySolver"), Is.Null);
+            Assert.That(service.GetField("_callGraph",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic), Is.Null);
+            Assert.That(service.GetField("_fixedPoint",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic), Is.Null);
+            Assert.That(service.GetProperty("CachedPurityCount",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic), Is.Not.Null);
+        });
+    }
+
+    [Test]
     public void EffectSummary_UsesOneByRefLikeViewInferencePath()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

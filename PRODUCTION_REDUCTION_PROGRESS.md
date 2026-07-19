@@ -488,14 +488,21 @@ Tests are excluded from the metric and must not be deleted.
   concatenation independently against their runtime slices. Generic fixed-point
   inference currently changes each from pure to impure when its rule is removed,
   so both remain explicit semantic owners rather than legacy deletion debt.
+- [x] Made the recursive purity engine the single interprocedural analysis
+  pipeline. Deleted the whole-compilation `CallGraphBuilder`, its parallel
+  operation/delegate/dispatch traversal, and `WorklistPuritySolver`; the
+  compilation service now memoizes canonical recursive results and resolves
+  cross-tree semantic models through one bounded cache. Cache, concurrency,
+  recursion, dispatch, and metadata tests retain every case through typed seams,
+  and architecture coverage prevents the prepass types and fields from returning.
 
 ## Current evidence
 
-- Maintained production: 93,636 lines (89,717 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,990 lines; remaining reduction: 6,010.
-  This tranche removed 34 maintained lines without deleting tests.
+- Maintained production: 93,186 lines (89,267 C#, 3,189 scripts, and 730
+  specifications); net reduction: 14,440 lines; remaining reduction: 5,560.
+  This tranche removed 450 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,208 passing tests and two documented Main skips.
+- Six lanes: 6,209 passing tests and two documented Main skips.
 
 ## Milestones
 
