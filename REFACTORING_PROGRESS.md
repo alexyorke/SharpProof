@@ -243,7 +243,8 @@ This is the active source of truth for the comprehensive refactor. Read
   Attributes, Analyzer, CodeFixes, NuGet packaging, Symbolic CLI, EffectSummary,
   and VSIX.
 - Generated README/example pages, configuration reference, test-impact
-  inventory, production metrics, and refactoring metrics all verify current.
+  inventory, and production metrics all verify current. The enforced maintained
+  LOC ledger is recorded in `PRODUCTION_REDUCTION_PROGRESS.md`.
 - The six-lane matrix covers exact CLI/package/VSIX, seeded fuzz,
   EffectSummary, architecture, and public-API boundary fixtures; the Tooling
   lane contributes 616 passing tests.

@@ -208,4 +208,32 @@ public sealed class ScriptProcessOwnershipTests
         Assert.That(script, Does.Not.Contain("Get-BalancedArguments"));
         Assert.That(command, Does.Contain("AnalyzerConfigurationOptionRegistry.All"));
     }
+
+    [Test]
+    public void ReleaseValidationUsesCanonicalFullBuildAndReductionLedger()
+    {
+        var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
+        var releaseValidation = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Invoke-SharpProofReleaseValidation.ps1"));
+        var build = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Invoke-SharpProofBuild.ps1"));
+
+        Assert.That(releaseValidation, Does.Contain("Invoke-SharpProofBuild.ps1"));
+        Assert.That(releaseValidation, Does.Contain("-Full"));
+        Assert.That(releaseValidation, Does.Not.Contain("SharpProof.ProofCore"));
+        Assert.That(build, Does.Contain("if ($Full)"));
+        Assert.That(build, Does.Contain("-p:EnableVsixPackaging=true"));
+        Assert.That(File.Exists(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Get-SharpProofRefactoringMetrics.ps1")), Is.False);
+        Assert.That(File.Exists(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "refactoring-baseline.json")), Is.False);
+    }
 }

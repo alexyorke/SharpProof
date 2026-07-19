@@ -59,7 +59,11 @@ if ($NoRestore)
     $buildArguments.Add('--no-restore')
 }
 
-if (-not $Full)
+if ($Full)
+{
+    $buildArguments.Add('-p:EnableVsixPackaging=true')
+}
+else
 {
     # Package and extension artifacts belong to the full release path. Avoid
     # generating packages transitively while compiling the developer graph.

@@ -27,7 +27,6 @@ refactor.
 The refactor preserves these external behaviors. Public .NET API changes are
 allowed and must update the checked-in API snapshots and package consumers.
 
-LOC remains an informational trend in `Get-SharpProofRefactoringMetrics.ps1`.
-It is not a completion gate: completion requires removal of duplicated
-responsibilities and unreachable legacy paths with characterized behavior, not
-an arbitrary line-count reduction.
+This file is the immutable historical architecture baseline. Current maintained
+LOC, reduction gates, and green checkpoints are recorded in
+[`PRODUCTION_REDUCTION_PROGRESS.md`](../PRODUCTION_REDUCTION_PROGRESS.md).
