@@ -64,6 +64,27 @@ public sealed class DiagnosticDescriptorMetadataTests
         });
     }
 
+    [Test]
+    public void DiagnosticDeclarations_HaveSingleCatalogOwner()
+    {
+        var analyzerDirectory = Path.Combine(FindRepositoryRoot(), "SharpProof.Analyzer");
+        var splitDeclarationFiles = Directory
+            .EnumerateFiles(analyzerDirectory, "SharpProofDiagnostics.*.cs", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .ToArray();
+        var catalogSource = File.ReadAllText(Path.Combine(analyzerDirectory, "AnalyzerDiagnosticCatalog.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(splitDeclarationFiles, Is.Empty);
+            Assert.That(
+                catalogSource.Split("public static readonly DiagnosticDescriptor ", StringSplitOptions.None),
+                Has.Length.EqualTo(AnalyzerDiagnosticCatalog.SupportedDiagnostics.Length + 1));
+            Assert.That(catalogSource, Does.Not.Contain("CreateDescriptor("));
+            Assert.That(catalogSource, Does.Not.Contain("CreateCommonBugDescriptor("));
+        });
+    }
+
     private static Dictionary<string, RuleMetadata> ReadCurrentReleaseMetadata(string repositoryRoot)
     {
         var metadata = new Dictionary<string, RuleMetadata>(StringComparer.Ordinal);

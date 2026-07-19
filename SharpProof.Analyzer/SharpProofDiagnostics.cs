@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
@@ -213,71 +212,4 @@ public static partial class SharpProofDiagnostics
     public const string MisplacedAllowSynchronizationAttributeId = "SP0007";
 
     public const string RedundantAllowSynchronizationId = "SP0008";
-    private static DiagnosticDescriptor CreateDescriptor(
-        string id,
-        LocalizableString title,
-        LocalizableString messageFormat,
-        string category,
-        DiagnosticSeverity defaultSeverity,
-        LocalizableString description)
-    {
-        return CreateDescriptor(id, title, messageFormat, category, defaultSeverity, true, description);
-    }
-
-    private static DiagnosticDescriptor CreateDescriptor(
-        string id,
-        LocalizableString title,
-        LocalizableString messageFormat,
-        string category,
-        DiagnosticSeverity defaultSeverity,
-        bool isEnabledByDefault,
-        LocalizableString description)
-    {
-        return new DiagnosticDescriptor(
-            id,
-            title,
-            messageFormat,
-            category,
-            defaultSeverity,
-            isEnabledByDefault,
-            description,
-            "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#" + id.ToLowerInvariant(),
-            new[] { WellKnownDiagnosticTags.Telemetry });
-    }
-
-    private static DiagnosticDescriptor CreateCommonBugDescriptor(
-        string id,
-        LocalizableString title,
-        LocalizableString messageFormat,
-        string category,
-        DiagnosticSeverity defaultSeverity,
-        LocalizableString description)
-    {
-        return CreateDescriptor(id, title, messageFormat, category, defaultSeverity, false, description);
-    }
-
-    private static DiagnosticDescriptor CreateMisplacedGetterAliasingAttributeDescriptor(
-        string id,
-        string attributeName,
-        string analysisKind)
-    {
-        return CreateDescriptor(
-            id,
-            $"Misplaced [{attributeName}] Attribute",
-            $"The [{attributeName}] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
-            "Usage",
-            DiagnosticSeverity.Error,
-            $"[{attributeName}] configures {analysisKind} analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.");
-    }
-
-    private static DiagnosticDescriptor CreateInferredContractDescriptor(string id, string title)
-    {
-        return CreateDescriptor(
-            id,
-            title,
-            InferredContractSuggestionMessageFormat,
-            "Suggestions",
-            DiagnosticSeverity.Info,
-            InferredContractSuggestionDescription);
-    }
 }

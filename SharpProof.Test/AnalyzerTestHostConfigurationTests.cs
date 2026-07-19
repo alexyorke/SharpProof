@@ -651,6 +651,7 @@ public sealed class TestClass
         var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
         var allowedFiles = new HashSet<string>(StringComparer.Ordinal)
         {
+            "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
             "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
             "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
             "SharpProof.Analyzer/SharpProofDiagnostics.cs"

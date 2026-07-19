@@ -275,14 +275,22 @@ Tests are excluded from the metric and must not be deleted.
   and line-break preservation forest. Exact expression-bodied, existing-getter,
   target-alias, and comment-preservation fixes remain unchanged; no test was
   deleted, and architecture coverage prevents the manual formatter from returning.
+- [x] Made one declarative analyzer catalog the source owner for all 75
+  diagnostic descriptors. Deleted eleven constructor-heavy partial declaration
+  files and four descriptor factory layers while retaining direct fields for
+  Roslyn release tracking and reflection discovery. A canonical metadata hash
+  matches the pre-refactor assembly exactly across IDs, titles, messages,
+  categories, severities, enabled defaults, descriptions, help links, and tags;
+  repository coverage prevents split declaration files and factories from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 99,417 lines (95,498 C#, 3,189 scripts, and 730
-  specifications); net reduction: 8,209 lines; remaining reduction: 11,791.
-  This tranche removed 200 maintained lines without deleting tests.
+- Maintained production: 99,180 lines (95,261 C#, 3,189 scripts, and 730
+  specifications); net reduction: 8,446 lines; remaining reduction: 11,554.
+  This tranche removed 237 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,185 passing tests and two documented skips.
+- Six lanes: 6,187 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -313,3 +321,9 @@ semantic owners, not adapters. Removing the Type, StringComparer,
 FormattableString, Enum/Boolean/IPAddress parsing, and Unsafe routes caused 17
 focused regressions; generated summaries alone do not yet preserve their
 operand, dispatch, out-argument, and compiler-lowering semantics.
+
+The syntax-level fresh-mutable-object all-path assignment fallback and the
+EffectSummary DateTime/DateTimeOffset call-semantic helpers are likewise live
+semantic owners. Removing them caused focused conditional-alias and four
+date/time classification regressions respectively, so they are not legacy
+adapter deletion candidates without a new canonical replacement.
