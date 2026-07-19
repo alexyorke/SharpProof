@@ -657,6 +657,29 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void EffectSummaryDocuments_HaveOneTypedSerializationModel()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var toolRoot = Path.Combine(root, "Tools", "SharpProof.EffectSummary");
+        var artifactSpec = File.ReadAllText(Path.Combine(toolRoot, "ArtifactSpec.cs"));
+        var catalogReader = File.ReadAllText(Path.Combine(toolRoot, "GeneratedPurityCatalogReader.cs"));
+        var progressStore = File.ReadAllText(Path.Combine(toolRoot, "EffectSummaryProgressStore.cs"));
+        var models = File.ReadAllText(Path.Combine(toolRoot, "EffectSummaryMetadataModels.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(artifactSpec, Does.Contain("Deserialize<EffectSummaryDocument>"));
+            Assert.That(catalogReader, Does.Contain("Deserialize<EffectSummaryDocument>"));
+            Assert.That(progressStore, Does.Contain("Deserialize<TProgress>"));
+            Assert.That(artifactSpec, Does.Not.Contain("JsonDocument.Parse"));
+            Assert.That(catalogReader, Does.Not.Contain("JsonDocument.Parse"));
+            Assert.That(progressStore, Does.Not.Contain("JsonDocument.Parse"));
+            Assert.That(models, Does.Contain("JsonPropertyName(\"DisplayName\")"));
+            Assert.That(models, Does.Contain("JsonPropertyName(\"Calls\")"));
+        });
+    }
+
+    [Test]
     public void SymbolicPatternLowering_HasOneTypedDispatcher()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

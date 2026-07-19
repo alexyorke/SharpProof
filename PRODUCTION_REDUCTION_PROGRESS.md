@@ -471,14 +471,21 @@ Tests are excluded from the metric and must not be deleted.
   are deleted. Direct solver/preprocessor tests and all four SMT-heavy lanes
   preserve contradiction, zero-timeout, opaque-operation, hazard-reason, and
   conservative fallback behavior.
+- [x] Made the canonical EffectSummary document and progress DTOs own both JSON
+  writing and reading. Artifact-source selection, resumable generated-catalog
+  merging, and both progress formats now deserialize their typed models instead
+  of maintaining three parallel `JsonDocument` walkers. Structural method
+  identity gained an exact immutable JSON constructor, while explicit property
+  ordering preserves existing summary bytes. Focused schema, artifact-spec,
+  resume, reviewed-category, sharding, and architecture tests cover the boundary.
 
 ## Current evidence
 
-- Maintained production: 93,772 lines (89,853 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,854 lines; remaining reduction: 6,146.
-  This tranche removed 202 maintained lines without deleting tests.
+- Maintained production: 93,670 lines (89,751 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,956 lines; remaining reduction: 6,044.
+  This tranche removed 102 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,205 passing tests and two documented Main skips.
+- Six lanes: 6,207 passing tests and two documented Main skips.
 
 ## Milestones
 

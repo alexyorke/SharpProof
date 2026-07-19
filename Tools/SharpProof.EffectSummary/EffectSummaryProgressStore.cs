@@ -29,9 +29,8 @@ internal static class EffectSummaryProgressStore
     }
 
     public static HashSet<string> LoadSharded(string progressPath, string inputFingerprint) =>
-        LoadCompletedOutputPaths(
+        LoadCompletedOutputPaths<ShardedEffectSummaryProgressDocument>(
             progressPath,
-            "InputFingerprint",
             inputFingerprint,
             $"Unsupported sharded effect-summary progress schema in '{progressPath}'.",
             $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
@@ -43,21 +42,18 @@ internal static class EffectSummaryProgressStore
     {
         SaveJson(
             progressPath,
-            new ShardedEffectSummaryProgressDocument
-            {
-                SchemaVersion = 1,
-                ToolModuleVersionId = ToolModuleVersionId,
-                InputFingerprint = inputFingerprint,
-                CompletedOutputPaths = completedOutputPaths
+            new ShardedEffectSummaryProgressDocument(
+                1,
+                ToolModuleVersionId,
+                inputFingerprint,
+                completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-            });
+                    .ToArray()));
     }
 
     public static HashSet<string> LoadArtifactSpec(string progressPath, string artifactSpecSha256) =>
-        LoadCompletedOutputPaths(
+        LoadCompletedOutputPaths<ArtifactSpecProgressDocument>(
             progressPath,
-            "ArtifactSpecSha256",
             artifactSpecSha256,
             $"Unsupported artifact-spec progress schema in '{progressPath}'.",
             $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
@@ -69,49 +65,35 @@ internal static class EffectSummaryProgressStore
     {
         SaveJson(
             progressPath,
-            new ArtifactSpecProgressDocument
-            {
-                SchemaVersion = 1,
-                ArtifactSpecSha256 = artifactSpecSha256,
-                CompletedOutputPaths = completedOutputPaths
+            new ArtifactSpecProgressDocument(
+                1,
+                artifactSpecSha256,
+                completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-            });
+                    .ToArray()));
     }
 
     private static string ToolModuleVersionId =>
         typeof(EffectSummaryProgressStore).Assembly.ManifestModule.ModuleVersionId.ToString("D");
 
-    private static HashSet<string> LoadCompletedOutputPaths(
+    private static HashSet<string> LoadCompletedOutputPaths<TProgress>(
         string progressPath,
-        string fingerprintPropertyName,
         string expectedFingerprint,
         string unsupportedSchemaMessage,
         string fingerprintMismatchMessage)
+        where TProgress : IEffectSummaryProgressDocument
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
-        var root = document.RootElement;
-        if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            schemaVersionElement.GetInt32() != 1)
+        var progress = JsonSerializer.Deserialize<TProgress>(File.ReadAllText(progressPath));
+        if (progress == null || progress.SchemaVersion != 1)
             throw new InvalidOperationException(unsupportedSchemaMessage);
 
-        var recordedFingerprint = root.TryGetProperty(fingerprintPropertyName, out var fingerprintElement)
-            ? fingerprintElement.GetString()
-            : null;
-        if (!string.Equals(recordedFingerprint, expectedFingerprint, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(progress.Fingerprint, expectedFingerprint, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(fingerprintMismatchMessage);
 
-        var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
-            completedElement.ValueKind == JsonValueKind.Array)
-            foreach (var pathElement in completedElement.EnumerateArray())
-            {
-                var path = pathElement.GetString();
-                if (!string.IsNullOrWhiteSpace(path)) completedOutputPaths.Add(Path.GetFullPath(path));
-            }
-
-        return completedOutputPaths;
+        return (progress.CompletedOutputPaths ?? Array.Empty<string>())
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static void SaveJson(string progressPath, object progress)

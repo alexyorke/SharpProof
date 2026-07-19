@@ -807,14 +807,11 @@ public partial class EffectSummaryToolTests
 
     private static string CreateGeneratedOnlySummaryDocument(JsonDocument summary)
     {
-        return CreateGeneratedPurityCatalogSummaryDocument(summary.RootElement.GetProperty("GeneratedPurityCatalog"));
-    }
-
-    private static string CreateGeneratedPurityCatalogSummaryDocument(object generatedPurityCatalog)
-    {
         return JsonSerializer.Serialize(new
         {
-            GeneratedPurityCatalog = generatedPurityCatalog
+            SchemaVersion = summary.RootElement.GetProperty("SchemaVersion").GetInt32(),
+            Assemblies = Array.Empty<object>(),
+            GeneratedPurityCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog")
         });
     }
 

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace SharpProof.Identity;
 
@@ -52,6 +53,20 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         Parameters = parameters?.ToImmutableArray() ?? throw new ArgumentNullException(nameof(parameters));
         ReturnType = returnType.Trim();
         ReturnRefKind = returnRefKind.Trim();
+    }
+
+    [JsonConstructor]
+    internal StructuralMethodIdentity(
+        string containingMetadataType,
+        string methodKind,
+        string name,
+        int genericArity,
+        ImmutableArray<StructuralParameterIdentity> parameters,
+        string returnType,
+        string returnRefKind)
+        : this(containingMetadataType, methodKind, name, genericArity,
+            (IEnumerable<StructuralParameterIdentity>)parameters, returnType, returnRefKind)
+    {
     }
 
     public string ContainingMetadataType { get; }

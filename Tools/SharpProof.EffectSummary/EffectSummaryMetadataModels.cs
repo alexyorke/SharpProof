@@ -1,27 +1,15 @@
-internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
+internal sealed class TypeNameProvider(bool eraseGenericInstantiationsForLookup = false)
+    : ISignatureTypeProvider<string, object?>
 {
-    private readonly bool eraseGenericInstantiationsForLookup;
-
-    public TypeNameProvider(bool eraseGenericInstantiationsForLookup = false)
-    {
-        this.eraseGenericInstantiationsForLookup = eraseGenericInstantiationsForLookup;
-    }
-
     public string GetArrayType(string elementType, ArrayShape shape)
     {
         var rank = Math.Max(shape.Rank, 1);
         return $"{elementType}[{new string(',', rank - 1)}]";
     }
 
-    public string GetByReferenceType(string elementType)
-    {
-        return $"ref {elementType}";
-    }
+    public string GetByReferenceType(string elementType) => $"ref {elementType}";
 
-    public string GetFunctionPointerType(MethodSignature<string> signature)
-    {
-        return "delegate*";
-    }
+    public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
 
     public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments)
     {
@@ -30,34 +18,18 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
         return $"{genericType}<{string.Join(", ", typeArguments)}>";
     }
 
-    public string GetGenericMethodParameter(object? genericContext, int index)
-    {
-        return $"!!{index}";
-    }
+    public string GetGenericMethodParameter(object? genericContext, int index) => $"!!{index}";
 
-    public string GetGenericTypeParameter(object? genericContext, int index)
-    {
-        return $"!{index}";
-    }
+    public string GetGenericTypeParameter(object? genericContext, int index) => $"!{index}";
 
-    public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired)
-    {
-        return unmodifiedType;
-    }
+    public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
 
-    public string GetPinnedType(string elementType)
-    {
-        return elementType;
-    }
+    public string GetPinnedType(string elementType) => elementType;
 
-    public string GetPointerType(string elementType)
-    {
-        return $"{elementType}*";
-    }
+    public string GetPointerType(string elementType) => $"{elementType}*";
 
-    public string GetPrimitiveType(PrimitiveTypeCode typeCode)
-    {
-        return typeCode switch
+    public string GetPrimitiveType(PrimitiveTypeCode typeCode) =>
+        typeCode switch
         {
             PrimitiveTypeCode.Boolean => "bool",
             PrimitiveTypeCode.Byte => "byte",
@@ -79,31 +51,20 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
             PrimitiveTypeCode.Void => "void",
             _ => typeCode.ToString()
         };
-    }
 
-    public string GetSZArrayType(string elementType)
-    {
-        return $"{elementType}[]";
-    }
+    public string GetSZArrayType(string elementType) => $"{elementType}[]";
 
-    public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-    {
-        return NormalizeExactTypeName(GetTypeName(metadataReader, handle));
-    }
+    public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind) =>
+        NormalizeExactTypeName(GetTypeName(metadataReader, handle));
 
-    public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-    {
-        return NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
-    }
+    public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind) =>
+        NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
 
     public string GetTypeFromSpecification(
         MetadataReader metadataReader,
         object? genericContext,
         TypeSpecificationHandle handle,
-        byte rawTypeKind)
-    {
-        return metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
-    }
+        byte rawTypeKind) => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
 }
 
 internal sealed record EffectSummaryDocument(
@@ -141,7 +102,7 @@ internal sealed record EffectSummaryArtifactSource(
     string? PackageAssemblyRelativePath);
 
 internal sealed record MethodEffectSummary(
-    [property: JsonIgnore] string Symbol,
+    [property: JsonPropertyName("DisplayName"), JsonPropertyOrder(1)] string DisplayName,
     string MetadataToken,
     int RelativeVirtualAddress,
     string? MethodBodySha256,
@@ -156,10 +117,21 @@ internal sealed record MethodEffectSummary(
     [property: JsonIgnore] string[] Calls,
     string[] Fields)
 {
-    public string DisplayName => Symbol;
+    [JsonConstructor]
+    private MethodEffectSummary()
+        : this(string.Empty, string.Empty, 0, null, string.Empty,
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<ExceptionProvenance>(),
+            Array.Empty<ExceptionProvenance>(), Array.Empty<string>(), Array.Empty<string>())
+    {
+    }
 
+    [JsonIgnore] public string Symbol => DisplayName;
+
+    [JsonPropertyOrder(2)]
     public StructuralMethodIdentity Identity { get; init; } = null!;
 
+    [JsonPropertyOrder(3)]
     public string CanonicalKey => Identity.ToCanonicalKey();
 
     [JsonPropertyName("Calls")]
@@ -168,20 +140,25 @@ internal sealed record MethodEffectSummary(
     [JsonIgnore]
     public StructuralMethodIdentity[] CallIdentities { get; init; } = Array.Empty<StructuralMethodIdentity>();
 
+    [JsonPropertyOrder(4)]
     public CallSiteSummary[] CallSites { get; init; } = Array.Empty<CallSiteSummary>();
 
+    [JsonPropertyOrder(5)]
     public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } =
         Array.Empty<ThrownExceptionEdgeSummary>();
 
+    [JsonPropertyOrder(6)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool TransitiveThrownExceptionEdgesTruncated { get; init; }
 
+    [JsonPropertyOrder(7)]
     public MethodPurityClassification? PurityClassification { get; init; }
 
     [JsonIgnore]
     public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } =
         Array.Empty<ExceptionPropagationSite>();
 
+    [JsonPropertyOrder(8)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public NullableContractSummary? NullableContracts { get; init; }
 

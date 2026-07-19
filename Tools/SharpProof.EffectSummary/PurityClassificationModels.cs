@@ -31,7 +31,7 @@ internal sealed record GeneratedPurityCatalogDocument(
     GeneratedPurityCatalogEntry[] Entries);
 
 internal sealed record GeneratedPurityCatalogEntry(
-    [property: JsonIgnore] string Symbol,
+    [property: JsonPropertyName("DisplayName"), JsonPropertyOrder(1)] string DisplayName,
     string CacheKey,
     string AssemblyName,
     string AssemblyPath,
@@ -50,10 +50,12 @@ internal sealed record GeneratedPurityCatalogEntry(
     string FreshnessClassification,
     string EffectVisibilityClassification)
 {
-    public string DisplayName => Symbol;
+    [JsonIgnore] public string Symbol => DisplayName;
 
+    [JsonPropertyOrder(2)]
     public StructuralMethodIdentity Identity { get; init; } = null!;
 
+    [JsonPropertyOrder(3)]
     public string CanonicalKey => Identity.ToCanonicalKey();
 }
 

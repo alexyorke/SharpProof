@@ -27,24 +27,28 @@ internal sealed class ArtifactSpecDocument
     }
 }
 
-internal sealed class ArtifactSpecProgressDocument
+internal interface IEffectSummaryProgressDocument
 {
-    public int SchemaVersion { get; set; }
-
-    public string ArtifactSpecSha256 { get; set; } = string.Empty;
-
-    public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
+    int SchemaVersion { get; }
+    string Fingerprint { get; }
+    string[] CompletedOutputPaths { get; }
 }
 
-internal sealed class ShardedEffectSummaryProgressDocument
+internal sealed record ArtifactSpecProgressDocument(
+    int SchemaVersion,
+    string ArtifactSpecSha256,
+    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument
 {
-    public int SchemaVersion { get; set; }
+    [JsonIgnore] public string Fingerprint => ArtifactSpecSha256;
+}
 
-    public string ToolModuleVersionId { get; set; } = string.Empty;
-
-    public string InputFingerprint { get; set; } = string.Empty;
-
-    public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
+internal sealed record ShardedEffectSummaryProgressDocument(
+    int SchemaVersion,
+    string ToolModuleVersionId,
+    string InputFingerprint,
+    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument
+{
+    [JsonIgnore] public string Fingerprint => InputFingerprint;
 }
 
 internal class ArtifactSpecDefaults
@@ -98,11 +102,9 @@ internal static class ArtifactSpecSymbolSource
         IReadOnlyList<string>? excludedSymbolPrefixes = null,
         IReadOnlyList<string>? includedSymbolPrefixes = null)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
-            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+        var document = JsonSerializer.Deserialize<EffectSummaryDocument>(File.ReadAllText(path)) ??
+                       throw new InvalidOperationException($"Failed to deserialize artifact source summary '{path}'.");
+        if (document.SchemaVersion != EffectSummarySchemaContract.CurrentVersion)
             throw new InvalidOperationException(
                 $"Artifact source summary '{path}' must use effect-summary schema " +
                 EffectSummarySchemaContract.CurrentVersion + ".");
@@ -112,31 +114,41 @@ internal static class ArtifactSpecSymbolSource
         var exclusionPrefixes = excludedSymbolPrefixes ?? Array.Empty<string>();
         var inclusionPrefixes = includedSymbolPrefixes ?? Array.Empty<string>();
 
-        if (TryCollectReachableSourceSummaryMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols,
+        var methods = (document.Assemblies ?? Array.Empty<AssemblyEffectReport>())
+            .SelectMany(static assembly => assembly.Methods ?? Array.Empty<MethodEffectSummary>())
+            .Select(static method => new SourceSummaryMethodEntry(
+                method.DisplayName,
+                method.CanonicalKey,
+                method.CanonicalCalls))
+            .ToArray();
+        if (TryCollectReachableSourceSummaryMethods(
+                methods,
+                inclusionPrefixes,
+                exclusionPrefixes,
+                symbols,
                 canonicalKeys))
             return new ArtifactSpecSymbolSet(
                 symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
                 canonicalKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
 
-        if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
-            generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
-            generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) &&
-            entriesElement.ValueKind == JsonValueKind.Array)
-            foreach (var entryElement in entriesElement.EnumerateArray())
-                AddSourceSummaryMethod(entryElement, inclusionPrefixes, exclusionPrefixes, symbols, canonicalKeys);
+        foreach (var entry in document.GeneratedPurityCatalog?.Entries ?? Array.Empty<GeneratedPurityCatalogEntry>())
+            AddSourceSummaryMethod(
+                entry.DisplayName,
+                entry.CanonicalKey,
+                inclusionPrefixes,
+                exclusionPrefixes,
+                symbols,
+                canonicalKeys);
 
-        if (symbols.Count == 0 &&
-            document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) &&
-            assembliesElement.ValueKind == JsonValueKind.Array)
-            foreach (var assemblyElement in assembliesElement.EnumerateArray())
-            {
-                if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
-                    methodsElement.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                foreach (var methodElement in methodsElement.EnumerateArray())
-                    AddSourceSummaryMethod(methodElement, inclusionPrefixes, exclusionPrefixes, symbols, canonicalKeys);
-            }
+        if (symbols.Count == 0)
+            foreach (var method in methods)
+                AddSourceSummaryMethod(
+                    method.DisplayName,
+                    method.CanonicalKey,
+                    inclusionPrefixes,
+                    exclusionPrefixes,
+                    symbols,
+                    canonicalKeys);
 
         if (symbols.Count == 0 && inclusionPrefixes.Count == 0)
             throw new InvalidOperationException($"Artifact source summary '{path}' did not contain any symbols.");
@@ -147,29 +159,20 @@ internal static class ArtifactSpecSymbolSource
     }
 
     private static void AddSourceSummaryMethod(
-        JsonElement methodElement,
+        string? symbol,
+        string? canonicalKey,
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
         ISet<string> symbols,
         ISet<string> canonicalKeys)
     {
-        var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
         var included = MatchesIncludedPrefix(symbol, includedSymbolPrefixes);
         if (!string.IsNullOrWhiteSpace(symbol) &&
             included &&
             !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, excludedSymbolPrefixes))
-            symbols.Add(symbol);
+            symbols.Add(symbol.Trim());
 
-        var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
-        if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
-    }
-
-    private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out var property) ||
-            property.ValueKind != JsonValueKind.String) return null;
-
-        return property.GetString()?.Trim();
+        if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey.Trim());
     }
 
     private static bool MatchesIncludedPrefix(string? symbol, IReadOnlyList<string> includedSymbolPrefixes)
@@ -182,44 +185,13 @@ internal static class ArtifactSpecSymbolSource
     }
 
     private static bool TryCollectReachableSourceSummaryMethods(
-        JsonElement rootElement,
+        IReadOnlyList<SourceSummaryMethodEntry> methods,
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
         HashSet<string> symbols,
         HashSet<string> canonicalKeys)
     {
-        if (includedSymbolPrefixes.Count == 0 ||
-            !rootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
-            assembliesElement.ValueKind != JsonValueKind.Array)
-            return false;
-
-        var methodEntries = new List<SourceSummaryMethodEntry>();
-        foreach (var assemblyElement in assembliesElement.EnumerateArray())
-        {
-            if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
-                methodsElement.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var methodElement in methodsElement.EnumerateArray())
-            {
-                var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
-                var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
-                if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(canonicalKey)) continue;
-
-                var calls = methodElement.TryGetProperty("Calls", out var callsElement) &&
-                            callsElement.ValueKind == JsonValueKind.Array
-                    ? callsElement.EnumerateArray()
-                        .Select(call => call.ValueKind == JsonValueKind.String ? call.GetString()?.Trim() : null)
-                        .Where(call => !string.IsNullOrWhiteSpace(call))
-                        .Cast<string>()
-                        .ToArray()
-                    : Array.Empty<string>();
-
-                methodEntries.Add(new SourceSummaryMethodEntry(symbol, canonicalKey, calls));
-            }
-        }
-
-        if (methodEntries.Count == 0) return false;
+        if (includedSymbolPrefixes.Count == 0 || methods.Count == 0) return false;
 
         var includedMemberTokens = includedSymbolPrefixes
             .Select(TryGetMemberToken)
@@ -228,21 +200,21 @@ internal static class ArtifactSpecSymbolSource
             .ToHashSet(StringComparer.Ordinal);
         if (includedMemberTokens.Count == 0) return false;
 
-        var byCanonicalKey = methodEntries
-            .GroupBy(entry => entry.CanonicalKey, StringComparer.Ordinal)
+        var byCanonicalKey = methods
+            .GroupBy(static method => method.CanonicalKey, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => new SourceSummaryMethodEntry(
                     group.First().DisplayName,
                     group.Key,
-                    group.SelectMany(entry => entry.Calls)
+                    group.SelectMany(static method => method.Calls)
                         .Distinct(StringComparer.Ordinal)
                         .ToArray()),
                 StringComparer.Ordinal);
         var queue = new Queue<SourceSummaryMethodEntry>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var entry in methodEntries.Where(entry =>
+        foreach (var entry in byCanonicalKey.Values.Where(entry =>
                      MatchesIncludedPrefix(entry.DisplayName, includedSymbolPrefixes) ||
                      includedMemberTokens.Contains(TryGetMemberToken(entry.DisplayName) ?? string.Empty)))
             if (visited.Add(entry.CanonicalKey))
