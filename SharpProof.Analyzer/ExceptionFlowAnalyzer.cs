@@ -309,142 +309,130 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var invocation in GetInvocationNodes(methodNode))
+        var rootOperation =
+            MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, false);
+        if (rootOperation != null)
         {
-            if (semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation)
+            foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
             {
-                foreach (var invokedMethod in ResolveInvocationTargets(
-                             invocationOperation,
-                             invocation,
-                             semanticModel,
-                             cancellationToken))
+                cancellationToken.ThrowIfCancellationRequested();
+                switch (operation)
                 {
-                    if (invokedMethod.MethodKind == MethodKind.DelegateInvoke) continue;
-
-                    if (seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
-                        yield return new MethodCallCandidate(invocation, invokedMethod);
+                    case IInvocationOperation invocation:
+                        foreach (var candidate in CreateInvocationCandidates(
+                                     invocation, semanticModel, cancellationToken))
+                            if (seen.Add(CreateMethodCallSiteKey(candidate))) yield return candidate;
+                        break;
+                    case IObjectCreationOperation { Constructor: { } constructor } creation:
+                        var creationCandidate = new MethodCallCandidate(creation.Syntax, constructor);
+                        if (seen.Add(CreateMethodCallSiteKey(creationCandidate))) yield return creationCandidate;
+                        break;
+                    case IPropertyReferenceOperation property:
+                        foreach (var candidate in CreatePropertyCandidates(
+                                     property, semanticModel, cancellationToken))
+                            if (seen.Add(CreateMethodCallSiteKey(candidate))) yield return candidate;
+                        break;
+                    case IInterpolatedStringHandlerCreationOperation handler:
+                        var handlerConstructor = FindObjectCreationConstructor(handler.HandlerCreation);
+                        if (handlerConstructor != null)
+                        {
+                            var handlerCandidate = new MethodCallCandidate(handler.Syntax, handlerConstructor);
+                            if (seen.Add(CreateMethodCallSiteKey(handlerCandidate))) yield return handlerCandidate;
+                        }
+                        break;
+                    default:
+                        if (TryGetOperatorOrConversionMethod(operation, out var method) &&
+                            seen.Add(CreateMethodCallSiteKey(operation.Syntax, method!)))
+                            yield return new MethodCallCandidate(operation.Syntax, method!);
+                        break;
                 }
-
-                if (TryCreateDynamicDispatchCandidate(
-                        invocation,
-                        invocationOperation.TargetMethod,
-                        invocationOperation,
-                        invocationOperation.Instance,
-                        semanticModel,
-                        cancellationToken,
-                        seen,
-                        out var dynamicDispatchCandidate))
-                    yield return dynamicDispatchCandidate;
-            }
-            else if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod &&
-                     invokedMethod.MethodKind != MethodKind.DelegateInvoke &&
-                     seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
-            {
-                yield return new MethodCallCandidate(invocation, invokedMethod);
             }
         }
 
-        foreach (var creation in GetObjectCreationNodes(methodNode))
-            if (semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol is IMethodSymbol constructorSymbol &&
-                seen.Add(CreateMethodCallSiteKey(creation, constructorSymbol)))
-                yield return new MethodCallCandidate(creation, constructorSymbol);
-
-        foreach (var initializer in GetConstructorInitializerNodes(methodNode))
-            if (TryGetConstructorInitializerTarget(initializer, semanticModel, cancellationToken,
-                    out var constructorSymbol) &&
-                seen.Add(CreateMethodCallSiteKey(initializer, constructorSymbol)))
-                yield return new MethodCallCandidate(initializer, constructorSymbol);
-
-        foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
+        if (methodNode is ConstructorDeclarationSyntax { Initializer: { } initializer })
         {
-            if (semanticModel.GetOperation(propertyAccess, cancellationToken) is IPropertyReferenceOperation
-                propertyReferenceOperation)
+            var initializedConstructor =
+                (semanticModel.GetOperation(initializer, cancellationToken) as IInvocationOperation)?.TargetMethod ??
+                semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol as IMethodSymbol;
+            if (initializedConstructor != null)
             {
-                foreach (var getterMethod in ResolvePropertyAccessorTargets(
-                             propertyReferenceOperation,
-                             false,
-                             propertyAccess,
-                             semanticModel,
-                             cancellationToken))
-                    if (seen.Add(CreateMethodCallSiteKey(propertyAccess, getterMethod)))
-                        yield return new MethodCallCandidate(propertyAccess, getterMethod);
-
-                if (TryCreateDynamicDispatchCandidate(
-                        propertyAccess,
-                        propertyReferenceOperation.Property?.GetMethod,
-                        propertyReferenceOperation,
-                        propertyReferenceOperation.Instance,
-                        semanticModel,
-                        cancellationToken,
-                        seen,
-                        out var dynamicDispatchCandidate))
-                    yield return dynamicDispatchCandidate;
-            }
-            else if (semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol
-                         propertySymbol &&
-                     propertySymbol.GetMethod != null &&
-                     seen.Add(CreateMethodCallSiteKey(propertyAccess, propertySymbol.GetMethod)))
-            {
-                yield return new MethodCallCandidate(propertyAccess, propertySymbol.GetMethod);
-            }
-        }
-
-        foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
-        {
-            if (semanticModel.GetOperation(propertyWrite, cancellationToken) is IPropertyReferenceOperation
-                propertyReferenceOperation)
-            {
-                foreach (var setterMethod in ResolvePropertyAccessorTargets(
-                             propertyReferenceOperation,
-                             true,
-                             propertyWrite,
-                             semanticModel,
-                             cancellationToken))
-                    if (seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
-                        yield return new MethodCallCandidate(propertyWrite, setterMethod);
-
-                if (TryCreateDynamicDispatchCandidate(
-                        propertyWrite,
-                        propertyReferenceOperation.Property?.SetMethod,
-                        propertyReferenceOperation,
-                        propertyReferenceOperation.Instance,
-                        semanticModel,
-                        cancellationToken,
-                        seen,
-                        out var dynamicDispatchCandidate))
-                    yield return dynamicDispatchCandidate;
-            }
-            else if (TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken,
-                         out var setterMethod) &&
-                     setterMethod != null &&
-                     seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
-            {
-                yield return new MethodCallCandidate(propertyWrite, setterMethod);
+                var candidate = new MethodCallCandidate(initializer, initializedConstructor);
+                if (seen.Add(CreateMethodCallSiteKey(candidate))) yield return candidate;
             }
         }
 
         foreach (var usingDisposeNode in GetUsingDisposeNodes(methodNode, semanticModel, cancellationToken))
-            if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode)))
-                yield return usingDisposeNode;
+            if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode))) yield return usingDisposeNode;
 
         foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel))
             if (seen.Add(CreateMethodCallSiteKey(forEachRuntimeNode.CallSite, forEachRuntimeNode.Method)))
                 yield return forEachRuntimeNode;
 
-        foreach (var operatorNode in GetOperatorAndConversionNodes(methodNode, semanticModel, cancellationToken))
-            if (seen.Add(CreateMethodCallSiteKey(operatorNode.CallSite, operatorNode.Method)))
-                yield return operatorNode;
-
         foreach (var delegateInvocationNode in GetLocalDelegateTargetInvocationNodes(methodNode, semanticModel,
                      cancellationToken))
-            if (seen.Add(CreateMethodCallSiteKey(delegateInvocationNode.CallSite, delegateInvocationNode.Method)))
+            if (seen.Add(CreateMethodCallSiteKey(delegateInvocationNode)))
                 yield return delegateInvocationNode;
+    }
 
-        foreach (var handlerConstructorNode in GetInterpolatedStringHandlerConstructorNodes(methodNode, semanticModel,
-                     cancellationToken))
-            if (seen.Add(CreateMethodCallSiteKey(handlerConstructorNode.CallSite, handlerConstructorNode.Method)))
-                yield return handlerConstructorNode;
+    private static IEnumerable<MethodCallCandidate> CreateInvocationCandidates(
+        IInvocationOperation invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var method = ResolveDispatchTarget(
+            invocation.TargetMethod,
+            invocation.Instance,
+            invocation.Syntax,
+            semanticModel,
+            cancellationToken,
+            exactType => PurityConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(
+                invocation.TargetMethod, exactType));
+        if (method.MethodKind != MethodKind.DelegateInvoke)
+            yield return new MethodCallCandidate(invocation.Syntax, method);
+
+        if (TryCreateDynamicDispatchCandidate(
+                invocation.Syntax,
+                invocation.TargetMethod,
+                invocation,
+                invocation.Instance,
+                semanticModel,
+                cancellationToken,
+                out var dynamicDispatchCandidate))
+            yield return dynamicDispatchCandidate;
+    }
+
+    private static IEnumerable<MethodCallCandidate> CreatePropertyCandidates(
+        IPropertyReferenceOperation property,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var setter = property.Syntax.Parent is AssignmentExpressionSyntax
+        {
+            RawKind: (int)SyntaxKind.SimpleAssignmentExpression
+        } assignment && ReferenceEquals(assignment.Left, property.Syntax);
+        var propertySymbol = property.Property;
+        var accessor = setter ? propertySymbol?.SetMethod : propertySymbol?.GetMethod;
+        if (propertySymbol != null && accessor != null)
+            yield return new MethodCallCandidate(
+                property.Syntax,
+                ResolveDispatchTarget(
+                    accessor,
+                    property.Instance,
+                    property.Syntax,
+                    semanticModel,
+                    cancellationToken,
+                    exactType => PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
+                        propertySymbol, exactType, setter)));
+
+        if (TryCreateDynamicDispatchCandidate(
+                property.Syntax,
+                accessor,
+                property,
+                property.Instance,
+                semanticModel,
+                cancellationToken,
+                out var dynamicDispatchCandidate))
+            yield return dynamicDispatchCandidate;
     }
 
     private static string CreateMethodCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
@@ -454,11 +442,6 @@ internal static partial class ExceptionFlowAnalyzer
                method.OriginalDefinition.ToDisplayString();
     }
 
-    private static string CreateDynamicDispatchCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
-    {
-        return CreateMethodCallSiteKey(callSite, method) + "|dynamic-dispatch";
-    }
-
     private static bool TryCreateDynamicDispatchCandidate(
         SyntaxNode callSite,
         IMethodSymbol? method,
@@ -466,15 +449,14 @@ internal static partial class ExceptionFlowAnalyzer
         IOperation? receiver,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        HashSet<string> seen,
         out MethodCallCandidate candidate)
     {
         candidate = null!;
         if (method == null ||
-            !IsSourceDispatchSlot(method) ||
-            TryResolveExactConcreteType(receiver, callSite, semanticModel, cancellationToken, out _) ||
-            !SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, operation) ||
-            !seen.Add(CreateDynamicDispatchCallSiteKey(callSite, method)))
+            method.OriginalDefinition.DeclaringSyntaxReferences.Length == 0 ||
+            PurityConcreteReceiverResolver.TryResolveExactConcreteType(
+                receiver, callSite, semanticModel, cancellationToken, out _) ||
+            !SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, operation))
             return false;
 
         candidate = new MethodCallCandidate(
@@ -484,14 +466,10 @@ internal static partial class ExceptionFlowAnalyzer
         return true;
     }
 
-    private static bool IsSourceDispatchSlot(IMethodSymbol method)
-    {
-        return method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
-    }
-
     private static string CreateMethodCallSiteKey(MethodCallCandidate candidate)
     {
         var key = CreateMethodCallSiteKey(candidate.CallSite, candidate.Method);
+        if (candidate.IsDynamicDispatch) key += "|dynamic-dispatch";
         if (candidate.UsingDisposeGuard?.ResourceExpression is not { } resourceExpression) return key;
 
         return key +
@@ -499,49 +477,7 @@ internal static partial class ExceptionFlowAnalyzer
                CreateSourceSpanKey(resourceExpression);
     }
 
-    private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(
-        IInvocationOperation invocationOperation,
-        SyntaxNode callSite,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var invokedMethod = invocationOperation.TargetMethod;
-        return invokedMethod == null
-            ? Enumerable.Empty<IMethodSymbol>()
-            : ResolveDispatchTargets(
-                invokedMethod,
-                invocationOperation.Instance,
-                callSite,
-                semanticModel,
-                cancellationToken,
-                exactReceiverType =>
-                    PurityConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType));
-    }
-
-    private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
-        IPropertyReferenceOperation propertyReferenceOperation,
-        bool preferSetter,
-        SyntaxNode callSite,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var property = propertyReferenceOperation.Property;
-        var accessor = preferSetter ? property?.SetMethod : property?.GetMethod;
-        return property == null || accessor == null
-            ? Enumerable.Empty<IMethodSymbol>()
-            : ResolveDispatchTargets(
-                accessor,
-                propertyReferenceOperation.Instance,
-                callSite,
-                semanticModel,
-                cancellationToken,
-                exactReceiverType => PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
-                    property,
-                    exactReceiverType,
-                    preferSetter));
-    }
-
-    private static IEnumerable<IMethodSymbol> ResolveDispatchTargets(
+    private static IMethodSymbol ResolveDispatchTarget(
         IMethodSymbol fallbackTarget,
         IOperation? receiver,
         SyntaxNode callSite,
@@ -550,77 +486,16 @@ internal static partial class ExceptionFlowAnalyzer
         Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget)
     {
         if (!SymbolicDispatchFacts.IsBaseReference(receiver) &&
-            TryResolveExactConcreteType(
+            PurityConcreteReceiverResolver.TryResolveExactConcreteType(
                 receiver,
                 callSite,
                 semanticModel,
                 cancellationToken,
                 out var exactReceiverType) &&
             resolveExactTarget(exactReceiverType) is { } exactTarget)
-            return new[] { exactTarget.OriginalDefinition };
+            return exactTarget.OriginalDefinition;
 
-        return new[] { fallbackTarget.OriginalDefinition };
-    }
-
-    private static IEnumerable<InvocationExpressionSyntax> GetInvocationNodes(SyntaxNode methodNode)
-    {
-        return GetRelevantDescendants<InvocationExpressionSyntax>(methodNode);
-    }
-
-    private static IEnumerable<SyntaxNode> GetObjectCreationNodes(SyntaxNode methodNode)
-    {
-        return GetRelevantDescendants<SyntaxNode>(methodNode)
-            .Where(node => node is ObjectCreationExpressionSyntax || node is ImplicitObjectCreationExpressionSyntax);
-    }
-
-    private static IEnumerable<ConstructorInitializerSyntax> GetConstructorInitializerNodes(SyntaxNode methodNode)
-    {
-        if (methodNode is ConstructorDeclarationSyntax constructorDeclaration &&
-            constructorDeclaration.Initializer != null)
-            yield return constructorDeclaration.Initializer;
-    }
-
-    private static bool TryGetConstructorInitializerTarget(
-        ConstructorInitializerSyntax initializer,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IMethodSymbol constructorSymbol)
-    {
-        if (semanticModel.GetOperation(initializer, cancellationToken) is IInvocationOperation invocationOperation &&
-            invocationOperation.TargetMethod != null)
-        {
-            constructorSymbol = invocationOperation.TargetMethod;
-            return true;
-        }
-
-        if (semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol symbol)
-        {
-            constructorSymbol = symbol;
-            return true;
-        }
-
-        constructorSymbol = null!;
-        return false;
-    }
-
-    private static IEnumerable<MethodCallCandidate> GetOperatorAndConversionNodes(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var rootOperation =
-            MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, false);
-        if (rootOperation == null) yield break;
-
-        foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
-            if (TryGetOperatorOrConversionMethod(operation, out var method))
-            {
-                var key = method!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) +
-                          "@" +
-                          CreateSourceSpanKey(operation.Syntax);
-                if (seen.Add(key)) yield return new MethodCallCandidate(operation.Syntax, method);
-            }
+        return fallbackTarget.OriginalDefinition;
     }
 
     private static string CreateSourceSpanKey(SyntaxNode node)

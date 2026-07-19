@@ -264,37 +264,6 @@ internal static partial class ExceptionFlowAnalyzer
         return true;
     }
 
-    private static IEnumerable<MethodCallCandidate> GetInterpolatedStringHandlerConstructorNodes(
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var interpolatedString in GetRelevantDescendants<InterpolatedStringExpressionSyntax>(methodNode))
-        {
-            var constructor = GetCompilerSelectedHandlerConstructor(
-                interpolatedString,
-                semanticModel,
-                cancellationToken);
-            if (constructor == null) continue;
-
-            yield return new MethodCallCandidate(interpolatedString, constructor);
-        }
-    }
-
-    private static IMethodSymbol? GetCompilerSelectedHandlerConstructor(
-        InterpolatedStringExpressionSyntax interpolatedString,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        for (var operation = semanticModel.GetOperation(interpolatedString, cancellationToken);
-             operation != null;
-             operation = operation.Parent)
-            if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation)
-                return FindObjectCreationConstructor(handlerCreation.HandlerCreation);
-
-        return null;
-    }
-
     private static IMethodSymbol? FindObjectCreationConstructor(IOperation root)
     {
         var pending = new Stack<IOperation>();

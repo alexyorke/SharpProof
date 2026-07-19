@@ -437,6 +437,28 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void ExceptionFlow_CollectsExplicitCallsFromTheCanonicalOperationTree()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
+        var collector = File.ReadAllText(Path.Combine(analyzerRoot, "ExceptionFlowAnalyzer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(collector, Does.Contain("ExecutionVisibility.VisibleDescendants(rootOperation)"));
+            Assert.That(collector, Does.Contain("case IInvocationOperation"));
+            Assert.That(collector, Does.Contain("case IObjectCreationOperation"));
+            Assert.That(collector, Does.Contain("case IPropertyReferenceOperation"));
+            Assert.That(collector, Does.Contain("case IInterpolatedStringHandlerCreationOperation"));
+            Assert.That(collector, Does.Not.Contain("GetInvocationNodes"));
+            Assert.That(collector, Does.Not.Contain("GetObjectCreationNodes"));
+            Assert.That(collector, Does.Not.Contain("GetOperatorAndConversionNodes"));
+            Assert.That(File.Exists(Path.Combine(
+                analyzerRoot, "ExceptionFlowAnalyzer.PropertyFlow.cs")), Is.False);
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

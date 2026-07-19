@@ -283,14 +283,25 @@ Tests are excluded from the metric and must not be deleted.
   categories, severities, enabled defaults, descriptions, help links, and tags;
   repository coverage prevents split declaration files and factories from
   returning.
+- [x] Made the canonical visible operation tree the exception-flow owner for
+  invocations, object creation, property access, user-defined operators and
+  conversions, and interpolated-string-handler construction. Deleted the
+  parallel syntax enumerators and the property-flow partial, and moved exact
+  receiver-type resolution to the concrete-receiver owner. Constructor
+  initializers, using disposal, foreach runtime members, and resolved local
+  delegates remain explicit compiler-boundary projections because they are not
+  all represented by the method-body operation root. Focused characterization
+  covers source and EffectSummary constructor initializers plus handler
+  construction, and architecture coverage prevents the removed syntax paths
+  from returning.
 
 ## Current evidence
 
-- Maintained production: 99,180 lines (95,261 C#, 3,189 scripts, and 730
-  specifications); net reduction: 8,446 lines; remaining reduction: 11,554.
-  This tranche removed 237 maintained lines without deleting tests.
+- Maintained production: 98,977 lines (95,058 C#, 3,189 scripts, and 730
+  specifications); net reduction: 8,649 lines; remaining reduction: 11,351.
+  This tranche removed 203 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,187 passing tests and two documented Main skips.
+- Six lanes: 6,189 passing tests and two documented Main skips.
 
 ## Milestones
 

@@ -1,14 +1,41 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Analyzer.Engine.Rules;
+using SharpProof.Symbolic;
 using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
 
 namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityConcreteReceiverResolver
 {
+    internal static bool TryResolveExactConcreteType(
+        IOperation? operation,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol concreteType)
+    {
+        operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+        if (operation != null &&
+            TryResolveKnownSystemTypeRuntimeReceiver(operation, semanticModel.Compilation, out concreteType))
+            return true;
+
+        if (operation?.Syntax is ExpressionSyntax expression &&
+            SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                expression, useNode, semanticModel, cancellationToken, out var exactType) &&
+            exactType is INamedTypeSymbol namedType)
+        {
+            concreteType = namedType;
+            return true;
+        }
+
+        concreteType = null!;
+        return false;
+    }
+
     internal static bool IsTrustedFreshArrayFactoryOperation(
         IOperation? operation,
         Compilation compilation,

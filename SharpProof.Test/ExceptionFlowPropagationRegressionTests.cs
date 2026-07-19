@@ -82,6 +82,38 @@ public class TestClass
     }
 
     [Test]
+    public async Task Sp0010_InterpolatedStringHandlerConstructor_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+using System.Runtime.CompilerServices;
+
+[InterpolatedStringHandler]
+public struct ThrowingHandler
+{
+    public ThrowingHandler(int literalLength, int formattedCount) =>
+        throw new InvalidOperationException();
+
+    public void AppendLiteral(string value)
+    {
+    }
+}
+
+public class TestClass
+{
+    private static void Consume(ThrowingHandler handler)
+    {
+    }
+
+    public void TestMethod() => Consume($""text"");
+}
+", "TestMethod");
+
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
+
+    [Test]
     public async Task Sp0011_PropertySetter_CheckedOnly_ReportsAssignmentSite()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
