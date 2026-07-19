@@ -191,14 +191,20 @@ Tests are excluded from the metric and must not be deleted.
   the `PurityCatalogSemantics` forwarding layer; SP0002 diagnostics remain
   present while evidence identifies the inferred fallback instead of a manual
   catalog hit, and architecture coverage prevents the tables from returning.
+- [x] Made the exported code-fix provider the sole diagnostic dispatch owner.
+  Deleted the handler interface, six one-method handler adapters, the family
+  enum, and the parallel handler registry. The provider retains the exact
+  fixable diagnostic set, titles, equivalence keys, and family behavior through
+  direct dispatch; architecture coverage prevents both adapter files from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 102,405 lines (98,330 C#, 3,189 scripts, and 886
-  specifications); net reduction: 5,221 lines; remaining reduction: 14,779.
-  This tranche removed 200 maintained lines without deleting tests.
+- Maintained production: 102,201 lines (98,126 C#, 3,189 scripts, and 886
+  specifications); net reduction: 5,425 lines; remaining reduction: 14,575.
+  This tranche removed 204 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,162 passing tests and two documented skips.
+- Six lanes: 6,164 passing tests and two documented skips.
 
 ## Milestones
 

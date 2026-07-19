@@ -241,6 +241,22 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void CodeFixes_DispatchDirectlyFromTheExportedProvider()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var codeFixRoot = Path.Combine(root, "SharpProof.CodeFixes");
+        var provider = File.ReadAllText(Path.Combine(codeFixRoot, "SharpProofCodeFixProvider.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(codeFixRoot, "CodeFixHandlers.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(codeFixRoot, "CodeFixHandlerRegistry.cs")), Is.False);
+            Assert.That(provider, Does.Contain("TryGetSimpleRemoval"));
+            Assert.That(provider, Does.Contain("RegisterSynchronizationCodeFix"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
