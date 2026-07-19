@@ -2,11 +2,66 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
+    private static PurityAnalysisResult CheckCfgImplicitSemantics(
+        SyntaxNode bodyNode,
+        PurityAnalysisContext context,
+        PurityAnalysisState returnState)
+    {
+        var root = context.SemanticModel.GetOperation(bodyNode, context.CancellationToken);
+        if (root == null) return PurityAnalysisResult.Pure;
+
+        var probeState = returnState.WithPathState(SymbolicRuntimeTypeFacts.RetainExactRuntimeTypes(returnState.PathState));
+        foreach (var operation in ExecutionVisibility.VisibleDescendants(root))
+        {
+            if (operation is ITryOperation tryOperation)
+            {
+                foreach (var catchClause in tryOperation.Catches)
+                {
+                    var result = AnalyzeOperationSubtreePurity(catchClause, context);
+                    if (!result.IsPure) return result;
+                }
+                if (tryOperation.Finally is { } finallyClause)
+                {
+                    var result = AnalyzeOperationSubtreePurity(finallyClause, context);
+                    if (!result.IsPure) return result;
+                }
+            }
+            else if (operation.Kind is OperationKind.Using or OperationKind.UsingDeclaration)
+            {
+                var result = CheckSingleOperation(operation, context, probeState);
+                if (!result.IsPure) return result;
+            }
+            else if (operation is IForEachLoopOperation forEach &&
+                     !IsSyntaxProvenUnreachable(
+                         operation.Syntax,
+                         context.SemanticModel,
+                         context.SmtAnalysis,
+                         context.CancellationToken))
+            {
+                var result = forEach.IsAsynchronous
+                    ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(forEach.Collection, context)
+                    : LoopPurityRule.CheckForEachEnumeratorPurity(forEach.Collection, context);
+                if (!result.IsPure) return result;
+            }
+            else if (operation is ICompoundAssignmentOperation { OperatorMethod: { } operatorMethod } &&
+                     !IsSyntaxProvenUnreachable(
+                         operation.Syntax,
+                         context.SemanticModel,
+                         context.SmtAnalysis,
+                         context.CancellationToken) &&
+                     !PurityCalleeResolver.GetCalleePurity(operatorMethod, context).IsPure)
+                return PurityAnalysisResult.Impure(operation.Syntax);
+        }
+
+        return PurityAnalysisResult.Pure;
+    }
+
     internal static PurityAnalysisResult CheckSingleOperation(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisState currentState)
     {
@@ -44,10 +99,7 @@ internal partial class PurityAnalysisEngine
             return CheckSingleOperation(flowCap.Value, context, currentState);
 
 
-        var isChecked = TryGetOperatorMethodForDirectPurityCheck(
-            operation,
-            includeCompoundAssignments: false,
-            out var operatorMethod);
+        var isChecked = TryGetOperatorMethodForDirectPurityCheck(operation, out var operatorMethod);
 
         if (isChecked && operation is IBinaryOperation binaryOp)
         {
@@ -138,7 +190,6 @@ internal partial class PurityAnalysisEngine
 
     private static bool TryGetOperatorMethodForDirectPurityCheck(
         IOperation operation,
-        bool includeCompoundAssignments,
         out IMethodSymbol? operatorMethod)
     {
         switch (operation)
@@ -148,10 +199,6 @@ internal partial class PurityAnalysisEngine
                 return true;
             case IUnaryOperation { IsChecked: true } unary:
                 operatorMethod = unary.OperatorMethod;
-                return true;
-            case ICompoundAssignmentOperation { OperatorMethod: not null } compound
-                when includeCompoundAssignments:
-                operatorMethod = compound.OperatorMethod.OriginalDefinition;
                 return true;
             default:
                 operatorMethod = null;

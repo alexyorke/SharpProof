@@ -412,6 +412,27 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void PurityCfg_OwnsImplicitSemanticsWithoutPostTraversalCompatibility()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var recursive = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Engine", "PurityAnalysisEngine.Recursive.cs"));
+        var cfgTransfer = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Engine", "PurityAnalysisEngine.CfgTransfer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(recursive, Does.Not.Contain("AnalyzePostCfgCompatibility"));
+            Assert.That(recursive, Does.Not.Contain("TryGetPostCfgInvocationImpurity"));
+            Assert.That(cfgTransfer, Does.Contain("CheckCfgImplicitSemantics"));
+            Assert.That(cfgTransfer, Does.Contain("ITryOperation"));
+            Assert.That(cfgTransfer, Does.Contain("OperationKind.Using"));
+            Assert.That(cfgTransfer, Does.Contain("IForEachLoopOperation"));
+            Assert.That(cfgTransfer, Does.Contain("ICompoundAssignmentOperation"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

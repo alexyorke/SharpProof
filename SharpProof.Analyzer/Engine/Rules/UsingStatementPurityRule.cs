@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -7,150 +6,65 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class UsingStatementPurityRule : IPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.Using, OperationKind.UsingDeclaration);
+    public IEnumerable<OperationKind> ApplicableOperationKinds => [OperationKind.Using, OperationKind.UsingDeclaration];
 
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        SyntaxNode? impureSyntaxNode = null;
-        IOperation? resourceOperation = null;
-        IOperation? bodyOperation = null;
-
-        if (operation is IUsingOperation usingOperation)
-        {
-            resourceOperation = usingOperation.Resources;
-            bodyOperation = usingOperation.Body;
-            impureSyntaxNode = usingOperation.Syntax;
-        }
-        else if (operation is IUsingDeclarationOperation usingDeclarationOperation)
-        {
-            resourceOperation = usingDeclarationOperation.DeclarationGroup;
-            impureSyntaxNode = usingDeclarationOperation.Syntax;
-        }
-        else
-        {
+        if (operation is not (IUsingOperation or IUsingDeclarationOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
 
+        var resourceOperation = operation is IUsingOperation statement ? statement.Resources :
+            ((IUsingDeclarationOperation)operation).DeclarationGroup;
         var isAwaitUsing = IsAwaitUsingOperation(operation);
-        var disposalSyntax = impureSyntaxNode ?? operation.Syntax;
-
-        if (resourceOperation != null)
-        {
-            var resourceResult = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            if (resourceOperation is IVariableDeclarationGroupOperation declarationGroup)
-            {
-                resourceResult = CheckDeclaratorInitializers(
-                    declarationGroup.Declarations.SelectMany(static declaration => declaration.Declarators),
-                    context,
-                    currentState);
-            }
-            else if (resourceOperation is IVariableDeclarationOperation variableDeclaration)
-            {
-                resourceResult = CheckDeclaratorInitializers(variableDeclaration.Declarators, context, currentState);
-            }
-            else if (resourceOperation is ILocalReferenceOperation localReferenceOperation)
-            {
-            }
-            else
-            {
-                resourceResult = PurityAnalysisEngine.CheckSingleOperation(resourceOperation, context, currentState);
-            }
-
-
-            if (!resourceResult.IsPure) return resourceResult;
-        }
-
-
-        if (bodyOperation != null)
-        {
-            var bodyResult = PurityAnalysisEngine.CheckSingleOperation(bodyOperation, context, currentState);
-            if (!bodyResult.IsPure) return bodyResult;
-        }
-
+        var disposalSyntax = operation.Syntax;
 
         var declaredLocals = FindDeclaredLocals(resourceOperation);
 
         foreach (var local in declaredLocals)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var localWasReassigned =
-                WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel, context.CancellationToken);
             var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState,
                 isAwaitUsing, context.CancellationToken);
             if (disposeReceiverType == null) continue;
 
-
-            var disposeMethod =
-                DisposalMemberClassifier.FindDisposalMethod(
-                    disposeReceiverType,
-                    context.SemanticModel.Compilation,
-                    isAwaitUsing);
-
-            if (disposeMethod == null) return MissingDisposalEvidence(operation, disposalSyntax, disposeReceiverType);
-
-            if (localWasReassigned &&
-                (disposeReceiverType.TypeKind == TypeKind.Interface || IsOverridableDispatchTarget(disposeMethod)))
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    disposalSyntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(UsingStatementPurityRule),
-                        operation,
-                        disposalSyntax,
-                        disposeMethod,
-                        "unstable_using_resource"));
-
-            var disposeResult = CheckImplicitDisposeCallee(
-                disposeMethod,
-                disposalSyntax,
-                context,
-                isAwaitUsing);
+            var disposeResult = CheckDisposeReceiver(
+                operation, disposalSyntax, disposeReceiverType, isAwaitUsing,
+                WasLocalReassignedBeforeUsing(
+                    local, operation, context.SemanticModel, context.CancellationToken), context);
             if (!disposeResult.IsPure) return disposeResult;
         }
 
-        if (declaredLocals.Count == 0)
-        {
-            var expressionDisposeReceiverType = ResolveExpressionDisposeReceiverType(resourceOperation);
-            if (expressionDisposeReceiverType != null)
-            {
-                var disposeMethod = DisposalMemberClassifier.FindDisposalMethod(
-                    expressionDisposeReceiverType,
-                    context.SemanticModel.Compilation,
-                    isAwaitUsing);
-
-                if (disposeMethod == null)
-                    return MissingDisposalEvidence(operation, disposalSyntax, expressionDisposeReceiverType);
-
-                var disposeResult = CheckImplicitDisposeCallee(
-                    disposeMethod,
-                    disposalSyntax,
-                    context,
-                    isAwaitUsing);
-                if (!disposeResult.IsPure) return disposeResult;
-            }
-        }
-
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return declaredLocals.Count == 0 && ResolveExpressionDisposeReceiverType(resourceOperation) is { } receiverType
+            ? CheckDisposeReceiver(operation, disposalSyntax, receiverType, isAwaitUsing, false, context)
+            : PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult MissingDisposalEvidence(
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckDisposeReceiver(
         IOperation operation,
         SyntaxNode syntax,
-        ITypeSymbol receiverType)
+        ITypeSymbol receiverType,
+        bool isAwaitUsing,
+        bool isUnstable,
+        PurityAnalysisContext context)
     {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
+        var disposeMethod = DisposalMemberClassifier.FindDisposalMethod(
+            receiverType, context.SemanticModel.Compilation, isAwaitUsing);
+        if (disposeMethod == null)
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                syntax, PurityAnalysisEngine.PurityEvidence.Create(
+                    "unknown_external_call", nameof(UsingStatementPurityRule), operation, syntax,
+                    receiverType, "missing_disposal_member"));
+        if (isUnstable && (receiverType.TypeKind == TypeKind.Interface || IsOverridableDispatchTarget(disposeMethod)))
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                syntax, PurityAnalysisEngine.PurityEvidence.Create(
                 "unknown_external_call",
                 nameof(UsingStatementPurityRule),
                 operation,
                 syntax,
-                receiverType,
-                "missing_disposal_member"));
+                disposeMethod,
+                "unstable_using_resource"));
+        return CheckImplicitDisposeCallee(disposeMethod, syntax, context, isAwaitUsing);
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckImplicitDisposeCallee(
@@ -162,27 +76,8 @@ internal class UsingStatementPurityRule : IPurityRule
         var disposeResult = PurityCalleeResolver.GetCalleePurityAtUse(disposeMethod, syntaxNode, context);
         if (!disposeResult.IsPure) return disposeResult;
 
-        return isAwaitUsing
-            ? AwaitPurityRule.CheckAwaitablePatternMembers(disposeMethod.ReturnType, syntaxNode, context)
-            : PurityAnalysisEngine.PurityAnalysisResult.Pure;
-    }
-
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDeclaratorInitializers(
-        IEnumerable<IVariableDeclaratorOperation> declarators,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        foreach (var declarator in declarators)
-        {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            var initVal = declarator.Initializer?.Value;
-            if (initVal == null) continue;
-
-            var initializerResult = PurityAnalysisEngine.CheckSingleOperation(initVal, context, currentState);
-            if (!initializerResult.IsPure) return initializerResult;
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return isAwaitUsing ? AwaitPurityRule.CheckAwaitablePatternMembers(disposeMethod.ReturnType, syntaxNode, context) :
+            PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
     private List<ILocalSymbol> FindDeclaredLocals(IOperation? resourceOperation)
@@ -211,8 +106,8 @@ internal class UsingStatementPurityRule : IPurityRule
             DisposalMemberClassifier.FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
             return concreteType;
 
-        var initializerType =
-            TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel, cancellationToken);
+        var initializerType = TryGetStableObjectCreationInitializerType(
+            local, usingOperation, semanticModel, cancellationToken);
         if (initializerType != null &&
             DisposalMemberClassifier.FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
             return initializerType;
@@ -247,10 +142,10 @@ internal class UsingStatementPurityRule : IPurityRule
     {
         var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken);
         var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        if (declaratorSyntax == null || initializerSyntax == null) return null;
+        if (initializerSyntax == null) return null;
 
         if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax,
-                declaratorSyntax, semanticModel, cancellationToken)) return null;
+                declaratorSyntax!, semanticModel, cancellationToken)) return null;
 
         var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
         var unwrappedInitializer = UnwrapConversionsForDisposeReceiver(initializerOperation);
@@ -259,37 +154,27 @@ internal class UsingStatementPurityRule : IPurityRule
             : null;
     }
 
-    private static bool HasDeclaratorInitializer(ILocalSymbol local, CancellationToken cancellationToken)
-    {
-        return RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken)?.Initializer != null;
-    }
+    private static bool HasDeclaratorInitializer(ILocalSymbol local, CancellationToken cancellationToken) =>
+        RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken)?.Initializer != null;
 
     private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation,
-        SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
-        var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken);
-        return declaratorSyntax != null &&
+        SemanticModel semanticModel, CancellationToken cancellationToken) =>
+        RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken) is { } declaratorSyntax &&
                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax,
                    declaratorSyntax, semanticModel, cancellationToken);
-    }
 
-    private static bool IsAwaitUsingOperation(IOperation operation)
-    {
-        return operation.Syntax switch
+    private static bool IsAwaitUsingOperation(IOperation operation) =>
+        operation.Syntax switch
         {
             UsingStatementSyntax usingStatementSyntax => usingStatementSyntax.AwaitKeyword.RawKind != 0,
             LocalDeclarationStatementSyntax localDeclarationStatementSyntax => localDeclarationStatementSyntax
                 .AwaitKeyword.RawKind != 0,
             _ => false
         };
-    }
 
-    private static bool IsOverridableDispatchTarget(IMethodSymbol methodSymbol)
-    {
-        if (methodSymbol.IsStatic || methodSymbol.ContainingType?.IsSealed == true) return false;
-
-        return methodSymbol.IsVirtual ||
+    private static bool IsOverridableDispatchTarget(IMethodSymbol methodSymbol) =>
+        !methodSymbol.IsStatic && methodSymbol.ContainingType?.IsSealed != true &&
+        (methodSymbol.IsVirtual ||
                methodSymbol.IsAbstract ||
-               (methodSymbol.IsOverride && !methodSymbol.IsSealed);
-    }
+               methodSymbol.IsOverride && !methodSymbol.IsSealed);
 }

@@ -260,14 +260,22 @@ Tests are excluded from the metric and must not be deleted.
   unrecognized types and operations still retain explicit conservative unknown
   behavior. Focused capability and architecture tests preserve established
   classifications and prevent the deleted member catalogs from returning.
+- [x] Deleted the broad post-CFG purity compatibility traversal that rechecked
+  using, foreach, throw, try, invocation, and operator behavior after canonical
+  CFG analysis. Characterization moved only Roslyn's implicit try/catch/finally,
+  disposal, enumerator-runtime-member, and compound-operator semantics into CFG
+  finalization; ordinary throws and invocations now have one analysis path. The
+  disposal rule no longer recursively rechecks resources and bodies already
+  visited by CFG, and architecture coverage prevents the compatibility pass
+  from returning.
 
 ## Current evidence
 
-- Maintained production: 99,817 lines (95,898 C#, 3,189 scripts, and 730
-  specifications); net reduction: 7,809 lines; remaining reduction: 12,191.
+- Maintained production: 99,617 lines (95,698 C#, 3,189 scripts, and 730
+  specifications); net reduction: 8,009 lines; remaining reduction: 11,991.
   This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,185 passing tests and two documented skips.
+- Six lanes: 6,186 passing tests and two documented skips.
 
 ## Milestones
 

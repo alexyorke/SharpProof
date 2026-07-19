@@ -162,15 +162,6 @@ internal partial class PurityAnalysisEngine
         return PurityAnalysisState.Pure.WithPathState(pathState);
     }
 
-    private static bool IsPostCfgOperationUnreachable(
-        IOperation operation,
-        PurityAnalysisContext context) =>
-        IsSyntaxProvenUnreachable(
-            operation.Syntax,
-            context.SemanticModel,
-            context.SmtAnalysis,
-            context.CancellationToken);
-
     private static bool IsImpurityProvenUnreachable(
         PurityAnalysisResult result,
         SemanticModel semanticModel,

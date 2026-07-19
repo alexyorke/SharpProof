@@ -133,7 +133,7 @@ internal partial class PurityAnalysisEngine
                 return exitState.FirstImpureSyntaxNode != null
                     ? PurityAnalysisResult.Impure(exitState.FirstImpureSyntaxNode, exitState.FirstImpurityEvidence)
                     : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(exitState.FirstImpurityEvidence);
-        return PurityAnalysisResult.Pure;
+        return CheckCfgImplicitSemantics(bodyNode, context, mergedNormalExitState);
     }
 
     private static PurityAnalysisState ApplyTransferFunction(

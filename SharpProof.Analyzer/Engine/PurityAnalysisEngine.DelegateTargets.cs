@@ -220,29 +220,4 @@ internal partial class PurityAnalysisEngine
             : null;
     }
 
-    private static bool IsTransientCharArrayConsumedByStringConstructor(IInvocationOperation invocationOperation,
-        SemanticModel semanticModel)
-    {
-        var targetMethod = invocationOperation.TargetMethod?.ReducedFrom ?? invocationOperation.TargetMethod;
-        var targetDefinition = targetMethod?.OriginalDefinition;
-        if (targetDefinition == null ||
-            targetDefinition.Name != "ToArray" ||
-            invocationOperation.Type is not IArrayTypeSymbol arrayType ||
-            arrayType.ElementType.SpecialType != SpecialType.System_Char)
-            return false;
-
-        var enumerableType = semanticModel.Compilation.GetTypeByMetadataName("System.Linq.Enumerable");
-        if (enumerableType == null ||
-            !SymbolEq.AreEqual(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
-            return false;
-
-        var parent = invocationOperation.Parent;
-        if (parent is IArgumentOperation argumentOperation) parent = argumentOperation.Parent;
-
-        if (parent is not IObjectCreationOperation objectCreationOperation) return false;
-
-        var constructorSymbol = objectCreationOperation.Constructor;
-        return constructorSymbol?.ContainingType?.SpecialType == SpecialType.System_String &&
-               objectCreationOperation.Arguments.Length == 1;
-    }
 }
