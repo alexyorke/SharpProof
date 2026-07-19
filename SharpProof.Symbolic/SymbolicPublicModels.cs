@@ -61,16 +61,6 @@ internal sealed class SymbolicBudgetInfo(
     int cacheEntryCount,
     SymbolicCacheInfo? cache = null)
 {
-    public SymbolicBudgetInfo(
-        int maxPathConditions,
-        int maxExpressionNodes,
-        int timeoutMilliseconds,
-        int methodBudgetMilliseconds,
-        int executedQueryCount,
-        int cacheEntryCount)
-        : this(maxPathConditions, maxExpressionNodes, timeoutMilliseconds, methodBudgetMilliseconds,
-            executedQueryCount, cacheEntryCount, null) { }
-
     public int MaxPathConditions { get; } = maxPathConditions;
     public int MaxExpressionNodes { get; } = maxExpressionNodes;
     public int TimeoutMilliseconds { get; } = timeoutMilliseconds;
@@ -88,7 +78,18 @@ internal sealed class SymbolicCacheInfo(long hits, long misses, int entries, lon
     public long Evictions { get; } = evictions;
 }
 
-internal sealed class SymbolicProofInfo
+internal sealed class SymbolicProofInfo(
+    SymbolicProofStatus status,
+    SymbolicProofBackend backend,
+    SymbolicUnknownReason unknownReason,
+    string reason,
+    bool cacheHit,
+    SymbolicBudgetInfo? budget,
+    SymbolicProofStage stage,
+    SymbolicProofSupport support,
+    string? target = null,
+    string? conditionText = null,
+    string? displayKind = null)
 {
     public SymbolicProofInfo(
         SymbolicProofStatus status,
@@ -122,56 +123,30 @@ internal sealed class SymbolicProofInfo
     {
     }
 
-    internal SymbolicProofInfo(
-        SymbolicProofStatus status,
-        SymbolicProofBackend backend,
-        SymbolicUnknownReason unknownReason,
-        string reason,
-        bool cacheHit,
-        SymbolicBudgetInfo? budget,
-        SymbolicProofStage stage,
-        SymbolicProofSupport support,
-        string? target = null,
-        string? conditionText = null,
-        string? displayKind = null)
-    {
-        Status = status;
-        Backend = backend;
-        UnknownReason = unknownReason;
-        Reason = reason ?? string.Empty;
-        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForProof(unknownReason, Reason);
-        CacheHit = cacheHit;
-        Budget = budget;
-        Stage = stage;
-        Support = support;
-        Target = target ?? string.Empty;
-        ConditionText = conditionText ?? string.Empty;
-        DisplayKind = displayKind ?? backend.ToString();
-    }
+    public SymbolicProofStatus Status { get; } = status;
 
-    public SymbolicProofStatus Status { get; }
+    public SymbolicProofBackend Backend { get; } = backend;
 
-    public SymbolicProofBackend Backend { get; }
+    public SymbolicUnknownReason UnknownReason { get; } = unknownReason;
 
-    public SymbolicUnknownReason UnknownReason { get; }
+    public string Reason { get; } = reason ?? string.Empty;
 
-    public string Reason { get; }
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
+        SymbolicUnknownReasonTaxonomy.ForProof(unknownReason, reason ?? string.Empty);
 
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
+    public bool CacheHit { get; } = cacheHit;
 
-    public bool CacheHit { get; }
+    public SymbolicBudgetInfo? Budget { get; } = budget;
 
-    public SymbolicBudgetInfo? Budget { get; }
+    public SymbolicProofStage Stage { get; } = stage;
 
-    public SymbolicProofStage Stage { get; }
+    public SymbolicProofSupport Support { get; } = support;
 
-    public SymbolicProofSupport Support { get; }
+    public string Target { get; } = target ?? string.Empty;
 
-    public string Target { get; }
+    public string ConditionText { get; } = conditionText ?? string.Empty;
 
-    public string ConditionText { get; }
-
-    public string DisplayKind { get; }
+    public string DisplayKind { get; } = displayKind ?? backend.ToString();
 }
 
 internal sealed class SymbolicFactInfo(

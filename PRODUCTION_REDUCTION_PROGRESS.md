@@ -202,14 +202,19 @@ Tests are excluded from the metric and must not be deleted.
   descriptor list, test-only feature/configuration metadata, and two duplicate
   suppression-ID lists; focused descriptor, configuration, and suppression
   tests preserve discovery, ordering, documentation, and proof-backed behavior.
+- [x] Made one unknown-reason taxonomy own proof, capability, complexity,
+  runtime-hazard, ensures, and purity classification. Deleted the parallel
+  domain dictionaries, consolidated raw-reason precedence, and condensed the
+  related immutable proof/result metadata. Exhaustive enum, stable-code, JSON,
+  retry/configuration, and architecture tests preserve conservative fallbacks.
 
 ## Current evidence
 
-- Maintained production: 101,996 lines (97,921 C#, 3,189 scripts, and 886
-  specifications); net reduction: 5,630 lines; remaining reduction: 14,370.
-  This tranche removed 205 maintained lines without deleting tests.
+- Maintained production: 101,789 lines (97,714 C#, 3,189 scripts, and 886
+  specifications); net reduction: 5,837 lines; remaining reduction: 14,163.
+  This tranche removed 207 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,165 passing tests and two documented skips.
+- Six lanes: 6,177 passing tests and two documented skips.
 
 ## Milestones
 

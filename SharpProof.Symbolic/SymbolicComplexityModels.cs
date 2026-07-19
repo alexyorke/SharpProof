@@ -73,52 +73,48 @@ internal sealed class SymbolicComplexityCalleeInfo(
         SymbolicUnknownReasonTaxonomy.ForComplexity(unknownReason);
 }
 
-internal sealed class SymbolicComplexityResult : SymbolicMethodResult
+internal sealed class SymbolicComplexityResult(
+    string filePath,
+    string methodName,
+    string methodDisplayName,
+    string declarationKind,
+    int spanStart,
+    int spanEnd,
+    int startLine,
+    int startColumn,
+    int endLine,
+    int endColumn,
+    SymbolicComplexityInfo complexity,
+    IReadOnlyList<SymbolicComplexityDriverInfo>? drivers = null,
+    IReadOnlyList<SymbolicComplexityUnknownReason>? unknownReasons = null,
+    IReadOnlyList<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
+    : SymbolicMethodResult(
+        filePath,
+        methodName,
+        methodDisplayName,
+        declarationKind,
+        spanStart,
+        spanEnd,
+        startLine,
+        startColumn,
+        endLine,
+        endColumn)
 {
-    public SymbolicComplexityResult(
-        string filePath,
-        string methodName,
-        string methodDisplayName,
-        string declarationKind,
-        int spanStart,
-        int spanEnd,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        SymbolicComplexityInfo complexity,
-        IReadOnlyList<SymbolicComplexityDriverInfo>? drivers = null,
-        IReadOnlyList<SymbolicComplexityUnknownReason>? unknownReasons = null,
-        IReadOnlyList<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
-        : base(
-            filePath,
-            methodName,
-            methodDisplayName,
-            declarationKind,
-            spanStart,
-            spanEnd,
-            startLine,
-            startColumn,
-            endLine,
-            endColumn)
-    {
-        Complexity = complexity ?? throw new ArgumentNullException(nameof(complexity));
-        Drivers = drivers ?? Array.Empty<SymbolicComplexityDriverInfo>();
-        UnknownReasons = unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>();
-        UnknownReasonDetails = UnknownReasons
-            .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)
-            .ToArray();
-        CalleeSummaries = calleeSummaries ?? Array.Empty<SymbolicComplexityCalleeInfo>();
-    }
+    public SymbolicComplexityInfo Complexity { get; } =
+        complexity ?? throw new ArgumentNullException(nameof(complexity));
 
-    public SymbolicComplexityInfo Complexity { get; }
+    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; } =
+        drivers ?? Array.Empty<SymbolicComplexityDriverInfo>();
 
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
+    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; } =
+        unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>();
 
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
+        (unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>())
+        .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)
+        .ToArray();
 
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
-
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
+    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; } =
+        calleeSummaries ?? Array.Empty<SymbolicComplexityCalleeInfo>();
 
 }

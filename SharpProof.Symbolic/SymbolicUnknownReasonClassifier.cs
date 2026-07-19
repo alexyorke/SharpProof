@@ -2,53 +2,29 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicUnknownReasonClassifier
 {
+    private static readonly (SymbolicUnknownReason Reason, string[] Fragments)[] Rules =
+    [
+        (SymbolicUnknownReason.Timeout, ["timeout", "timed_out"]),
+        (SymbolicUnknownReason.MethodBudgetExceeded, ["method_budget"]),
+        (SymbolicUnknownReason.PathConditionBudgetExceeded,
+            ["path_condition", "max_path_conditions", "too_many_path_conditions"]),
+        (SymbolicUnknownReason.ExpressionBudgetExceeded, ["expression_budget", "max_expression"]),
+        (SymbolicUnknownReason.CancellationRequested, ["cancellation", "cancelled", "canceled"]),
+        (SymbolicUnknownReason.EncodingFailure, ["encoding"]),
+        (SymbolicUnknownReason.UnsupportedIrEncoding, ["unsupported"]),
+        (SymbolicUnknownReason.SmtDisabled, ["smt_required", "smt_disabled", "smt_off"]),
+        (SymbolicUnknownReason.SmtUnavailable, ["transient_failure", "z3", "native", "unavailable", "load"])
+    ];
+
     internal static SymbolicUnknownReason Classify(string reason)
     {
         if (string.IsNullOrWhiteSpace(reason)) return SymbolicUnknownReason.Unknown;
 
-        if (ContainsReason(reason, "timeout") ||
-            ContainsReason(reason, "timed_out"))
-            return SymbolicUnknownReason.Timeout;
-
-        if (ContainsReason(reason, "method_budget")) return SymbolicUnknownReason.MethodBudgetExceeded;
-
-        if (ContainsReason(reason, "path_condition") ||
-            ContainsReason(reason, "max_path_conditions") ||
-            ContainsReason(reason, "too_many_path_conditions"))
-            return SymbolicUnknownReason.PathConditionBudgetExceeded;
-
-        if (ContainsReason(reason, "expression_budget") ||
-            ContainsReason(reason, "max_expression"))
-            return SymbolicUnknownReason.ExpressionBudgetExceeded;
-
-        if (ContainsReason(reason, "cancellation") ||
-            ContainsReason(reason, "cancelled") ||
-            ContainsReason(reason, "canceled"))
-            return SymbolicUnknownReason.CancellationRequested;
-
-        if (ContainsReason(reason, "encoding")) return SymbolicUnknownReason.EncodingFailure;
-
-        if (ContainsReason(reason, "unsupported")) return SymbolicUnknownReason.UnsupportedIrEncoding;
-
-        if (ContainsReason(reason, "smt_required") ||
-            ContainsReason(reason, "smt_disabled") ||
-            ContainsReason(reason, "smt_off"))
-            return SymbolicUnknownReason.SmtDisabled;
-
-        if (ContainsReason(reason, "transient_failure")) return SymbolicUnknownReason.SmtUnavailable;
-
-        if (ContainsReason(reason, "z3") ||
-            ContainsReason(reason, "native") ||
-            ContainsReason(reason, "unavailable") ||
-            ContainsReason(reason, "load"))
-            return SymbolicUnknownReason.SmtUnavailable;
+        foreach (var rule in Rules)
+            if (rule.Fragments.Any(fragment => reason.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0))
+                return rule.Reason;
 
         return SymbolicUnknownReason.Unknown;
-    }
-
-    private static bool ContainsReason(string reason, string value)
-    {
-        return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
 

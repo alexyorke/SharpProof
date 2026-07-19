@@ -46,53 +46,46 @@ internal sealed class SymbolicCapabilitySite(
     public int SourceColumn { get; } = sourceColumn;
 }
 
-internal sealed class SymbolicCapabilityResult : SymbolicMethodResult
+internal sealed class SymbolicCapabilityResult(
+    string filePath,
+    string methodName,
+    string methodDisplayName,
+    string declarationKind,
+    int spanStart,
+    int spanEnd,
+    int startLine,
+    int startColumn,
+    int endLine,
+    int endColumn,
+    SymbolicCapability capabilities,
+    string capabilityText,
+    IReadOnlyList<SymbolicCapabilitySite>? sites = null,
+    IReadOnlyList<SymbolicCapabilityUnknownReason>? unknownReasons = null)
+    : SymbolicMethodResult(
+        filePath,
+        methodName,
+        methodDisplayName,
+        declarationKind,
+        spanStart,
+        spanEnd,
+        startLine,
+        startColumn,
+        endLine,
+        endColumn)
 {
-    public SymbolicCapabilityResult(
-        string filePath,
-        string methodName,
-        string methodDisplayName,
-        string declarationKind,
-        int spanStart,
-        int spanEnd,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        SymbolicCapability capabilities,
-        string capabilityText,
-        IReadOnlyList<SymbolicCapabilitySite>? sites = null,
-        IReadOnlyList<SymbolicCapabilityUnknownReason>? unknownReasons = null)
-        : base(
-            filePath,
-            methodName,
-            methodDisplayName,
-            declarationKind,
-            spanStart,
-            spanEnd,
-            startLine,
-            startColumn,
-            endLine,
-            endColumn)
-    {
-        Capabilities = capabilities;
-        CapabilityText = capabilityText ?? string.Empty;
-        Sites = sites ?? Array.Empty<SymbolicCapabilitySite>();
-        UnknownReasons = unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>();
-        UnknownReasonDetails = UnknownReasons
-            .Select(SymbolicUnknownReasonTaxonomy.ForCapability)
-            .ToArray();
-    }
+    public SymbolicCapability Capabilities { get; } = capabilities;
 
-    public SymbolicCapability Capabilities { get; }
+    public string CapabilityText { get; } = capabilityText ?? string.Empty;
 
-    public string CapabilityText { get; }
+    public IReadOnlyList<SymbolicCapabilitySite> Sites { get; } = sites ?? Array.Empty<SymbolicCapabilitySite>();
 
-    public IReadOnlyList<SymbolicCapabilitySite> Sites { get; }
+    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; } =
+        unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>();
 
-    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
-
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
+        (unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>())
+        .Select(SymbolicUnknownReasonTaxonomy.ForCapability)
+        .ToArray();
 
     public bool HasUnknowns => UnknownReasons.Count != 0 || Sites.Any(static site => site.IsUnknown);
 

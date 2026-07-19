@@ -275,6 +275,22 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var taxonomy = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicUnknownReasonTaxonomy.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(taxonomy, Does.Not.Contain("CapabilityReasonDescriptors"));
+            Assert.That(taxonomy, Does.Not.Contain("ComplexityReasonDescriptors"));
+            Assert.That(taxonomy, Does.Contain("Describe(SymbolicCapabilityUnknownReason reason)"));
+            Assert.That(taxonomy, Does.Contain("Describe(SymbolicComplexityUnknownReason reason)"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
