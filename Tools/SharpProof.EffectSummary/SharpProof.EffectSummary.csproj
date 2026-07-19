@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="EffectSummaryGeneratedPurityRules.json" LogicalName="SharpProof.EffectSummary.GeneratedPurityRules.json" />
     <EmbeddedResource Include="EffectSummaryUsage.txt" LogicalName="SharpProof.EffectSummary.Usage.txt" />
   </ItemGroup>
   <ItemGroup>

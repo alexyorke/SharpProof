@@ -546,7 +546,10 @@ public sealed class RepositoryArchitectureTests
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var fuzzRoot = Path.Combine(root, "Tools", "SharpProof.Fuzz.Core");
         var generator = File.ReadAllText(Path.Combine(fuzzRoot, "FuzzCaseGenerator.cs"));
-        var registry = File.ReadAllText(Path.Combine(fuzzRoot, "FuzzShapeRegistry.json"));
+        using var registry = JsonDocument.Parse(File.ReadAllText(Path.Combine(fuzzRoot, "FuzzShapeRegistry.json")));
+        var ids = registry.RootElement.EnumerateArray()
+            .Select(entry => entry.GetProperty("Id").GetString())
+            .ToArray();
 
         Assert.Multiple(() =>
         {
@@ -554,8 +557,34 @@ public sealed class RepositoryArchitectureTests
             Assert.That(generator, Does.Not.Contain("MethodEntry("));
             Assert.That(generator, Does.Not.Contain("StaticEntry("));
             Assert.That(generator, Does.Not.Contain("ShapeRegistryEntry Entry("));
-            Assert.That(registry, Does.Contain("\"Id\": \"PureArithmetic\""));
-            Assert.That(registry, Does.Contain("\"Id\": \"ImpureUsingAwaitDelegateFlow\""));
+            Assert.That(ids, Does.Contain("PureArithmetic"));
+            Assert.That(ids, Does.Contain("ImpureUsingAwaitDelegateFlow"));
+        });
+    }
+
+    [Test]
+    public void EffectSummaryGeneratedPurityRules_HaveOneDeclarativeOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var toolRoot = Path.Combine(root, "Tools", "SharpProof.EffectSummary");
+        var source = File.ReadAllText(Path.Combine(toolRoot, "EffectSummaryGeneratedPurityRules.cs"));
+        using var registry = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            toolRoot, "EffectSummaryGeneratedPurityRules.json")));
+        var impure = registry.RootElement.GetProperty("Impure");
+        var pure = registry.RootElement.GetProperty("Pure");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source, Does.Contain("ToolEmbeddedText.Load"));
+            Assert.That(source, Does.Not.Contain("System.Guid.NewGuid()"));
+            Assert.That(source, Does.Not.Contain("System.Diagnostics.StackFrame.GetMethod()"));
+            Assert.That(impure.GetArrayLength(), Is.EqualTo(19));
+            Assert.That(pure.GetArrayLength(), Is.EqualTo(3));
+            Assert.That(impure[0].GetProperty("ExactSymbols")[0].GetString(), Is.EqualTo("System.Guid.NewGuid()"));
+            Assert.That(impure[17].GetProperty("Predicate").GetString(),
+                Is.EqualTo("IsGeneratedArrayComparerSort"));
+            Assert.That(pure[1].GetProperty("Predicate").GetString(),
+                Is.EqualTo("IsImmutableHashSetEnumeratorMethod"));
         });
     }
 

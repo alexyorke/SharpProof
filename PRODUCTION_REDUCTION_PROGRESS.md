@@ -402,14 +402,21 @@ Tests are excluded from the metric and must not be deleted.
   metadata and four-variant source bytes remain hash-identical, the broader
   fuzz/shape suite stays green, and architecture coverage prevents the inline
   registry and template block from returning.
+- [x] Made one validated embedded registry the declarative owner for the 22
+  ordered EffectSummary generated-purity overrides. The first-match projection
+  and the two semantic predicates remain code; exact symbols, prefixes,
+  categories, visibility, and predicate identities now have one data owner.
+  Representative pure, impure, prefix, and predicate runtime slices preserve
+  their classifications, and architecture coverage prevents inline tables from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 95,451 lines (91,532 C#, 3,189 scripts, and 730
-  specifications); net reduction: 12,175 lines; remaining reduction: 7,825.
-  This tranche removed 436 maintained lines without deleting tests.
+- Maintained production: 95,278 lines (91,359 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,348 lines; remaining reduction: 7,652.
+  This tranche removed 173 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,201 passing tests and two documented Main skips.
+- Six lanes: 6,202 passing tests and two documented Main skips.
 
 ## Milestones
 
