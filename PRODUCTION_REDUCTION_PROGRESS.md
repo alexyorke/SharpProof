@@ -560,3 +560,17 @@ The EffectSummary DateTime/DateTimeOffset call-semantic helpers remain live
 semantic owners. Removing them caused four focused date/time classification
 regressions, so they are not legacy adapter deletion candidates without a new
 canonical replacement.
+
+The built-in EffectSummary artifact manifest is also not an aggregate duplicate.
+The generated `runtime-core-bcl` catalog contributes 5,389 canonical method keys
+that are absent from the union of the other 34 generated artifacts. Its 183 root
+prefixes therefore cannot be removed or replaced by the narrower artifacts
+without first introducing a sound metadata-driven root-selection policy.
+
+The remaining fresh-string and immutable-string rewrite predicates are live
+semantic owners. Disabling the char-replace, fresh-copy, guarded-rewrite, and
+indexed-replace dispatch entries changed the focused runtime `Substring` and
+both characterized `Replace` overloads from `pure` to `impure`. Generic
+fixed-point call classification does not yet track that the callee's memory
+writes target the caller's freshly allocated string, so these rules must remain
+until ownership evidence is propagated across calls.
