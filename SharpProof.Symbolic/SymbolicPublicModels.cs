@@ -52,7 +52,14 @@ internal enum SymbolicUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicBudgetInfo
+internal sealed class SymbolicBudgetInfo(
+    int maxPathConditions,
+    int maxExpressionNodes,
+    int timeoutMilliseconds,
+    int methodBudgetMilliseconds,
+    int executedQueryCount,
+    int cacheEntryCount,
+    SymbolicCacheInfo? cache = null)
 {
     public SymbolicBudgetInfo(
         int maxPathConditions,
@@ -61,67 +68,24 @@ internal sealed class SymbolicBudgetInfo
         int methodBudgetMilliseconds,
         int executedQueryCount,
         int cacheEntryCount)
-        : this(
-            maxPathConditions,
-            maxExpressionNodes,
-            timeoutMilliseconds,
-            methodBudgetMilliseconds,
-            executedQueryCount,
-            cacheEntryCount,
-            null)
-    {
-    }
+        : this(maxPathConditions, maxExpressionNodes, timeoutMilliseconds, methodBudgetMilliseconds,
+            executedQueryCount, cacheEntryCount, null) { }
 
-    public SymbolicBudgetInfo(
-        int maxPathConditions,
-        int maxExpressionNodes,
-        int timeoutMilliseconds,
-        int methodBudgetMilliseconds,
-        int executedQueryCount,
-        int cacheEntryCount,
-        SymbolicCacheInfo? cache)
-    {
-        MaxPathConditions = maxPathConditions;
-        MaxExpressionNodes = maxExpressionNodes;
-        TimeoutMilliseconds = timeoutMilliseconds;
-        MethodBudgetMilliseconds = methodBudgetMilliseconds;
-        ExecutedQueryCount = executedQueryCount;
-        CacheEntryCount = cacheEntryCount;
-        Cache = cache;
-    }
-
-    public int MaxPathConditions { get; }
-
-    public int MaxExpressionNodes { get; }
-
-    public int TimeoutMilliseconds { get; }
-
-    public int MethodBudgetMilliseconds { get; }
-
-    public int ExecutedQueryCount { get; }
-
-    public int CacheEntryCount { get; }
-
-    public SymbolicCacheInfo? Cache { get; }
+    public int MaxPathConditions { get; } = maxPathConditions;
+    public int MaxExpressionNodes { get; } = maxExpressionNodes;
+    public int TimeoutMilliseconds { get; } = timeoutMilliseconds;
+    public int MethodBudgetMilliseconds { get; } = methodBudgetMilliseconds;
+    public int ExecutedQueryCount { get; } = executedQueryCount;
+    public int CacheEntryCount { get; } = cacheEntryCount;
+    public SymbolicCacheInfo? Cache { get; } = cache;
 }
 
-internal sealed class SymbolicCacheInfo
+internal sealed class SymbolicCacheInfo(long hits, long misses, int entries, long evictions)
 {
-    public SymbolicCacheInfo(long hits, long misses, int entries, long evictions)
-    {
-        Hits = hits;
-        Misses = misses;
-        Entries = entries;
-        Evictions = evictions;
-    }
-
-    public long Hits { get; }
-
-    public long Misses { get; }
-
-    public int Entries { get; }
-
-    public long Evictions { get; }
+    public long Hits { get; } = hits;
+    public long Misses { get; } = misses;
+    public int Entries { get; } = entries;
+    public long Evictions { get; } = evictions;
 }
 
 internal sealed class SymbolicProofInfo
@@ -210,43 +174,24 @@ internal sealed class SymbolicProofInfo
     public string DisplayKind { get; }
 }
 
-internal sealed class SymbolicFactInfo
+internal sealed class SymbolicFactInfo(
+    string kind,
+    string text,
+    string provenance,
+    string confidence,
+    int sourceSpanStart,
+    int sourceSpanLength,
+    string? symbolKey = null,
+    string? evidenceKey = null)
 {
-    public SymbolicFactInfo(
-        string kind,
-        string text,
-        string provenance,
-        string confidence,
-        int sourceSpanStart,
-        int sourceSpanLength,
-        string? symbolKey = null,
-        string? evidenceKey = null)
-    {
-        Kind = kind ?? string.Empty;
-        Text = text ?? string.Empty;
-        Provenance = provenance ?? string.Empty;
-        Confidence = confidence ?? string.Empty;
-        SourceSpanStart = sourceSpanStart;
-        SourceSpanLength = sourceSpanLength;
-        SymbolKey = symbolKey;
-        EvidenceKey = evidenceKey;
-    }
-
-    public string Kind { get; }
-
-    public string Text { get; }
-
-    public string Provenance { get; }
-
-    public string Confidence { get; }
-
-    public int SourceSpanStart { get; }
-
-    public int SourceSpanLength { get; }
-
-    public string? SymbolKey { get; }
-
-    public string? EvidenceKey { get; }
+    public string Kind { get; } = kind ?? string.Empty;
+    public string Text { get; } = text ?? string.Empty;
+    public string Provenance { get; } = provenance ?? string.Empty;
+    public string Confidence { get; } = confidence ?? string.Empty;
+    public int SourceSpanStart { get; } = sourceSpanStart;
+    public int SourceSpanLength { get; } = sourceSpanLength;
+    public string? SymbolKey { get; } = symbolKey;
+    public string? EvidenceKey { get; } = evidenceKey;
 
     internal static SymbolicFactInfo FromFact(SymbolicFact fact)
     {
@@ -343,29 +288,16 @@ internal sealed class SymbolicFactInfo
     }
 }
 
-internal sealed class SymbolicInvariantInfo
+internal sealed class SymbolicInvariantInfo(
+    string mergedText,
+    IReadOnlyList<SymbolicFactInfo>? facts = null,
+    IReadOnlyList<SymbolicProofInfo>? proofs = null,
+    SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction,
+    int conditionCount = 0)
 {
-    public SymbolicInvariantInfo(
-        string mergedText,
-        IReadOnlyList<SymbolicFactInfo>? facts = null,
-        IReadOnlyList<SymbolicProofInfo>? proofs = null,
-        SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction,
-        int conditionCount = 0)
-    {
-        MergedText = mergedText ?? string.Empty;
-        Facts = facts ?? Array.Empty<SymbolicFactInfo>();
-        Proofs = proofs ?? Array.Empty<SymbolicProofInfo>();
-        MergeKind = mergeKind;
-        ConditionCount = conditionCount;
-    }
-
-    public string MergedText { get; }
-
-    public SymbolicInvariantMergeKind MergeKind { get; }
-
-    public int ConditionCount { get; }
-
-    public IReadOnlyList<SymbolicFactInfo> Facts { get; }
-
-    public IReadOnlyList<SymbolicProofInfo> Proofs { get; }
+    public string MergedText { get; } = mergedText ?? string.Empty;
+    public SymbolicInvariantMergeKind MergeKind { get; } = mergeKind;
+    public int ConditionCount { get; } = conditionCount;
+    public IReadOnlyList<SymbolicFactInfo> Facts { get; } = facts ?? Array.Empty<SymbolicFactInfo>();
+    public IReadOnlyList<SymbolicProofInfo> Proofs { get; } = proofs ?? Array.Empty<SymbolicProofInfo>();
 }

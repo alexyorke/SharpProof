@@ -14,66 +14,36 @@ internal enum SymbolicCapabilityUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicCapabilitySite
+internal sealed class SymbolicCapabilitySite(
+    SymbolicCapability capabilities,
+    string capabilityText,
+    string siteKind,
+    string operationKind,
+    string operationText,
+    string symbolDisplayName,
+    bool isTransitive,
+    bool isUnknown,
+    SymbolicCapabilityUnknownReason unknownReason,
+    int sourceSpanStart,
+    int sourceSpanLength,
+    int sourceLine,
+    int sourceColumn)
 {
-    public SymbolicCapabilitySite(
-        SymbolicCapability capabilities,
-        string capabilityText,
-        string siteKind,
-        string operationKind,
-        string operationText,
-        string symbolDisplayName,
-        bool isTransitive,
-        bool isUnknown,
-        SymbolicCapabilityUnknownReason unknownReason,
-        int sourceSpanStart,
-        int sourceSpanLength,
-        int sourceLine,
-        int sourceColumn)
-    {
-        Capabilities = capabilities;
-        CapabilityText = capabilityText ?? string.Empty;
-        SiteKind = siteKind ?? string.Empty;
-        OperationKind = operationKind ?? string.Empty;
-        OperationText = operationText ?? string.Empty;
-        SymbolDisplayName = symbolDisplayName ?? string.Empty;
-        IsTransitive = isTransitive;
-        IsUnknown = isUnknown;
-        UnknownReason = unknownReason;
-        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapability(unknownReason);
-        SourceSpanStart = sourceSpanStart;
-        SourceSpanLength = sourceSpanLength;
-        SourceLine = sourceLine;
-        SourceColumn = sourceColumn;
-    }
-
-    public SymbolicCapability Capabilities { get; }
-
-    public string CapabilityText { get; }
-
-    public string SiteKind { get; }
-
-    public string OperationKind { get; }
-
-    public string OperationText { get; }
-
-    public string SymbolDisplayName { get; }
-
-    public bool IsTransitive { get; }
-
-    public bool IsUnknown { get; }
-
-    public SymbolicCapabilityUnknownReason UnknownReason { get; }
-
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
-
-    public int SourceSpanStart { get; }
-
-    public int SourceSpanLength { get; }
-
-    public int SourceLine { get; }
-
-    public int SourceColumn { get; }
+    public SymbolicCapability Capabilities { get; } = capabilities;
+    public string CapabilityText { get; } = capabilityText ?? string.Empty;
+    public string SiteKind { get; } = siteKind ?? string.Empty;
+    public string OperationKind { get; } = operationKind ?? string.Empty;
+    public string OperationText { get; } = operationText ?? string.Empty;
+    public string SymbolDisplayName { get; } = symbolDisplayName ?? string.Empty;
+    public bool IsTransitive { get; } = isTransitive;
+    public bool IsUnknown { get; } = isUnknown;
+    public SymbolicCapabilityUnknownReason UnknownReason { get; } = unknownReason;
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
+        SymbolicUnknownReasonTaxonomy.ForCapability(unknownReason);
+    public int SourceSpanStart { get; } = sourceSpanStart;
+    public int SourceSpanLength { get; } = sourceSpanLength;
+    public int SourceLine { get; } = sourceLine;
+    public int SourceColumn { get; } = sourceColumn;
 }
 
 internal sealed class SymbolicCapabilityResult : SymbolicMethodResult

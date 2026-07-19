@@ -27,92 +27,50 @@ internal enum SymbolicComplexityUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicComplexityInfo
+internal sealed class SymbolicComplexityInfo(
+    string text,
+    SymbolicComplexityKind kind,
+    bool isConservative,
+    bool isUnknown,
+    bool isRecursiveUnknown)
 {
-    public SymbolicComplexityInfo(
-        string text,
-        SymbolicComplexityKind kind,
-        bool isConservative,
-        bool isUnknown,
-        bool isRecursiveUnknown)
-    {
-        Text = text ?? string.Empty;
-        Kind = kind;
-        IsConservative = isConservative;
-        IsUnknown = isUnknown;
-        IsRecursiveUnknown = isRecursiveUnknown;
-    }
-
-    public string Text { get; }
-
-    public SymbolicComplexityKind Kind { get; }
-
-    public bool IsConservative { get; }
-
-    public bool IsUnknown { get; }
-
-    public bool IsRecursiveUnknown { get; }
+    public string Text { get; } = text ?? string.Empty;
+    public SymbolicComplexityKind Kind { get; } = kind;
+    public bool IsConservative { get; } = isConservative;
+    public bool IsUnknown { get; } = isUnknown;
+    public bool IsRecursiveUnknown { get; } = isRecursiveUnknown;
 }
 
-internal sealed class SymbolicComplexityDriverInfo
+internal sealed class SymbolicComplexityDriverInfo(
+    string kind,
+    string description,
+    int sourceSpanStart,
+    int sourceSpanLength,
+    int sourceLine,
+    int sourceColumn)
 {
-    public SymbolicComplexityDriverInfo(
-        string kind,
-        string description,
-        int sourceSpanStart,
-        int sourceSpanLength,
-        int sourceLine,
-        int sourceColumn)
-    {
-        Kind = kind ?? string.Empty;
-        Description = description ?? string.Empty;
-        SourceSpanStart = sourceSpanStart;
-        SourceSpanLength = sourceSpanLength;
-        SourceLine = sourceLine;
-        SourceColumn = sourceColumn;
-    }
-
-    public string Kind { get; }
-
-    public string Description { get; }
-
-    public int SourceSpanStart { get; }
-
-    public int SourceSpanLength { get; }
-
-    public int SourceLine { get; }
-
-    public int SourceColumn { get; }
+    public string Kind { get; } = kind ?? string.Empty;
+    public string Description { get; } = description ?? string.Empty;
+    public int SourceSpanStart { get; } = sourceSpanStart;
+    public int SourceSpanLength { get; } = sourceSpanLength;
+    public int SourceLine { get; } = sourceLine;
+    public int SourceColumn { get; } = sourceColumn;
 }
 
-internal sealed class SymbolicComplexityCalleeInfo
+internal sealed class SymbolicComplexityCalleeInfo(
+    string methodDisplayName,
+    string complexityText,
+    SymbolicComplexityKind kind,
+    bool isConservative,
+    SymbolicComplexityUnknownReason unknownReason)
 {
-    public SymbolicComplexityCalleeInfo(
-        string methodDisplayName,
-        string complexityText,
-        SymbolicComplexityKind kind,
-        bool isConservative,
-        SymbolicComplexityUnknownReason unknownReason)
-    {
-        MethodDisplayName = methodDisplayName ?? string.Empty;
-        ComplexityText = complexityText ?? string.Empty;
-        Kind = kind;
-        IsConservative = isConservative;
-        UnknownReason = unknownReason;
-        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForComplexity(unknownReason);
-    }
-
-    public string MethodDisplayName { get; }
-
-    public string ComplexityText { get; }
-
-    public SymbolicComplexityKind Kind { get; }
-
-    public bool IsConservative { get; }
-
-    public SymbolicComplexityUnknownReason UnknownReason { get; }
-
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
+    public string MethodDisplayName { get; } = methodDisplayName ?? string.Empty;
+    public string ComplexityText { get; } = complexityText ?? string.Empty;
+    public SymbolicComplexityKind Kind { get; } = kind;
+    public bool IsConservative { get; } = isConservative;
+    public SymbolicComplexityUnknownReason UnknownReason { get; } = unknownReason;
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
+        SymbolicUnknownReasonTaxonomy.ForComplexity(unknownReason);
 }
 
 internal sealed class SymbolicComplexityResult : SymbolicMethodResult

@@ -153,14 +153,19 @@ Tests are excluded from the metric and must not be deleted.
   inference. Removed the test-impact generator's duplicate 19-module table and
   unused generated project graph; selector closure now follows module identities
   directly, and all 40 selector characterizations preserve conservative routing.
+- [x] Condensed 20 internal immutable query, witness, capability, complexity,
+  budget, cache, and summary carriers around primary constructors. Preserved
+  class identity and normalization semantics, and made the two witness property
+  orders that mix stored and computed values explicit so CLI JSON remains
+  byte-identical instead of depending on compiler metadata order.
 
 ## Current evidence
 
-- Maintained production: 103,694 lines (99,619 C#, 3,189 scripts, and 886
-  specifications); net reduction: 3,932 lines; remaining reduction: 16,068.
-  This tranche removed 48 maintained lines without deleting tests.
+- Maintained production: 103,491 lines (99,416 C#, 3,189 scripts, and 886
+  specifications); net reduction: 4,135 lines; remaining reduction: 15,865.
+  This tranche removed 203 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,157 passing tests and two documented skips.
+- Six lanes: 6,156 passing tests and two documented skips.
 
 ## Milestones
 

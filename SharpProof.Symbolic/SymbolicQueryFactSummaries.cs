@@ -42,20 +42,12 @@ internal static class SymbolicCompactProjection
     }
 }
 
-internal readonly struct SymbolicBoundedProjection<T>
+internal readonly struct SymbolicBoundedProjection<T>(IReadOnlyList<T> items, int totalCount)
 {
-    public SymbolicBoundedProjection(IReadOnlyList<T> items, int totalCount)
-    {
-        Items = items ?? throw new ArgumentNullException(nameof(items));
-        if (totalCount < items.Count)
-            throw new ArgumentOutOfRangeException(nameof(totalCount));
-
-        TotalCount = totalCount;
-    }
-
-    public IReadOnlyList<T> Items { get; }
-
-    public int TotalCount { get; }
+    public IReadOnlyList<T> Items { get; } = items ?? throw new ArgumentNullException(nameof(items));
+    public int TotalCount { get; } = totalCount >= items.Count
+        ? totalCount
+        : throw new ArgumentOutOfRangeException(nameof(totalCount));
 
     public int OmittedCount => TotalCount - Items.Count;
 
@@ -505,27 +497,16 @@ internal sealed class SymbolicSourceQueryFilter
     }
 }
 
-internal sealed class SymbolicReachabilitySummary
+internal sealed class SymbolicReachabilitySummary(
+    int notCheckedCount,
+    int unknownCount,
+    int reachableCount,
+    int unreachableCount)
 {
-    public SymbolicReachabilitySummary(
-        int notCheckedCount,
-        int unknownCount,
-        int reachableCount,
-        int unreachableCount)
-    {
-        NotCheckedCount = notCheckedCount;
-        UnknownCount = unknownCount;
-        ReachableCount = reachableCount;
-        UnreachableCount = unreachableCount;
-    }
-
-    public int NotCheckedCount { get; }
-
-    public int UnknownCount { get; }
-
-    public int ReachableCount { get; }
-
-    public int UnreachableCount { get; }
+    public int NotCheckedCount { get; } = notCheckedCount;
+    public int UnknownCount { get; } = unknownCount;
+    public int ReachableCount { get; } = reachableCount;
+    public int UnreachableCount { get; } = unreachableCount;
 
     public static SymbolicReachabilitySummary FromProgramPoints(
         IEnumerable<SymbolicProgramPointResult> programPoints)
@@ -561,31 +542,18 @@ internal sealed class SymbolicReachabilitySummary
     }
 }
 
-internal sealed class SymbolicProofOutcomeSummary
+internal sealed class SymbolicProofOutcomeSummary(
+    int totalCount,
+    int unknownCount,
+    int provenTrueCount,
+    int provenFalseCount,
+    int unreachableCount)
 {
-    public SymbolicProofOutcomeSummary(
-        int totalCount,
-        int unknownCount,
-        int provenTrueCount,
-        int provenFalseCount,
-        int unreachableCount)
-    {
-        TotalCount = totalCount;
-        UnknownCount = unknownCount;
-        ProvenTrueCount = provenTrueCount;
-        ProvenFalseCount = provenFalseCount;
-        UnreachableCount = unreachableCount;
-    }
-
-    public int TotalCount { get; }
-
-    public int UnknownCount { get; }
-
-    public int ProvenTrueCount { get; }
-
-    public int ProvenFalseCount { get; }
-
-    public int UnreachableCount { get; }
+    public int TotalCount { get; } = totalCount;
+    public int UnknownCount { get; } = unknownCount;
+    public int ProvenTrueCount { get; } = provenTrueCount;
+    public int ProvenFalseCount { get; } = provenFalseCount;
+    public int UnreachableCount { get; } = unreachableCount;
 
     public static SymbolicProofOutcomeSummary FromProofs(
         IEnumerable<SymbolicConditionProofResult> proofs)
@@ -626,31 +594,20 @@ internal sealed class SymbolicProofOutcomeSummary
     }
 }
 
-internal sealed class SymbolicProgramPointSummary
+internal sealed class SymbolicProgramPointSummary(
+    int programPointCount,
+    int totalPathConditionCount,
+    int maxPathConditionCount,
+    SymbolicReachabilitySummary reachability,
+    SymbolicProofOutcomeSummary proofOutcomes)
 {
-    public SymbolicProgramPointSummary(
-        int programPointCount,
-        int totalPathConditionCount,
-        int maxPathConditionCount,
-        SymbolicReachabilitySummary reachability,
-        SymbolicProofOutcomeSummary proofOutcomes)
-    {
-        ProgramPointCount = programPointCount;
-        TotalPathConditionCount = totalPathConditionCount;
-        MaxPathConditionCount = maxPathConditionCount;
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
-    }
-
-    public int ProgramPointCount { get; }
-
-    public int TotalPathConditionCount { get; }
-
-    public int MaxPathConditionCount { get; }
-
-    public SymbolicReachabilitySummary Reachability { get; }
-
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public int ProgramPointCount { get; } = programPointCount;
+    public int TotalPathConditionCount { get; } = totalPathConditionCount;
+    public int MaxPathConditionCount { get; } = maxPathConditionCount;
+    public SymbolicReachabilitySummary Reachability { get; } =
+        reachability ?? throw new ArgumentNullException(nameof(reachability));
+    public SymbolicProofOutcomeSummary ProofOutcomes { get; } =
+        proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
 
     public static SymbolicProgramPointSummary FromProgramPoints(
         IEnumerable<SymbolicProgramPointResult> programPoints)
@@ -895,23 +852,14 @@ internal sealed class SymbolicConditionProofSummary
     }
 }
 
-internal sealed class SymbolicConditionProofReasonSummary
+internal sealed class SymbolicConditionProofReasonSummary(
+    SymbolicTruthValue truthValue,
+    string reason,
+    int count)
 {
-    public SymbolicConditionProofReasonSummary(
-        SymbolicTruthValue truthValue,
-        string reason,
-        int count)
-    {
-        TruthValue = truthValue;
-        Reason = reason ?? string.Empty;
-        Count = count;
-    }
-
-    public SymbolicTruthValue TruthValue { get; }
-
-    public string Reason { get; }
-
-    public int Count { get; }
+    public SymbolicTruthValue TruthValue { get; } = truthValue;
+    public string Reason { get; } = reason ?? string.Empty;
+    public int Count { get; } = count;
 
     public string GetDisplayReason()
     {
