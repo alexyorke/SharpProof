@@ -8,13 +8,11 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowEngine
 {
-    internal sealed class ExceptionFlowResult(
-        ImmutableArray<ExceptionFlowSite> sites,
-        ImmutableArray<SymbolicRuntimeHazard> rawHazards)
+    internal sealed record ExceptionFlowResult(
+        ImmutableArray<ExceptionFlowSite> Sites,
+        ImmutableArray<SymbolicRuntimeHazard> RawHazards)
     {
-        public ImmutableArray<ExceptionFlowSite> Sites { get; } = sites;
-        public ImmutableArray<SymbolicRuntimeHazard> RawHazards { get; } = rawHazards;
-        public ExceptionEvidenceProjection Evidence { get; } = new(sites);
+        public ExceptionEvidenceProjection Evidence { get; } = new(Sites);
     }
 
     internal sealed class ExceptionFlowSite(

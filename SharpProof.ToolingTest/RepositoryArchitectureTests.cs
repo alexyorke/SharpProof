@@ -348,6 +348,28 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void AnalysisCarriers_UsePrimaryOwnershipInsteadOfCopyConstructors()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var carriers = new[]
+        {
+            ("SharpProof.Analyzer/Engine/Rules/PurityAnalysisContext.cs", "record PurityAnalysisContext("),
+            ("SharpProof.Analyzer/MethodAnalysisSnapshot.cs", "record MethodAnalysisSnapshot("),
+            ("SharpProof.Analyzer/EffectSummaryEntryTrustMetadata.cs", "class EffectSummaryEntryTrustMetadata("),
+            ("SharpProof.Symbolic/SymbolicSourceInput.cs", "record SymbolicSourceInput("),
+            ("SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs", "class SmtAnalysisHealth("),
+            ("Tools/SharpProof.EffectSummary/EffectSummaryIlAnalysisContext.cs",
+                "record EffectSummaryIlAnalysisContext(")
+        };
+
+        foreach (var (relativePath, declaration) in carriers)
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.That(source, Does.Contain(declaration), relativePath);
+        }
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

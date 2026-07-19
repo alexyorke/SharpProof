@@ -332,21 +332,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     }
 }
 
-internal sealed class SymbolicRuntimeHazardQueryOptions
+internal sealed class SymbolicRuntimeHazardQueryOptions(
+    bool includeUnprovenCandidates = false,
+    IEnumerable<SymbolicRuntimeHazardKind>? kinds = null)
 {
     public static readonly SymbolicRuntimeHazardQueryOptions Default = new();
 
-    public SymbolicRuntimeHazardQueryOptions(
-        bool includeUnprovenCandidates = false,
-        IEnumerable<SymbolicRuntimeHazardKind>? kinds = null)
-    {
-        IncludeUnprovenCandidates = includeUnprovenCandidates;
-        Kinds = kinds?.ToImmutableHashSet() ?? ImmutableHashSet<SymbolicRuntimeHazardKind>.Empty;
-    }
-
-    public bool IncludeUnprovenCandidates { get; }
-
-    public ImmutableHashSet<SymbolicRuntimeHazardKind> Kinds { get; }
+    public bool IncludeUnprovenCandidates { get; } = includeUnprovenCandidates;
+    public ImmutableHashSet<SymbolicRuntimeHazardKind> Kinds { get; } =
+        kinds?.ToImmutableHashSet() ?? ImmutableHashSet<SymbolicRuntimeHazardKind>.Empty;
 
     public bool Includes(SymbolicRuntimeHazardKind kind)
     {

@@ -673,14 +673,14 @@ internal sealed class SymbolicOperationTransferModelTests
         var context = new PurityAnalysisContext(
             fixture.SemanticModel,
             fixture.SemanticModel.Compilation.GetSpecialType(SpecialType.System_Object),
-            pureAttributeSymbol: null,
-            allowSynchronizationAttributeSymbol: null,
+            PureAttributeSymbol: null,
+            AllowSynchronizationAttributeSymbol: null,
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
             ImmutableList<IPurityRule>.Empty,
             CancellationToken.None,
-            purityService: null,
+            PurityService: null,
             smtAnalysis);
         var created = PurityAssignmentEnvelope.TryCreate(operation, initialState, context, out var envelope);
         var purity = PurityAssignmentTransition.Apply(envelope, initialState, context);
@@ -1255,14 +1255,14 @@ internal sealed class SymbolicOperationTransferModelTests
         new(
             fixture.SemanticModel,
             fixture.Compilation.GetSpecialType(SpecialType.System_Object),
-            pureAttributeSymbol: null,
-            allowSynchronizationAttributeSymbol: null,
+            PureAttributeSymbol: null,
+            AllowSynchronizationAttributeSymbol: null,
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
             ImmutableList<IPurityRule>.Empty,
             CancellationToken.None,
-            purityService: null,
+            PurityService: null,
             smtAnalysis);
 
     private static ImmutableArray<SymbolicFact> OwnedFacts(

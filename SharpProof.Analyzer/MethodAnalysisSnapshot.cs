@@ -6,37 +6,18 @@ using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
-internal sealed class MethodAnalysisSnapshot
+internal sealed record MethodAnalysisSnapshot(
+    SymbolicMethodAnalysisInput Input,
+    ImmutableArray<IOperation> OperationBlocks,
+    IOperation? RootOperation,
+    ImmutableArray<IOperation> VisibleOperations,
+    MethodBodySemanticFacts SemanticFacts)
 {
-    private MethodAnalysisSnapshot(
-        SymbolicMethodAnalysisInput input,
-        ImmutableArray<IOperation> operationBlocks,
-        IOperation? rootOperation,
-        ImmutableArray<IOperation> visibleOperations,
-        MethodBodySemanticFacts semanticFacts)
-    {
-        Input = input;
-        OperationBlocks = operationBlocks;
-        RootOperation = rootOperation;
-        VisibleOperations = visibleOperations;
-        SemanticFacts = semanticFacts;
-    }
-
-    internal SymbolicMethodAnalysisInput Input { get; }
-
     internal IMethodSymbol MethodSymbol => Input.MethodSymbol;
 
     internal SyntaxNode Declaration => Input.Declaration;
 
     internal SemanticModel SemanticModel => Input.SemanticModel;
-
-    internal ImmutableArray<IOperation> OperationBlocks { get; }
-
-    internal IOperation? RootOperation { get; }
-
-    internal ImmutableArray<IOperation> VisibleOperations { get; }
-
-    internal MethodBodySemanticFacts SemanticFacts { get; }
 
     internal SymbolicSourceInput Source => Input.Source;
 
@@ -73,29 +54,9 @@ internal sealed class MethodAnalysisSnapshot
     }
 }
 
-internal sealed class MethodBodySemanticFacts
-{
-    internal MethodBodySemanticFacts(
-        int operationBlockCount,
-        int visibleOperationCount,
-        int returnOperationCount,
-        bool containsLocalFunction,
-        bool hasRootOperation)
-    {
-        OperationBlockCount = operationBlockCount;
-        VisibleOperationCount = visibleOperationCount;
-        ReturnOperationCount = returnOperationCount;
-        ContainsLocalFunction = containsLocalFunction;
-        HasRootOperation = hasRootOperation;
-    }
-
-    internal int OperationBlockCount { get; }
-
-    internal int VisibleOperationCount { get; }
-
-    internal int ReturnOperationCount { get; }
-
-    internal bool ContainsLocalFunction { get; }
-
-    internal bool HasRootOperation { get; }
-}
+internal sealed record MethodBodySemanticFacts(
+    int OperationBlockCount,
+    int VisibleOperationCount,
+    int ReturnOperationCount,
+    bool ContainsLocalFunction,
+    bool HasRootOperation);

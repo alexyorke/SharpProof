@@ -268,77 +268,29 @@ internal static class BclPurityFallbackHeuristics
         return new Classification(guess, "low", reason, "bcl_fallback_" + category);
     }
 
-    public readonly struct Shape
-    {
-        public Shape(
-            string namespaceName,
-            string typeName,
-            string memberName,
-            bool isFrameworkMetadataSymbol,
-            bool isProperty,
-            bool isField,
-            bool isConstructor,
-            bool isStatic,
-            bool returnsVoid,
-            bool returnsByRef,
-            bool hasRefOrOutParameter,
-            bool hasValueLikeReturn,
-            bool hasValueTypeContainingType,
-            bool hasOnlyValueLikeOrReadOnlyViewParameters,
-            bool isSetterOnlyProperty,
-            bool isReadOnlyField = false)
-        {
-            NamespaceName = namespaceName ?? string.Empty;
-            TypeName = typeName ?? string.Empty;
-            MemberName = memberName ?? string.Empty;
-            IsFrameworkMetadataSymbol = isFrameworkMetadataSymbol;
-            IsProperty = isProperty;
-            IsField = isField;
-            IsConstructor = isConstructor;
-            IsStatic = isStatic;
-            ReturnsVoid = returnsVoid;
-            ReturnsByRef = returnsByRef;
-            HasRefOrOutParameter = hasRefOrOutParameter;
-            HasValueLikeReturn = hasValueLikeReturn;
-            HasValueTypeContainingType = hasValueTypeContainingType;
-            HasOnlyValueLikeOrReadOnlyViewParameters = hasOnlyValueLikeOrReadOnlyViewParameters;
-            IsSetterOnlyProperty = isSetterOnlyProperty;
-            IsReadOnlyField = isReadOnlyField;
-        }
+    public readonly record struct Shape(
+        string NamespaceName,
+        string TypeName,
+        string MemberName,
+        bool IsFrameworkMetadataSymbol,
+        bool IsProperty,
+        bool IsField,
+        bool IsConstructor,
+        bool IsStatic,
+        bool ReturnsVoid,
+        bool ReturnsByRef,
+        bool HasRefOrOutParameter,
+        bool HasValueLikeReturn,
+        bool HasValueTypeContainingType,
+        bool HasOnlyValueLikeOrReadOnlyViewParameters,
+        bool IsSetterOnlyProperty,
+        bool IsReadOnlyField = false);
 
-        public string NamespaceName { get; }
-        public string TypeName { get; }
-        public string MemberName { get; }
-        public bool IsFrameworkMetadataSymbol { get; }
-        public bool IsProperty { get; }
-        public bool IsField { get; }
-        public bool IsConstructor { get; }
-        public bool IsStatic { get; }
-        public bool ReturnsVoid { get; }
-        public bool ReturnsByRef { get; }
-        public bool HasRefOrOutParameter { get; }
-        public bool HasValueLikeReturn { get; }
-        public bool HasValueTypeContainingType { get; }
-        public bool HasOnlyValueLikeOrReadOnlyViewParameters { get; }
-        public bool IsSetterOnlyProperty { get; }
-        public bool IsReadOnlyField { get; }
-    }
-
-    public readonly struct Classification
-    {
-        public Classification(string guess, string confidence, string reason, string category)
-        {
-            Guess = guess;
-            Confidence = confidence;
-            Reason = reason;
-            Category = category;
-        }
-
-        public string Guess { get; }
-        public string Confidence { get; }
-        public string Reason { get; }
-        public string Category { get; }
-    }
+    public readonly record struct Classification(
+        string Guess,
+        string Confidence,
+        string Reason,
+        string Category);
 
     private static class KnownPrimitiveOrValueAliases
     {

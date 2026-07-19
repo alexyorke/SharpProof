@@ -17,96 +17,62 @@ internal enum SmtSolverContextRecycleScope
     AllThreadsOnNextUse
 }
 
-internal sealed class SmtSolverLifecycleOptions
+internal sealed class SmtSolverLifecycleOptions(
+    int maxTransientRetries = 1,
+    bool recycleContextOnTransientFailure = true,
+    bool disposeCurrentThreadContextOnServiceDispose = true)
 {
     public static readonly SmtSolverLifecycleOptions Default = new();
 
-    public SmtSolverLifecycleOptions(
-        int maxTransientRetries = 1,
-        bool recycleContextOnTransientFailure = true,
-        bool disposeCurrentThreadContextOnServiceDispose = true)
+    public int MaxTransientRetries { get; } = ValidateRetryCount(maxTransientRetries);
+    public bool RecycleContextOnTransientFailure { get; } = recycleContextOnTransientFailure;
+    public bool DisposeCurrentThreadContextOnServiceDispose { get; } = disposeCurrentThreadContextOnServiceDispose;
+
+    private static int ValidateRetryCount(int value)
     {
-        if (maxTransientRetries < 0)
+        if (value < 0)
             throw new ArgumentOutOfRangeException(
                 nameof(maxTransientRetries),
                 "Transient retry count cannot be negative.");
-
-        MaxTransientRetries = maxTransientRetries;
-        RecycleContextOnTransientFailure = recycleContextOnTransientFailure;
-        DisposeCurrentThreadContextOnServiceDispose = disposeCurrentThreadContextOnServiceDispose;
+        return value;
     }
-
-    public int MaxTransientRetries { get; }
-
-    public bool RecycleContextOnTransientFailure { get; }
-
-    public bool DisposeCurrentThreadContextOnServiceDispose { get; }
 }
 
-internal sealed class SmtAnalysisHealth
+internal sealed class SmtAnalysisHealth(
+    SmtAnalysisHealthState state,
+    string lastFailureCode,
+    int consecutiveTransientFailureCount,
+    int transientRetryCount,
+    int recoveredTransientFailureCount,
+    int contextRecycleCount,
+    long contextGeneration)
 {
-    internal SmtAnalysisHealth(
-        SmtAnalysisHealthState state,
-        string lastFailureCode,
-        int consecutiveTransientFailureCount,
-        int transientRetryCount,
-        int recoveredTransientFailureCount,
-        int contextRecycleCount,
-        long contextGeneration)
-    {
-        State = state;
-        LastFailureCode = lastFailureCode ?? string.Empty;
-        ConsecutiveTransientFailureCount = consecutiveTransientFailureCount;
-        TransientRetryCount = transientRetryCount;
-        RecoveredTransientFailureCount = recoveredTransientFailureCount;
-        ContextRecycleCount = contextRecycleCount;
-        ContextGeneration = contextGeneration;
-    }
-
-    public SmtAnalysisHealthState State { get; }
+    public SmtAnalysisHealthState State { get; } = state;
 
     public bool IsAvailable => State == SmtAnalysisHealthState.Ready;
 
     public bool IsPermanentlyUnavailable => State == SmtAnalysisHealthState.PermanentlyUnavailable;
 
-    public string LastFailureCode { get; }
-
-    public int ConsecutiveTransientFailureCount { get; }
-
-    public int TransientRetryCount { get; }
-
-    public int RecoveredTransientFailureCount { get; }
-
-    public int ContextRecycleCount { get; }
-
-    public long ContextGeneration { get; }
+    public string LastFailureCode { get; } = lastFailureCode ?? string.Empty;
+    public int ConsecutiveTransientFailureCount { get; } = consecutiveTransientFailureCount;
+    public int TransientRetryCount { get; } = transientRetryCount;
+    public int RecoveredTransientFailureCount { get; } = recoveredTransientFailureCount;
+    public int ContextRecycleCount { get; } = contextRecycleCount;
+    public long ContextGeneration { get; } = contextGeneration;
 }
 
-internal sealed class SmtSolverContextRecycleResult
+internal sealed class SmtSolverContextRecycleResult(
+    SmtSolverContextRecycleScope scope,
+    bool disposedCurrentThreadContext,
+    long requestedGeneration,
+    int localCacheEntryCount,
+    int sharedCacheEntryCount)
 {
-    internal SmtSolverContextRecycleResult(
-        SmtSolverContextRecycleScope scope,
-        bool disposedCurrentThreadContext,
-        long requestedGeneration,
-        int localCacheEntryCount,
-        int sharedCacheEntryCount)
-    {
-        Scope = scope;
-        DisposedCurrentThreadContext = disposedCurrentThreadContext;
-        RequestedGeneration = requestedGeneration;
-        LocalCacheEntryCount = localCacheEntryCount;
-        SharedCacheEntryCount = sharedCacheEntryCount;
-    }
-
-    public SmtSolverContextRecycleScope Scope { get; }
-
-    public bool DisposedCurrentThreadContext { get; }
-
-    public long RequestedGeneration { get; }
-
-    public int LocalCacheEntryCount { get; }
-
-    public int SharedCacheEntryCount { get; }
+    public SmtSolverContextRecycleScope Scope { get; } = scope;
+    public bool DisposedCurrentThreadContext { get; } = disposedCurrentThreadContext;
+    public long RequestedGeneration { get; } = requestedGeneration;
+    public int LocalCacheEntryCount { get; } = localCacheEntryCount;
+    public int SharedCacheEntryCount { get; } = sharedCacheEntryCount;
 }
 
 internal interface ISmtProofSearchSession : IDisposable

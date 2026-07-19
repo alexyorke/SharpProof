@@ -239,14 +239,22 @@ Tests are excluded from the metric and must not be deleted.
   through feature-specific adapters. Registry value kinds now drive one
   validation path, and focused configuration tests preserve defaults, aliases,
   tree overrides, invalid-value diagnostics, and suppression behavior.
+- [x] Consolidated the remaining constructor-only analysis carriers around
+  primary constructors and immutable records. Symbolic source inputs, SMT
+  lifecycle snapshots, analyzer method/purity contexts, effect-summary trust
+  and IL contexts, exception-flow results, and BCL fallback shapes no longer
+  duplicate parameter, assignment, and property ownership. Property names,
+  normalization, JSON evidence, cache behavior, and fallback classifications
+  remain unchanged; architecture coverage prevents the copy-constructor forms
+  from returning.
 
 ## Current evidence
 
-- Maintained production: 100,492 lines (96,573 C#, 3,189 scripts, and 730
-  specifications); net reduction: 7,134 lines; remaining reduction: 12,866.
-  This tranche removed 203 maintained lines without deleting tests.
+- Maintained production: 100,287 lines (96,368 C#, 3,189 scripts, and 730
+  specifications); net reduction: 7,339 lines; remaining reduction: 12,661.
+  This tranche removed 205 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,181 passing tests and two documented skips.
+- Six lanes: 6,182 passing tests and two documented skips.
 
 ## Milestones
 

@@ -2,43 +2,24 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer;
 
-internal sealed class EffectSummaryEntryTrustMetadata
+internal sealed class EffectSummaryEntryTrustMetadata(
+    SummaryAssemblyIdentity? assemblyIdentity,
+    SummaryMethodIdentity? methodIdentity,
+    EffectSummaryArtifactSource? artifactSource,
+    int sourcePriority,
+    int builtInSourcePriority,
+    int additionalSourcePriority,
+    string? sourcePath,
+    EffectSummaryCompatibilityReporter? compatibilityReporter)
 {
-    internal EffectSummaryEntryTrustMetadata(
-        SummaryAssemblyIdentity? assemblyIdentity,
-        SummaryMethodIdentity? methodIdentity,
-        EffectSummaryArtifactSource? artifactSource,
-        int sourcePriority,
-        int builtInSourcePriority,
-        int additionalSourcePriority,
-        string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
-        AssemblyIdentity = assemblyIdentity;
-        MethodIdentity = methodIdentity;
-        ArtifactSource = artifactSource;
-        SourcePriority = sourcePriority;
-        BuiltInSourcePriority = builtInSourcePriority;
-        AdditionalSourcePriority = additionalSourcePriority;
-        SourcePath = sourcePath;
-        CompatibilityReporter = compatibilityReporter;
-    }
-
-    internal SummaryAssemblyIdentity? AssemblyIdentity { get; }
-
-    internal SummaryMethodIdentity? MethodIdentity { get; }
-
-    internal int SourcePriority { get; }
-
-    internal string? SourcePath { get; }
-
-    private EffectSummaryArtifactSource? ArtifactSource { get; }
-
-    private int BuiltInSourcePriority { get; }
-
-    private int AdditionalSourcePriority { get; }
-
-    private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
+    internal SummaryAssemblyIdentity? AssemblyIdentity { get; } = assemblyIdentity;
+    internal SummaryMethodIdentity? MethodIdentity { get; } = methodIdentity;
+    internal int SourcePriority { get; } = sourcePriority;
+    internal string? SourcePath { get; } = sourcePath;
+    private EffectSummaryArtifactSource? ArtifactSource { get; } = artifactSource;
+    private int BuiltInSourcePriority { get; } = builtInSourcePriority;
+    private int AdditionalSourcePriority { get; } = additionalSourcePriority;
+    private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; } = compatibilityReporter;
 
     internal bool IsTrustedFor(
         IMethodSymbol methodSymbol,

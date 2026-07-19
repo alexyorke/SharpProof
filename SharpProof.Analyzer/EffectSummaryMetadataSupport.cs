@@ -326,20 +326,14 @@ internal sealed class EffectSummaryIdentityResolver
     }
 }
 
-internal sealed class SummaryAssemblyIdentity
+internal sealed class SummaryAssemblyIdentity(
+    string? assemblyName,
+    string? assemblySha256,
+    string? moduleVersionId)
 {
-    public SummaryAssemblyIdentity(string? assemblyName, string? assemblySha256, string? moduleVersionId)
-    {
-        AssemblyName = assemblyName;
-        AssemblySha256 = assemblySha256;
-        ModuleVersionId = moduleVersionId;
-    }
-
-    public string? AssemblyName { get; }
-
-    public string? AssemblySha256 { get; }
-
-    public string? ModuleVersionId { get; }
+    public string? AssemblyName { get; } = assemblyName;
+    public string? AssemblySha256 { get; } = assemblySha256;
+    public string? ModuleVersionId { get; } = moduleVersionId;
 
     public bool IsComplete =>
         !string.IsNullOrWhiteSpace(AssemblyName) &&
@@ -400,17 +394,10 @@ internal sealed class SummaryAssemblyIdentity
     }
 }
 
-internal sealed class SummaryMethodIdentity
+internal sealed class SummaryMethodIdentity(string? metadataToken, string? methodBodySha256)
 {
-    public SummaryMethodIdentity(string? metadataToken, string? methodBodySha256)
-    {
-        MetadataToken = metadataToken;
-        MethodBodySha256 = methodBodySha256;
-    }
-
-    public string? MetadataToken { get; }
-
-    public string? MethodBodySha256 { get; }
+    public string? MetadataToken { get; } = metadataToken;
+    public string? MethodBodySha256 { get; } = methodBodySha256;
 
     public bool MatchesMetadataToken(ActualMethodIdentity? actualMethodIdentity)
     {
@@ -525,17 +512,12 @@ internal sealed class ActualMethodIdentity
         !Attributes.HasFlag(MethodAttributes.Static);
 }
 
-internal sealed class MethodBodyHashProvider
+internal sealed class MethodBodyHashProvider(string assemblyPath)
 {
-    private readonly string _assemblyPath;
+    private readonly string _assemblyPath = assemblyPath;
     private readonly Dictionary<int, string?> _cache = new();
     private readonly object _lock = new();
     private byte[]? _assemblyBytes;
-
-    public MethodBodyHashProvider(string assemblyPath)
-    {
-        _assemblyPath = assemblyPath;
-    }
 
     public string? ComputeMethodBodySha256(int relativeVirtualAddress)
     {
@@ -584,27 +566,16 @@ internal sealed class MethodBodyHashProvider
     }
 }
 
-internal sealed class ActualAssemblyIdentity
+internal sealed class ActualAssemblyIdentity(
+    string assemblyName,
+    string assemblySha256,
+    string moduleVersionId,
+    string? assemblyPath = null)
 {
-    public ActualAssemblyIdentity(
-        string assemblyName,
-        string assemblySha256,
-        string moduleVersionId,
-        string? assemblyPath = null)
-    {
-        AssemblyName = assemblyName;
-        AssemblySha256 = assemblySha256;
-        ModuleVersionId = moduleVersionId;
-        AssemblyPath = assemblyPath;
-    }
-
-    public string AssemblyName { get; }
-
-    public string AssemblySha256 { get; }
-
-    public string ModuleVersionId { get; }
-
-    public string? AssemblyPath { get; }
+    public string AssemblyName { get; } = assemblyName;
+    public string AssemblySha256 { get; } = assemblySha256;
+    public string ModuleVersionId { get; } = moduleVersionId;
+    public string? AssemblyPath { get; } = assemblyPath;
 
     public static ActualAssemblyIdentity? FromFile(string path)
     {
