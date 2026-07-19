@@ -17,10 +17,7 @@ internal static class InferredContractSuggestionAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        var options = AnalyzerConfiguration.GetInferredContractSuggestionOptions(
-            context.Options,
-            context.Node.SyntaxTree,
-            session.Configuration.InferredContractSuggestions);
+        var options = context.Configuration.InferredContractSuggestions;
         if (!options.IsEnabled ||
             context.Snapshot.RootOperation == null ||
             !IsSupportedDeclaration(context.Node) ||

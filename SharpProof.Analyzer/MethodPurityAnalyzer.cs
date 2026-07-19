@@ -12,9 +12,6 @@ internal static class MethodPurityAnalyzer
     internal static void AnalyzeSymbolForPurity(
         MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
-        MissingPuritySuggestionOptions missingPuritySuggestions,
-        bool emitExplanations,
-        bool reportBclFallbackGuesses,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
@@ -161,10 +158,7 @@ internal static class MethodPurityAnalyzer
         if (methodSymbol.IsAbstract) return;
 
 
-        var effectiveMissingPuritySuggestions = AnalyzerConfiguration.GetMissingPuritySuggestionOptions(
-            context.Options,
-            context.Node.SyntaxTree,
-            missingPuritySuggestions);
+        var effectiveMissingPuritySuggestions = context.Configuration.MissingPuritySuggestions;
 
         if (!hasPurityEnforcementAttribute &&
             (hasImpureAttribute || !effectiveMissingPuritySuggestions.IsEnabled))
@@ -194,14 +188,8 @@ internal static class MethodPurityAnalyzer
         }
         var isPure = purityResult.IsPure;
 
-        var effectiveEmitExplanations = AnalyzerConfiguration.GetEmitExplanations(
-            context.Options,
-            context.Node.SyntaxTree,
-            emitExplanations);
-        var effectiveReportBclFallbackGuesses = AnalyzerConfiguration.GetReportBclFallbackGuesses(
-            context.Options,
-            context.Node.SyntaxTree,
-            reportBclFallbackGuesses);
+        var effectiveEmitExplanations = context.Configuration.EmitExplanations;
+        var effectiveReportBclFallbackGuesses = context.Configuration.ReportBclFallbackGuesses;
 
         if (!isPure && hasPurityEnforcementAttribute)
         {

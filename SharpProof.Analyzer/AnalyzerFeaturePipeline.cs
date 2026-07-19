@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 
@@ -68,9 +69,6 @@ internal static class AnalyzerFeaturePipeline
                 MethodPurityAnalyzer.AnalyzeSymbolForPurity(
                     context,
                     session.PurityService,
-                    session.Configuration.MissingPuritySuggestions,
-                    session.Configuration.EmitExplanations,
-                    session.Configuration.ReportBclFallbackGuesses,
                     session.Baseline,
                     session.AttributePolicy);
 
@@ -108,7 +106,6 @@ internal static class AnalyzerFeaturePipeline
             if (features.Includes(AnalyzerFeatures.Exceptions))
                 ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
                     context,
-                    session.Configuration,
                     session.ExceptionSummaryCatalog,
                     session.PurityService,
                     session.Baseline,
@@ -147,7 +144,10 @@ internal static class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
         methodContext = new MethodBodyAnalysisContext(
             state,
-            context.Options,
+            AnalyzerConfiguration.GetTreeConfiguration(
+                context.Options,
+                declaration.SyntaxTree,
+                session.Configuration),
             context.CancellationToken,
             reportDiagnostic);
         return true;
@@ -178,7 +178,10 @@ internal static class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
         methodContext = new MethodBodyAnalysisContext(
             state,
-            context.Options,
+            AnalyzerConfiguration.GetTreeConfiguration(
+                context.Options,
+                context.Node.SyntaxTree,
+                session.Configuration),
             context.CancellationToken,
             reportDiagnostic);
         return true;

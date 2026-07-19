@@ -27,28 +27,18 @@ internal static partial class ExceptionFlowAnalyzer
 
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
-        AnalyzerConfiguration config,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        var runtimeHazardMode = AnalyzerConfiguration.GetRuntimeHazardMode(
-            context.Options,
-            context.Node.SyntaxTree,
-            config.RuntimeHazardMode);
-        var reportMethodSummaries = AnalyzerConfiguration.GetReportExceptions(
-                                        context.Options,
-                                        context.Node.SyntaxTree,
-                                        config.ReportExceptions) ||
-                                    AnalyzerConfiguration.RuntimeHazardReportsMethodSummaries(runtimeHazardMode);
-        var reportCheckedExceptionSites = AnalyzerConfiguration.GetCheckedExceptions(
-                                              context.Options,
-                                              context.Node.SyntaxTree,
-                                              config.CheckedExceptions) ||
-                                          AnalyzerConfiguration.RuntimeHazardReportsSites(runtimeHazardMode);
+        var runtimeHazardMode = context.Configuration.RuntimeHazardMode;
+        var reportMethodSummaries = context.Configuration.ReportExceptions ||
+                                    (runtimeHazardMode & RuntimeHazardMode.Summaries) != 0;
+        var reportCheckedExceptionSites = context.Configuration.CheckedExceptions ||
+                                          (runtimeHazardMode & RuntimeHazardMode.Sites) != 0;
         var reportUnknownRuntimeHazards =
-            AnalyzerConfiguration.RuntimeHazardReportsUnknownCandidates(runtimeHazardMode);
+            (runtimeHazardMode & RuntimeHazardMode.Unknowns) != 0;
 
         var methodSymbol = context.MethodSymbol;
 

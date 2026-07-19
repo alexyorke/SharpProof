@@ -233,19 +233,25 @@ Tests are excluded from the metric and must not be deleted.
   paths are rejected. The `migrate` command remains as a current-schema
   validator/normalizer, and focused analyzer, CLI, documentation, and
   architecture coverage preserves current SARIF and baseline behavior.
+- [x] Made one immutable tree-configuration snapshot flow through the common
+  method analysis context. Purity, suggestions, exception reporting,
+  nullability, and diagnostic suppression no longer re-read AnalyzerConfig
+  through feature-specific adapters. Registry value kinds now drive one
+  validation path, and focused configuration tests preserve defaults, aliases,
+  tree overrides, invalid-value diagnostics, and suppression behavior.
 
 ## Current evidence
 
-- Maintained production: 100,695 lines (96,776 C#, 3,189 scripts, and 730
-  specifications); net reduction: 6,931 lines; remaining reduction: 13,069.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 100,492 lines (96,573 C#, 3,189 scripts, and 730
+  specifications); net reduction: 7,134 lines; remaining reduction: 12,866.
+  This tranche removed 203 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,180 passing tests and two documented skips.
+- Six lanes: 6,181 passing tests and two documented skips.
 
 ## Milestones
 
 - [x] 3,000 lines removed: inferred-summary foundation and first migrated rules.
-- [ ] 7,000 lines removed: manual semantic catalogs substantially migrated.
+- [x] 7,000 lines removed: manual semantic catalogs substantially migrated.
 - [ ] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
 - [ ] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
 - [ ] 20,000 lines removed: CLI/ProofCore cleanup and final dead-code deletion complete.
@@ -260,5 +266,8 @@ complete; otherwise preserve the explicit owner. Require focused parity before
 deleting the old path in the same tranche, and do not revisit the independently
 required string-hash, type-identity, CFG/loop-transfer, EffectSummary
 assembly-reader, generated-purity override catalog, remaining semantic-wrapper
-groups, or impacted-test orchestration owners without new call-site ownership
-or generic-instantiation evidence.
+groups, syntactic proof classifier, or impacted-test orchestration owners
+without new call-site ownership or generic-instantiation evidence. Removing the
+syntactic classifier caused 48 focused regressions, including proven results
+becoming unknown for formulas outside the current Z3 encoding and zero-budget
+proofs that intentionally avoid solver work.

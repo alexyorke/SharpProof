@@ -237,33 +237,18 @@ internal static class AnalyzerConfigurationOptionRegistry
 
     internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode)
     {
-        switch (value?.Trim().ToLowerInvariant())
+        mode = value?.Trim().ToLowerInvariant() switch
         {
-            case "none":
-                mode = RuntimeHazardMode.Off;
-                return true;
-            case "sites":
-                mode = RuntimeHazardMode.Sites;
-                return true;
-            case "summaries":
-                mode = RuntimeHazardMode.Summaries;
-                return true;
-            case "all":
-                mode = RuntimeHazardMode.All;
-                return true;
-            case "unknowns":
-                mode = RuntimeHazardMode.Unknowns;
-                return true;
-            case "sites-and-unknowns":
-                mode = RuntimeHazardMode.SitesAndUnknowns;
-                return true;
-            case "all-and-unknowns":
-                mode = RuntimeHazardMode.AllAndUnknowns;
-                return true;
-            default:
-                mode = default;
-                return false;
-        }
+            "none" => RuntimeHazardMode.Off,
+            "sites" => RuntimeHazardMode.Sites,
+            "summaries" => RuntimeHazardMode.Summaries,
+            "all" => RuntimeHazardMode.All,
+            "unknowns" => RuntimeHazardMode.Unknowns,
+            "sites-and-unknowns" => RuntimeHazardMode.SitesAndUnknowns,
+            "all-and-unknowns" => RuntimeHazardMode.AllAndUnknowns,
+            _ => (RuntimeHazardMode)(-1)
+        };
+        return mode != (RuntimeHazardMode)(-1);
     }
 
     internal static bool IsCanonicalAllowedValue(AnalyzerConfigurationOption option, string? value)
@@ -284,37 +269,27 @@ internal static class AnalyzerConfigurationOptionRegistry
         All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
 
-internal sealed class AnalyzerConfigurationOption
+internal sealed class AnalyzerConfigurationOption(
+    string key,
+    AnalyzerConfigurationScope scope,
+    AnalyzerConfigurationValueKind valueKind,
+    AnalyzerConfigurationDefault defaultValue,
+    string description,
+    ImmutableArray<string> allowedValues = default,
+    PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
+    ImmutableArray<string> acceptedAliases = default)
 {
-    public AnalyzerConfigurationOption(
-        string key,
-        AnalyzerConfigurationScope scope,
-        AnalyzerConfigurationValueKind valueKind,
-        AnalyzerConfigurationDefault defaultValue,
-        string description,
-        ImmutableArray<string> allowedValues = default,
-        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
-        ImmutableArray<string> acceptedAliases = default)
-    {
-        Key = key;
-        Scope = scope;
-        ValueKind = valueKind;
-        Default = defaultValue;
-        Description = description;
-        AllowedValues = allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
-        PurityPolicyImpact = purityPolicyImpact;
-        AcceptedAliases = acceptedAliases.IsDefault ? ImmutableArray<string>.Empty : acceptedAliases;
-    }
-
-    public string Key { get; }
-    public AnalyzerConfigurationScope Scope { get; }
-    public AnalyzerConfigurationValueKind ValueKind { get; }
-    public AnalyzerConfigurationDefault Default { get; }
+    public string Key { get; } = key;
+    public AnalyzerConfigurationScope Scope { get; } = scope;
+    public AnalyzerConfigurationValueKind ValueKind { get; } = valueKind;
+    public AnalyzerConfigurationDefault Default { get; } = defaultValue;
     public string DefaultValue => Default.DocumentationValue;
-    public string Description { get; }
-    public ImmutableArray<string> AllowedValues { get; }
-    public PurityPolicyImpact PurityPolicyImpact { get; }
-    public ImmutableArray<string> AcceptedAliases { get; }
+    public string Description { get; } = description;
+    public ImmutableArray<string> AllowedValues { get; } =
+        allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
+    public PurityPolicyImpact PurityPolicyImpact { get; } = purityPolicyImpact;
+    public ImmutableArray<string> AcceptedAliases { get; } =
+        acceptedAliases.IsDefault ? ImmutableArray<string>.Empty : acceptedAliases;
 
     public bool IsGlobal =>
         Scope == AnalyzerConfigurationScope.GlobalOnly ||
@@ -325,24 +300,12 @@ internal sealed class AnalyzerConfigurationOption
         Scope == AnalyzerConfigurationScope.GlobalAndTree;
 }
 
-internal readonly record struct AnalyzerConfigurationDefault
+internal readonly record struct AnalyzerConfigurationDefault(
+    string? ConstantValue,
+    int BoundedValue,
+    int DeepValue,
+    string Unit)
 {
-    private AnalyzerConfigurationDefault(
-        string? constantValue,
-        int boundedValue,
-        int deepValue,
-        string unit)
-    {
-        ConstantValue = constantValue;
-        BoundedValue = boundedValue;
-        DeepValue = deepValue;
-        Unit = unit;
-    }
-
-    internal string? ConstantValue { get; }
-    internal int BoundedValue { get; }
-    internal int DeepValue { get; }
-    internal string Unit { get; }
     internal bool IsModeDependent => ConstantValue == null;
 
     internal string DocumentationValue => IsModeDependent

@@ -601,14 +601,7 @@ internal static class NullableContractAnalyzer
 
     private static bool ShouldReportInconclusive(MethodBodyAnalysisContext context)
     {
-        var provider = context.Options.AnalyzerConfigOptionsProvider;
-        var treeOptions = provider.GetOptions(context.Node.SyntaxTree);
-        if (treeOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var treeValue) &&
-            AnalyzerConfiguration.TryParseBool(treeValue, out var treeEnabled))
-            return treeEnabled;
-
-        return provider.GlobalOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var globalValue) &&
-               AnalyzerConfiguration.TryParseBool(globalValue, out var globalEnabled) && globalEnabled;
+        return context.Configuration.ReportNullableInconclusive;
     }
 
     private static ImmutableDictionary<string, string?> CreateProperties(

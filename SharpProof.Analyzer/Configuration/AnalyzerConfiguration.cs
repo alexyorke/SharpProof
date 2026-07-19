@@ -22,6 +22,7 @@ internal class AnalyzerConfiguration(
     ProvenDiagnosticSuppressionOptions provenDiagnosticSuppressions,
     bool reportExceptions,
     bool checkedExceptions,
+    bool reportNullableInconclusive,
     bool enableEffectSummaryJson,
     string purityProfile,
     TrustedBoundaryReviewMode trustedBoundaryReviewMode,
@@ -46,6 +47,7 @@ internal class AnalyzerConfiguration(
     public ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions { get; } = provenDiagnosticSuppressions;
     public bool ReportExceptions { get; } = reportExceptions;
     public bool CheckedExceptions { get; } = checkedExceptions;
+    public bool ReportNullableInconclusive { get; } = reportNullableInconclusive;
     public bool EnableEffectSummaryJson { get; } = enableEffectSummaryJson;
     public string PurityProfile { get; } = purityProfile;
     public TrustedBoundaryReviewMode TrustedBoundaryReviewMode { get; } = trustedBoundaryReviewMode;
@@ -89,6 +91,8 @@ internal class AnalyzerConfiguration(
                 SharpProofDiagnosticSuppressor.SupportedDiagnosticIds));
         var reportExceptions = GetBoolOrDefault(optionSource, ConfigKeys.ReportExceptions, false);
         var checkedExceptions = GetBoolOrDefault(optionSource, ConfigKeys.CheckedExceptions, false);
+        var reportNullableInconclusive =
+            GetBoolOrDefault(optionSource, ConfigKeys.ReportNullableInconclusive, false);
         var enableEffectSummaryJson = GetBoolOrDefault(optionSource, ConfigKeys.EnableEffectSummaryJson, false);
         var symbolicConfiguration = SymbolicProjectConfiguration.FromAnalyzerOptions(options);
         return new AnalyzerConfiguration(
@@ -106,6 +110,7 @@ internal class AnalyzerConfiguration(
             provenDiagnosticSuppressions,
             reportExceptions,
             checkedExceptions,
+            reportNullableInconclusive,
             enableEffectSummaryJson,
             GetPurityProfile(optionSource),
             GetTrustedBoundaryReviewMode(optionSource),
@@ -114,146 +119,81 @@ internal class AnalyzerConfiguration(
             invalidConfigurationValues);
     }
 
-    public static MissingPuritySuggestionOptions GetMissingPuritySuggestionOptions(
+    internal static AnalyzerTreeConfiguration GetTreeConfiguration(
         AnalyzerOptions options,
         SyntaxTree syntaxTree,
-        MissingPuritySuggestionOptions fallback)
+        AnalyzerConfiguration fallback)
     {
-        return GetTreeOptions(options, syntaxTree, fallback, treeOptions =>
+        var global = new AnalyzerTreeConfiguration(
+            fallback.MissingPuritySuggestions,
+            fallback.InferredContractSuggestions,
+            fallback.EmitExplanations,
+            fallback.ReportBclFallbackGuesses,
+            fallback.RuntimeHazardMode,
+            fallback.ProvenDiagnosticSuppressions,
+            fallback.ReportExceptions,
+            fallback.CheckedExceptions,
+            fallback.ReportNullableInconclusive);
+        return GetTreeOptions(options, syntaxTree, global, treeOptions =>
         {
             var optionSource = new ConfigurationOptionSource(treeOptions);
             var suggestMissing = GetBoolOrDefault(
                 optionSource,
                 ConfigKeys.SuggestMissingEnforcePure,
-                fallback.Enabled);
-            return new MissingPuritySuggestionOptions(
+                fallback.MissingPuritySuggestions.Enabled);
+            var missingPuritySuggestions = new MissingPuritySuggestionOptions(
                 suggestMissing,
-                GetSuggestionScope(optionSource, ConfigKeys.SuggestMissingEnforcePureScope, fallback.Scope),
+                GetSuggestionScope(
+                    optionSource,
+                    ConfigKeys.SuggestMissingEnforcePureScope,
+                    fallback.MissingPuritySuggestions.Scope),
                 GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated,
-                    fallback.ExcludeGeneratedFiles),
+                    fallback.MissingPuritySuggestions.ExcludeGeneratedFiles),
                 GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeTests,
-                    fallback.ExcludeTestFiles),
+                    fallback.MissingPuritySuggestions.ExcludeTestFiles),
                 GetNonNegativeInt(optionSource, ConfigKeys.SuggestMissingEnforcePureMinComplexity,
-                    fallback.MinimumComplexity),
+                    fallback.MissingPuritySuggestions.MinimumComplexity),
                 GetValues(optionSource, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters,
-                    fallback.NamespaceFilters));
-        });
-    }
-
-    public static InferredContractSuggestionOptions GetInferredContractSuggestionOptions(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        InferredContractSuggestionOptions fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions =>
-            {
-                var optionSource = new ConfigurationOptionSource(treeOptions);
-                return new InferredContractSuggestionOptions(
-                    GetBoolOrDefault(optionSource, ConfigKeys.SuggestInferredContracts, fallback.Enabled),
-                    GetSuggestionScope(optionSource, ConfigKeys.SuggestInferredContractsScope, fallback.Scope),
-                    GetInferredContractKinds(optionSource, fallback.Kinds),
+                    fallback.MissingPuritySuggestions.NamespaceFilters));
+            var inferredContracts = new InferredContractSuggestionOptions(
+                    GetBoolOrDefault(
+                        optionSource,
+                        ConfigKeys.SuggestInferredContracts,
+                        fallback.InferredContractSuggestions.Enabled),
+                    GetSuggestionScope(
+                        optionSource,
+                        ConfigKeys.SuggestInferredContractsScope,
+                        fallback.InferredContractSuggestions.Scope),
+                    GetInferredContractKinds(optionSource, fallback.InferredContractSuggestions.Kinds),
                     GetInferredContractConfidence(
                         optionSource,
                         ConfigKeys.SuggestInferredContractsMinimumConfidence,
-                        fallback.MinimumConfidence));
-            });
-    }
-
-    public static bool GetEmitExplanations(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        bool fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions => GetBoolOrDefault(
-                new ConfigurationOptionSource(treeOptions),
-                ConfigKeys.EmitExplanations,
-                fallback));
-    }
-
-    public static bool GetReportBclFallbackGuesses(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        bool fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions => GetBoolOrDefault(
-                new ConfigurationOptionSource(treeOptions),
-                ConfigKeys.ReportBclFallbackGuesses,
-                fallback));
-    }
-
-    public static bool GetReportExceptions(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        bool fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions => GetBoolOrDefault(
-                new ConfigurationOptionSource(treeOptions),
-                ConfigKeys.ReportExceptions,
-                fallback));
-    }
-
-    public static bool GetCheckedExceptions(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        bool fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions => GetBoolOrDefault(
-                new ConfigurationOptionSource(treeOptions),
-                ConfigKeys.CheckedExceptions,
-                fallback));
-    }
-
-    public static RuntimeHazardMode GetRuntimeHazardMode(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        RuntimeHazardMode fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions => GetRuntimeHazardMode(new ConfigurationOptionSource(treeOptions), fallback));
-    }
-
-    public static ProvenDiagnosticSuppressionOptions GetProvenDiagnosticSuppressionOptions(
-        AnalyzerOptions options,
-        SyntaxTree syntaxTree,
-        ProvenDiagnosticSuppressionOptions fallback)
-    {
-        return GetTreeOptions(
-            options,
-            syntaxTree,
-            fallback,
-            treeOptions =>
-            {
-                var optionSource = new ConfigurationOptionSource(treeOptions);
-                return new ProvenDiagnosticSuppressionOptions(
+                        fallback.InferredContractSuggestions.MinimumConfidence));
+            var suppressions = new ProvenDiagnosticSuppressionOptions(
                     GetBoolOrDefault(
                         optionSource,
                         ConfigKeys.SuppressProvenDiagnostics,
-                        fallback.Enabled),
-                    GetSuppressionDiagnosticIds(optionSource, fallback.DiagnosticIds));
-            });
+                        fallback.ProvenDiagnosticSuppressions.Enabled),
+                    GetSuppressionDiagnosticIds(
+                        optionSource,
+                        fallback.ProvenDiagnosticSuppressions.DiagnosticIds));
+            return new AnalyzerTreeConfiguration(
+                missingPuritySuggestions,
+                inferredContracts,
+                GetBoolOrDefault(optionSource, ConfigKeys.EmitExplanations, fallback.EmitExplanations),
+                GetBoolOrDefault(
+                    optionSource,
+                    ConfigKeys.ReportBclFallbackGuesses,
+                    fallback.ReportBclFallbackGuesses),
+                GetRuntimeHazardMode(optionSource, fallback.RuntimeHazardMode),
+                suppressions,
+                GetBoolOrDefault(optionSource, ConfigKeys.ReportExceptions, fallback.ReportExceptions),
+                GetBoolOrDefault(optionSource, ConfigKeys.CheckedExceptions, fallback.CheckedExceptions),
+                GetBoolOrDefault(
+                    optionSource,
+                    ConfigKeys.ReportNullableInconclusive,
+                    fallback.ReportNullableInconclusive));
+        });
     }
 
     private static T GetTreeOptions<T>(
@@ -270,21 +210,6 @@ internal class AnalyzerConfiguration(
         {
             return fallback;
         }
-    }
-
-    public static bool RuntimeHazardReportsMethodSummaries(RuntimeHazardMode mode)
-    {
-        return (mode & RuntimeHazardMode.Summaries) != 0;
-    }
-
-    public static bool RuntimeHazardReportsSites(RuntimeHazardMode mode)
-    {
-        return (mode & RuntimeHazardMode.Sites) != 0;
-    }
-
-    public static bool RuntimeHazardReportsUnknownCandidates(RuntimeHazardMode mode)
-    {
-        return (mode & RuntimeHazardMode.Unknowns) != 0;
     }
 
     private static ImmutableHashSet<string> GetConfiguredMemberKeys(ConfigurationOptionSource options, string key)
@@ -395,14 +320,9 @@ internal class AnalyzerConfiguration(
         RuntimeHazardMode fallback)
     {
         return options.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value)
-            ? ParseRuntimeHazardMode(value, fallback)
-            : fallback;
-    }
-
-    private static RuntimeHazardMode ParseRuntimeHazardMode(string value, RuntimeHazardMode fallback)
-    {
-        return AnalyzerConfigurationOptionRegistry.TryParseRuntimeHazardMode(value, out var parsed)
-            ? parsed
+            ? AnalyzerConfigurationOptionRegistry.TryParseRuntimeHazardMode(value, out var parsed)
+                ? parsed
+                : fallback
             : fallback;
     }
 
@@ -464,11 +384,6 @@ internal class AnalyzerConfiguration(
             : fallback;
     }
 
-    private static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value)
-    {
-        return AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
-    }
-
     private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(
         AnalyzerOptions options)
     {
@@ -481,7 +396,7 @@ internal class AnalyzerConfiguration(
 
         bool TryGetOption(string key, out string value)
         {
-            return TryGetGlobalOption(options, key, out value);
+            return AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
         }
     }
 
@@ -522,35 +437,29 @@ internal class AnalyzerConfiguration(
         TryGetConfigurationOption tryGetOption,
         AnalyzerConfigurationOption option)
     {
-        switch (option.ValueKind)
+        if (!tryGetOption(option.Key, out var value)) return;
+
+        var reason = option.ValueKind switch
         {
-            case AnalyzerConfigurationValueKind.Bool:
-                ValidateBool(builder, tryGetOption, option.Key);
-                return;
-            case AnalyzerConfigurationValueKind.StringList:
-                return;
-            case AnalyzerConfigurationValueKind.StructuralMemberKeyList:
-                ValidateStructuralMemberKeyList(builder, tryGetOption, option.Key);
-                return;
-            case AnalyzerConfigurationValueKind.NonNegativeInteger:
-                ValidateNonNegativeInt(builder, tryGetOption, option.Key);
-                return;
-            case AnalyzerConfigurationValueKind.PositiveInteger:
-                ValidatePositiveInt(builder, tryGetOption, option.Key);
-                return;
-            case AnalyzerConfigurationValueKind.PurityProfile:
-            case AnalyzerConfigurationValueKind.MissingPuritySuggestionScope:
-            case AnalyzerConfigurationValueKind.RuntimeHazardMode:
-            case AnalyzerConfigurationValueKind.SmtMode:
-            case AnalyzerConfigurationValueKind.AllowedValue:
-                ValidateAllowedValue(builder, tryGetOption, option);
-                return;
-            case AnalyzerConfigurationValueKind.AllowedValueList:
-                ValidateAllowedValueList(builder, tryGetOption, option);
-                return;
-            default:
-                return;
-        }
+            AnalyzerConfigurationValueKind.Bool when !TryParseBool(value, out _) =>
+                "expected a boolean value",
+            AnalyzerConfigurationValueKind.StructuralMemberKeyList =>
+                GetStructuralMemberKeyListError(value),
+            AnalyzerConfigurationValueKind.NonNegativeInteger =>
+                GetIntegerError(value, 0, "expected a non-negative integer"),
+            AnalyzerConfigurationValueKind.PositiveInteger =>
+                GetIntegerError(value, 1, "expected a positive integer"),
+            AnalyzerConfigurationValueKind.PurityProfile or
+                AnalyzerConfigurationValueKind.MissingPuritySuggestionScope or
+                AnalyzerConfigurationValueKind.RuntimeHazardMode or
+                AnalyzerConfigurationValueKind.SmtMode or
+                AnalyzerConfigurationValueKind.AllowedValue
+                when !AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value) =>
+                "expected one of: " + string.Join(", ", option.AllowedValues),
+            AnalyzerConfigurationValueKind.AllowedValueList => GetAllowedValueListError(option, value),
+            _ => null
+        };
+        if (reason != null) AddInvalidConfigurationValue(builder, option.Key, value, reason);
     }
 
     private static void ValidateGlobalOnlyTreeOption(
@@ -586,113 +495,33 @@ internal class AnalyzerConfiguration(
                string.Equals(globalValue, treeValue, StringComparison.Ordinal);
     }
 
-    private static void ValidateBool(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key)
+    private static string? GetAllowedValueListError(AnalyzerConfigurationOption option, string value)
     {
-        if (tryGetOption(key, out var value) &&
-            !TryParseBool(value, out _))
-            AddInvalidConfigurationValue(builder, key, value, "expected a boolean value");
-    }
-
-    private static void ValidateAllowedValue(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        AnalyzerConfigurationOption option)
-    {
-        if (!tryGetOption(option.Key, out var value)) return;
-
-        if (AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value)) return;
-
-        AddInvalidConfigurationValue(
-            builder,
-            option.Key,
-            value,
-            "expected one of: " + string.Join(", ", option.AllowedValues));
-    }
-
-    private static void ValidateAllowedValueList(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        AnalyzerConfigurationOption option)
-    {
-        if (!tryGetOption(option.Key, out var value)) return;
-
         var invalid = SplitValues(value)
             .Select(static item => item.ToLowerInvariant())
             .Where(item => !option.AllowedValues.Contains(item, StringComparer.Ordinal))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static item => item, StringComparer.Ordinal)
             .ToArray();
-        if (invalid.Length == 0) return;
-
-        AddInvalidConfigurationValue(
-            builder,
-            option.Key,
-            value,
-            "unknown values: " + string.Join(", ", invalid) + "; expected: " +
-            string.Join(", ", option.AllowedValues));
+        return invalid.Length == 0
+            ? null
+            : "unknown values: " + string.Join(", ", invalid) + "; expected: " +
+              string.Join(", ", option.AllowedValues);
     }
 
-    private static void ValidateStructuralMemberKeyList(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key)
+    private static string? GetStructuralMemberKeyListError(string value)
     {
-        if (!tryGetOption(key, out var value)) return;
-
-        var invalid = SplitValues(value)
-            .Where(static item => !ConfiguredMemberKey.TryParse(item, out _))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static item => item, StringComparer.Ordinal)
-            .ToArray();
-        if (invalid.Length == 0) return;
-
-        AddInvalidConfigurationValue(
-            builder,
-            key,
-            value,
-            "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes");
+        return SplitValues(value).Any(static item => !ConfiguredMemberKey.TryParse(item, out _))
+            ? "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes"
+            : null;
     }
 
-    private static void ValidatePositiveInt(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key)
+    private static string? GetIntegerError(string value, int minimum, string reason)
     {
-        ValidateIntAtLeast(
-            builder,
-            tryGetOption,
-            key,
-            minimum: 1,
-            reason: "expected a positive integer");
-    }
-
-    private static void ValidateNonNegativeInt(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key)
-    {
-        ValidateIntAtLeast(
-            builder,
-            tryGetOption,
-            key,
-            minimum: 0,
-            reason: "expected a non-negative integer");
-    }
-
-    private static void ValidateIntAtLeast(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key,
-        int minimum,
-        string reason)
-    {
-        if (tryGetOption(key, out var value) &&
-            (!int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
-             parsed < minimum))
-            AddInvalidConfigurationValue(builder, key, value, reason);
+        return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
+               parsed >= minimum
+            ? null
+            : reason;
     }
 
     private static void AddInvalidConfigurationValue(
@@ -729,7 +558,7 @@ internal class AnalyzerConfiguration(
         internal bool TryGetValue(string key, out string value)
         {
             if (_globalOptions != null)
-                return TryGetGlobalOption(_globalOptions, key, out value);
+                return AnalyzerConfigurationValueReader.TryGetGlobalOption(_globalOptions, key, out value);
             if (_treeOptions != null)
             {
                 if (_treeOptions.TryGetValue(key, out var treeValue))
@@ -751,6 +580,17 @@ internal readonly record struct InvalidAnalyzerConfigurationValue(
     string Key,
     string Value,
     string Reason);
+
+internal sealed record AnalyzerTreeConfiguration(
+    MissingPuritySuggestionOptions MissingPuritySuggestions,
+    InferredContractSuggestionOptions InferredContractSuggestions,
+    bool EmitExplanations,
+    bool ReportBclFallbackGuesses,
+    RuntimeHazardMode RuntimeHazardMode,
+    ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions,
+    bool ReportExceptions,
+    bool CheckedExceptions,
+    bool ReportNullableInconclusive);
 
 internal enum MissingPuritySuggestionScope
 {

@@ -328,6 +328,26 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void AnalyzerFeatures_ConsumeOneTreeConfigurationSnapshot()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var configuration = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfiguration.cs"));
+        var methodContext = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "MethodBodyAnalysisState.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configuration, Does.Contain("AnalyzerTreeConfiguration GetTreeConfiguration"));
+            Assert.That(methodContext, Does.Contain("AnalyzerTreeConfiguration Configuration"));
+            Assert.That(methodContext, Does.Not.Contain("AnalyzerOptions Options"));
+            Assert.That(configuration, Does.Not.Contain("GetEmitExplanations("));
+            Assert.That(configuration, Does.Not.Contain("GetReportExceptions("));
+            Assert.That(configuration, Does.Not.Contain("GetCheckedExceptions("));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

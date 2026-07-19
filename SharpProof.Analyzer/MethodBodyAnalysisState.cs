@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
@@ -129,12 +129,12 @@ internal sealed class MethodBodyAnalysisContext
 
     internal MethodBodyAnalysisContext(
         MethodBodyAnalysisState state,
-        AnalyzerOptions options,
+        AnalyzerTreeConfiguration configuration,
         CancellationToken cancellationToken,
         Action<Diagnostic> reportDiagnostic)
     {
         State = state ?? throw new ArgumentNullException(nameof(state));
-        Options = options ?? throw new ArgumentNullException(nameof(options));
+        Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         CancellationToken = cancellationToken;
         _reportDiagnostic = reportDiagnostic ?? throw new ArgumentNullException(nameof(reportDiagnostic));
     }
@@ -149,7 +149,7 @@ internal sealed class MethodBodyAnalysisContext
 
     internal SemanticModel SemanticModel => Snapshot.SemanticModel;
 
-    internal AnalyzerOptions Options { get; }
+    internal AnalyzerTreeConfiguration Configuration { get; }
 
     internal CancellationToken CancellationToken { get; }
 

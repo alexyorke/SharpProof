@@ -99,7 +99,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         if (context.ReportedDiagnostics.IsDefaultOrEmpty) return;
 
         var configuration = AnalyzerConfiguration.FromOptions(context.Options);
-        var candidates = CollectCandidates(context, configuration.ProvenDiagnosticSuppressions);
+        var candidates = CollectCandidates(context, configuration);
         if (candidates.Count == 0) return;
 
         SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
@@ -140,7 +140,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
 
     private static List<SuppressionCandidate> CollectCandidates(
         SuppressionAnalysisContext context,
-        ProvenDiagnosticSuppressionOptions globalOptions)
+        AnalyzerConfiguration configuration)
     {
         var candidates = new List<SuppressionCandidate>();
         var optionsByTree = new Dictionary<SyntaxTree, ProvenDiagnosticSuppressionOptions>();
@@ -154,10 +154,10 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
 
             if (!optionsByTree.TryGetValue(syntaxTree, out var options))
             {
-                options = AnalyzerConfiguration.GetProvenDiagnosticSuppressionOptions(
+                options = AnalyzerConfiguration.GetTreeConfiguration(
                     context.Options,
                     syntaxTree,
-                    globalOptions);
+                    configuration).ProvenDiagnosticSuppressions;
                 optionsByTree.Add(syntaxTree, options);
             }
 
