@@ -722,33 +722,19 @@ public partial class EffectSummaryToolTests
                 return s_effectSummaryToolDllPath;
 
             var repositoryRoot = GetRepositoryRoot();
-            var projectPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary",
-                "SharpProof.EffectSummary.csproj");
-            var dllPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary", "bin", "Debug", "net8.0",
+            var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent?.Name ??
+                                throw new InvalidOperationException("Could not resolve the test build configuration.");
+            var dllPath = Path.Combine(
+                repositoryRoot,
+                "Tools",
+                "SharpProof.EffectSummary",
+                "bin",
+                configuration,
+                "net8.0",
                 "SharpProof.EffectSummary.dll");
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            startInfo.ArgumentList.Add("build");
-            startInfo.ArgumentList.Add(projectPath);
-            startInfo.ArgumentList.Add("-m:20");
-            startInfo.ArgumentList.Add("--no-restore");
-
-            using var process = Process.Start(startInfo) ??
-                                throw new InvalidOperationException("Failed to build effect summary tool.");
-            var standardOutput = process.StandardOutput.ReadToEnd();
-            var standardError = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0 || !File.Exists(dllPath))
+            if (!File.Exists(dllPath))
                 throw new AssertionException(
-                    "Effect summary tool build failed." + Environment.NewLine +
-                    standardOutput + Environment.NewLine +
-                    standardError);
+                    "The canonical build did not produce the EffectSummary tool: " + dllPath);
 
             s_effectSummaryToolDllPath = dllPath;
             return s_effectSummaryToolDllPath;

@@ -227,6 +227,12 @@ public sealed class ScriptProcessOwnershipTests
         Assert.That(releaseValidation, Does.Not.Contain("SharpProof.ProofCore"));
         Assert.That(build, Does.Contain("if ($Full)"));
         Assert.That(build, Does.Contain("-p:EnableVsixPackaging=true"));
+        var effectSummaryHelper = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ToolingTest",
+            "EffectSummaryToolTests.Helpers.cs"));
+        Assert.That(effectSummaryHelper, Does.Contain("AppContext.BaseDirectory"));
+        Assert.That(effectSummaryHelper, Does.Not.Contain("startInfo.ArgumentList.Add(\"build\")"));
         Assert.That(File.Exists(Path.Combine(
             repositoryRoot,
             "scripts",

@@ -143,14 +143,19 @@ Tests are excluded from the metric and must not be deleted.
   The PowerShell layer now only invokes the bounded dotnet wrapper and applies
   golden-file verification. Registry defaults, scopes, value kinds, allowed
   values, descriptions, samples, and diagnostics produce byte-identical docs.
+- [x] Made the full solution build the single release-validation owner. The
+  retained release command delegates to `Invoke-SharpProofBuild.ps1 -Full`,
+  which now explicitly enables VSIX packaging; focused validation produces the
+  NuGet and VSIX artifacts with zero warnings. Removed the superseded
+  historical LOC reporter and mutable baseline in favor of this enforced ledger.
 
 ## Current evidence
 
-- Maintained production: 103,945 lines (99,619 C#, 3,446 scripts, and 880
-  specifications); net reduction: 3,681 lines; remaining reduction: 16,319.
-  This tranche removed 207 net maintained lines without deleting tests.
+- Maintained production: 103,742 lines (99,619 C#, 3,243 scripts, and 880
+  specifications); net reduction: 3,884 lines; remaining reduction: 16,116.
+  This tranche removed 203 maintained script lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,155 passing tests and two documented skips.
+- Six lanes: 6,156 passing tests and two documented skips.
 
 ## Milestones
 
