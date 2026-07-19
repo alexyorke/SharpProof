@@ -47,9 +47,7 @@ internal static class AnalyzerFeaturePipeline
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
     {
-        using (session.GeneratedPurityCatalog == null
-                   ? null
-                   : GeneratedPurityCatalog.UseCurrent(session.GeneratedPurityCatalog))
+        using (EffectSummaryCatalog.UseCurrent(session.EffectSummaryCatalog))
         using (ImpurityCatalog.UseConfiguredOverrides(session.Configuration))
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node))
         {
@@ -97,7 +95,7 @@ internal static class AnalyzerFeaturePipeline
             if (features.Includes(AnalyzerFeatures.Exceptions))
                 ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
                     context,
-                    session.ExceptionSummaryCatalog,
+                    session.EffectSummaryCatalog,
                     session.PurityService,
                     session.Baseline,
                     session.AttributePolicy);

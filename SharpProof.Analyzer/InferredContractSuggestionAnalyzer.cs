@@ -229,7 +229,7 @@ internal static class InferredContractSuggestionAnalyzer
                 () => ExceptionFlowEngine.AnalyzeMethod(
                     context.Snapshot.Input,
                     context.CancellationToken,
-                    session.ExceptionSummaryCatalog,
+                    session.EffectSummaryCatalog,
                     session.PurityService.SmtAnalysis,
                     session.AttributePolicy));
         }

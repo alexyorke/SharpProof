@@ -63,9 +63,9 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedGeneratedPurity(
         IMethodSymbol methodSymbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
     {
-        return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
+        return EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
     }
 
     internal static bool IsMetadataSymbol(ISymbol? symbol)
@@ -76,7 +76,7 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedDefinitiveGeneratedPurity(
         IMethodSymbol? methodSymbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
     {
         return TryGetTrustedGeneratedPurityCore(
             methodSymbol,
@@ -89,7 +89,7 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedGeneratedPurityCoverage(
         IMethodSymbol? methodSymbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
     {
         return TryGetTrustedGeneratedPurityCore(
             methodSymbol,
@@ -112,7 +112,7 @@ internal partial class PurityAnalysisEngine
             "config_known_impure",
             StringComparison.Ordinal);
 
-        GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+        EffectSummaryCatalog.PurityEntry generatedPurity = default;
         var hasTrustedGeneratedPurity = !hasConfiguredKnownImpureMember &&
                                         TryGetTrustedGeneratedPurityCoverage(originalDefinition, compilation,
                                             out generatedPurity);
@@ -126,15 +126,15 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedGeneratedFieldPurity(
         IFieldSymbol fieldSymbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
     {
-        return GeneratedPurityCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
+        return EffectSummaryCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
     }
 
     internal static bool TryGetTrustedDefinitiveGeneratedFieldPurity(
         IFieldSymbol? fieldSymbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
     {
         return TryGetTrustedGeneratedPurityCore(
             fieldSymbol,
@@ -149,7 +149,7 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         bool requireDefinitive,
         TryGetGeneratedPurity<TSymbol> lookup,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
         where TSymbol : class, ISymbol
     {
         purity = default;
@@ -163,7 +163,7 @@ internal partial class PurityAnalysisEngine
     private delegate bool TryGetGeneratedPurity<TSymbol>(
         TSymbol symbol,
         Compilation compilation,
-        out GeneratedPurityCatalog.PurityEntry purity)
+        out EffectSummaryCatalog.PurityEntry purity)
         where TSymbol : class, ISymbol;
 
     internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
@@ -187,7 +187,7 @@ internal partial class PurityAnalysisEngine
     internal readonly struct TrustedMethodPurityMetadata(
         string? knownImpureMemberSource,
         bool hasTrustedGeneratedPurity,
-        GeneratedPurityCatalog.PurityEntry generatedPurity)
+        EffectSummaryCatalog.PurityEntry generatedPurity)
     {
         public string? KnownImpureMemberSource { get; } = knownImpureMemberSource;
 
@@ -195,7 +195,7 @@ internal partial class PurityAnalysisEngine
             string.Equals(KnownImpureMemberSource, "config_known_impure", StringComparison.Ordinal);
 
         public bool HasTrustedGeneratedPurity { get; } = hasTrustedGeneratedPurity;
-        public GeneratedPurityCatalog.PurityEntry GeneratedPurity { get; } = generatedPurity;
+        public EffectSummaryCatalog.PurityEntry GeneratedPurity { get; } = generatedPurity;
         public bool AllowsKnownPureFallback => !HasTrustedGeneratedPurity;
     }
 }

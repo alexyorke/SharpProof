@@ -167,7 +167,7 @@ public sealed class StructuralMethodIdentityTests
         Assert.That(roslynKey, Is.EqualTo(entry.GetProperty("CanonicalKey").GetString()));
         Assert.That(entry.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
 
-        var catalogType = analyzerAssembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
+        var catalogType = analyzerAssembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog", true)!;
         var catalog = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
         var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
         var arguments = new object?[] { getEnumerator.OriginalDefinition, compilation, null };

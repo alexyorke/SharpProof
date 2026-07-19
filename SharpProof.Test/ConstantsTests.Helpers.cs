@@ -42,7 +42,7 @@ public partial class ConstantsTests
         ImmutableArray<AdditionalText> additionalFiles)
     {
         var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
+            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog", true)!;
         var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
         var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
         var catalog = fromOptions.Invoke(null,

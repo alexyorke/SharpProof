@@ -5,7 +5,7 @@ internal static partial class ExceptionFlowEngine
     internal static ExceptionFlowResult AnalyzeMethod(
         SymbolicMethodAnalysisInput input,
         CancellationToken cancellationToken,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        EffectSummaryCatalog exceptionSummaryCatalog,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         HashSet<IMethodSymbol>? visitedMethods = null)

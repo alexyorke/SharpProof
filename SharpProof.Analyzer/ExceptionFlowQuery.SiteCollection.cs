@@ -7,7 +7,7 @@ internal static partial class ExceptionFlowEngine
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         IMethodSymbol methodSymbol,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,

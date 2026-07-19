@@ -90,12 +90,12 @@ internal static partial class ImpurityCatalog
     private static bool TryGetGeneratedMethodPurity(
         IMethodSymbol? methodSymbol,
         Compilation? compilation,
-        out GeneratedPurityCatalog.PurityEntry classification)
+        out EffectSummaryCatalog.PurityEntry classification)
     {
         classification = default;
         if (compilation == null || methodSymbol == null) return false;
 
-        return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification);
+        return EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification);
     }
 
     public static bool IsKnownImpure(ISymbol symbol)

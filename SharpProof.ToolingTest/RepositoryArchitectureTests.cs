@@ -219,12 +219,12 @@ public sealed class RepositoryArchitectureTests
     public void AnalyzerAssembly_DoesNotRetainDuplicateExceptionFactProjection()
     {
         var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
-        var catalog = assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog", true)!;
+        var catalog = assembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog", true)!;
 
         Assert.Multiple(() =>
         {
             Assert.That(
-                assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog+SummaryExceptionFact"),
+                assembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog+SummaryExceptionFact"),
                 Is.Null);
             Assert.That(catalog.GetMethod(
                 "ParseExceptionFacts",
@@ -341,8 +341,7 @@ public sealed class RepositoryArchitectureTests
         var expectedDeclarations = new Dictionary<string, string>
         {
             ["SharpProof.Analyzer/MethodAnalysisRequest.cs"] = "class MethodAnalysisRequest(",
-            ["SharpProof.Analyzer/GeneratedPurityCatalog.cs"] = "struct PurityEntry(",
-            ["SharpProof.Analyzer/ExceptionSummaryCatalog.cs"] = "class SummaryExceptionInfo(",
+            ["SharpProof.Analyzer/EffectSummaryCatalog.cs"] = "struct PurityEntry(",
             ["SharpProof.ProofCore/SmtIntegerInterval.cs"] = "struct SmtIntegerInterval(",
             ["SharpProof.Symbolic/Ir/SymbolicLoweringResult.cs"] = "class SymbolicLoweringResult<T>(",
             ["SharpProof.Symbolic/SymbolicProgramPointProjector.cs"] =
@@ -355,6 +354,15 @@ public sealed class RepositoryArchitectureTests
         {
             foreach (var (path, declaration) in expectedDeclarations)
                 Assert.That(File.ReadAllText(Path.Combine(root, path)), Does.Contain(declaration), path);
+            Assert.That(
+                File.ReadAllText(Path.Combine(root, "SharpProof.Analyzer", "EffectSummaryCatalog.cs")),
+                Does.Contain("record SummaryExceptionInfo("));
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "ExceptionSummaryCatalog.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "GeneratedPurityCatalog.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "EffectSummaryCatalogEntryMap.cs")), Is.False);
         });
     }
 

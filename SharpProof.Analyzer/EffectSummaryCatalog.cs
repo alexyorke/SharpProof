@@ -1,33 +1,42 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class GeneratedPurityCatalog
+internal sealed class EffectSummaryCatalog
 {
-    private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new();
+    private const int BuiltInSourcePriority = 0;
+    private const int AdditionalSourcePriority = 1;
 
-    private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
+    private static readonly AsyncLocal<EffectSummaryCatalog?> CurrentCatalog = new();
+
+    private static readonly Lazy<EffectSummaryCatalog> BuiltInCatalog =
         new(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    private static readonly EffectSummaryIdentityResolver IdentityResolver =
+    private static readonly EffectSummaryIdentityResolver PurityIdentityResolver =
         new(
             true,
             false,
             RoslynStructuralMethodIdentity.GetCanonicalKey);
 
-    public static readonly GeneratedPurityCatalog Empty = new(
+    private static readonly EffectSummaryIdentityResolver ExceptionIdentityResolver =
+        new(
+            false,
+            true,
+            RoslynStructuralMethodIdentity.GetCanonicalKey);
+
+    public static readonly EffectSummaryCatalog Empty = new(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
 
     private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
-    private GeneratedPurityCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
+    private EffectSummaryCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
     {
         _entriesBySymbol = entriesBySymbol;
     }
 
     private bool IsEmpty => _entriesBySymbol.IsEmpty;
 
-    public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? BuiltInCatalog.Value;
+    public static EffectSummaryCatalog Current => CurrentCatalog.Value ?? BuiltInCatalog.Value;
 
-    public static GeneratedPurityCatalog FromOptions(
+    public static EffectSummaryCatalog FromOptions(
         AnalyzerOptions options,
         CancellationToken cancellationToken)
     {
@@ -37,47 +46,53 @@ internal sealed class GeneratedPurityCatalog
             new EffectSummaryCompatibilityReporter());
     }
 
-    internal static GeneratedPurityCatalog FromOptionsWithCompatibilityReporter(
+    internal static EffectSummaryCatalog FromOptionsWithCompatibilityReporter(
         AnalyzerOptions options,
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter compatibilityReporter)
     {
-        return BuiltInEffectSummaryLoader.LoadCatalogWithAdditionalDocuments(
+        var builtInCatalog = BuiltInCatalog.Value;
+        if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
+
+        var entries = CloneEntries(builtInCatalog._entriesBySymbol);
+        BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
             options,
             cancellationToken,
-            BuiltInCatalog.Value,
-            CreateMutableEntries,
-            EffectSummaryCatalogSourcePriorities.Additional,
-            ParseEntries,
-            CreateCatalog,
-            compatibilityReporter);
+            (path, json) => AddJson(entries, json, AdditionalSourcePriority, path, compatibilityReporter));
+        return CreateCatalog(entries);
     }
 
-    private static GeneratedPurityCatalog CreateBuiltInCatalog()
+    private static EffectSummaryCatalog CreateBuiltInCatalog()
     {
-        return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
-            EffectSummaryCatalogSourcePriorities.BuiltIn,
-            ParseEntries,
-            CreateCatalog);
+        var entries = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+        BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(
+            json => AddJson(entries, json, BuiltInSourcePriority, null, null));
+        return CreateCatalog(entries);
     }
 
-    public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)
+    public static IDisposable UseCurrent(EffectSummaryCatalog catalog)
     {
         return new Scope(CurrentCatalog.Value, catalog.IsEmpty ? null : catalog);
     }
 
-    private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
-        GeneratedPurityCatalog catalog)
+    private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CloneEntries(
+        ImmutableDictionary<string, ImmutableArray<SummaryEntry>> source)
     {
-        return EffectSummaryCatalogEntryMap.Clone(catalog._entriesBySymbol);
+        var clone = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+        foreach (var item in source)
+            clone.Add(item.Key, item.Value.ToBuilder());
+        return clone;
     }
 
-    private static GeneratedPurityCatalog CreateCatalog(
+    private static EffectSummaryCatalog CreateCatalog(
         Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
     {
         if (entriesBySymbol.Count == 0) return Empty;
 
-        return new GeneratedPurityCatalog(EffectSummaryCatalogEntryMap.Freeze(entriesBySymbol));
+        return new EffectSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
+            static item => item.Key,
+            static item => item.Value.ToImmutable(),
+            StringComparer.Ordinal));
     }
 
     public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification)
@@ -87,8 +102,8 @@ internal sealed class GeneratedPurityCatalog
 
         if (TryGetImplicitMetadataValueTypeConstructorPurity(methodSymbol, out classification)) return true;
 
-        var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
-        var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
+        var actualAssemblyIdentity = PurityIdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+        var actualMethodIdentity = PurityIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         if (actualAssemblyIdentity == null || actualMethodIdentity == null) return false;
 
         var bestEntry = SelectBestEntry(
@@ -116,8 +131,8 @@ internal sealed class GeneratedPurityCatalog
                 implicitClassification,
                 true));
 
-        var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
-        var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
+        var actualAssemblyIdentity = PurityIdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+        var actualMethodIdentity = PurityIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         var trustedEntries = new List<SummaryEntry>();
         var methodKeys = RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol).ToArray();
         var bestEntry = actualAssemblyIdentity != null && actualMethodIdentity != null
@@ -133,7 +148,7 @@ internal sealed class GeneratedPurityCatalog
             bestEntry = SelectBestEntry(
                 methodKeys,
                 entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
-                         entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
+                         entry.SourcePriority == BuiltInSourcePriority &&
                          entry.AssemblyIdentity?.IsComplete == true &&
                          entry.MethodIdentity != null,
                 trustedEntries);
@@ -143,10 +158,10 @@ internal sealed class GeneratedPurityCatalog
         var uniqueEntries = new Dictionary<string, TrustedPurityEntry>(StringComparer.Ordinal);
         foreach (var entry in trustedEntries)
         {
-            var source = entry.SourcePriority == EffectSummaryCatalogSourcePriorities.Additional
+            var source = entry.SourcePriority == AdditionalSourcePriority
                 ? "additional_generated_summary"
                 : "built_in_generated_summary";
-            var value = entry.SourcePriority == EffectSummaryCatalogSourcePriorities.Additional
+            var value = entry.SourcePriority == AdditionalSourcePriority
                 ? entry.SourcePath ?? entry.DisplayName
                 : entry.DisplayName;
             var key = source + "\u001f" + value + "\u001f" + entry.Classification.Classification;
@@ -187,7 +202,7 @@ internal sealed class GeneratedPurityCatalog
         var bestEntry = SelectBestEntry(
             RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
-                     entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
+                     entry.SourcePriority == BuiltInSourcePriority &&
                      entry.AssemblyIdentity?.IsComplete == true &&
                      entry.MethodIdentity != null);
 
@@ -199,7 +214,7 @@ internal sealed class GeneratedPurityCatalog
 
     private static bool IsBuiltInAbstractInterfaceEntry(IMethodSymbol methodSymbol, SummaryEntry entry)
     {
-        return entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
+        return entry.SourcePriority == BuiltInSourcePriority &&
                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface &&
                (string.Equals(entry.Classification.PrimaryCategory, "abstract", StringComparison.Ordinal) ||
                 entry.Classification.Categories.Contains("abstract", StringComparer.Ordinal));
@@ -279,6 +294,75 @@ internal sealed class GeneratedPurityCatalog
             out classification);
     }
 
+    public bool TryGetExceptionInfos(
+        IMethodSymbol methodSymbol,
+        Compilation? compilation,
+        out ImmutableArray<SummaryExceptionInfo> exceptionInfos)
+    {
+        if (IsEmpty)
+        {
+            exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
+            return false;
+        }
+
+        var matchedSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+        var matchedEdges =
+            new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
+                StringComparer.Ordinal);
+        var actualAssemblyIdentity = compilation is null
+            ? null
+            : ExceptionIdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+        var actualMethodIdentity = compilation is null
+            ? null
+            : ExceptionIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
+
+        foreach (var entry in EnumerateEntries(
+                     RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol)))
+        {
+            if (entry.ExceptionInfos.IsDefaultOrEmpty ||
+                !entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
+                continue;
+
+            foreach (var exceptionInfo in entry.ExceptionInfos)
+            {
+                if (!matchedSources.TryGetValue(exceptionInfo.ExceptionType, out var sources))
+                {
+                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    matchedSources.Add(exceptionInfo.ExceptionType, sources);
+                }
+
+                sources.UnionWith(exceptionInfo.Sources);
+                if (exceptionInfo.Edges.IsDefaultOrEmpty) continue;
+
+                if (!matchedEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap))
+                {
+                    edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
+                        SummaryExceptionEdgeInfoComparer.Instance);
+                    matchedEdges.Add(exceptionInfo.ExceptionType, edgeMap);
+                }
+
+                foreach (var edge in exceptionInfo.Edges) edgeMap[edge] = edge;
+            }
+        }
+
+        if (matchedSources.Count == 0)
+        {
+            exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
+            return false;
+        }
+
+        exceptionInfos = matchedSources
+            .OrderBy(static item => item.Key, StringComparer.Ordinal)
+            .Select(item => new SummaryExceptionInfo(
+                item.Key,
+                item.Value.ToImmutableArray(),
+                matchedEdges.TryGetValue(item.Key, out var edgeMap)
+                    ? OrderExceptionEdges(edgeMap.Values)
+                    : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
+            .ToImmutableArray();
+        return true;
+    }
+
     private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
     {
         var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
@@ -314,9 +398,9 @@ internal sealed class GeneratedPurityCatalog
         ICollection<SummaryEntry>? eligibleEntries = null)
     {
         SummaryEntry? bestEntry = null;
-        foreach (var entry in EffectSummaryCatalogEntryMap.Enumerate(_entriesBySymbol, keys))
+        foreach (var entry in EnumerateEntries(keys))
         {
-            if (!isEligible(entry)) continue;
+            if (!entry.HasPurity || !isEligible(entry)) continue;
 
             eligibleEntries?.Add(entry);
             if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
@@ -326,17 +410,49 @@ internal sealed class GeneratedPurityCatalog
         return bestEntry;
     }
 
+    private IEnumerable<SummaryEntry> EnumerateEntries(IEnumerable<string> keys)
+    {
+        foreach (var key in keys)
+            if (_entriesBySymbol.TryGetValue(key, out var entries))
+                foreach (var entry in entries)
+                    yield return entry;
+    }
+
     internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation,
         out bool canBeOverridden)
     {
         canBeOverridden = false;
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true) return false;
 
-        var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
+        var actualMethodIdentity = PurityIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         if (actualMethodIdentity == null) return false;
 
         canBeOverridden = actualMethodIdentity.CanBeOverridden;
         return true;
+    }
+
+    private static void AddJson(
+        Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
+        string json,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter)
+    {
+        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _)) return;
+
+        using (document)
+        {
+            foreach (var entry in ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter))
+            {
+                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var entries))
+                {
+                    entries = ImmutableArray.CreateBuilder<SummaryEntry>();
+                    entriesBySymbol.Add(entry.Symbol, entries);
+                }
+
+                entries.Add(entry);
+            }
+        }
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
@@ -345,7 +461,8 @@ internal sealed class GeneratedPurityCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        if (document.TryGetGeneratedPurityEntries(out var entriesElement))
+        var hasGeneratedPurity = document.TryGetGeneratedPurityEntries(out var entriesElement);
+        if (hasGeneratedPurity)
         {
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
@@ -360,6 +477,7 @@ internal sealed class GeneratedPurityCatalog
                     canonicalKey,
                     displayName,
                     purityEntry,
+                    ImmutableArray<SummaryExceptionInfo>.Empty,
                     SummaryAssemblyIdentity.FromJson(entryElement),
                     SummaryMethodIdentity.FromJson(entryElement),
                     EffectSummaryArtifactSource.FromJson(entryElement),
@@ -367,8 +485,6 @@ internal sealed class GeneratedPurityCatalog
                     sourcePath,
                     compatibilityReporter);
             }
-
-            yield break;
         }
 
         foreach (var assembly in document.EnumerateLegacyAssemblies())
@@ -377,11 +493,18 @@ internal sealed class GeneratedPurityCatalog
             var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
             foreach (var methodElement in assembly.EnumerateMethods())
             {
-                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
-                    !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
-                    purityElement.ValueKind != JsonValueKind.Object ||
-                    !TryCreatePurityEntry(purityElement, out var purityEntry))
-                    continue;
+                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey)) continue;
+
+                PurityEntry? purityEntry = null;
+                if (!hasGeneratedPurity &&
+                    methodElement.TryGetProperty("PurityClassification", out var purityElement) &&
+                    purityElement.ValueKind == JsonValueKind.Object &&
+                    TryCreatePurityEntry(purityElement, out var parsedPurity))
+                    purityEntry = parsedPurity;
+
+                var exceptionInfos = ReadExceptionInfos(methodElement);
+                if (!purityEntry.HasValue && exceptionInfos.IsDefaultOrEmpty) continue;
+
                 var displayName = AnalyzerJsonElementReader.GetTrimmedStringProperty(methodElement, "DisplayName") ??
                                   canonicalKey;
 
@@ -389,6 +512,7 @@ internal sealed class GeneratedPurityCatalog
                     canonicalKey,
                     displayName,
                     purityEntry,
+                    exceptionInfos,
                     assemblyIdentity,
                     SummaryMethodIdentity.FromJson(methodElement),
                     artifactSource,
@@ -397,6 +521,35 @@ internal sealed class GeneratedPurityCatalog
                     compatibilityReporter);
             }
         }
+    }
+
+    private static ImmutableArray<SummaryExceptionInfo> ReadExceptionInfos(JsonElement methodElement)
+    {
+        var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+        var exceptionEdges =
+            new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
+                StringComparer.Ordinal);
+        exceptionTypes.UnionWith(EnumerateTrimmedStringArrayValues(methodElement, "ThrownExceptionTypes"));
+        exceptionTypes.UnionWith(EnumerateTrimmedStringArrayValues(methodElement, "TransitiveThrownExceptionTypes"));
+        AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
+        AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionProvenance");
+        AddExceptionEdges(
+            exceptionTypes,
+            exceptionSources,
+            exceptionEdges,
+            methodElement,
+            "TransitiveThrownExceptionEdges");
+        return exceptionTypes
+            .Select(exceptionType => new SummaryExceptionInfo(
+                exceptionType,
+                exceptionSources.TryGetValue(exceptionType, out var sources)
+                    ? sources.ToImmutableArray()
+                    : ImmutableArray<string>.Empty,
+                exceptionEdges.TryGetValue(exceptionType, out var edges)
+                    ? OrderExceptionEdges(edges.Values)
+                    : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
+            .ToImmutableArray();
     }
 
     private static bool TryCreatePurityEntry(JsonElement element, out PurityEntry purityEntry)
@@ -461,6 +614,129 @@ internal sealed class GeneratedPurityCatalog
         return builder.ToImmutable();
     }
 
+    private static ImmutableArray<SummaryExceptionEdgeInfo> OrderExceptionEdges(
+        IEnumerable<SummaryExceptionEdgeInfo> edges) => edges
+        .OrderBy(static edge => edge.Depth)
+        .ThenBy(static edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
+        .ThenBy(static edge => string.Join(">", edge.CallChain.Select(static item => item.ToCanonicalKey())),
+            StringComparer.Ordinal)
+        .ThenBy(static edge => edge.SourcePath, StringComparer.Ordinal)
+        .ToImmutableArray();
+
+    private static void AddExceptionSources(
+        ImmutableSortedSet<string>.Builder exceptionTypes,
+        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+        JsonElement methodElement,
+        string propertyName)
+    {
+        foreach (var element in EnumerateObjectArrayProperty(methodElement, propertyName))
+            if (TryGetExceptionType(element, out var exceptionType))
+                AddExceptionSource(
+                    exceptionTypes,
+                    exceptionSources,
+                    exceptionType,
+                    AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath"));
+    }
+
+    private static void AddExceptionEdges(
+        ImmutableSortedSet<string>.Builder exceptionTypes,
+        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+        Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>> exceptionEdges,
+        JsonElement methodElement,
+        string propertyName)
+    {
+        foreach (var element in EnumerateObjectArrayProperty(methodElement, propertyName))
+        {
+            if (!TryGetExceptionType(element, out var exceptionType)) continue;
+
+            var sourcePath = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "SourcePath");
+            AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, sourcePath);
+            if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
+            {
+                edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
+                    SummaryExceptionEdgeInfoComparer.Instance);
+                exceptionEdges.Add(exceptionType, edgeMap);
+            }
+
+            var calleeIdentity = element.TryGetProperty("CalleeIdentity", out var identityElement) &&
+                                 StructuralMethodIdentityJson.TryReadIdentity(identityElement, out var identity)
+                ? identity
+                : null;
+            int? depth = element.TryGetProperty("Depth", out var depthElement) &&
+                         depthElement.ValueKind == JsonValueKind.Number && depthElement.TryGetInt32(out var value)
+                ? value
+                : null;
+            var edge = new SummaryExceptionEdgeInfo(
+                sourcePath,
+                StructuralMethodIdentityJson.ReadCallChain(element),
+                calleeIdentity,
+                depth);
+            edgeMap[edge] = edge;
+        }
+    }
+
+    private static void AddExceptionSource(
+        ImmutableSortedSet<string>.Builder exceptionTypes,
+        Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+        string exceptionType,
+        string? sourcePath)
+    {
+        exceptionTypes.Add(exceptionType);
+        if (sourcePath == null) return;
+
+        if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+        {
+            sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+            exceptionSources.Add(exceptionType, sources);
+        }
+
+        sources.Add(sourcePath);
+    }
+
+    private static IEnumerable<string> EnumerateTrimmedStringArrayValues(
+        JsonElement element,
+        string propertyName)
+    {
+        if (!TryGetArrayProperty(element, propertyName, out var valuesElement)) yield break;
+
+        foreach (var valueElement in valuesElement.EnumerateArray())
+        {
+            if (valueElement.ValueKind != JsonValueKind.String) continue;
+            var value = valueElement.GetString();
+            if (!string.IsNullOrWhiteSpace(value)) yield return value!.Trim();
+        }
+    }
+
+    private static IEnumerable<JsonElement> EnumerateObjectArrayProperty(
+        JsonElement element,
+        string propertyName)
+    {
+        if (!TryGetArrayProperty(element, propertyName, out var valuesElement)) yield break;
+
+        foreach (var valueElement in valuesElement.EnumerateArray())
+            if (valueElement.ValueKind == JsonValueKind.Object)
+                yield return valueElement;
+    }
+
+    private static bool TryGetArrayProperty(
+        JsonElement element,
+        string propertyName,
+        out JsonElement valuesElement)
+    {
+        if (element.TryGetProperty(propertyName, out valuesElement) &&
+            valuesElement.ValueKind == JsonValueKind.Array)
+            return true;
+
+        valuesElement = default;
+        return false;
+    }
+
+    private static bool TryGetExceptionType(JsonElement element, out string exceptionType)
+    {
+        exceptionType = AnalyzerJsonElementReader.GetTrimmedStringProperty(element, "ExceptionType")!;
+        return exceptionType != null;
+    }
+
     private bool TryGetTrustedPurityByMethodKeys(
         IAssemblySymbol? containingAssembly,
         ImmutableArray<string> methodKeys,
@@ -471,13 +747,15 @@ internal sealed class GeneratedPurityCatalog
         if (containingAssembly == null || methodKeys.IsDefaultOrEmpty) return false;
 
         var implementationPath =
-            IdentityResolver.TryResolveRuntimeImplementationAssemblyPath(containingAssembly, methodKeys, methodKeys[0]);
+            PurityIdentityResolver.TryResolveRuntimeImplementationAssemblyPath(
+                containingAssembly, methodKeys, methodKeys[0]);
         if (!string.IsNullOrWhiteSpace(implementationPath))
         {
             var path = implementationPath!;
-            if (IdentityResolver.TryResolveMethodIdentityFromPath(methodKeys, path, out var implementationIdentity))
+            if (PurityIdentityResolver.TryResolveMethodIdentityFromPath(
+                    methodKeys, path, out var implementationIdentity))
             {
-                var assemblyIdentity = IdentityResolver.GetAssemblyIdentity(path);
+                var assemblyIdentity = PurityIdentityResolver.GetAssemblyIdentity(path);
                 if (TryMatchTrustedEntry(methodKeys, assemblyIdentity, implementationIdentity, out classification))
                     return true;
             }
@@ -486,8 +764,8 @@ internal sealed class GeneratedPurityCatalog
         var referencePath = SummaryAssemblyReferenceResolver.FindAssemblyReferencePath(containingAssembly, compilation);
         if (referencePath == null) return false;
 
-        var referenceAssemblyIdentity = IdentityResolver.GetAssemblyIdentity(referencePath);
-        return IdentityResolver.TryResolveMethodIdentityFromPath(methodKeys, referencePath,
+        var referenceAssemblyIdentity = PurityIdentityResolver.GetAssemblyIdentity(referencePath);
+        return PurityIdentityResolver.TryResolveMethodIdentityFromPath(methodKeys, referencePath,
                    out var referenceIdentity) &&
                TryMatchTrustedEntry(methodKeys, referenceAssemblyIdentity, referenceIdentity, out classification);
     }
@@ -527,24 +805,45 @@ internal sealed class GeneratedPurityCatalog
     private sealed class SummaryEntry(
         string symbol,
         string displayName,
-        PurityEntry classification,
+        PurityEntry? classification,
+        ImmutableArray<SummaryExceptionInfo> exceptionInfos,
         SummaryAssemblyIdentity? assemblyIdentity,
         SummaryMethodIdentity? methodIdentity,
         EffectSummaryArtifactSource? artifactSource,
         int sourcePriority,
         string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter) : EffectSummaryCatalogEntry(
-            symbol,
-            displayName,
+        EffectSummaryCompatibilityReporter? compatibilityReporter)
+    {
+        private readonly EffectSummaryEntryTrustMetadata _trust = new(
             assemblyIdentity,
             methodIdentity,
             artifactSource,
             sourcePriority,
+            BuiltInSourcePriority,
+            AdditionalSourcePriority,
             sourcePath,
-            compatibilityReporter)
-    {
+            compatibilityReporter);
+
+        public string Symbol { get; } = symbol;
         public string DisplayName { get; } = displayName;
-        public PurityEntry Classification { get; } = classification;
+        public bool HasPurity => classification.HasValue;
+        public PurityEntry Classification => classification!.Value;
+        public ImmutableArray<SummaryExceptionInfo> ExceptionInfos { get; } = exceptionInfos;
+        public SummaryAssemblyIdentity? AssemblyIdentity => _trust.AssemblyIdentity;
+        public SummaryMethodIdentity? MethodIdentity => _trust.MethodIdentity;
+        public int SourcePriority => _trust.SourcePriority;
+        public string? SourcePath => _trust.SourcePath;
+
+        public bool IsTrustedFor(
+            IMethodSymbol methodSymbol,
+            ActualAssemblyIdentity? actualAssemblyIdentity,
+            ActualMethodIdentity? actualMethodIdentity) =>
+            _trust.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity, DisplayName);
+
+        public bool IsTrustedFor(
+            ActualAssemblyIdentity? actualAssemblyIdentity,
+            ActualMethodIdentity? actualMethodIdentity) =>
+            _trust.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, DisplayName);
     }
 
     internal readonly struct PurityEntry(
@@ -599,11 +898,47 @@ internal sealed class GeneratedPurityCatalog
         internal bool IsSelected { get; } = isSelected;
     }
 
+    internal sealed record SummaryExceptionInfo(
+        string ExceptionType,
+        ImmutableArray<string> Sources,
+        ImmutableArray<SummaryExceptionEdgeInfo> Edges);
+
+    internal sealed record SummaryExceptionEdgeInfo(
+        string? SourcePath,
+        ImmutableArray<StructuralMethodIdentity> CallChain,
+        StructuralMethodIdentity? CalleeIdentity,
+        int? Depth);
+
+    private sealed class SummaryExceptionEdgeInfoComparer : IEqualityComparer<SummaryExceptionEdgeInfo>
+    {
+        internal static readonly SummaryExceptionEdgeInfoComparer Instance = new();
+
+        public bool Equals(SummaryExceptionEdgeInfo? left, SummaryExceptionEdgeInfo? right) =>
+            ReferenceEquals(left, right) ||
+            left is not null && right is not null &&
+            string.Equals(left.SourcePath, right.SourcePath, StringComparison.Ordinal) &&
+            left.CallChain.SequenceEqual(right.CallChain) &&
+            object.Equals(left.CalleeIdentity, right.CalleeIdentity) &&
+            left.Depth == right.Depth;
+
+        public int GetHashCode(SummaryExceptionEdgeInfo edge)
+        {
+            unchecked
+            {
+                var hash = 17;
+                hash = hash * 31 + (edge.SourcePath == null ? 0 : StringComparer.Ordinal.GetHashCode(edge.SourcePath));
+                foreach (var identity in edge.CallChain) hash = hash * 31 + identity.GetHashCode();
+                hash = hash * 31 + (edge.CalleeIdentity?.GetHashCode() ?? 0);
+                return hash * 31 + (edge.Depth ?? 0);
+            }
+        }
+    }
+
     private sealed class Scope : IDisposable
     {
-        private readonly GeneratedPurityCatalog? _previous;
+        private readonly EffectSummaryCatalog? _previous;
 
-        public Scope(GeneratedPurityCatalog? previous, GeneratedPurityCatalog? current)
+        public Scope(EffectSummaryCatalog? previous, EffectSummaryCatalog? current)
         {
             _previous = previous;
             CurrentCatalog.Value = current;

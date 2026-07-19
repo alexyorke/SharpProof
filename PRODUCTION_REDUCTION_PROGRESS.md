@@ -454,14 +454,24 @@ Tests are excluded from the metric and must not be deleted.
   program-point tests preserve solver health, evidence, truncation, and query
   behavior; architecture coverage prevents the duplicate snapshot type from
   returning.
+- [x] Made `EffectSummaryCatalog` the single analyzer owner for generated purity
+  and exception summaries. Deleted the parallel exception catalog, its duplicate
+  parser and entry graph, the generic one-consumer entry-map/base-entry stack,
+  and the generic catalog-loader adapters. Purity and exception lookups retain
+  their distinct identity policies while sharing immutable entries, trust
+  metadata, source precedence, and one session-scoped catalog. Focused parsing,
+  trust, exception-edge, packaging, and architecture tests preserve tolerant
+  malformed-input behavior and prevent all three superseded catalog paths from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 94,250 lines (90,331 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,376 lines; remaining reduction: 6,624.
-  This tranche removed 34 maintained lines without deleting tests.
+- Maintained production: 93,974 lines (90,055 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,652 lines; remaining reduction: 6,348.
+  This tranche removed 276 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,205 passing tests and two documented Main skips.
+- Six lanes: 6,204 passing tests and two documented Main skips. The catalog-map
+  unit test was retained as an equivalent unified-catalog isolation test.
 
 ## Milestones
 

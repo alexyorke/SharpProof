@@ -200,8 +200,8 @@ internal static class TrustedBoundaryReviewAnalyzer
                 false));
 
         var generatedEntries = method == null
-            ? ImmutableArray<GeneratedPurityCatalog.TrustedPurityEntry>.Empty
-            : GeneratedPurityCatalog.Current.GetTrustedPurityEntries(method, compilation);
+            ? ImmutableArray<EffectSummaryCatalog.TrustedPurityEntry>.Empty
+            : EffectSummaryCatalog.Current.GetTrustedPurityEntries(method, compilation);
         foreach (var entry in generatedEntries)
             candidates.Add(new TrustCandidate(
                 entry.Source,

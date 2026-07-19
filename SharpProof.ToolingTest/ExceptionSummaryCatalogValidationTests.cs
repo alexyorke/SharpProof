@@ -2247,7 +2247,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             new TestAnalyzerConfigOptionsProvider(CreateEffectSummaryJsonEnabledGlobalOptions()));
 
         var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog", true)!;
+            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog", true)!;
         var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
         var tryGetExceptionInfosMethod = catalogType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .Single(method => method.Name == "TryGetExceptionInfos" &&
@@ -2349,7 +2349,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             new TestAnalyzerConfigOptionsProvider(CreateEffectSummaryJsonEnabledGlobalOptions()));
 
         var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog", true)!;
+            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.EffectSummaryCatalog", true)!;
         var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
         var tryGetExceptionInfosMethod = catalogType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .Single(method => method.Name == "TryGetExceptionInfos" &&

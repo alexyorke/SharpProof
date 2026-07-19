@@ -35,52 +35,6 @@ internal static class BuiltInEffectSummaryLoader
         return false;
     }
 
-    internal static TCatalog LoadCatalogWithAdditionalDocuments<TCatalog, TEntry>(
-        AnalyzerOptions options,
-        CancellationToken cancellationToken,
-        TCatalog builtInCatalog,
-        Func<TCatalog, Dictionary<string, ImmutableArray<TEntry>.Builder>> cloneEntries,
-        int sourcePriority,
-        Func<EffectSummaryJsonDocument, int, string?, EffectSummaryCompatibilityReporter?, IEnumerable<TEntry>>
-            parseEntries,
-        Func<Dictionary<string, ImmutableArray<TEntry>.Builder>, TCatalog> createCatalog,
-        EffectSummaryCompatibilityReporter compatibilityReporter)
-        where TEntry : IEffectSummaryCatalogEntry
-    {
-        if (!HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
-
-        var entries = cloneEntries(builtInCatalog);
-        LoadAdditionalSummaryJsonDocuments(
-            options,
-            cancellationToken,
-            (path, json) => EffectSummaryCatalogEntryMap.AddJson(
-                entries,
-                json,
-                sourcePriority,
-                path,
-                compatibilityReporter,
-                parseEntries));
-        return createCatalog(entries);
-    }
-
-    internal static TCatalog LoadBuiltInCatalog<TCatalog, TEntry>(
-        int sourcePriority,
-        Func<EffectSummaryJsonDocument, int, string?, EffectSummaryCompatibilityReporter?, IEnumerable<TEntry>>
-            parseEntries,
-        Func<Dictionary<string, ImmutableArray<TEntry>.Builder>, TCatalog> createCatalog)
-        where TEntry : IEffectSummaryCatalogEntry
-    {
-        var entries = new Dictionary<string, ImmutableArray<TEntry>.Builder>(StringComparer.Ordinal);
-        LoadBuiltInSummaryJsonDocuments(json => EffectSummaryCatalogEntryMap.AddJson(
-            entries,
-            json,
-            sourcePriority,
-            null,
-            null,
-            parseEntries));
-        return createCatalog(entries);
-    }
-
     internal static bool IsSummaryFile(string path)
     {
         var fileName = Path.GetFileName(path);

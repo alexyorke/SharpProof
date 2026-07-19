@@ -53,7 +53,7 @@ internal partial class MethodInvocationPurityRule
         if (methodSymbol.DeclaringSyntaxReferences.Length > 0 || methodSymbol.IsAbstract) return false;
 
         var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
-        return !GeneratedPurityCatalog.IsFrameworkAssemblyName(assemblyName);
+        return !EffectSummaryCatalog.IsFrameworkAssemblyName(assemblyName);
     }
 
     private static bool TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(

@@ -6,7 +6,7 @@ internal static partial class ExceptionFlowEngine
         ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
@@ -68,7 +68,7 @@ internal static partial class ExceptionFlowEngine
         ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)

@@ -30,22 +30,17 @@ internal sealed class AnalyzerSession : IDisposable
                 Configuration.AnalysisLimits),
             LazyThreadSafetyMode.ExecutionAndPublication);
 
-        ExceptionSummaryCatalog = (Features.Includes(AnalyzerFeatures.Exceptions) ||
-                                   Features.Includes(AnalyzerFeatures.Suggestions)) &&
-                                  Configuration.EnableEffectSummaryJson
-            ? ExceptionSummaryCatalog.FromOptionsWithCompatibilityReporter(
+        var needsEffectSummaries = Configuration.EnableEffectSummaryJson &&
+                                   (Features.Includes(AnalyzerFeatures.Exceptions) ||
+                                    Features.Includes(AnalyzerFeatures.Suggestions) ||
+                                    Features.Includes(AnalyzerFeatures.Purity) ||
+                                    Configuration.TrustedBoundaryReviewMode != TrustedBoundaryReviewMode.Off);
+        EffectSummaryCatalog = needsEffectSummaries
+            ? EffectSummaryCatalog.FromOptionsWithCompatibilityReporter(
                 options,
                 cancellationToken,
                 EffectSummaryCompatibilityReporter)
-            : ExceptionSummaryCatalog.Empty;
-        GeneratedPurityCatalog = (Features.Includes(AnalyzerFeatures.Purity) ||
-                                  Configuration.TrustedBoundaryReviewMode != TrustedBoundaryReviewMode.Off) &&
-                                 Configuration.EnableEffectSummaryJson
-            ? GeneratedPurityCatalog.FromOptionsWithCompatibilityReporter(
-                options,
-                cancellationToken,
-                EffectSummaryCompatibilityReporter)
-            : null;
+            : EffectSummaryCatalog.Empty;
     }
 
     internal AnalyzerFeatures Features { get; }
@@ -58,9 +53,7 @@ internal sealed class AnalyzerSession : IDisposable
 
     internal EffectSummaryCompatibilityReporter EffectSummaryCompatibilityReporter { get; }
 
-    internal ExceptionSummaryCatalog ExceptionSummaryCatalog { get; }
-
-    internal GeneratedPurityCatalog? GeneratedPurityCatalog { get; }
+    internal EffectSummaryCatalog EffectSummaryCatalog { get; }
 
     internal CompilationPurityService PurityService => _purityService.Value;
 

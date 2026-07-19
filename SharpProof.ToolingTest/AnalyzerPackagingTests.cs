@@ -2021,7 +2021,7 @@ namespace TestNamespace {
     public void GeneratedPurityCatalog_EmptyScope_DoesNotMaskBuiltInFallback()
     {
         var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
-            "SharpProof.Analyzer.GeneratedPurityCatalog",
+            "SharpProof.Analyzer.EffectSummaryCatalog",
             true)!;
         var emptyCatalog = catalogType.GetField("Empty", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
         var useCurrent = catalogType.GetMethod("UseCurrent", BindingFlags.Public | BindingFlags.Static)!;
@@ -2056,7 +2056,7 @@ namespace TestNamespace {
             File.WriteAllText(summaryPath, summaryJson);
 
             var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
-                "SharpProof.Analyzer.GeneratedPurityCatalog",
+                "SharpProof.Analyzer.EffectSummaryCatalog",
                 true)!;
             var createBuiltInCatalog =
                 catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -2121,7 +2121,7 @@ namespace TestNamespace {
             File.WriteAllText(summaryPath, summaryJson);
 
             var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
-                "SharpProof.Analyzer.ExceptionSummaryCatalog",
+                "SharpProof.Analyzer.EffectSummaryCatalog",
                 true)!;
             var createBuiltInCatalog =
                 catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -2196,7 +2196,7 @@ namespace TestNamespace {
             File.WriteAllText(summaryPath, summaryJson);
 
             var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
-                "SharpProof.Analyzer.ExceptionSummaryCatalog",
+                "SharpProof.Analyzer.EffectSummaryCatalog",
                 true)!;
             var createBuiltInCatalog =
                 catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;

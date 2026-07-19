@@ -121,7 +121,7 @@ public class EffectSummarySymbolKeyFactoryTests
             false,
             RoslynStructuralMethodIdentity.GetCanonicalKey);
         var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
-            "SharpProof.Analyzer.GeneratedPurityCatalog",
+            "SharpProof.Analyzer.EffectSummaryCatalog",
             true)!;
         var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
         var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;

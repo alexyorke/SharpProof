@@ -62,7 +62,7 @@ public sealed class ExceptionFlowResultGraphTests
         return ExceptionFlowEngine.AnalyzeMethod(
             SymbolicMethodAnalysisInput.Create(methodSymbol, method, model),
             CancellationToken.None,
-            ExceptionSummaryCatalog.Empty,
+            EffectSummaryCatalog.Empty,
             smt,
             SharpProofAttributeIdentityPolicy.Create(ImmutableHashSet<string>.Empty));
     }

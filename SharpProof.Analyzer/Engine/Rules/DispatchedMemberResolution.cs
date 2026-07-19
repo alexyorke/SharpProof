@@ -113,7 +113,7 @@ internal static class DispatchedMemberResolution
 
         if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride) return false;
 
-        if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
+        if (EffectSummaryCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
             return canBeOverridden;
 
         return !methodSymbol.IsSealed;

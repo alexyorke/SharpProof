@@ -1488,8 +1488,8 @@ public class TestClass
                 node.ToString() == "error.HResult")
             .ToArray();
         var scopedCatalog = GetGeneratedPurityCatalog();
-        using var currentScope = GeneratedPurityCatalog.UseCurrent(scopedCatalog);
-        var currentCatalog = GeneratedPurityCatalog.Current;
+        using var currentScope = EffectSummaryCatalog.UseCurrent(scopedCatalog);
+        var currentCatalog = EffectSummaryCatalog.Current;
         var classifications = memberAccesses.ToDictionary(
             node => node.ToString(),
             node =>

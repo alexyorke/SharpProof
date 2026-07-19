@@ -17,7 +17,7 @@ public partial class DiagnosticEvidenceTests
     private static readonly ImmutableArray<MetadataReference> GeneratedPurityProbeReferences =
         AnalyzerTestHost.GetTrustedPlatformReferences().Add(EnforcePureAttributeReference);
 
-    private static readonly Lazy<GeneratedPurityCatalog> DefaultGeneratedPurityCatalog = new(
+    private static readonly Lazy<EffectSummaryCatalog> DefaultGeneratedPurityCatalog = new(
         () => CreateGeneratedPurityCatalog(CreateGeneratedPurityAnalyzerOptions()),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -203,12 +203,12 @@ public partial class DiagnosticEvidenceTests
             syntaxTree.GetRoot());
     }
 
-    private static GeneratedPurityCatalog CreateGeneratedPurityCatalog(AnalyzerOptions analyzerOptions)
+    private static EffectSummaryCatalog CreateGeneratedPurityCatalog(AnalyzerOptions analyzerOptions)
     {
-        return GeneratedPurityCatalog.FromOptions(analyzerOptions, CancellationToken.None);
+        return EffectSummaryCatalog.FromOptions(analyzerOptions, CancellationToken.None);
     }
 
-    private static GeneratedPurityCatalog GetGeneratedPurityCatalog(AnalyzerOptions? analyzerOptions = null)
+    private static EffectSummaryCatalog GetGeneratedPurityCatalog(AnalyzerOptions? analyzerOptions = null)
     {
         return analyzerOptions is null
             ? DefaultGeneratedPurityCatalog.Value
@@ -240,7 +240,7 @@ public partial class DiagnosticEvidenceTests
     }
 
     private static GeneratedPurityResolution ResolveGeneratedPurity(
-        GeneratedPurityCatalog catalog,
+        EffectSummaryCatalog catalog,
         ISymbol symbol,
         Compilation compilation)
     {
@@ -256,7 +256,7 @@ public partial class DiagnosticEvidenceTests
     }
 
     private static GeneratedPurityResolution ResolveGeneratedPurity(
-        GeneratedPurityCatalog catalog,
+        EffectSummaryCatalog catalog,
         IMethodSymbol method,
         Compilation compilation)
     {
@@ -265,7 +265,7 @@ public partial class DiagnosticEvidenceTests
     }
 
     private static GeneratedPurityResolution ResolveGeneratedPurity(
-        GeneratedPurityCatalog catalog,
+        EffectSummaryCatalog catalog,
         IFieldSymbol field,
         Compilation compilation)
     {
@@ -275,7 +275,7 @@ public partial class DiagnosticEvidenceTests
 
     private static GeneratedPurityResolution CreateGeneratedPurityResolution(
         bool matched,
-        GeneratedPurityCatalog.PurityEntry purity)
+        EffectSummaryCatalog.PurityEntry purity)
     {
         return matched
             ? new GeneratedPurityResolution(

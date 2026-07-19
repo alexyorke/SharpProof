@@ -42,7 +42,7 @@ internal partial class PropertyReferencePurityRule
 
         if (propertyReferenceOperation.Property.GetMethod is { } runtimeBackedGetter &&
             PurityConcreteReceiverResolver.IsKnownSystemTypeRuntimeReceiver(propertyReferenceOperation.Instance) &&
-            GeneratedPurityCatalog.Current.TryGetSystemTypeRuntimeImplementationPurity(
+            EffectSummaryCatalog.Current.TryGetSystemTypeRuntimeImplementationPurity(
                 runtimeBackedGetter.OriginalDefinition,
                 context.SemanticModel.Compilation,
                 out var runtimeImplementationPurity))

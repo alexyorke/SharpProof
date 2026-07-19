@@ -16,7 +16,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
-        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        EffectSummaryCatalog exceptionSummaryCatalog,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)

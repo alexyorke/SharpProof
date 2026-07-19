@@ -115,7 +115,7 @@ public sealed class EffectSummarySchemaV5Tests
             root.GetRawText());
         var options = AnalyzerTestHost.CreateAnalyzerOptions(
             additionalFiles: ImmutableArray.Create<AdditionalText>(additionalText));
-        var catalog = ExceptionSummaryCatalog.FromOptions(options, CancellationToken.None);
+        var catalog = EffectSummaryCatalog.FromOptions(options, CancellationToken.None);
 
         Assert.That(catalog.TryGetExceptionInfos(methodSymbol, compilation, out var exceptionInfos), Is.True);
         var exceptionInfo = exceptionInfos.Single(info =>
