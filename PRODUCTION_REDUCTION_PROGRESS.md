@@ -357,12 +357,17 @@ Tests are excluded from the metric and must not be deleted.
   surface directly; all eight query kinds, concurrent caching, typed failures,
   cancellation retry, and package consumers retain their characterized
   behavior.
+- [x] Split the exported code-fix provider into a thin 182-line coordinator,
+  attribute-edit handlers, and inferred-contract handlers while retaining its
+  declarative simple-removal registry and single MEF export. CodeFixes now uses
+  the repository C# 12 level and project-owned global imports; fixable IDs,
+  formatting, packaging, VSIX loading, and fix-all behavior remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 96,565 lines (92,646 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,061 lines; remaining reduction: 8,939.
-  This tranche removed 43 maintained lines without deleting tests.
+- Maintained production: 96,566 lines (92,647 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,060 lines; remaining reduction: 8,940.
+  This responsibility split added one maintained line without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,195 passing tests and two documented Main skips.
 

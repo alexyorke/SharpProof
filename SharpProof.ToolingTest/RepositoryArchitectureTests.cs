@@ -90,6 +90,7 @@ public sealed class RepositoryArchitectureTests
         {
             "SharpProof.Analyzer",
             "SharpProof.Attributes",
+            "SharpProof.CodeFixes",
             "SharpProof.Contracts",
             "SharpProof.ProofCore",
             "SharpProof.Symbolic",
@@ -373,22 +374,29 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
-    public void CodeFixes_DispatchDirectlyFromTheExportedProvider()
+    public void CodeFixes_DispatchFromOneExportedProviderIntoFamilyPartials()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var codeFixRoot = Path.Combine(root, "SharpProof.CodeFixes");
         var provider = File.ReadAllText(Path.Combine(codeFixRoot, "SharpProofCodeFixProvider.cs"));
+        var attributeEdits = File.ReadAllText(Path.Combine(
+            codeFixRoot, "SharpProofCodeFixProvider.AttributeEdits.cs"));
+        var inferredContracts = File.ReadAllText(Path.Combine(
+            codeFixRoot, "SharpProofCodeFixProvider.InferredContracts.cs"));
 
         Assert.Multiple(() =>
         {
             Assert.That(File.Exists(Path.Combine(codeFixRoot, "CodeFixHandlers.cs")), Is.False);
             Assert.That(File.Exists(Path.Combine(codeFixRoot, "CodeFixHandlerRegistry.cs")), Is.False);
+            Assert.That(provider, Does.Contain("public sealed partial class SharpProofCodeFixProvider"));
             Assert.That(provider, Does.Contain("TryGetSimpleRemoval"));
             Assert.That(provider, Does.Contain("RegisterSynchronizationCodeFix"));
-            Assert.That(provider, Does.Contain("Formatter.FormatAsync"));
-            Assert.That(provider, Does.Not.Contain("FormatMovedLeadingTrivia"));
-            Assert.That(provider, Does.Not.Contain("FormatMovedTrailingTrivia"));
-            Assert.That(provider, Does.Not.Contain("CreateExpressionBodiedGetter"));
+            Assert.That(attributeEdits, Does.Contain("RemoveAttributesMatchingAsync"));
+            Assert.That(inferredContracts, Does.Contain("RegisterInferredContractCodeFix"));
+            Assert.That(attributeEdits, Does.Contain("Formatter.FormatAsync"));
+            Assert.That(attributeEdits + inferredContracts, Does.Not.Contain("FormatMovedLeadingTrivia"));
+            Assert.That(attributeEdits + inferredContracts, Does.Not.Contain("FormatMovedTrailingTrivia"));
+            Assert.That(attributeEdits + inferredContracts, Does.Not.Contain("CreateExpressionBodiedGetter"));
         });
     }
 
