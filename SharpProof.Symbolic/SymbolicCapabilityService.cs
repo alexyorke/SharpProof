@@ -21,9 +21,8 @@ internal sealed class SymbolicCapabilityService
 
     public SymbolicCapabilityResult Query(
         SymbolicQueryContext request,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicMethodLikeQueryDispatcher.Execute(
+        CancellationToken cancellationToken) =>
+        SymbolicMethodLikeQueryDispatcher.Execute(
             request,
             SymbolicSourceCompilationKind.Capabilities,
             "Capability source kind is not supported.",
@@ -33,17 +32,15 @@ internal sealed class SymbolicCapabilityService
             ResolveMethodLikeDeclaration,
             ExecuteAnalysis,
             cancellationToken);
-    }
 
     private static SymbolicCapabilityResult ExecuteAnalysis(
         ResolvedCapabilityTarget target,
         Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        var summary = new AnalysisSession(compilation, cancellationToken)
-            .Analyze(target.Declaration, target.SemanticModel);
-        return CreateResult(target, summary, cancellationToken);
-    }
+        CancellationToken cancellationToken) =>
+        CreateResult(
+            target,
+            new AnalysisSession(compilation, cancellationToken).Analyze(target.Declaration, target.SemanticModel),
+            cancellationToken);
 
     private static SymbolicCapabilityResult CreateResult(
         ResolvedCapabilityTarget target,
@@ -111,22 +108,16 @@ internal sealed class SymbolicCapabilityService
             declaration.GetType().Name);
     }
 
-    private sealed class AnalysisSession
+    private sealed class AnalysisSession(Compilation compilation, CancellationToken cancellationToken)
     {
         private readonly HashSet<IMethodSymbol> _activeMethods =
             new(SymbolEqualityComparer.Default);
 
-        private readonly CancellationToken _cancellationToken;
-        private readonly Compilation _compilation;
+        private readonly CancellationToken _cancellationToken = cancellationToken;
+        private readonly Compilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
 
         private readonly Dictionary<IMethodSymbol, CapabilitySummary> _methodCache =
             new(SymbolEqualityComparer.Default);
-
-        public AnalysisSession(Compilation compilation, CancellationToken cancellationToken)
-        {
-            _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-            _cancellationToken = cancellationToken;
-        }
 
         public CapabilitySummary Analyze(SyntaxNode declaration, SemanticModel semanticModel)
         {
@@ -183,58 +174,32 @@ internal sealed class SymbolicCapabilityService
 
         private IEnumerable<CapabilitySiteData> AnalyzeOperation(IOperation operation)
         {
-            switch (operation)
+            return operation switch
             {
-                case ILockOperation:
-                    yield return CapabilitySiteData.Proven(
-                        SharpProofCapability.Synchronization,
-                        operation,
-                        "lock",
-                        string.Empty);
-                    yield break;
-
-                case IDynamicMemberReferenceOperation dynamicMemberReferenceOperation
-                    when dynamicMemberReferenceOperation.Parent is IDynamicInvocationOperation
-                        or IDynamicIndexerAccessOperation:
-                    yield break;
-
-                case IDynamicInvocationOperation:
-                case IDynamicIndexerAccessOperation:
-                case IDynamicMemberReferenceOperation:
-                case IDynamicObjectCreationOperation:
-                    yield return CapabilitySiteData.Unknown(
-                        operation,
-                        "dynamic",
-                        SymbolicCapabilityUnknownReason.DynamicDispatch,
-                        string.Empty);
-                    yield break;
-
-                case IInvocationOperation invocation:
-                    foreach (var site in AnalyzeSymbolUsage(invocation.TargetMethod, invocation, "invocation",
-                                 invocation.TargetMethod)) yield return site;
-                    yield break;
-
-                case IObjectCreationOperation objectCreationOperation:
-                    foreach (var site in AnalyzeSymbolUsage(
-                                 objectCreationOperation.Constructor,
-                                 objectCreationOperation,
-                                 "object_creation",
-                                 objectCreationOperation.Constructor ?? (ISymbol?)objectCreationOperation.Type))
-                        yield return site;
-                    yield break;
-
-                case IPropertyReferenceOperation propertyReferenceOperation:
-                    foreach (var site in AnalyzePropertyUsage(propertyReferenceOperation)) yield return site;
-                    yield break;
-
-                case IFieldReferenceOperation fieldReferenceOperation:
-                    foreach (var site in AnalyzeFieldUsage(fieldReferenceOperation.Field, fieldReferenceOperation))
-                        yield return site;
-                    yield break;
-
-                default:
-                    yield break;
-            }
+                ILockOperation => new[]
+                {
+                    CapabilitySiteData.Proven(
+                        SharpProofCapability.Synchronization, operation, "lock", string.Empty)
+                },
+                IDynamicMemberReferenceOperation { Parent: IDynamicInvocationOperation or IDynamicIndexerAccessOperation } =>
+                    Array.Empty<CapabilitySiteData>(),
+                IDynamicInvocationOperation or IDynamicIndexerAccessOperation or
+                    IDynamicMemberReferenceOperation or IDynamicObjectCreationOperation => new[]
+                    {
+                        CapabilitySiteData.Unknown(
+                            operation, "dynamic", SymbolicCapabilityUnknownReason.DynamicDispatch, string.Empty)
+                    },
+                IInvocationOperation invocation => AnalyzeSymbolUsage(
+                    invocation.TargetMethod, invocation, "invocation", invocation.TargetMethod),
+                IObjectCreationOperation creation => AnalyzeSymbolUsage(
+                    creation.Constructor,
+                    creation,
+                    "object_creation",
+                    creation.Constructor ?? (ISymbol?)creation.Type),
+                IPropertyReferenceOperation property => AnalyzePropertyUsage(property),
+                IFieldReferenceOperation field => AnalyzeFieldUsage(field.Field, field),
+                _ => Array.Empty<CapabilitySiteData>()
+            };
         }
 
         private IEnumerable<CapabilitySiteData> AnalyzePropertyUsage(
@@ -242,8 +207,8 @@ internal sealed class SymbolicCapabilityService
         {
             var accessor = propertyReferenceOperation.Property.GetMethod ??
                            propertyReferenceOperation.Property.SetMethod;
-            foreach (var site in AnalyzeSymbolUsage(accessor, propertyReferenceOperation, "property_access",
-                         propertyReferenceOperation.Property)) yield return site;
+            return AnalyzeSymbolUsage(
+                accessor, propertyReferenceOperation, "property_access", propertyReferenceOperation.Property);
         }
 
         private IEnumerable<CapabilitySiteData> AnalyzeFieldUsage(IFieldSymbol fieldSymbol,
@@ -368,12 +333,9 @@ internal sealed class SymbolicCapabilityService
             return true;
         }
 
-        private static IMethodSymbol ResolveSourceImplementation(IMethodSymbol methodSymbol)
-        {
-            return methodSymbol.PartialImplementationPart ??
-                   methodSymbol.PartialDefinitionPart?.PartialImplementationPart ??
-                   methodSymbol;
-        }
+        private static IMethodSymbol ResolveSourceImplementation(IMethodSymbol methodSymbol) =>
+            methodSymbol.PartialImplementationPart ??
+            methodSymbol.PartialDefinitionPart?.PartialImplementationPart ?? methodSymbol;
 
         private bool TryResolveSourceDeclaration(
             IMethodSymbol methodSymbol,
@@ -391,27 +353,19 @@ internal sealed class SymbolicCapabilityService
                 out semanticModel);
         }
 
-        private static bool IsVisibleOperation(IOperation operation, SyntaxNode declaration)
-        {
-            for (var node = operation.Syntax; node != null && node != declaration; node = node.Parent)
-                if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(node))
-                    return false;
-
-            return true;
-        }
+        private static bool IsVisibleOperation(IOperation operation, SyntaxNode declaration) =>
+            !operation.Syntax.AncestorsAndSelf()
+                .TakeWhile(node => node != declaration)
+                .Any(CSharpSyntaxFacts.IsNestedLocalCallableBoundary);
 
         private static IMethodSymbol? TryGetMethodSymbol(
             SyntaxNode declaration,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken);
-        }
+            CancellationToken cancellationToken) =>
+            SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken);
 
-        private static bool IsSourceMethod(IMethodSymbol methodSymbol)
-        {
-            return SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
-        }
+        private static bool IsSourceMethod(IMethodSymbol methodSymbol) =>
+            SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
 
         private static bool TryClassifySymbolCapabilities(ISymbol symbol, out SharpProofCapability capabilities)
         {
@@ -444,286 +398,130 @@ internal sealed class SymbolicCapabilityService
             string namespaceName,
             string typeName,
             string memberName,
-            ISymbol symbol)
+            ISymbol symbol) => typeName switch
         {
-            if (typeName == "System.Console") return SharpProofCapability.Console;
+            "System.Console" => SharpProofCapability.Console,
+            "System.Environment" or "System.AppContext" => IsClockMember(memberName)
+                ? SharpProofCapability.Clock
+                : SharpProofCapability.Environment,
+            "System.Guid" when memberName == "NewGuid" => SharpProofCapability.Randomness,
+            "System.Diagnostics.Stopwatch" when IsStopwatchClockMember(memberName) => SharpProofCapability.Clock,
+            "System.DateTime" or "System.DateTimeOffset" when IsClockMember(memberName) =>
+                SharpProofCapability.Clock,
+            "System.Random" or "System.Security.Cryptography.RandomNumberGenerator" =>
+                SharpProofCapability.Randomness,
+            "System.Diagnostics.Process" or "System.Diagnostics.ProcessStartInfo" => SharpProofCapability.Process,
+            "Microsoft.Win32.Registry" or "Microsoft.Win32.RegistryKey" => SharpProofCapability.Registry,
+            _ when namespaceName.StartsWith("System.Net", StringComparison.Ordinal) => SharpProofCapability.Network,
+            _ when IsReflectionType(namespaceName, typeName) =>
+                ClassifyReflectionCapability(typeName, memberName, symbol),
+            _ when namespaceName.StartsWith("System.Runtime.InteropServices", StringComparison.Ordinal) ||
+                   typeName.StartsWith("System.Runtime.Loader.AssemblyLoadContext", StringComparison.Ordinal) =>
+                SharpProofCapability.NativeInterop,
+            _ when IsSynchronizationType(typeName) => SharpProofCapability.Synchronization,
+            _ => ClassifyIoCapability(typeName, memberName)
+        };
 
-            if (typeName == "System.Environment" ||
-                typeName == "System.AppContext")
-                return IsClockMember(memberName)
-                    ? SharpProofCapability.Clock
-                    : SharpProofCapability.Environment;
+        private static bool IsReflectionType(string namespaceName, string typeName) =>
+            namespaceName.StartsWith("System.Reflection", StringComparison.Ordinal) ||
+            typeName is "System.Type" or "System.Activator" or "System.Delegate";
 
-            if (typeName == "System.Guid" &&
-                string.Equals(memberName, "NewGuid", StringComparison.Ordinal))
-                return SharpProofCapability.Randomness;
-
-            if (typeName == "System.Diagnostics.Stopwatch")
-                return IsStopwatchClockMember(memberName)
-                    ? SharpProofCapability.Clock
-                    : SharpProofCapability.None;
-
-            if (typeName == "System.DateTime" ||
-                typeName == "System.DateTimeOffset")
-                return IsClockMember(memberName) ? SharpProofCapability.Clock : SharpProofCapability.None;
-
-            if (typeName == "System.Random" ||
-                typeName == "System.Security.Cryptography.RandomNumberGenerator")
-                return SharpProofCapability.Randomness;
-
-            if (typeName.StartsWith("System.Net.", StringComparison.Ordinal) ||
-                typeName.StartsWith("System.Net", StringComparison.Ordinal) ||
-                namespaceName.StartsWith("System.Net", StringComparison.Ordinal))
-                return SharpProofCapability.Network;
-
-            if (typeName == "System.Diagnostics.Process" ||
-                typeName == "System.Diagnostics.ProcessStartInfo")
-                return SharpProofCapability.Process;
-
-            if (typeName == "Microsoft.Win32.Registry" ||
-                typeName == "Microsoft.Win32.RegistryKey")
-                return SharpProofCapability.Registry;
-
-            if (namespaceName.StartsWith("System.Reflection", StringComparison.Ordinal) ||
-                typeName == "System.Type" ||
-                typeName == "System.Activator" ||
-                typeName == "System.Delegate")
-                return ClassifyReflectionCapability(typeName, memberName, symbol);
-
-            if (namespaceName.StartsWith("System.Runtime.InteropServices", StringComparison.Ordinal) ||
-                typeName.StartsWith("System.Runtime.Loader.AssemblyLoadContext", StringComparison.Ordinal))
-                return SharpProofCapability.NativeInterop;
-
-            if (typeName == "System.Threading.Monitor" ||
-                typeName == "System.Threading.Mutex" ||
-                typeName == "System.Threading.Semaphore" ||
-                typeName == "System.Threading.SemaphoreSlim" ||
-                typeName == "System.Threading.Interlocked" ||
-                typeName == "System.Threading.EventWaitHandle" ||
-                typeName == "System.Threading.AutoResetEvent" ||
-                typeName == "System.Threading.ManualResetEvent" ||
-                typeName == "System.Threading.ManualResetEventSlim")
-                return SharpProofCapability.Synchronization;
-
-            return ClassifyIoCapability(typeName, memberName);
-        }
+        private static bool IsSynchronizationType(string typeName) => typeName is
+            "System.Threading.Monitor" or "System.Threading.Mutex" or
+            "System.Threading.Semaphore" or "System.Threading.SemaphoreSlim" or
+            "System.Threading.Interlocked" or "System.Threading.EventWaitHandle" or
+            "System.Threading.AutoResetEvent" or "System.Threading.ManualResetEvent" or
+            "System.Threading.ManualResetEventSlim";
 
         private static SharpProofCapability ClassifyReflectionCapability(
             string typeName,
             string memberName,
-            ISymbol symbol)
+            ISymbol symbol) => (typeName, memberName) switch
         {
-            if (typeName == "System.Delegate" &&
-                string.Equals(memberName, "DynamicInvoke", StringComparison.Ordinal))
-                return SharpProofCapability.Reflection;
+            ("System.Delegate", "DynamicInvoke") => SharpProofCapability.Reflection,
+            ("System.Type", "GetType" or "GetTypeFromHandle") => SharpProofCapability.Reflection,
+            _ when typeName == "System.Activator" || symbol.ContainingNamespace?.ToDisplayString()
+                .StartsWith("System.Reflection", StringComparison.Ordinal) == true =>
+                SharpProofCapability.Reflection,
+            _ => SharpProofCapability.None
+        };
 
-            if (typeName == "System.Type" &&
-                (string.Equals(memberName, "GetType", StringComparison.Ordinal) ||
-                 string.Equals(memberName, "GetTypeFromHandle", StringComparison.Ordinal)))
-                return SharpProofCapability.Reflection;
+        private static SharpProofCapability ClassifyIoCapability(string typeName, string memberName) =>
+            typeName == "System.IO.Path"
+                ? SharpProofCapability.None
+                : IsFileLikeType(typeName)
+                    ? ClassifyFileLikeMember(memberName)
+                    : IsStreamLikeType(typeName) && IsIoMember(memberName)
+                        ? SharpProofCapability.IO
+                        : SharpProofCapability.None;
 
-            return symbol.ContainingNamespace?.ToDisplayString()
-                       .StartsWith("System.Reflection", StringComparison.Ordinal) == true ||
-                   typeName == "System.Activator"
-                ? SharpProofCapability.Reflection
-                : SharpProofCapability.None;
-        }
+        private static bool IsFileLikeType(string typeName) => typeName is
+            "System.IO.File" or "System.IO.FileInfo" or "System.IO.Directory" or "System.IO.DirectoryInfo" or
+            "System.IO.DriveInfo" or "System.IO.FileSystemWatcher" or "System.IO.FileStream";
 
-        private static SharpProofCapability ClassifyIoCapability(string typeName, string memberName)
-        {
-            if (typeName == "System.IO.Path") return SharpProofCapability.None;
-
-            if (typeName == "System.IO.File" ||
-                typeName == "System.IO.FileInfo" ||
-                typeName == "System.IO.Directory" ||
-                typeName == "System.IO.DirectoryInfo" ||
-                typeName == "System.IO.DriveInfo" ||
-                typeName == "System.IO.FileSystemWatcher" ||
-                typeName == "System.IO.FileStream")
-                return ClassifyFileLikeMember(memberName);
-
-            if (typeName.StartsWith("System.IO.Stream", StringComparison.Ordinal) ||
-                typeName == "System.IO.StreamReader" ||
-                typeName == "System.IO.StreamWriter" ||
-                typeName == "System.IO.BinaryReader" ||
-                typeName == "System.IO.BinaryWriter" ||
-                typeName == "System.IO.TextReader" ||
-                typeName == "System.IO.TextWriter" ||
-                typeName.StartsWith("System.IO.Pipes.", StringComparison.Ordinal))
-                return ClassifyGenericIoMember(memberName);
-
-            return SharpProofCapability.None;
-        }
+        private static bool IsStreamLikeType(string typeName) =>
+            typeName.StartsWith("System.IO.Stream", StringComparison.Ordinal) ||
+            typeName is "System.IO.BinaryReader" or "System.IO.BinaryWriter" or
+                "System.IO.TextReader" or "System.IO.TextWriter" ||
+            typeName.StartsWith("System.IO.Pipes.", StringComparison.Ordinal);
 
         private static SharpProofCapability ClassifyFileLikeMember(string memberName)
         {
-            if (FileReadWriteMembers.Contains(memberName))
+            if (memberName is "Open" or "OpenHandle" or "OpenText")
                 return SharpProofCapability.FileRead | SharpProofCapability.FileWrite;
 
-            if (FileReadMembers.Contains(memberName)) return SharpProofCapability.FileRead;
+            if (IsFileMetadataRead(memberName) ||
+                memberName.StartsWith("Read", StringComparison.Ordinal) ||
+                memberName.StartsWith("Enumerate", StringComparison.Ordinal) ||
+                memberName.StartsWith("Get", StringComparison.Ordinal) ||
+                memberName is "OpenRead" or "Exists" or "Refresh")
+                return SharpProofCapability.FileRead;
 
-            if (FileWriteMembers.Contains(memberName)) return SharpProofCapability.FileWrite;
+            if (memberName.StartsWith("Write", StringComparison.Ordinal) ||
+                memberName.StartsWith("Append", StringComparison.Ordinal) ||
+                memberName.StartsWith("Create", StringComparison.Ordinal) ||
+                memberName.StartsWith("Set", StringComparison.Ordinal) ||
+                memberName is "Delete" or "Move" or "MoveTo" or "Replace" or
+                    "Copy" or "CopyTo" or "Encrypt" or "Decrypt")
+                return SharpProofCapability.FileWrite;
 
             return SharpProofCapability.None;
         }
 
-        private static SharpProofCapability ClassifyGenericIoMember(string memberName)
-        {
-            return GenericIoMembers.Contains(memberName)
-                ? SharpProofCapability.IO
-                : SharpProofCapability.None;
-        }
+        private static bool IsFileMetadataRead(string memberName) => memberName is
+            "Length" or "AvailableFreeSpace" or "TotalFreeSpace" or "TotalSize" or
+            "CreationTime" or "CreationTimeUtc" or "LastAccessTime" or "LastAccessTimeUtc" or
+            "LastWriteTime" or "LastWriteTimeUtc";
 
-        private static readonly ImmutableHashSet<string> FileReadMembers =
-            ImmutableHashSet.Create(
-                StringComparer.Ordinal,
-                "ReadAllBytes",
-                "ReadAllBytesAsync",
-                "ReadAllLines",
-                "ReadAllLinesAsync",
-                "ReadAllText",
-                "ReadAllTextAsync",
-                "ReadLines",
-                "OpenRead",
-                "Exists",
-                "EnumerateDirectories",
-                "EnumerateFiles",
-                "EnumerateFileSystemEntries",
-                "GetAttributes",
-                "GetCreationTime",
-                "GetCreationTimeUtc",
-                "GetCurrentDirectory",
-                "GetDirectories",
-                "GetDirectoryRoot",
-                "GetFiles",
-                "GetFileSystemEntries",
-                "GetLastAccessTime",
-                "GetLastAccessTimeUtc",
-                "GetLastWriteTime",
-                "GetLastWriteTimeUtc",
-                "GetLogicalDrives",
-                "GetParent",
-                "Length",
-                "AvailableFreeSpace",
-                "TotalFreeSpace",
-                "TotalSize",
-                "CreationTime",
-                "CreationTimeUtc",
-                "LastAccessTime",
-                "LastAccessTimeUtc",
-                "LastWriteTime",
-                "LastWriteTimeUtc",
-                "Refresh");
+        private static bool IsIoMember(string memberName) =>
+            memberName.StartsWith("Read", StringComparison.Ordinal) ||
+            memberName.StartsWith("Write", StringComparison.Ordinal) ||
+            memberName.StartsWith("Flush", StringComparison.Ordinal) ||
+            memberName.StartsWith("BeginRead", StringComparison.Ordinal) ||
+            memberName.StartsWith("EndRead", StringComparison.Ordinal) ||
+            memberName.StartsWith("BeginWrite", StringComparison.Ordinal) ||
+            memberName.StartsWith("EndWrite", StringComparison.Ordinal) ||
+            memberName.StartsWith("CopyTo", StringComparison.Ordinal) ||
+            string.Equals(memberName, "SetLength", StringComparison.Ordinal);
 
-        private static readonly ImmutableHashSet<string> FileWriteMembers =
-            ImmutableHashSet.Create(
-                StringComparer.Ordinal,
-                "WriteAllBytes",
-                "WriteAllBytesAsync",
-                "WriteAllLines",
-                "WriteAllLinesAsync",
-                "WriteAllText",
-                "WriteAllTextAsync",
-                "AppendAllLines",
-                "AppendAllLinesAsync",
-                "AppendAllText",
-                "AppendAllTextAsync",
-                "AppendText",
-                "Create",
-                "CreateDirectory",
-                "CreateSubdirectory",
-                "CreateText",
-                "Delete",
-                "Move",
-                "MoveTo",
-                "SetAttributes",
-                "SetCreationTime",
-                "SetCreationTimeUtc",
-                "SetCurrentDirectory",
-                "SetLastAccessTime",
-                "SetLastAccessTimeUtc",
-                "SetLastWriteTime",
-                "SetLastWriteTimeUtc",
-                "Replace",
-                "Copy",
-                "CopyTo",
-                "Encrypt",
-                "Decrypt");
+        private static bool IsClockMember(string memberName) => memberName is
+            "Now" or "UtcNow" or "Today" or "TickCount" or "TickCount64" or "GetTimestamp";
 
-        private static readonly ImmutableHashSet<string> FileReadWriteMembers =
-            ImmutableHashSet.Create(StringComparer.Ordinal, "Open", "OpenHandle", "OpenText");
+        private static bool IsStopwatchClockMember(string memberName) => memberName is
+            "Elapsed" or "ElapsedMilliseconds" or "ElapsedTicks" or "Frequency" or
+            "GetElapsedTime" or "GetTimestamp" or "IsHighResolution" or
+            "QueryPerformanceCounter" or "QueryPerformanceFrequency" or
+            "Restart" or "Start" or "StartNew" or "Stop";
 
-        private static readonly ImmutableHashSet<string> GenericIoMembers =
-            ImmutableHashSet.Create(
-                StringComparer.Ordinal,
-                "Read",
-                "ReadAsync",
-                "ReadByte",
-                "ReadBlock",
-                "ReadBlockAsync",
-                "ReadLine",
-                "ReadLineAsync",
-                "ReadToEnd",
-                "ReadToEndAsync",
-                "BeginRead",
-                "EndRead",
-                "CopyTo",
-                "CopyToAsync",
-                "Write",
-                "WriteAsync",
-                "WriteByte",
-                "WriteLine",
-                "WriteLineAsync",
-                "BeginWrite",
-                "EndWrite",
-                "Flush",
-                "FlushAsync",
-                "SetLength");
-
-        private static bool IsClockMember(string memberName)
-        {
-            return string.Equals(memberName, "Now", StringComparison.Ordinal) ||
-                   string.Equals(memberName, "UtcNow", StringComparison.Ordinal) ||
-                   string.Equals(memberName, "Today", StringComparison.Ordinal) ||
-                   string.Equals(memberName, "TickCount", StringComparison.Ordinal) ||
-                   string.Equals(memberName, "TickCount64", StringComparison.Ordinal) ||
-                   string.Equals(memberName, "GetTimestamp", StringComparison.Ordinal);
-        }
-
-        private static bool IsStopwatchClockMember(string memberName)
-        {
-            return memberName is
-                "Elapsed" or
-                "ElapsedMilliseconds" or
-                "ElapsedTicks" or
-                "Frequency" or
-                "GetElapsedTime" or
-                "GetTimestamp" or
-                "IsHighResolution" or
-                "QueryPerformanceCounter" or
-                "QueryPerformanceFrequency" or
-                "Restart" or
-                "Start" or
-                "StartNew" or
-                "Stop";
-        }
-
-        private static bool IsKnownCapabilityNeutralSymbol(string namespaceName, string typeName, string memberName)
-        {
-            if (namespaceName.StartsWith("System", StringComparison.Ordinal))
-            {
-                if (typeName == "System.IO.Path") return true;
-
-                if (typeName == "System.Math" ||
-                    typeName == "System.String" ||
-                    typeName.StartsWith("System.MemoryExtensions", StringComparison.Ordinal) ||
-                    typeName.StartsWith("System.Convert", StringComparison.Ordinal))
-                    return true;
-            }
-
-            return typeName == "System.Object" &&
-                   string.Equals(memberName, "ToString", StringComparison.Ordinal);
-        }
+        private static bool IsKnownCapabilityNeutralSymbol(
+            string namespaceName,
+            string typeName,
+            string memberName) =>
+            namespaceName.StartsWith("System", StringComparison.Ordinal) &&
+            (typeName is "System.IO.Path" or "System.Math" or "System.String" ||
+             typeName.StartsWith("System.MemoryExtensions", StringComparison.Ordinal) ||
+             typeName.StartsWith("System.Convert", StringComparison.Ordinal)) ||
+            typeName == "System.Object" && memberName == "ToString";
 
         private static bool IsNativeInteropSymbol(ISymbol symbol)
         {
@@ -759,17 +557,11 @@ internal sealed class SymbolicCapabilityService
         public string DeclarationKind { get; } = declarationKind;
     }
 
-    private sealed class CapabilitySummary(
-        SharpProofCapability capabilities,
-        ImmutableArray<CapabilitySiteData> sites,
-        ImmutableArray<SymbolicCapabilityUnknownReason> unknownReasons)
+    private sealed record CapabilitySummary(
+        SharpProofCapability Capabilities,
+        ImmutableArray<CapabilitySiteData> Sites,
+        ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons)
     {
-        public SharpProofCapability Capabilities { get; } = capabilities;
-
-        public ImmutableArray<CapabilitySiteData> Sites { get; } = sites;
-
-        public ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons { get; } = unknownReasons;
-
         public static CapabilitySummary FromSites(
             IReadOnlyList<CapabilitySiteData> sites,
             IReadOnlyCollection<SymbolicCapabilityUnknownReason> unknownReasons)
@@ -796,57 +588,38 @@ internal sealed class SymbolicCapabilityService
         }
     }
 
-    private sealed class CapabilitySiteData
+    private sealed class CapabilitySiteData(
+        SharpProofCapability capabilities,
+        IOperation operation,
+        string siteKind,
+        string symbolDisplayName,
+        bool isTransitive,
+        bool isUnknown,
+        SymbolicCapabilityUnknownReason unknownReason)
     {
-        public CapabilitySiteData(
-            SharpProofCapability capabilities,
-            IOperation operation,
-            string siteKind,
-            string symbolDisplayName,
-            bool isTransitive,
-            bool isUnknown,
-            SymbolicCapabilityUnknownReason unknownReason)
-        {
-            Capabilities = SymbolicCapabilityFacts.Normalize(capabilities);
-            SiteKind = siteKind;
-            OperationKind = operation.Kind.ToString();
-            OperationText = operation.Syntax.ToString();
-            SymbolDisplayName = symbolDisplayName;
-            IsTransitive = isTransitive;
-            IsUnknown = isUnknown;
-            UnknownReason = unknownReason;
-            SpanStart = operation.Syntax.SpanStart;
-            SpanLength = operation.Syntax.Span.Length;
-            Identity =
-                operation.Syntax.SpanStart + "|" +
-                operation.Syntax.Span.Length + "|" +
-                siteKind + "|" +
-                Capabilities + "|" +
-                unknownReason + "|" +
-                symbolDisplayName;
-        }
+        public SharpProofCapability Capabilities { get; } = SymbolicCapabilityFacts.Normalize(capabilities);
 
-        public SharpProofCapability Capabilities { get; }
+        public string SiteKind { get; } = siteKind;
 
-        public string SiteKind { get; }
+        public string OperationKind { get; } = operation.Kind.ToString();
 
-        public string OperationKind { get; }
+        public string OperationText { get; } = operation.Syntax.ToString();
 
-        public string OperationText { get; }
+        public string SymbolDisplayName { get; } = symbolDisplayName;
 
-        public string SymbolDisplayName { get; }
+        public bool IsTransitive { get; } = isTransitive;
 
-        public bool IsTransitive { get; }
+        public bool IsUnknown { get; } = isUnknown;
 
-        public bool IsUnknown { get; }
+        public SymbolicCapabilityUnknownReason UnknownReason { get; } = unknownReason;
 
-        public SymbolicCapabilityUnknownReason UnknownReason { get; }
+        public int SpanStart { get; } = operation.Syntax.SpanStart;
 
-        public int SpanStart { get; }
+        public int SpanLength { get; } = operation.Syntax.Span.Length;
 
-        public int SpanLength { get; }
-
-        public string Identity { get; }
+        public string Identity { get; } = operation.Syntax.SpanStart + "|" + operation.Syntax.Span.Length + "|" +
+            siteKind + "|" + SymbolicCapabilityFacts.Normalize(capabilities) + "|" + unknownReason + "|" +
+            symbolDisplayName;
 
         public static CapabilitySiteData Proven(
             SharpProofCapability capabilities,
@@ -854,8 +627,7 @@ internal sealed class SymbolicCapabilityService
             string siteKind,
             string symbolDisplayName,
             bool isTransitive = false)
-        {
-            return new CapabilitySiteData(
+            => new(
                 capabilities,
                 operation,
                 siteKind,
@@ -863,7 +635,6 @@ internal sealed class SymbolicCapabilityService
                 isTransitive,
                 false,
                 SymbolicCapabilityUnknownReason.None);
-        }
 
         public static CapabilitySiteData Unknown(
             IOperation operation,
@@ -871,8 +642,7 @@ internal sealed class SymbolicCapabilityService
             SymbolicCapabilityUnknownReason unknownReason,
             string symbolDisplayName,
             bool isTransitive = false)
-        {
-            return new CapabilitySiteData(
+            => new(
                 SharpProofCapability.None,
                 operation,
                 siteKind,
@@ -880,6 +650,5 @@ internal sealed class SymbolicCapabilityService
                 isTransitive,
                 true,
                 unknownReason);
-        }
     }
 }

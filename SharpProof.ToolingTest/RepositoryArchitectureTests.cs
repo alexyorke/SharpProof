@@ -395,6 +395,23 @@ public sealed class RepositoryArchitectureTests
         }
     }
 
+    [Test]
+    public void CapabilityAnalysis_InfersIoFamiliesInsteadOfEnumeratingMembers()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicCapabilityService.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source, Does.Contain("memberName.StartsWith(\"Read\""));
+            Assert.That(source, Does.Contain("IsFileLikeType"));
+            Assert.That(source, Does.Not.Contain("FileReadMembers"));
+            Assert.That(source, Does.Not.Contain("FileWriteMembers"));
+            Assert.That(source, Does.Not.Contain("GenericIoMembers"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

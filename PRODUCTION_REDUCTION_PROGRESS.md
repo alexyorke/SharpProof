@@ -254,14 +254,20 @@ Tests are excluded from the metric and must not be deleted.
   plumbing. Exact help, validation errors, exit codes, text, JSON, SARIF, and
   package behavior remain characterized; architecture coverage prevents local
   argument loops from returning.
+- [x] Replaced four manually enumerated file and stream capability-member
+  catalogs with type-family and operation-name inference. New framework file
+  APIs such as `File.GetUnixFileMode` now classify without catalog maintenance;
+  unrecognized types and operations still retain explicit conservative unknown
+  behavior. Focused capability and architecture tests preserve established
+  classifications and prevent the deleted member catalogs from returning.
 
 ## Current evidence
 
-- Maintained production: 100,017 lines (96,098 C#, 3,189 scripts, and 730
-  specifications); net reduction: 7,609 lines; remaining reduction: 12,391.
-  This tranche removed 270 maintained lines without deleting tests.
+- Maintained production: 99,817 lines (95,898 C#, 3,189 scripts, and 730
+  specifications); net reduction: 7,809 lines; remaining reduction: 12,191.
+  This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,183 passing tests and two documented skips.
+- Six lanes: 6,185 passing tests and two documented skips.
 
 ## Milestones
 

@@ -339,6 +339,27 @@ public sealed class TestClass
     }
 
     [Test]
+    public void QueryCapabilities_NewFileReadApi_IsInferredWithoutMemberCatalogEntry()
+    {
+        const string source = """
+                              using System.IO;
+
+                              public static class C
+                              {
+                                  public static UnixFileMode ReadMode(string path)
+                                  {
+                                      return File.GetUnixFileMode(path);
+                                  }
+                              }
+                              """;
+
+        var result = QueryCapabilitiesAtMarker(source, "GetUnixFileMode");
+
+        Assert.That(result.Capabilities.HasFlag(SymbolicCapability.FileRead), Is.True);
+        Assert.That(result.HasUnknowns, Is.False);
+    }
+
+    [Test]
     public void QueryCapabilities_DynamicInvocation_ReturnsUnknownReason()
     {
         const string source = """
