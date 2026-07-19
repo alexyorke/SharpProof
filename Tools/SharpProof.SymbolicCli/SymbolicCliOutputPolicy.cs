@@ -10,25 +10,13 @@ internal static class SymbolicCliOutputPolicy
     public const string Sarif = "--sarif";
     public const string Markdown = "--markdown";
 
-    public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
-
-    public static bool RequestsJsonErrors(string argument)
+    public static JsonSerializerOptions JsonOptions { get; } = new()
     {
-        return argument is ErrorJson or
-            Json or
-            RequestJson or
-            RequestJsonStdin or
-            Sarif;
-    }
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        options.Converters.Add(new JsonStringEnumConverter());
-        return options;
-    }
+    public static bool RequestsJsonErrors(string argument) =>
+        argument is ErrorJson or Json or RequestJson or RequestJsonStdin or Sarif;
 }

@@ -1,3 +1,5 @@
+using SharpProof.Tools.Shared;
+
 namespace SharpProof.Tools.Fuzz;
 
 public sealed record FuzzOptions
@@ -22,81 +24,49 @@ public sealed record FuzzOptions
                                   --no-repeat              Do not run repeated analyzer determinism checks.
                                 """;
 
-    public int? Iterations { get; init; } = 100;
+    public int? Iterations { get; set; } = 100;
 
-    public TimeSpan? Duration { get; init; }
+    public TimeSpan? Duration { get; set; }
 
-    public int Seed { get; init; } = 12345;
+    public int Seed { get; set; } = 12345;
 
-    public string OutputDirectory { get; init; } = DefaultOutputDirectory();
+    public string OutputDirectory { get; set; } = DefaultOutputDirectory();
 
-    public int MaxInterestingCases { get; init; } = 100;
+    public int MaxInterestingCases { get; set; } = 100;
 
-    public int MaxInterestingCasesPerFamily { get; init; } = 10;
+    public int MaxInterestingCasesPerFamily { get; set; } = 10;
 
-    public int CheckpointEvery { get; init; } = 100;
+    public int CheckpointEvery { get; set; } = 100;
 
-    public int Parallelism { get; init; } = DefaultParallelism;
+    public int Parallelism { get; set; } = DefaultParallelism;
 
     internal static int DefaultParallelism => Math.Max(1, Math.Min(Environment.ProcessorCount, 4));
 
-    public bool Quiet { get; init; }
+    public bool Quiet { get; set; }
 
-    public bool FailOnFindings { get; init; }
+    public bool FailOnFindings { get; set; }
 
-    public bool RepeatAnalyzer { get; init; } = true;
+    public bool RepeatAnalyzer { get; set; } = true;
+
+    private static readonly ToolOptionSet<FuzzOptions> OptionSet = new ToolOptionSet<FuzzOptions>()
+        .Add(static (o, r, a) => o.Iterations = ReadInt(r, a), "--iterations")
+        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromSeconds), "--seconds")
+        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromMinutes), "--minutes")
+        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromHours), "--hours")
+        .Add(static (o, r, a) => o.Seed = ReadInt(r, a), "--seed")
+        .Add(static (o, r, a) => o.OutputDirectory = r.RequiredValue(a, $"{a} expects a value."), "--out")
+        .Add(static (o, r, a) => o.MaxInterestingCases = ReadInt(r, a), "--max-interesting")
+        .Add(static (o, r, a) => o.MaxInterestingCasesPerFamily = ReadInt(r, a), "--max-interesting-per-family")
+        .Add(static (o, r, a) => o.CheckpointEvery = ReadInt(r, a), "--checkpoint-every")
+        .Add(static (o, r, a) => o.Parallelism = ReadInt(r, a), "--parallelism")
+        .Add(static (o, _, _) => o.Quiet = true, "--quiet")
+        .Add(static (o, _, _) => o.FailOnFindings = true, "--fail-on-findings")
+        .Add(static (o, _, _) => o.RepeatAnalyzer = false, "--no-repeat");
 
     public static FuzzOptions Parse(string[] args)
     {
         var options = new FuzzOptions();
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            switch (arg)
-            {
-                case "--iterations":
-                    options = options with { Iterations = ReadInt(args, ref i, arg) };
-                    break;
-                case "--seconds":
-                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromSeconds) };
-                    break;
-                case "--minutes":
-                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromMinutes) };
-                    break;
-                case "--hours":
-                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromHours) };
-                    break;
-                case "--seed":
-                    options = options with { Seed = ReadInt(args, ref i, arg) };
-                    break;
-                case "--out":
-                    options = options with { OutputDirectory = ReadString(args, ref i, arg) };
-                    break;
-                case "--max-interesting":
-                    options = options with { MaxInterestingCases = ReadInt(args, ref i, arg) };
-                    break;
-                case "--max-interesting-per-family":
-                    options = options with { MaxInterestingCasesPerFamily = ReadInt(args, ref i, arg) };
-                    break;
-                case "--checkpoint-every":
-                    options = options with { CheckpointEvery = ReadInt(args, ref i, arg) };
-                    break;
-                case "--parallelism":
-                    options = options with { Parallelism = ReadInt(args, ref i, arg) };
-                    break;
-                case "--quiet":
-                    options = options with { Quiet = true };
-                    break;
-                case "--fail-on-findings":
-                    options = options with { FailOnFindings = true };
-                    break;
-                case "--no-repeat":
-                    options = options with { RepeatAnalyzer = false };
-                    break;
-                default:
-                    throw new ArgumentException($"Unknown option '{arg}'.");
-            }
-        }
+        OptionSet.Parse(args, options);
 
         if (options.Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
 
@@ -116,29 +86,28 @@ public sealed record FuzzOptions
         return options;
     }
 
-    private static int ReadInt(string[] args, ref int index, string option)
+    private static int ReadInt(ToolArgumentReader reader, string option)
     {
-        var value = ReadString(args, ref index, option);
+        var value = reader.RequiredValue(option, $"{option} expects a value.");
         return int.TryParse(value, out var parsed)
             ? parsed
             : throw new ArgumentException($"{option} expects an integer.");
     }
 
-    private static double ReadDouble(string[] args, ref int index, string option)
+    private static double ReadDouble(ToolArgumentReader reader, string option)
     {
-        var value = ReadString(args, ref index, option);
+        var value = reader.RequiredValue(option, $"{option} expects a value.");
         return double.TryParse(value, out var parsed) && double.IsFinite(parsed) && parsed >= 0
             ? parsed
             : throw new ArgumentException($"{option} expects a finite non-negative number.");
     }
 
     private static TimeSpan ReadDuration(
-        string[] args,
-        ref int index,
+        ToolArgumentReader reader,
         string option,
         Func<double, TimeSpan> createDuration)
     {
-        var value = ReadDouble(args, ref index, option);
+        var value = ReadDouble(reader, option);
         try
         {
             return createDuration(value);
@@ -149,21 +118,11 @@ public sealed record FuzzOptions
         }
     }
 
-    private static string ReadString(string[] args, ref int index, string option)
-    {
-        if (index + 1 >= args.Length) throw new ArgumentException($"{option} expects a value.");
-
-        index++;
-        return args[index];
-    }
-
-    private static string DefaultOutputDirectory()
-    {
-        return Path.Combine(
+    private static string DefaultOutputDirectory() =>
+        Path.Combine(
             Environment.CurrentDirectory,
             "artifacts",
             "fuzz",
             DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
-    }
 
 }

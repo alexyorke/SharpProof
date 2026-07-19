@@ -370,6 +370,31 @@ public sealed class RepositoryArchitectureTests
         }
     }
 
+    [Test]
+    public void CommandTools_ShareArgumentCursorAndDispatchOwnership()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var parser = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Tooling.Core", "ToolArgumentParser.cs"));
+        var optionSources = new[]
+        {
+            "Tools/SharpProof.SymbolicCli/SymbolicCliOptions.cs",
+            "Tools/SharpProof.EffectSummary/CliOptions.cs",
+            "Tools/SharpProof.Fuzz.Core/FuzzOptions.cs",
+            "Tools/SharpProof.Baseline/Program.cs",
+            "Tools/SharpProof.CorpusReport/Program.cs"
+        };
+
+        Assert.That(parser, Does.Contain("class ToolArgumentReader"));
+        foreach (var relativePath in optionSources)
+        {
+            var source = File.ReadAllText(Path.Combine(root,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.That(source, Does.Contain("ToolOptionSet<"), relativePath);
+            Assert.That(source, Does.Not.Contain("for (var i = 0; i < args.Length"), relativePath);
+        }
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

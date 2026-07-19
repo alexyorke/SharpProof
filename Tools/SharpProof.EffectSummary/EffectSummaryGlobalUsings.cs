@@ -13,6 +13,7 @@ global using System.Text.Json.Serialization;
 global using SharpProof.Identity;
 global using SharpProof.Inference;
 global using SharpProof.Schema;
+global using SharpProof.Tools.Shared;
 global using SharpProof.Analyzer.Engine;
 global using static EffectSummaryMetadataReader;
 global using static EffectSummaryIlAnalyzer;

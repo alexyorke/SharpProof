@@ -25,18 +25,15 @@ public static class ToolCommandHost
         int argumentErrorExitCode,
         TextWriter error,
         Action<TextWriter>? writeUsage = null)
-    {
-        try
-        {
-            return await command().ConfigureAwait(false);
-        }
-        catch (ArgumentException exception)
-        {
-            error.WriteLine(exception.Message);
-            writeUsage?.Invoke(error);
-            return argumentErrorExitCode;
-        }
-    }
+        => await RunAsync(
+            command,
+            static exception => exception is ArgumentException,
+            exception =>
+            {
+                error.WriteLine(exception.Message);
+                writeUsage?.Invoke(error);
+                return argumentErrorExitCode;
+            }).ConfigureAwait(false);
 
     public static async Task<int> RunAsync(
         Func<Task<int>> command,

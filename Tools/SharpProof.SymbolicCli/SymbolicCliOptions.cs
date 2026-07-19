@@ -1,3 +1,5 @@
+using SharpProof.Tools.Shared;
+
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
@@ -451,146 +453,104 @@ internal sealed class SymbolicCliOptions
         values.AddRange(normalized);
     }
 
-    private delegate void OptionHandler(SymbolicCliOptions options, OptionCursor cursor, string option);
-
-    private sealed class OptionCursor(string[] arguments)
-    {
-        private int _index = -1;
-        public string Current => arguments[_index];
-        public bool MoveNext() => ++_index < arguments.Length;
-        public string String(string option) => ReadString(arguments, ref _index, option);
-        public int PositiveInt(string option) => ReadPositiveInt(arguments, ref _index, option);
-        public int NonNegativeInt(string option) => ReadNonNegativeInt(arguments, ref _index, option);
-        public LanguageVersion LanguageVersion(string option) => ReadLanguageVersion(arguments, ref _index, option);
-        public NullableContextOptions Nullable(string option) => ReadNullableContext(arguments, ref _index, option);
-        public DocumentationMode DocumentationMode(string option) => ReadDocumentationMode(arguments, ref _index, option);
-        public Platform Platform(string option) => ReadPlatform(arguments, ref _index, option);
-        public OptimizationLevel Optimization(string option) => ReadOptimizationLevel(arguments, ref _index, option);
-        public string ProgramPointKind(string option) => ReadProgramPointKind(arguments, ref _index, option);
-        public SymbolicReachability Reachability(string option) => ReadReachability(arguments, ref _index, option);
-        public SymbolicTruthValue TruthValue(string option) => ReadTruthValue(arguments, ref _index, option);
-        public SymbolicCapability Capability(string option) => ReadCapability(arguments, ref _index, option);
-        public SharpProof.Attributes.ComplexityKind Complexity(string option) => ReadComplexityBound(arguments, ref _index, option);
-        public SymbolicRuntimeHazardKind HazardKind(string option) => ReadHazardKind(arguments, ref _index, option);
-        public SymbolicRuntimeHazardStatus HazardStatus(string option) => ReadHazardStatus(arguments, ref _index, option);
-        public SmtAnalysisMode SmtMode(string option) => ReadSmtMode(arguments, ref _index, option);
-    }
-
-    private static readonly IReadOnlyDictionary<string, OptionHandler> OptionHandlers = CreateOptionHandlers();
-
-    private static IReadOnlyDictionary<string, OptionHandler> CreateOptionHandlers()
-    {
-        var handlers = new Dictionary<string, OptionHandler>(StringComparer.Ordinal);
-        void Add(OptionHandler handler, params string[] names)
-        {
-            foreach (var name in names) handlers.Add(name, handler);
-        }
-
-        Add(static (o, _, _) => o.Explain = true, "explain");
-        Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h");
-        Add(static (o, _, _) => o.ErrorJson = true, SymbolicCliOutputPolicy.ErrorJson);
-        Add(static (o, _, _) => o.Sarif = true, SymbolicCliOutputPolicy.Sarif);
-        Add(static (o, _, _) => o.Markdown = true, SymbolicCliOutputPolicy.Markdown);
-        Add(static (o, c, a) => { o.ReportMaxDiagnostics = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-diagnostics");
-        Add(static (o, c, a) => { o.ReportMaxHazards = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-hazards");
-        Add(static (o, c, a) => { o.ReportMaxItems = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-items");
-        Add(static (o, c, a) => o.FilePath = c.String(a), "--file");
-        Add(static (o, _, _) => o.ReadSourceFromStdin = true, "--stdin");
-        Add(static (o, c, a) => o.InlineSourceText = c.String(a), "--source-text");
-        Add(static (o, c, a) => o.SourceFileName = c.String(a), "--source-file-name");
-        Add(static (o, c, a) => o.SourceMapUri = c.String(a), "--source-map-uri");
-        Add(static (o, c, a) => { o.SourceMapOriginalLine = c.PositiveInt(a); o.SourceMapOriginalLineSpecified = true; }, "--source-map-original-line");
-        Add(static (o, c, a) => { o.SourceMapOriginalColumn = c.PositiveInt(a); o.SourceMapOriginalColumnSpecified = true; }, "--source-map-original-column");
-        Add(static (o, c, a) => o.ProjectPath = c.String(a), "--project");
-        Add(static (o, c, a) => o.SolutionPath = c.String(a), "--solution");
-        Add(static (o, c, a) => o.ProjectName = c.String(a), "--project-name");
-        Add(static (o, c, a) => o.MSBuildProperties["Configuration"] = c.String(a), "--configuration");
-        Add(static (o, c, a) => o.MSBuildProperties["TargetFramework"] = c.String(a), "--framework", "--target-framework");
-        Add(static (o, c, a) => o.AddMSBuildProperty(c.String(a), a), "--msbuild-property");
-        Add(static (o, c, a) => o.Line = c.PositiveInt(a), "--line");
-        Add(static (o, c, a) => { o.Column = c.PositiveInt(a); o.HasColumn = true; }, "--column");
-        Add(static (o, c, a) => o.Position = c.NonNegativeInt(a), "--position");
-        Add(static (o, c, a) => o.SpanStart = c.NonNegativeInt(a), "--span-start");
-        Add(static (o, c, a) => o.SpanEnd = c.NonNegativeInt(a), "--span-end");
-        Add(static (o, c, a) => o.SpanStartLine = c.PositiveInt(a), "--span-start-line");
-        Add(static (o, c, a) => o.SpanStartColumn = c.PositiveInt(a), "--span-start-column");
-        Add(static (o, c, a) => o.SpanEndLine = c.PositiveInt(a), "--span-end-line");
-        Add(static (o, c, a) => o.SpanEndColumn = c.PositiveInt(a), "--span-end-column");
-        Add(static (o, _, _) => o.LineInvariants = true, "--line-invariants", "--all-line-points");
-        Add(static (o, _, _) => o.AllLines = true, "--all-lines", "--file-invariants");
-        Add(static (o, _, _) => o.LineExpressions = true, "--line-expressions", "--include-expressions");
-        Add(static (o, _, _) => o.PostLineInvariants = true, "--post-line-invariants");
-        Add(static (o, c, a) => { o.ReferencePaths.Add(c.String(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--reference", "-r");
-        Add(static (o, c, a) => { o.LanguageVersion = c.LanguageVersion(a); o.StandaloneCompilationOptionsSpecified = true; }, "--language-version", "--lang-version");
-        Add(static (o, c, a) => { o.PreprocessorSymbols.Add(c.String(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--define", "-d");
-        Add(static (o, c, a) => { o.NullableContext = c.Nullable(a); o.StandaloneCompilationOptionsSpecified = true; }, "--nullable");
-        Add(static (o, _, _) => { o.AllowUnsafe = true; o.StandaloneCompilationOptionsSpecified = true; }, "--allow-unsafe", "--unsafe");
-        Add(static (o, c, a) => { o.DocumentationMode = c.DocumentationMode(a); o.StandaloneCompilationOptionsSpecified = true; }, "--documentation-mode");
-        Add(static (o, c, a) => { o.Platform = c.Platform(a); o.StandaloneCompilationOptionsSpecified = true; }, "--platform");
-        Add(static (o, c, a) => { o.OptimizationLevel = c.Optimization(a); o.StandaloneCompilationOptionsSpecified = true; }, "--optimization", "--optimize");
-        Add(static (o, c, a) => { o.AssemblyName = c.String(a); o.StandaloneCompilationOptionsSpecified = true; }, "--assembly-name");
-        Add(static (o, c, a) => o.NodeKinds.Add(c.String(a)), "--node-kind");
-        Add(static (o, c, a) => o.ProgramPointKinds.Add(c.ProgramPointKind(a)), "--program-point-kind", "--point-kind");
-        Add(static (o, c, a) => o.FilterLines.Add(c.PositiveInt(a)), "--filter-line");
-        Add(static (o, c, a) => o.FilterLineStart = c.PositiveInt(a), "--line-start");
-        Add(static (o, c, a) => o.FilterLineEnd = c.PositiveInt(a), "--line-end");
-        Add(static (o, _, _) => o.WithFacts = true, "--with-facts");
-        Add(static (o, _, _) => o.WithConditions = true, "--with-conditions");
-        Add(static (o, c, a) => o.MethodNames.Add(c.String(a)), "--method");
-        Add(static (o, c, a) => o.MethodNameContains.Add(c.String(a)), "--method-contains");
-        Add(static (o, c, a) => o.ConditionTargets.Add(c.String(a)), "--condition-target", "--target");
-        Add(static (o, c, a) => o.InvariantTargets.Add(c.String(a)), "--invariant-target", "--focus-target");
-        Add(static (o, c, a) => o.Conditions.Add(c.String(a)), "--condition");
-        Add(static (o, c, a) => o.ConditionContains.Add(c.String(a)), "--condition-contains");
-        Add(static (o, c, a) => o.ReachabilityFilters.Add(c.Reachability(a)), "--reachability");
-        Add(static (o, _, _) => o.WithProofs = true, "--with-proofs");
-        Add(static (o, c, a) => o.ProofOutcomes.Add(c.TruthValue(a)), "--proof-outcome");
-        Add(static (o, c, a) => o.ProofConditions.Add(c.String(a)), "--proof-condition");
-        Add(static (o, c, a) => o.ProofConditionContains.Add(c.String(a)), "--proof-condition-contains");
-        Add(static (o, _, _) => o.Json = true, SymbolicCliOutputPolicy.Json);
-        Add(static (o, _, _) => o.FailOnAnalysisTruncation = true, "--fail-on-analysis-truncation");
-        Add(static (o, c, a) => o.AddThreshold(c.String(a), a), "--fail-on-threshold");
-        Add(static (o, _, _) => o.CheckReachability = true, "--check-reachability");
-        Add(static (o, c, a) => o.ImpliedConditions.Add(c.String(a)), "--implies");
-        Add(static (o, _, _) => o.RuntimeHazards = true, "--runtime-hazards");
-        Add(static (o, _, _) => o.Complexity = true, "--complexity");
-        Add(static (o, _, _) => o.Capabilities = true, "--capabilities");
-        Add(static (o, _, _) => o.FailOnHazard = true, "--fail-on-hazard");
-        Add(static (o, _, _) => o.FailOnUnprovenImplies = true, "--fail-on-unproven-implies");
-        Add(static (o, c, a) => o.AllowedCapabilities.Add(c.Capability(a)), "--allowed-capability");
-        Add(static (o, _, _) => o.FailOnCapabilityViolation = true, "--fail-on-capability-violation");
-        Add(static (o, _, _) => o.FailOnCapabilityUnknown = true, "--fail-on-capability-unknown");
-        Add(static (o, c, a) => o.MaximumComplexity = c.Complexity(a), "--fail-on-complexity-exceeded");
-        Add(static (o, _, _) => o.FailOnComplexityUnknown = true, "--fail-on-complexity-unknown");
-        Add(static (o, c, a) => o.MaximumConservativeUnknowns = c.NonNegativeInt(a), "--max-conservative-unknowns");
-        Add(static (o, c, a) => o.HazardKinds.Add(c.HazardKind(a)), "--hazard-kind");
-        Add(static (o, c, a) => o.HazardStatuses.Add(c.HazardStatus(a)), "--hazard-status");
-        Add(static (o, c, a) => o.HazardExceptionTypes.Add(c.String(a)), "--hazard-exception-type", "--exception-type");
-        Add(static (o, c, a) => o.HazardCategories.Add(c.String(a)), "--hazard-category");
-        Add(static (o, _, _) => o.IncludeUnprovenHazards = true, "--include-unproven-hazards");
-        Add(static (o, c, a) => { o.SmtMode = c.SmtMode(a); o.SmtModeSpecified = true; }, "--smt-mode");
-        Add(static (o, c, a) => o.SmtTimeoutMs = c.PositiveInt(a), "--smt-timeout-ms");
-        Add(static (o, c, a) => o.SmtMethodBudgetMs = c.PositiveInt(a), "--smt-method-budget-ms");
-        Add(static (o, c, a) => o.SmtMaxPathConditions = c.PositiveInt(a), "--smt-max-path-conditions");
-        Add(static (o, c, a) => o.SmtMaxExpressionNodes = c.PositiveInt(a), "--smt-max-expression-nodes");
-        Add(static (o, c, a) => { o.SmtTransientRetryCount = c.NonNegativeInt(a); o.SmtTransientRetryCountSpecified = true; }, "--smt-transient-retries");
-        Add(static (o, _, _) => { o.SmtRecycleContextOnTransientFailure = false; o.SmtRecycleContextOnTransientFailureSpecified = true; }, "--smt-keep-context-on-transient-failure");
-        Add(static (o, _, _) => { o.SmtDisposeContextOnExit = true; o.SmtDisposeContextOnExitSpecified = true; }, "--smt-dispose-context-on-exit");
-        Add(static (o, c, a) => o.AddAnalysisLimitOverride(c.String(a), a), "--analysis-limit");
-        return handlers;
-    }
+    private static readonly ToolOptionSet<SymbolicCliOptions> OptionHandlers =
+        new ToolOptionSet<SymbolicCliOptions>()
+        .Add(static (o, _, _) => o.Explain = true, "explain")
+        .Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h")
+        .Add(static (o, _, _) => o.ErrorJson = true, SymbolicCliOutputPolicy.ErrorJson)
+        .Add(static (o, _, _) => o.Sarif = true, SymbolicCliOutputPolicy.Sarif)
+        .Add(static (o, _, _) => o.Markdown = true, SymbolicCliOutputPolicy.Markdown)
+        .Add(static (o, c, a) => { o.ReportMaxDiagnostics = c.Int32(a, 0); o.ReportLimitSpecified = true; }, "--report-max-diagnostics")
+        .Add(static (o, c, a) => { o.ReportMaxHazards = c.Int32(a, 0); o.ReportLimitSpecified = true; }, "--report-max-hazards")
+        .Add(static (o, c, a) => { o.ReportMaxItems = c.Int32(a, 0); o.ReportLimitSpecified = true; }, "--report-max-items")
+        .Add(static (o, c, a) => o.FilePath = c.RequiredValue(a), "--file")
+        .Add(static (o, _, _) => o.ReadSourceFromStdin = true, "--stdin")
+        .Add(static (o, c, a) => o.InlineSourceText = c.RequiredValue(a), "--source-text")
+        .Add(static (o, c, a) => o.SourceFileName = c.RequiredValue(a), "--source-file-name")
+        .Add(static (o, c, a) => o.SourceMapUri = c.RequiredValue(a), "--source-map-uri")
+        .Add(static (o, c, a) => { o.SourceMapOriginalLine = c.Int32(a, 1); o.SourceMapOriginalLineSpecified = true; }, "--source-map-original-line")
+        .Add(static (o, c, a) => { o.SourceMapOriginalColumn = c.Int32(a, 1); o.SourceMapOriginalColumnSpecified = true; }, "--source-map-original-column")
+        .Add(static (o, c, a) => o.ProjectPath = c.RequiredValue(a), "--project")
+        .Add(static (o, c, a) => o.SolutionPath = c.RequiredValue(a), "--solution")
+        .Add(static (o, c, a) => o.ProjectName = c.RequiredValue(a), "--project-name")
+        .Add(static (o, c, a) => o.MSBuildProperties["Configuration"] = c.RequiredValue(a), "--configuration")
+        .Add(static (o, c, a) => o.MSBuildProperties["TargetFramework"] = c.RequiredValue(a), "--framework", "--target-framework")
+        .Add(static (o, c, a) => o.AddMSBuildProperty(c.RequiredValue(a), a), "--msbuild-property")
+        .Add(static (o, c, a) => o.Line = c.Int32(a, 1), "--line")
+        .Add(static (o, c, a) => { o.Column = c.Int32(a, 1); o.HasColumn = true; }, "--column")
+        .Add(static (o, c, a) => o.Position = c.Int32(a, 0), "--position")
+        .Add(static (o, c, a) => o.SpanStart = c.Int32(a, 0), "--span-start")
+        .Add(static (o, c, a) => o.SpanEnd = c.Int32(a, 0), "--span-end")
+        .Add(static (o, c, a) => o.SpanStartLine = c.Int32(a, 1), "--span-start-line")
+        .Add(static (o, c, a) => o.SpanStartColumn = c.Int32(a, 1), "--span-start-column")
+        .Add(static (o, c, a) => o.SpanEndLine = c.Int32(a, 1), "--span-end-line")
+        .Add(static (o, c, a) => o.SpanEndColumn = c.Int32(a, 1), "--span-end-column")
+        .Add(static (o, _, _) => o.LineInvariants = true, "--line-invariants", "--all-line-points")
+        .Add(static (o, _, _) => o.AllLines = true, "--all-lines", "--file-invariants")
+        .Add(static (o, _, _) => o.LineExpressions = true, "--line-expressions", "--include-expressions")
+        .Add(static (o, _, _) => o.PostLineInvariants = true, "--post-line-invariants")
+        .Add(static (o, c, a) => { o.ReferencePaths.Add(c.RequiredValue(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--reference", "-r")
+        .Add(static (o, c, a) => { o.LanguageVersion = ReadLanguageVersion(c, a); o.StandaloneCompilationOptionsSpecified = true; }, "--language-version", "--lang-version")
+        .Add(static (o, c, a) => { o.PreprocessorSymbols.Add(c.RequiredValue(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--define", "-d")
+        .Add(static (o, c, a) => { o.NullableContext = ReadNullableContext(c, a); o.StandaloneCompilationOptionsSpecified = true; }, "--nullable")
+        .Add(static (o, _, _) => { o.AllowUnsafe = true; o.StandaloneCompilationOptionsSpecified = true; }, "--allow-unsafe", "--unsafe")
+        .Add(static (o, c, a) => { o.DocumentationMode = c.DefinedEnum<DocumentationMode>(a, "must be none, parse, or diagnose."); o.StandaloneCompilationOptionsSpecified = true; }, "--documentation-mode")
+        .Add(static (o, c, a) => { o.Platform = c.DefinedEnum<Platform>(a, "requires a recognized Roslyn platform value."); o.StandaloneCompilationOptionsSpecified = true; }, "--platform")
+        .Add(static (o, c, a) => { o.OptimizationLevel = c.DefinedEnum<OptimizationLevel>(a, "must be debug or release."); o.StandaloneCompilationOptionsSpecified = true; }, "--optimization", "--optimize")
+        .Add(static (o, c, a) => { o.AssemblyName = c.RequiredValue(a); o.StandaloneCompilationOptionsSpecified = true; }, "--assembly-name")
+        .Add(static (o, c, a) => o.NodeKinds.Add(c.RequiredValue(a)), "--node-kind")
+        .Add(static (o, c, a) => o.ProgramPointKinds.Add(ReadProgramPointKind(c, a)), "--program-point-kind", "--point-kind")
+        .Add(static (o, c, a) => o.FilterLines.Add(c.Int32(a, 1)), "--filter-line")
+        .Add(static (o, c, a) => o.FilterLineStart = c.Int32(a, 1), "--line-start")
+        .Add(static (o, c, a) => o.FilterLineEnd = c.Int32(a, 1), "--line-end")
+        .Add(static (o, _, _) => o.WithFacts = true, "--with-facts")
+        .Add(static (o, _, _) => o.WithConditions = true, "--with-conditions")
+        .Add(static (o, c, a) => o.MethodNames.Add(c.RequiredValue(a)), "--method")
+        .Add(static (o, c, a) => o.MethodNameContains.Add(c.RequiredValue(a)), "--method-contains")
+        .Add(static (o, c, a) => o.ConditionTargets.Add(c.RequiredValue(a)), "--condition-target", "--target")
+        .Add(static (o, c, a) => o.InvariantTargets.Add(c.RequiredValue(a)), "--invariant-target", "--focus-target")
+        .Add(static (o, c, a) => o.Conditions.Add(c.RequiredValue(a)), "--condition")
+        .Add(static (o, c, a) => o.ConditionContains.Add(c.RequiredValue(a)), "--condition-contains")
+        .Add(static (o, c, a) => o.ReachabilityFilters.Add(c.DefinedEnum<SymbolicReachability>(a, "must be NotChecked, Unknown, Reachable, or Unreachable.")), "--reachability")
+        .Add(static (o, _, _) => o.WithProofs = true, "--with-proofs")
+        .Add(static (o, c, a) => o.ProofOutcomes.Add(c.DefinedEnum<SymbolicTruthValue>(a, "must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.")), "--proof-outcome")
+        .Add(static (o, c, a) => o.ProofConditions.Add(c.RequiredValue(a)), "--proof-condition")
+        .Add(static (o, c, a) => o.ProofConditionContains.Add(c.RequiredValue(a)), "--proof-condition-contains")
+        .Add(static (o, _, _) => o.Json = true, SymbolicCliOutputPolicy.Json)
+        .Add(static (o, _, _) => o.FailOnAnalysisTruncation = true, "--fail-on-analysis-truncation")
+        .Add(static (o, c, a) => o.AddThreshold(c.RequiredValue(a), a), "--fail-on-threshold")
+        .Add(static (o, _, _) => o.CheckReachability = true, "--check-reachability")
+        .Add(static (o, c, a) => o.ImpliedConditions.Add(c.RequiredValue(a)), "--implies")
+        .Add(static (o, _, _) => o.RuntimeHazards = true, "--runtime-hazards")
+        .Add(static (o, _, _) => o.Complexity = true, "--complexity")
+        .Add(static (o, _, _) => o.Capabilities = true, "--capabilities")
+        .Add(static (o, _, _) => o.FailOnHazard = true, "--fail-on-hazard")
+        .Add(static (o, _, _) => o.FailOnUnprovenImplies = true, "--fail-on-unproven-implies")
+        .Add(static (o, c, a) => o.AllowedCapabilities.Add(c.DefinedEnum<SymbolicCapability>(a, "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicCapability>()) + ".")), "--allowed-capability")
+        .Add(static (o, _, _) => o.FailOnCapabilityViolation = true, "--fail-on-capability-violation")
+        .Add(static (o, _, _) => o.FailOnCapabilityUnknown = true, "--fail-on-capability-unknown")
+        .Add(static (o, c, a) => o.MaximumComplexity = c.DefinedEnum<SharpProof.Attributes.ComplexityKind>(a, "must be one of: " + string.Join(", ", Enum.GetNames<SharpProof.Attributes.ComplexityKind>()) + "."), "--fail-on-complexity-exceeded")
+        .Add(static (o, _, _) => o.FailOnComplexityUnknown = true, "--fail-on-complexity-unknown")
+        .Add(static (o, c, a) => o.MaximumConservativeUnknowns = c.Int32(a, 0), "--max-conservative-unknowns")
+        .Add(static (o, c, a) => o.HazardKinds.Add(c.DefinedEnum<SymbolicRuntimeHazardKind>(a, "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".")), "--hazard-kind")
+        .Add(static (o, c, a) => o.HazardStatuses.Add(c.DefinedEnum<SymbolicRuntimeHazardStatus>(a, "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".")), "--hazard-status")
+        .Add(static (o, c, a) => o.HazardExceptionTypes.Add(c.RequiredValue(a)), "--hazard-exception-type", "--exception-type")
+        .Add(static (o, c, a) => o.HazardCategories.Add(c.RequiredValue(a)), "--hazard-category")
+        .Add(static (o, _, _) => o.IncludeUnprovenHazards = true, "--include-unproven-hazards")
+        .Add(static (o, c, a) => { o.SmtMode = ReadSmtMode(c, a); o.SmtModeSpecified = true; }, "--smt-mode")
+        .Add(static (o, c, a) => o.SmtTimeoutMs = c.Int32(a, 1), "--smt-timeout-ms")
+        .Add(static (o, c, a) => o.SmtMethodBudgetMs = c.Int32(a, 1), "--smt-method-budget-ms")
+        .Add(static (o, c, a) => o.SmtMaxPathConditions = c.Int32(a, 1), "--smt-max-path-conditions")
+        .Add(static (o, c, a) => o.SmtMaxExpressionNodes = c.Int32(a, 1), "--smt-max-expression-nodes")
+        .Add(static (o, c, a) => { o.SmtTransientRetryCount = c.Int32(a, 0); o.SmtTransientRetryCountSpecified = true; }, "--smt-transient-retries")
+        .Add(static (o, _, _) => { o.SmtRecycleContextOnTransientFailure = false; o.SmtRecycleContextOnTransientFailureSpecified = true; }, "--smt-keep-context-on-transient-failure")
+        .Add(static (o, _, _) => { o.SmtDisposeContextOnExit = true; o.SmtDisposeContextOnExitSpecified = true; }, "--smt-dispose-context-on-exit")
+        .Add(static (o, c, a) => o.AddAnalysisLimitOverride(c.RequiredValue(a), a), "--analysis-limit");
 
     public static SymbolicCliOptions Parse(string[] args)
     {
         var options = new SymbolicCliOptions();
-        var cursor = new OptionCursor(args);
-        while (cursor.MoveNext())
-        {
-            var arg = cursor.Current;
-            if (!OptionHandlers.TryGetValue(arg, out var handler))
-                throw new ArgumentException($"Unknown option '{arg}'.");
-            handler(options, cursor, arg);
-        }
+        OptionHandlers.Parse(args, options);
 
         if (!options.ShowHelp)
         {
@@ -598,76 +558,52 @@ internal sealed class SymbolicCliOptions
             NormalizeStringList(options.PreprocessorSymbols);
             _ = options.CreateCompilationProfile();
 
-            if ((options.Sarif ? 1 : 0) +
+            Reject((options.Sarif ? 1 : 0) +
                 (options.Markdown ? 1 : 0) +
-                (options.Json ? 1 : 0) > 1)
-                throw new ArgumentException(
-                    "--json, --sarif, and --markdown are mutually exclusive.");
-
-            if ((options.Sarif || options.Markdown) && !options.Explain)
-                throw new ArgumentException("--sarif and --markdown require explain.");
-
-            if (options.ReportLimitSpecified && !options.Explain)
-                throw new ArgumentException(
-                    "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain.");
-
-            if (options.Json && options.HasInvariantTargetFilter && !options.Explain)
-                throw new ArgumentException(
-                    "--invariant-target cannot be combined with --json; use text output.");
-
-            if (options.FailOnUnprovenImplies && options.ImpliedConditions.Count == 0)
-                throw new ArgumentException("--fail-on-unproven-implies requires at least one --implies condition.");
-
-            if (!options.Capabilities &&
+                (options.Json ? 1 : 0) > 1,
+                "--json, --sarif, and --markdown are mutually exclusive.");
+            Reject((options.Sarif || options.Markdown) && !options.Explain,
+                "--sarif and --markdown require explain.");
+            Reject(options.ReportLimitSpecified && !options.Explain,
+                "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain.");
+            Reject(options.Json && options.HasInvariantTargetFilter && !options.Explain,
+                "--invariant-target cannot be combined with --json; use text output.");
+            Reject(options.FailOnUnprovenImplies && options.ImpliedConditions.Count == 0,
+                "--fail-on-unproven-implies requires at least one --implies condition.");
+            Reject(!options.Capabilities &&
                 (options.FailOnCapabilityViolation ||
                  options.FailOnCapabilityUnknown ||
-                 options.AllowedCapabilities.Count != 0))
-                throw new ArgumentException(
-                    "--allowed-capability, --fail-on-capability-violation, and --fail-on-capability-unknown require --capabilities.");
-
-            if (options.AllowedCapabilities.Count != 0 && !options.FailOnCapabilityViolation)
-                throw new ArgumentException(
-                    "--allowed-capability requires --fail-on-capability-violation.");
-
-            if (!options.Complexity &&
-                (options.MaximumComplexity.HasValue || options.FailOnComplexityUnknown))
-                throw new ArgumentException(
-                    "--fail-on-complexity-exceeded and --fail-on-complexity-unknown require --complexity.");
-
-            if (options.MaximumConservativeUnknowns.HasValue &&
-                (options.RuntimeHazards || options.Complexity || options.Capabilities))
-                throw new ArgumentException(
-                    "--max-conservative-unknowns is supported only for invariant query results.");
-
-            if (!options.RuntimeHazards &&
+                 options.AllowedCapabilities.Count != 0),
+                "--allowed-capability, --fail-on-capability-violation, and --fail-on-capability-unknown require --capabilities.");
+            Reject(options.AllowedCapabilities.Count != 0 && !options.FailOnCapabilityViolation,
+                "--allowed-capability requires --fail-on-capability-violation.");
+            Reject(!options.Complexity &&
+                   (options.MaximumComplexity.HasValue || options.FailOnComplexityUnknown),
+                "--fail-on-complexity-exceeded and --fail-on-complexity-unknown require --complexity.");
+            Reject(options.MaximumConservativeUnknowns.HasValue &&
+                   (options.RuntimeHazards || options.Complexity || options.Capabilities),
+                "--max-conservative-unknowns is supported only for invariant query results.");
+            Reject(!options.RuntimeHazards &&
                 (options.IncludeUnprovenHazards ||
                  options.FailOnHazard ||
                  options.HazardKinds.Count != 0 ||
                  options.HazardStatuses.Count != 0 ||
                  options.HazardExceptionTypes.Count != 0 ||
-                 options.HazardCategories.Count != 0))
-                throw new ArgumentException(
-                    "--fail-on-hazard, --hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
-
-            if (options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
-                !options.IncludeUnprovenHazards)
-                throw new ArgumentException(
-                    "--hazard-status values other than Proven require --include-unproven-hazards.");
+                 options.HazardCategories.Count != 0),
+                "--fail-on-hazard, --hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
+            Reject(options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
+                   !options.IncludeUnprovenHazards,
+                "--hazard-status values other than Proven require --include-unproven-hazards.");
 
             var sourceCount = (options.FilePath != null ? 1 : 0) +
                               (options.ReadSourceFromStdin ? 1 : 0) +
                               (options.InlineSourceText != null ? 1 : 0);
-            if (sourceCount == 0)
-                throw new ArgumentException("Specify one source input: --file, --stdin, or --source-text.");
-
-            if (sourceCount > 1)
-                throw new ArgumentException("--file, --stdin, and --source-text are mutually exclusive.");
-
-            if (options.ProjectPath != null && options.SolutionPath != null)
-                throw new ArgumentException("--project cannot be combined with --solution.");
-
-            if (options.IsProjectAware && options.FilePath == null)
-                throw new ArgumentException("--project and --solution require --file.");
+            Reject(sourceCount == 0, "Specify one source input: --file, --stdin, or --source-text.");
+            Reject(sourceCount > 1, "--file, --stdin, and --source-text are mutually exclusive.");
+            Reject(options.ProjectPath != null && options.SolutionPath != null,
+                "--project cannot be combined with --solution.");
+            Reject(options.IsProjectAware && options.FilePath == null,
+                "--project and --solution require --file.");
 
             if (!options.IsProjectAware && options.FilePath != null && !File.Exists(CliHost.GetFullPath(options.FilePath)))
                 throw SymbolicCliErrorWriter.CreateException(
@@ -678,22 +614,17 @@ internal sealed class SymbolicCliOptions
                     "path",
                     options.FilePath);
 
-            if (options.SourceFileName != null && !options.HasInlineSource)
-                throw new ArgumentException("--source-file-name requires --stdin or --source-text.");
-
-            if (string.IsNullOrWhiteSpace(options.SourceFileName) && options.SourceFileName != null)
-                throw new ArgumentException("--source-file-name requires a non-empty path.");
-
-            if (options.SourceMapUri != null && !options.HasInlineSource)
-                throw new ArgumentException("--source-map-uri requires --stdin or --source-text.");
-
-            if ((options.SourceMapOriginalLineSpecified || options.SourceMapOriginalColumnSpecified) &&
-                options.SourceMapUri == null)
-                throw new ArgumentException(
-                    "--source-map-original-line and --source-map-original-column require --source-map-uri.");
-
-            if (string.IsNullOrWhiteSpace(options.SourceMapUri) && options.SourceMapUri != null)
-                throw new ArgumentException("--source-map-uri requires a non-empty URI.");
+            Reject(options.SourceFileName != null && !options.HasInlineSource,
+                "--source-file-name requires --stdin or --source-text.");
+            Reject(string.IsNullOrWhiteSpace(options.SourceFileName) && options.SourceFileName != null,
+                "--source-file-name requires a non-empty path.");
+            Reject(options.SourceMapUri != null && !options.HasInlineSource,
+                "--source-map-uri requires --stdin or --source-text.");
+            Reject((options.SourceMapOriginalLineSpecified || options.SourceMapOriginalColumnSpecified) &&
+                   options.SourceMapUri == null,
+                "--source-map-original-line and --source-map-original-column require --source-map-uri.");
+            Reject(string.IsNullOrWhiteSpace(options.SourceMapUri) && options.SourceMapUri != null,
+                "--source-map-uri requires a non-empty URI.");
 
             if (options.ProjectPath != null && !File.Exists(CliHost.GetFullPath(options.ProjectPath)))
                 throw SymbolicCliErrorWriter.CreateException(
@@ -713,138 +644,99 @@ internal sealed class SymbolicCliOptions
                     "path",
                     options.SolutionPath);
 
-            if (!options.IsProjectAware && options.ProjectName != null)
-                throw new ArgumentException("--project-name requires --project or --solution.");
-
-            if (!options.IsProjectAware && options.MSBuildProperties.Count != 0)
-                throw new ArgumentException(
-                    "--configuration, --framework, and --msbuild-property require --project or --solution.");
-
-            if (options.IsProjectAware && options.StandaloneCompilationOptionsSpecified)
-                throw new ArgumentException(
-                    "Standalone compilation options cannot be combined with --project or --solution; configure the project instead.");
-
-            if (options.Position.HasValue && options.Line != 0)
-                throw new ArgumentException("--position cannot be combined with --line.");
-
-            if (options.Position.HasValue && options.IsAnySpanQuery)
-                throw new ArgumentException("--position cannot be combined with span query options.");
-
-            if (options.IsAnySpanQuery && options.Line != 0)
-                throw new ArgumentException("Span query options cannot be combined with --line.");
-
-            if (options.IsAnySpanQuery && options.LineInvariants)
-                throw new ArgumentException("Span query options cannot be combined with --line-invariants.");
-
-            if (options.IsAnySpanQuery && options.Column != 1)
-                throw new ArgumentException("Span query options cannot be combined with --column.");
-
-            if (options.IsSpanQuery && (!options.SpanStart.HasValue || !options.SpanEnd.HasValue))
-                throw new ArgumentException("--span-start and --span-end must be provided together.");
-
-            if (options.IsLineColumnSpanQuery &&
+            Reject(!options.IsProjectAware && options.ProjectName != null,
+                "--project-name requires --project or --solution.");
+            Reject(!options.IsProjectAware && options.MSBuildProperties.Count != 0,
+                "--configuration, --framework, and --msbuild-property require --project or --solution.");
+            Reject(options.IsProjectAware && options.StandaloneCompilationOptionsSpecified,
+                "Standalone compilation options cannot be combined with --project or --solution; configure the project instead.");
+            Reject(options.Position.HasValue && options.Line != 0,
+                "--position cannot be combined with --line.");
+            Reject(options.Position.HasValue && options.IsAnySpanQuery,
+                "--position cannot be combined with span query options.");
+            Reject(options.IsAnySpanQuery && options.Line != 0,
+                "Span query options cannot be combined with --line.");
+            Reject(options.IsAnySpanQuery && options.LineInvariants,
+                "Span query options cannot be combined with --line-invariants.");
+            Reject(options.IsAnySpanQuery && options.Column != 1,
+                "Span query options cannot be combined with --column.");
+            Reject(options.IsSpanQuery && (!options.SpanStart.HasValue || !options.SpanEnd.HasValue),
+                "--span-start and --span-end must be provided together.");
+            Reject(options.IsLineColumnSpanQuery &&
                 (!options.SpanStartLine.HasValue ||
                  !options.SpanStartColumn.HasValue ||
                  !options.SpanEndLine.HasValue ||
-                 !options.SpanEndColumn.HasValue))
-                throw new ArgumentException(
-                    "--span-start-line, --span-start-column, --span-end-line, and --span-end-column must be provided together.");
-
-            if (options.IsSpanQuery && options.IsLineColumnSpanQuery)
-                throw new ArgumentException("Absolute span options cannot be combined with line/column span options.");
-
-            if (options.SpanEnd.HasValue &&
+                 !options.SpanEndColumn.HasValue),
+                "--span-start-line, --span-start-column, --span-end-line, and --span-end-column must be provided together.");
+            Reject(options.IsSpanQuery && options.IsLineColumnSpanQuery,
+                "Absolute span options cannot be combined with line/column span options.");
+            Reject(options.SpanEnd.HasValue &&
                 options.SpanStart.HasValue &&
-                options.SpanEnd.Value < options.SpanStart.Value)
-                throw new ArgumentException("--span-end cannot be less than --span-start.");
-
-            if (options.SpanStartLine.HasValue &&
+                options.SpanEnd.Value < options.SpanStart.Value,
+                "--span-end cannot be less than --span-start.");
+            Reject(options.SpanStartLine.HasValue &&
                 options.SpanEndLine.HasValue &&
                 (options.SpanEndLine.Value < options.SpanStartLine.Value ||
                  (options.SpanEndLine.Value == options.SpanStartLine.Value &&
-                  options.SpanEndColumn!.Value < options.SpanStartColumn!.Value)))
-                throw new ArgumentException("Line/column span end cannot be before span start.");
+                  options.SpanEndColumn!.Value < options.SpanStartColumn!.Value)),
+                "Line/column span end cannot be before span start.");
 
-            if (options.AllLines &&
+            Reject(options.AllLines &&
                 (options.Position.HasValue || options.IsAnySpanQuery || options.Line != 0 || options.Column != 1 ||
-                 options.LineInvariants))
-                throw new ArgumentException(
-                    "--all-lines cannot be combined with --line, --column, --position, span query options, or --line-invariants.");
-
-            if (options.Position.HasValue && options.LineInvariants)
-                throw new ArgumentException("--line-invariants cannot be combined with --position.");
-
-            if (options.RuntimeHazards && options.Position.HasValue)
-                throw new ArgumentException(
-                    "--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
-
-            if (options.RuntimeHazards && options.HasInvariantTargetFilter)
-                throw new ArgumentException("--invariant-target cannot be combined with --runtime-hazards.");
-
-            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions ||
-                                           options.PostLineInvariants || options.Column != 1 ||
-                                           options.IsLineColumnSpanQuery))
-                throw new ArgumentException(
-                    "--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
-
-            if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability ||
-                                           options.HasResultFilter))
-                throw new ArgumentException(
-                    "--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
-
-            if (options.RuntimeHazards && options.Complexity)
-                throw new ArgumentException("--runtime-hazards cannot be combined with --complexity.");
-
-            if (options.RuntimeHazards && options.Capabilities)
-                throw new ArgumentException("--runtime-hazards cannot be combined with --capabilities.");
+                 options.LineInvariants),
+                "--all-lines cannot be combined with --line, --column, --position, span query options, or --line-invariants.");
+            Reject(options.Position.HasValue && options.LineInvariants,
+                "--line-invariants cannot be combined with --position.");
+            Reject(options.RuntimeHazards && options.Position.HasValue,
+                "--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
+            Reject(options.RuntimeHazards && options.HasInvariantTargetFilter,
+                "--invariant-target cannot be combined with --runtime-hazards.");
+            Reject(options.RuntimeHazards && (options.LineInvariants || options.LineExpressions ||
+                   options.PostLineInvariants || options.Column != 1 || options.IsLineColumnSpanQuery),
+                "--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
+            Reject(options.RuntimeHazards && (options.ImpliedConditions.Count != 0 ||
+                   options.CheckReachability || options.HasResultFilter),
+                "--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
+            Reject(options.RuntimeHazards && options.Complexity,
+                "--runtime-hazards cannot be combined with --complexity.");
+            Reject(options.RuntimeHazards && options.Capabilities,
+                "--runtime-hazards cannot be combined with --capabilities.");
 
             if (options.Complexity) options.ValidateFocusedAnalysisCompatibility("--complexity");
 
-            if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
-                throw new ArgumentException(
-                    "--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
-
-            if (options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
-                throw new ArgumentException(
-                    "--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
-
-            if (options.FilterLineStart.HasValue &&
+            Reject(options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery,
+                "--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
+            Reject(options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery,
+                "--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
+            Reject(options.FilterLineStart.HasValue &&
                 options.FilterLineEnd.HasValue &&
-                options.FilterLineStart.Value > options.FilterLineEnd.Value)
-                throw new ArgumentException("--line-start cannot be greater than --line-end.");
-
-            if (!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0)
-                throw new ArgumentException("--line, --position, --span-start/--span-end, or --all-lines is required.");
+                options.FilterLineStart.Value > options.FilterLineEnd.Value,
+                "--line-start cannot be greater than --line-end.");
+            Reject(!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0,
+                "--line, --position, --span-start/--span-end, or --all-lines is required.");
 
             if (options.Explain)
             {
                 options.CheckReachability = true;
-                if (options.RuntimeHazards || options.Complexity || options.Capabilities)
-                    throw new ArgumentException(
-                        "explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
-
-                if (options.AllLines || options.IsAnySpanQuery || options.LineInvariants)
-                    throw new ArgumentException("explain supports --line, --line with --column, or --position only.");
-
-                if (options.HasExitGates)
-                    throw new ArgumentException(
-                        "CI exit gates require a focused query mode and cannot be combined with explain.");
+                Reject(options.RuntimeHazards || options.Complexity || options.Capabilities,
+                    "explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
+                Reject(options.AllLines || options.IsAnySpanQuery || options.LineInvariants,
+                    "explain supports --line, --line with --column, or --position only.");
+                Reject(options.HasExitGates,
+                    "CI exit gates require a focused query mode and cannot be combined with explain.");
             }
 
-            if (options.Complexity && options.Line == 0 && !options.Position.HasValue)
-                throw new ArgumentException("--complexity requires --line or --position.");
-
-            if (options.Complexity && options.Capabilities)
-                throw new ArgumentException("--complexity cannot be combined with --capabilities.");
+            Reject(options.Complexity && options.Line == 0 && !options.Position.HasValue,
+                "--complexity requires --line or --position.");
+            Reject(options.Complexity && options.Capabilities,
+                "--complexity cannot be combined with --capabilities.");
 
             if (options.Capabilities) options.ValidateFocusedAnalysisCompatibility("--capabilities");
 
-            if (options.Capabilities && options.Line == 0 && !options.Position.HasValue)
-                throw new ArgumentException("--capabilities requires --line or --position.");
-
-            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsAnySpanQuery)
-                throw new ArgumentException(
-                    "Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
+            Reject(options.Capabilities && options.Line == 0 && !options.Position.HasValue,
+                "--capabilities requires --line or --position.");
+            Reject(options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsAnySpanQuery,
+                "Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
 
             options.ValidateThresholds();
 
@@ -864,18 +756,18 @@ internal sealed class SymbolicCliOptions
 
     private void ValidateFocusedAnalysisCompatibility(string optionName)
     {
-        if (HasInvariantTargetFilter)
-            throw new ArgumentException($"--invariant-target cannot be combined with {optionName}.");
+        Reject(HasInvariantTargetFilter, $"--invariant-target cannot be combined with {optionName}.");
+        Reject(AllLines || IsAnySpanQuery || LineInvariants,
+            $"{optionName} supports --line, --line with --column, or --position only.");
+        Reject(LineExpressions || PostLineInvariants || HasResultFilter,
+            $"{optionName} cannot be combined with invariant program-point filters.");
+        Reject(ImpliedConditions.Count != 0 || CheckReachability,
+            $"{optionName} cannot be combined with implied-condition proofs or reachability checks.");
+    }
 
-        if (AllLines || IsAnySpanQuery || LineInvariants)
-            throw new ArgumentException($"{optionName} supports --line, --line with --column, or --position only.");
-
-        if (LineExpressions || PostLineInvariants || HasResultFilter)
-            throw new ArgumentException($"{optionName} cannot be combined with invariant program-point filters.");
-
-        if (ImpliedConditions.Count != 0 || CheckReachability)
-            throw new ArgumentException(
-                $"{optionName} cannot be combined with implied-condition proofs or reachability checks.");
+    private static void Reject(bool invalid, string message)
+    {
+        if (invalid) throw new ArgumentException(message);
     }
 
     public SymbolicSourceCompilationProfile CreateCompilationProfile()
@@ -1109,51 +1001,15 @@ internal sealed class SymbolicCliOptions
         return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(CliHost.GetFullPath(path)));
     }
 
-    private static string ReadString(string[] args, ref int index, string optionName)
-    {
-        if (index + 1 >= args.Length) throw new ArgumentException(optionName + " requires a value.");
-
-        return args[++index];
-    }
-
-    private static int ReadInt(string[] args, ref int index, string optionName)
-    {
-        var value = ReadString(args, ref index, optionName);
-        if (!int.TryParse(value, out var parsed))
-            throw new ArgumentException(optionName + " requires an integer value.");
-
-        return parsed;
-    }
-
-    private static int ReadPositiveInt(string[] args, ref int index, string optionName)
-    {
-        var parsed = ReadInt(args, ref index, optionName);
-        if (parsed <= 0) throw new ArgumentException(optionName + " requires a positive integer value.");
-
-        return parsed;
-    }
-
-    private static int ReadNonNegativeInt(string[] args, ref int index, string optionName)
-    {
-        var parsed = ReadInt(args, ref index, optionName);
-        if (parsed < 0) throw new ArgumentException(optionName + " requires a non-negative integer value.");
-
-        return parsed;
-    }
-
-    private void AddAnalysisLimitOverride(string value, string optionName)
-    {
+    private void AddAnalysisLimitOverride(string value, string optionName) =>
         AddNamedInteger(
             value, optionName, AnalysisLimitOverrides, IsAnalysisLimitName,
             "<name>=<positive-integer>", "limit name", 1);
-    }
 
-    private void AddThreshold(string value, string optionName)
-    {
+    private void AddThreshold(string value, string optionName) =>
         AddNamedInteger(
             value, optionName, Thresholds, IsThresholdName,
             "<metric>=<non-negative-integer>", "metric", 0);
-    }
 
     private static void AddNamedInteger(
         string value,
@@ -1197,10 +1053,8 @@ internal sealed class SymbolicCliOptions
         MSBuildProperties[name] = propertyValue;
     }
 
-    private int GetAnalysisLimit(string name, int fallback)
-    {
-        return AnalysisLimitOverrides.TryGetValue(name, out var value) ? value : fallback;
-    }
+    private int GetAnalysisLimit(string name, int fallback) =>
+        AnalysisLimitOverrides.TryGetValue(name, out var value) ? value : fallback;
 
     private static bool IsAnalysisLimitName(string name) => SharpProofAnalysisBudget.IsNamedLimit(name);
 
@@ -1217,17 +1071,17 @@ internal sealed class SymbolicCliOptions
             "complexity-unknowns";
     }
 
-    private static LanguageVersion ReadLanguageVersion(string[] args, ref int index, string optionName)
+    private static LanguageVersion ReadLanguageVersion(ToolArgumentReader reader, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim();
+        var value = reader.RequiredValue(optionName).Trim();
         if (LanguageVersionFacts.TryParse(value, out var languageVersion)) return languageVersion;
 
         throw new ArgumentException(optionName + " requires a recognized C# language version.");
     }
 
-    private static NullableContextOptions ReadNullableContext(string[] args, ref int index, string optionName)
+    private static NullableContextOptions ReadNullableContext(ToolArgumentReader reader, string optionName)
     {
-        var value = ReadString(args, ref index, optionName).Trim().ToLowerInvariant();
+        var value = reader.RequiredValue(optionName).Trim().ToLowerInvariant();
         return value switch
         {
             "disable" or "disabled" => NullableContextOptions.Disable,
@@ -1239,108 +1093,21 @@ internal sealed class SymbolicCliOptions
         };
     }
 
-    private static DocumentationMode ReadDocumentationMode(string[] args, ref int index, string optionName)
+    private static SmtAnalysisMode ReadSmtMode(ToolArgumentReader reader, string optionName)
     {
-        return ReadDefinedEnum<DocumentationMode>(
-            args, ref index, optionName, "must be none, parse, or diagnose.");
-    }
-
-    private static Platform ReadPlatform(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<Platform>(
-            args, ref index, optionName, "requires a recognized Roslyn platform value.");
-    }
-
-    private static OptimizationLevel ReadOptimizationLevel(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<OptimizationLevel>(
-            args, ref index, optionName, "must be debug or release.");
-    }
-
-    private static SmtAnalysisMode ReadSmtMode(string[] args, ref int index, string optionName)
-    {
-        var value = ReadString(args, ref index, optionName).Trim().ToLowerInvariant();
-        switch (value)
+        var value = reader.RequiredValue(optionName).Trim().ToLowerInvariant();
+        return value switch
         {
-            case "disabled":
-                return SmtAnalysisMode.Off;
-            case "bounded":
-                return SmtAnalysisMode.Bounded;
-            case "deep":
-                return SmtAnalysisMode.Deep;
-            default:
-                throw new ArgumentException(optionName + " must be disabled, bounded, or deep.");
-        }
+            "disabled" => SmtAnalysisMode.Off,
+            "bounded" => SmtAnalysisMode.Bounded,
+            "deep" => SmtAnalysisMode.Deep,
+            _ => throw new ArgumentException(optionName + " must be disabled, bounded, or deep.")
+        };
     }
 
-    private static SymbolicRuntimeHazardKind ReadHazardKind(string[] args, ref int index, string optionName)
+    private static string ReadProgramPointKind(ToolArgumentReader reader, string optionName)
     {
-        return ReadDefinedEnum<SymbolicRuntimeHazardKind>(
-            args,
-            ref index,
-            optionName,
-            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
-    }
-
-    private static SymbolicRuntimeHazardStatus ReadHazardStatus(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<SymbolicRuntimeHazardStatus>(
-            args,
-            ref index,
-            optionName,
-            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
-    }
-
-    private static SymbolicCapability ReadCapability(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<SymbolicCapability>(
-            args,
-            ref index,
-            optionName,
-            "must be one of: " + string.Join(", ", Enum.GetNames<SymbolicCapability>()) + ".");
-    }
-
-    private static SharpProof.Attributes.ComplexityKind ReadComplexityBound(
-        string[] args,
-        ref int index,
-        string optionName)
-    {
-        return ReadDefinedEnum<SharpProof.Attributes.ComplexityKind>(
-            args,
-            ref index,
-            optionName,
-            "must be one of: " + string.Join(", ", Enum.GetNames<SharpProof.Attributes.ComplexityKind>()) + ".");
-    }
-
-    private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<SymbolicReachability>(
-            args, ref index, optionName, "must be NotChecked, Unknown, Reachable, or Unreachable.");
-    }
-
-    private static SymbolicTruthValue ReadTruthValue(string[] args, ref int index, string optionName)
-    {
-        return ReadDefinedEnum<SymbolicTruthValue>(
-            args, ref index, optionName, "must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.");
-    }
-
-    private static TEnum ReadDefinedEnum<TEnum>(
-        string[] args,
-        ref int index,
-        string optionName,
-        string requirement)
-        where TEnum : struct, Enum
-    {
-        var value = ReadString(args, ref index, optionName).Trim();
-        if (Enum.TryParse<TEnum>(value, true, out var parsed) && Enum.IsDefined(typeof(TEnum), parsed))
-            return parsed;
-
-        throw new ArgumentException(optionName + " " + requirement);
-    }
-
-    private static string ReadProgramPointKind(string[] args, ref int index, string optionName)
-    {
-        var value = ReadString(args, ref index, optionName).Trim();
+        var value = reader.RequiredValue(optionName).Trim();
         if (SymbolicProgramPointKinds.TryNormalizeKnownKind(value, out var normalizedKind)) return normalizedKind;
 
         throw new ArgumentException(optionName + " must be Statement, Expression, or Other.");

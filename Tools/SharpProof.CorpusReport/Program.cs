@@ -44,27 +44,16 @@ internal sealed class CorpusReportOptions
     public string? OutputPath { get; private set; }
     public bool ShowHelp { get; private set; }
 
+    private static readonly ToolOptionSet<CorpusReportOptions> OptionSet =
+        new ToolOptionSet<CorpusReportOptions>()
+            .Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h")
+            .Add(static (o, r, _) => o.OutputPath =
+                r.RequiredValue("--output", "--output requires a path."), "--output", "-o");
+
     public static CorpusReportOptions Parse(string[] args)
     {
         var options = new CorpusReportOptions();
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (arg == "--help" || arg == "-h")
-            {
-                options.ShowHelp = true;
-            }
-            else if (arg == "--output" || arg == "-o")
-            {
-                if (i + 1 >= args.Length) throw new ArgumentException("--output requires a path.");
-
-                options.OutputPath = args[++i];
-            }
-            else
-            {
-                options.Inputs.Add(arg);
-            }
-        }
+        OptionSet.Parse(args, options, positional: static (o, value) => o.Inputs.Add(value));
 
         return options;
     }

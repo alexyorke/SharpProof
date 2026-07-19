@@ -66,91 +66,43 @@ internal sealed class CliOptions
 
     private string? PackageAssemblyRelativePath { get; set; }
 
+    private static readonly ToolOptionSet<CliOptions> OptionSet = new ToolOptionSet<CliOptions>()
+        .Add(static (o, r, a) => o.AssemblyPaths.Add(r.RequiredValue(a, $"Missing value for {a}.")), "--assembly")
+        .Add(static (o, r, a) => o.ArtifactSpecPath = r.RequiredValue(a, $"Missing value for {a}."), "--artifact-spec")
+        .Add(static (o, r, a) =>
+        {
+            o.ArtifactSpecPath = r.RequiredValue(a, $"Missing value for {a}.");
+            o.WriteArtifactSpecDependencyManifests = true;
+        }, "--artifact-spec-dependencies")
+        .Add(static (o, r, a) => o.InputManifestPath = r.RequiredValue(a, $"Missing value for {a}."), "--input-manifest")
+        .Add(static (o, r, a) => o.OutputManifestPath = r.RequiredValue(a, $"Missing value for {a}."), "--output-manifest")
+        .Add(static (o, r, a) => o.DependencyOutputRoot = r.RequiredValue(a, $"Missing value for {a}."), "--dependency-output-root")
+        .Add(static (o, r, a) => o.Framework = r.RequiredValue(a, $"Missing value for {a}."), "--framework")
+        .Add(static (o, r, a) => o.RuntimeAssemblyName = r.RequiredValue(a, $"Missing value for {a}."), "--runtime-assembly")
+        .Add(static (o, _, _) => o.AllRuntimeAssemblies = true, "--all-runtime-assemblies")
+        .Add(static (o, r, a) => o.SymbolPrefixes.Add(r.RequiredValue(a, $"Missing value for {a}.")), "--symbol-prefix")
+        .Add(static (o, _, _) => o.IncludeCallees = true, "--include-callees")
+        .Add(static (o, r, a) => o.MaxDepth = ReadInt(r, a), "--max-depth")
+        .Add(static (o, r, a) => o.MaxExceptionEdges = ReadPositiveInt(r, a), "--max-exception-edges")
+        .Add(static (o, _, _) => o.IncludeTransitiveRoots = true, "--transitive-roots")
+        .Add(static (o, r, a) => o.ProgressPath = r.RequiredValue(a, $"Missing value for {a}."), "--progress")
+        .Add(static (o, r, a) => o.ShardOutputPath = r.RequiredValue(a, $"Missing value for {a}."), "--shard-output")
+        .Add(static (o, _, _) => o.Resume = true, "--resume")
+        .Add(static (o, _, _) => o.IncludePurityClassification = true, "--classify-purity")
+        .Add(static (o, _, _) => o.IncludeBclFallbackInventory = true, "--bcl-fallback-inventory")
+        .Add(static (o, _, _) =>
+        {
+            o.IncludePurityClassification = true;
+            o.CompareManualCatalogs = true;
+        }, "--compare-manual-catalogs")
+        .Add(static (o, r, a) => o.OutputPath = r.RequiredValue(a, $"Missing value for {a}."), "--output")
+        .Add(static (o, r, a) => o.Limit = ReadInt(r, a), "--limit")
+        .Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h", "/?");
+
     public static CliOptions Parse(string[] args)
     {
         var options = new CliOptions();
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            switch (arg)
-            {
-                case "--assembly":
-                    options.AssemblyPaths.Add(ReadRequiredValue(args, ref i, arg));
-                    break;
-                case "--artifact-spec":
-                    options.ArtifactSpecPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--artifact-spec-dependencies":
-                    options.ArtifactSpecPath = ReadRequiredValue(args, ref i, arg);
-                    options.WriteArtifactSpecDependencyManifests = true;
-                    break;
-                case "--input-manifest":
-                    options.InputManifestPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--output-manifest":
-                    options.OutputManifestPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--dependency-output-root":
-                    options.DependencyOutputRoot = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--framework":
-                    options.Framework = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--runtime-assembly":
-                    options.RuntimeAssemblyName = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--all-runtime-assemblies":
-                    options.AllRuntimeAssemblies = true;
-                    break;
-                case "--symbol-prefix":
-                    options.SymbolPrefixes.Add(ReadRequiredValue(args, ref i, arg));
-                    break;
-                case "--include-callees":
-                    options.IncludeCallees = true;
-                    break;
-                case "--max-depth":
-                    options.MaxDepth = ReadInt(args, ref i, arg);
-                    break;
-                case "--max-exception-edges":
-                    options.MaxExceptionEdges = ReadPositiveInt(args, ref i, arg);
-                    break;
-                case "--transitive-roots":
-                    options.IncludeTransitiveRoots = true;
-                    break;
-                case "--progress":
-                    options.ProgressPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--shard-output":
-                    options.ShardOutputPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--resume":
-                    options.Resume = true;
-                    break;
-                case "--classify-purity":
-                    options.IncludePurityClassification = true;
-                    break;
-                case "--bcl-fallback-inventory":
-                    options.IncludeBclFallbackInventory = true;
-                    break;
-                case "--compare-manual-catalogs":
-                    options.IncludePurityClassification = true;
-                    options.CompareManualCatalogs = true;
-                    break;
-                case "--output":
-                    options.OutputPath = ReadRequiredValue(args, ref i, arg);
-                    break;
-                case "--limit":
-                    options.Limit = ReadInt(args, ref i, arg);
-                    break;
-                case "--help":
-                case "-h":
-                case "/?":
-                    options.ShowHelp = true;
-                    break;
-                default:
-                    throw new ArgumentException($"Unknown option '{arg}'.");
-            }
-        }
+        OptionSet.Parse(args, options);
 
         if (!options.ShowHelp) options.Validate();
 
@@ -455,25 +407,17 @@ internal sealed class CliOptions
         return Path.Combine(userProfile, ".nuget", "packages");
     }
 
-    private static string ReadRequiredValue(string[] args, ref int index, string option)
+    private static int ReadPositiveInt(ToolArgumentReader reader, string option)
     {
-        if (index + 1 >= args.Length) throw new ArgumentException($"Missing value for {option}.");
-
-        index++;
-        return args[index];
-    }
-
-    private static int ReadPositiveInt(string[] args, ref int index, string option)
-    {
-        var value = ReadInt(args, ref index, option);
+        var value = ReadInt(reader, option);
         if (value <= 0) throw new ArgumentException($"{option} must be greater than zero.");
 
         return value;
     }
 
-    private static int ReadInt(string[] args, ref int index, string option)
+    private static int ReadInt(ToolArgumentReader reader, string option)
     {
-        var text = ReadRequiredValue(args, ref index, option);
+        var text = reader.RequiredValue(option, $"Missing value for {option}.");
         if (!int.TryParse(text, out var value))
             throw new ArgumentException($"{option} requires an integer value, but received '{text}'.");
 

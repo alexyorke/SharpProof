@@ -247,14 +247,21 @@ Tests are excluded from the metric and must not be deleted.
   normalization, JSON evidence, cache behavior, and fallback classifications
   remain unchanged; architecture coverage prevents the copy-constructor forms
   from returning.
+- [x] Made `SharpProof.Tooling.Core` the single command-line argument cursor,
+  typed value parser, and option-dispatch owner for Symbolic CLI, EffectSummary,
+  Fuzz, Baseline, and CorpusReport. Deleted five independent loops, four value
+  readers, Symbolic's private cursor/enum parser, and repeated host/output
+  plumbing. Exact help, validation errors, exit codes, text, JSON, SARIF, and
+  package behavior remain characterized; architecture coverage prevents local
+  argument loops from returning.
 
 ## Current evidence
 
-- Maintained production: 100,287 lines (96,368 C#, 3,189 scripts, and 730
-  specifications); net reduction: 7,339 lines; remaining reduction: 12,661.
-  This tranche removed 205 maintained lines without deleting tests.
+- Maintained production: 100,017 lines (96,098 C#, 3,189 scripts, and 730
+  specifications); net reduction: 7,609 lines; remaining reduction: 12,391.
+  This tranche removed 270 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,182 passing tests and two documented skips.
+- Six lanes: 6,183 passing tests and two documented skips.
 
 ## Milestones
 

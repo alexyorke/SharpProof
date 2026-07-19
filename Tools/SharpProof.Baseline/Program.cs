@@ -115,6 +115,13 @@ internal sealed class BaselineCommandOptions
     public string? OutputPath { get; private set; }
     public bool ShowHelp { get; private set; }
 
+    private static readonly ToolOptionSet<BaselineCommandOptions> OptionSet =
+        new ToolOptionSet<BaselineCommandOptions>()
+            .Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h")
+            .Add(static (o, r, a) => o.BaselinePath = r.RequiredValue(a), "--baseline", "-b")
+            .Add(static (o, r, a) => o.OutputPath = r.RequiredValue(a), "--output", "-o")
+            .Add(static (o, r, a) => o.Inputs.Add(r.RequiredValue(a)), "--sarif", "--input");
+
     public static BaselineCommandOptions Parse(string[] args)
     {
         var options = new BaselineCommandOptions();
@@ -131,36 +138,7 @@ internal sealed class BaselineCommandOptions
         }
 
         options.Command = args[0].Trim().ToLowerInvariant();
-        for (var i = 1; i < args.Length; i++)
-        {
-            var arg = args[i];
-            switch (arg)
-            {
-                case "--help":
-                case "-h":
-                    options.ShowHelp = true;
-                    break;
-
-                case "--baseline":
-                case "-b":
-                    options.BaselinePath = ReadValue(args, ref i, arg);
-                    break;
-
-                case "--output":
-                case "-o":
-                    options.OutputPath = ReadValue(args, ref i, arg);
-                    break;
-
-                case "--sarif":
-                case "--input":
-                    options.Inputs.Add(ReadValue(args, ref i, arg));
-                    break;
-
-                default:
-                    options.Inputs.Add(arg);
-                    break;
-            }
-        }
+        OptionSet.Parse(args, options, 1, static (o, value) => o.Inputs.Add(value));
 
         return options;
     }
@@ -190,10 +168,4 @@ internal sealed class BaselineCommandOptions
         return true;
     }
 
-    private static string ReadValue(string[] args, ref int index, string option)
-    {
-        if (index + 1 >= args.Length) throw new ArgumentException(option + " requires a value.");
-
-        return args[++index];
-    }
 }

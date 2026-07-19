@@ -1,6 +1,10 @@
 using System.Threading;
 
-internal sealed class CliHost
+internal sealed class CliHost(
+    TextReader input,
+    TextWriter output,
+    TextWriter error,
+    string baseDirectory)
 {
     private static readonly AsyncLocal<CliHost?> AmbientHost = new();
     private static readonly CliHost SystemHost = new(
@@ -9,23 +13,16 @@ internal sealed class CliHost
         System.Console.Error,
         Directory.GetCurrentDirectory());
 
-    private CliHost(TextReader input, TextWriter output, TextWriter error, string baseDirectory)
-    {
-        Input = input ?? throw new ArgumentNullException(nameof(input));
-        Output = output ?? throw new ArgumentNullException(nameof(output));
-        Error = error ?? throw new ArgumentNullException(nameof(error));
-        BaseDirectory = Path.GetFullPath(baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory)));
-    }
-
     public static CliHost Current => AmbientHost.Value ?? SystemHost;
 
-    public TextReader Input { get; }
+    public TextReader Input { get; } = input ?? throw new ArgumentNullException(nameof(input));
 
-    public TextWriter Output { get; }
+    public TextWriter Output { get; } = output ?? throw new ArgumentNullException(nameof(output));
 
-    public TextWriter Error { get; }
+    public TextWriter Error { get; } = error ?? throw new ArgumentNullException(nameof(error));
 
-    public string BaseDirectory { get; }
+    public string BaseDirectory { get; } =
+        Path.GetFullPath(baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory)));
 
     public static string GetFullPath(string path)
     {
@@ -43,20 +40,14 @@ internal sealed class CliHost
         return new Scope(previous);
     }
 
-    private sealed class Scope : IDisposable
+    private sealed class Scope(CliHost? previous) : IDisposable
     {
-        private readonly CliHost? _previous;
         private bool _disposed;
-
-        public Scope(CliHost? previous)
-        {
-            _previous = previous;
-        }
 
         public void Dispose()
         {
             if (_disposed) return;
-            AmbientHost.Value = _previous;
+            AmbientHost.Value = previous;
             _disposed = true;
         }
     }
@@ -72,13 +63,7 @@ internal static class Console
     public static TextWriter Error => CliHost.Current.Error;
 
 
-    public static void WriteLine()
-    {
-        Out.WriteLine();
-    }
+    public static void WriteLine() => Out.WriteLine();
 
-    public static void WriteLine(string? value)
-    {
-        Out.WriteLine(value);
-    }
+    public static void WriteLine(string? value) => Out.WriteLine(value);
 }
