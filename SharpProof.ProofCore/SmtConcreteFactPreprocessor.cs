@@ -66,35 +66,11 @@ internal sealed class SmtConcreteFactPreprocessor
             }
         }
 
-        var stringLengthEqualities = new Dictionary<SmtFormula, long>();
-        foreach (var condition in normalizedConditions)
-            if (!TryCollectStringLengthEqualities(condition, stringLengthEqualities))
-            {
-                preparedConditions = Array.Empty<SmtFormula>();
-                return SmtConcreteFactPreparationStatus.Unsatisfiable;
-            }
-
-        foreach (var condition in normalizedConditions)
-        {
-            var status = TryInferStringEqualitiesFromLengthConstrainedPredicates(
-                condition,
-                stringLengthEqualities,
-                facts);
-            if (status != SmtConcreteFactPreparationStatus.Ready)
-            {
-                preparedConditions = Array.Empty<SmtFormula>();
-                return status;
-            }
-        }
-
-        var stringShapeStatus = TryApplyStringShapeFacts(
-            normalizedConditions,
-            stringLengthEqualities,
-            facts);
-        if (stringShapeStatus != SmtConcreteFactPreparationStatus.Ready)
+        var concreteStringStatus = InferConcreteStringsForRegexValidation(normalizedConditions, facts);
+        if (concreteStringStatus != SmtConcreteFactPreparationStatus.Ready)
         {
             preparedConditions = Array.Empty<SmtFormula>();
-            return stringShapeStatus;
+            return concreteStringStatus;
         }
 
         var builder = new List<SmtFormula>(normalizedConditions.Count);
@@ -488,67 +464,57 @@ internal sealed class SmtConcreteFactPreprocessor
             SmtNullConstant;
     }
 
-
-    private static bool TryAddStringEquality(
-        ConcreteFactContext facts,
-        SmtFormula formula,
-        string value,
-        ref bool changed)
+    private static SmtConcreteFactPreparationStatus InferConcreteStringsForRegexValidation(
+        IEnumerable<SmtFormula> conditions,
+        ConcreteFactContext facts)
     {
-        if (facts.StringEqualities.TryGetValue(formula, out var existing))
-            return string.Equals(existing, value, StringComparison.Ordinal);
+        var conjuncts = conditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts).ToArray();
+        var lengths = new Dictionary<SmtFormula, long>();
+        foreach (var conjunct in conjuncts)
+        {
+            if (!TryGetStringLengthEquality(conjunct, out var value, out var length)) continue;
+            if (length < 0 || lengths.TryGetValue(value, out var existing) && existing != length)
+                return SmtConcreteFactPreparationStatus.Unsatisfiable;
 
-        facts.StringEqualities.Add(formula, value);
-        changed = true;
-        return true;
+            lengths[value] = length;
+        }
+
+        foreach (var conjunct in conjuncts)
+        {
+            if (!TryGetPositiveStringPredicate(conjunct, out var value, out var argument) ||
+                !lengths.TryGetValue(value, out var length) ||
+                !facts.TryGetKnownString(argument, out var concreteArgument) ||
+                length != concreteArgument.Length)
+                continue;
+
+            if (facts.StringEqualities.TryGetValue(value, out var existing))
+            {
+                if (!string.Equals(existing, concreteArgument, StringComparison.Ordinal))
+                    return SmtConcreteFactPreparationStatus.Unsatisfiable;
+            }
+            else
+            {
+                facts.StringEqualities.Add(value, concreteArgument);
+            }
+        }
+
+        return SmtConcreteFactPreparationStatus.Ready;
     }
 
-    private static bool TryAddStringEquality(
-        ConcreteFactContext facts,
-        SmtFormula formula,
-        string value)
-    {
-        var changed = false;
-        return TryAddStringEquality(facts, formula, value, ref changed);
-    }
-
-    private static bool TryCollectStringLengthEqualities(
-        SmtFormula formula,
-        Dictionary<SmtFormula, long> stringLengthEqualities)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
-            return TryCollectStringLengthEqualities(andFormula.Left, stringLengthEqualities) &&
-                   TryCollectStringLengthEqualities(andFormula.Right, stringLengthEqualities);
-
-        if (!TryGetStringLengthEquality(formula, out var value, out var length)) return true;
-
-        if (length < 0) return false;
-
-        if (stringLengthEqualities.TryGetValue(value, out var existing)) return existing == length;
-
-        stringLengthEqualities.Add(value, length);
-        return true;
-    }
-
-    private static bool TryGetStringLengthEquality(
-        SmtFormula formula,
-        out SmtFormula value,
-        out long length)
+    private static bool TryGetStringLengthEquality(SmtFormula formula, out SmtFormula value, out long length)
     {
         value = null!;
         length = default;
-        if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equalFormula) return false;
+        if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equality) return false;
 
-        if (equalFormula.Left is SmtStringLengthTerm leftLength &&
-            equalFormula.Right is SmtIntegerConstant rightConstant)
+        if (equality.Left is SmtStringLengthTerm left && equality.Right is SmtIntegerConstant right)
         {
-            value = leftLength.Value;
-            length = rightConstant.Value;
+            value = left.Value;
+            length = right.Value;
             return true;
         }
 
-        if (equalFormula.Left is SmtIntegerConstant leftConstant &&
-            equalFormula.Right is SmtStringLengthTerm rightLength)
+        if (equality.Left is SmtIntegerConstant leftConstant && equality.Right is SmtStringLengthTerm rightLength)
         {
             value = rightLength.Value;
             length = leftConstant.Value;
@@ -558,165 +524,21 @@ internal sealed class SmtConcreteFactPreprocessor
         return false;
     }
 
-    private static SmtConcreteFactPreparationStatus TryInferStringEqualitiesFromLengthConstrainedPredicates(
+    private static bool TryGetPositiveStringPredicate(
         SmtFormula formula,
-        IReadOnlyDictionary<SmtFormula, long> stringLengthEqualities,
-        ConcreteFactContext facts)
+        out SmtFormula value,
+        out SmtFormula argument)
     {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
+        (value, argument) = formula switch
         {
-            var leftStatus = TryInferStringEqualitiesFromLengthConstrainedPredicates(
-                andFormula.Left,
-                stringLengthEqualities,
-                facts);
-            if (leftStatus != SmtConcreteFactPreparationStatus.Ready) return leftStatus;
-
-            return TryInferStringEqualitiesFromLengthConstrainedPredicates(
-                andFormula.Right,
-                stringLengthEqualities,
-                facts);
-        }
-
-        if (!TryGetPositiveStringPredicateFact(formula, out var predicate) ||
-            !stringLengthEqualities.TryGetValue(predicate.Value, out var knownLength) ||
-            !facts.TryGetKnownString(predicate.Argument, out var concreteArgument))
-            return SmtConcreteFactPreparationStatus.Ready;
-
-        if (knownLength < concreteArgument.Length) return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (knownLength == concreteArgument.Length)
-            if (!TryAddStringEquality(facts, predicate.Value, concreteArgument))
-                return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static SmtConcreteFactPreparationStatus TryApplyStringShapeFacts(
-        IReadOnlyList<SmtFormula> conditions,
-        IReadOnlyDictionary<SmtFormula, long> stringLengthEqualities,
-        ConcreteFactContext facts)
-    {
-        var shapeFacts = new Dictionary<SmtFormula, StringShapeFact>();
-        foreach (var condition in conditions)
-        {
-            var status = TryCollectStringShapeFacts(condition, facts, shapeFacts);
-            if (status != SmtConcreteFactPreparationStatus.Ready) return status;
-        }
-
-        foreach (var entry in shapeFacts)
-        {
-            var value = entry.Key;
-            var shape = entry.Value;
-            long? exactLength = null;
-            if (stringLengthEqualities.TryGetValue(value, out var knownLength))
-                exactLength = knownLength;
-        else if (facts.TryGetKnownString(value, out var concreteValue)) exactLength = concreteValue.Length;
-
-            if (exactLength.HasValue)
-            {
-                if (shape.MinLength > exactLength.Value) return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-                if (!TryApplyExactLengthStringShape(value, exactLength.Value, shape, facts))
-                    return SmtConcreteFactPreparationStatus.Unsatisfiable;
-            }
-        }
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static SmtConcreteFactPreparationStatus TryCollectStringShapeFacts(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        Dictionary<SmtFormula, StringShapeFact> shapeFacts)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
-        {
-            var leftStatus = TryCollectStringShapeFacts(andFormula.Left, facts, shapeFacts);
-            if (leftStatus != SmtConcreteFactPreparationStatus.Ready) return leftStatus;
-
-            return TryCollectStringShapeFacts(andFormula.Right, facts, shapeFacts);
-        }
-
-        if (!TryGetPositiveStringPredicateFact(formula, out var predicate) ||
-                !facts.TryGetKnownString(predicate.Argument, out var argument))
-            return SmtConcreteFactPreparationStatus.Ready;
-
-        var shape = shapeFacts.TryGetValue(predicate.Value, out var existing)
-            ? existing
-            : default;
-
-        var status = predicate.Kind switch
-        {
-            StringPredicateKind.Contains => shape.AddContains(argument),
-            StringPredicateKind.StartsWith => shape.AddPrefix(argument),
-            StringPredicateKind.EndsWith => shape.AddSuffix(argument),
-            _ => SmtConcreteFactPreparationStatus.Ready
+            SmtStringContainsFormula contains => (contains.Value, contains.Search),
+            SmtStringStartsWithFormula startsWith => (startsWith.Value, startsWith.Prefix),
+            SmtStringEndsWithFormula endsWith => (endsWith.Value, endsWith.Suffix),
+            _ => (null!, null!)
         };
-
-        if (status != SmtConcreteFactPreparationStatus.Ready) return status;
-
-        shapeFacts[predicate.Value] = shape;
-        return SmtConcreteFactPreparationStatus.Ready;
+        return value != null;
     }
 
-    private static bool TryApplyExactLengthStringShape(
-        SmtFormula value,
-        long exactLength,
-        StringShapeFact shape,
-        ConcreteFactContext facts)
-    {
-        if (exactLength > int.MaxValue) return true;
-
-        var length = (int)exactLength;
-        var prefix = shape.Prefix;
-        var suffix = shape.Suffix;
-        if (prefix is not null &&
-            prefix.Length != 0 &&
-            prefix.Length == length)
-            return TryAddStringEquality(facts, value, prefix);
-
-        if (suffix is not null &&
-            suffix.Length != 0 &&
-            suffix.Length == length)
-            return TryAddStringEquality(facts, value, suffix);
-
-        if (prefix is not null &&
-            suffix is not null &&
-            prefix.Length != 0 &&
-            suffix.Length != 0 &&
-            prefix.Length + suffix.Length >= length)
-        {
-            var characters = new char?[length];
-            if (!TryOverlayString(characters, 0, prefix) ||
-                !TryOverlayString(characters, length - suffix.Length, suffix))
-                return false;
-
-            if (characters.All(static c => c.HasValue))
-                return TryAddStringEquality(
-                    facts,
-                    value,
-                    new string(characters.Select(static c => c!.Value).ToArray()));
-        }
-
-        return true;
-    }
-
-    private static bool TryOverlayString(char?[] target, int start, string value)
-    {
-        if (start < 0 ||
-            start + value.Length > target.Length)
-            return false;
-
-        for (var i = 0; i < value.Length; i++)
-        {
-            var index = start + i;
-            if (target[index].HasValue && target[index]!.Value != value[i]) return false;
-
-            target[index] = value[i];
-        }
-
-        return true;
-    }
 
     private SmtConcreteFactPreparationStatus SimplifyConcreteFacts(
         SmtFormula formula,
@@ -843,105 +665,7 @@ internal sealed class SmtConcreteFactPreprocessor
         return false;
     }
 
-    private static bool TryGetPositiveStringPredicateFact(
-        SmtFormula formula,
-        out StringPredicateFact predicate)
-    {
-        switch (formula)
-        {
-            case SmtStringContainsFormula contains:
-                predicate = new StringPredicateFact(StringPredicateKind.Contains, contains.Value, contains.Search);
-                return true;
-            case SmtStringStartsWithFormula startsWith:
-                predicate = new StringPredicateFact(StringPredicateKind.StartsWith, startsWith.Value,
-                    startsWith.Prefix);
-                return true;
-            case SmtStringEndsWithFormula endsWith:
-                predicate = new StringPredicateFact(StringPredicateKind.EndsWith, endsWith.Value, endsWith.Suffix);
-                return true;
-            default:
-                predicate = default;
-                return false;
-        }
-    }
-
-
     private delegate bool CheckedLongBinaryOperation(long left, long right, out long value);
 
     private delegate bool TryGetPositiveFact<TFact>(SmtFormula formula, out TFact fact);
-
-    private struct StringShapeFact
-    {
-        public string? Prefix;
-
-        public string? Suffix;
-
-        public long MinLength;
-
-        public SmtConcreteFactPreparationStatus AddContains(string value)
-        {
-            return ApplyMinimumLength(value.Length);
-        }
-
-        public SmtConcreteFactPreparationStatus AddPrefix(string value)
-        {
-            return AddAffix(value, isPrefix: true);
-        }
-
-        public SmtConcreteFactPreparationStatus AddSuffix(string value)
-        {
-            return AddAffix(value, isPrefix: false);
-        }
-
-        private SmtConcreteFactPreparationStatus AddAffix(string value, bool isPrefix)
-        {
-            var current = isPrefix ? Prefix : Suffix;
-            if (current != null && !AreCompatibleAffixes(current, value, isPrefix))
-                return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-            if (current == null || value.Length > current.Length)
-            {
-                if (isPrefix)
-                    Prefix = value;
-                else
-                    Suffix = value;
-            }
-
-            return ApplyMinimumLength(value.Length);
-        }
-
-        private SmtConcreteFactPreparationStatus ApplyMinimumLength(int length)
-        {
-            if (length > MinLength) MinLength = length;
-
-            return SmtConcreteFactPreparationStatus.Ready;
-        }
-
-        private static bool AreCompatibleAffixes(string left, string right, bool isPrefix)
-        {
-            var minLength = Math.Min(left.Length, right.Length);
-            var leftStart = isPrefix ? 0 : left.Length - minLength;
-            var rightStart = isPrefix ? 0 : right.Length - minLength;
-            return string.Equals(
-                left.Substring(leftStart, minLength),
-                right.Substring(rightStart, minLength),
-                StringComparison.Ordinal);
-        }
-    }
-
-    private enum StringPredicateKind
-    {
-        Contains,
-        StartsWith,
-        EndsWith
-    }
-
-    private readonly struct StringPredicateFact(StringPredicateKind kind, SmtFormula value, SmtFormula argument)
-    {
-        public StringPredicateKind Kind { get; } = kind;
-
-        public SmtFormula Value { get; } = value;
-
-        public SmtFormula Argument { get; } = argument;
-    }
 }

@@ -220,14 +220,20 @@ Tests are excluded from the metric and must not be deleted.
   emits its three empty arrays, generated-purity catalog construction remains
   intact, and architecture and packaging tests prevent the retired normalizers
   from returning or the boundary shape from drifting.
+- [x] Removed ProofCore's general manual string-shape reconstruction before SMT.
+  Exact Z3 string constraints now own length, contains, prefix, suffix, and
+  overlap consistency. Retained only a narrow same-length concrete-value bridge
+  needed to validate .NET regex semantics conservatively; focused regex and
+  string tests preserve all outcomes, and architecture coverage prevents the
+  duplicate shape engine from returning.
 
 ## Current evidence
 
-- Maintained production: 101,122 lines (97,203 C#, 3,189 scripts, and 730
-  specifications); net reduction: 6,504 lines; remaining reduction: 13,496.
-  This tranche removed 511 maintained lines without deleting tests.
+- Maintained production: 100,896 lines (96,977 C#, 3,189 scripts, and 730
+  specifications); net reduction: 6,730 lines; remaining reduction: 13,270.
+  This tranche removed 226 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,178 passing tests and two documented skips.
+- Six lanes: 6,179 passing tests and two documented skips.
 
 ## Milestones
 

@@ -291,6 +291,22 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void ProofCore_DelegatesGeneralStringShapeConsistencyToSmt()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var preprocessor = File.ReadAllText(Path.Combine(
+            root, "SharpProof.ProofCore", "SmtConcreteFactPreprocessor.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(preprocessor, Does.Not.Contain("TryApplyStringShapeFacts"));
+            Assert.That(preprocessor, Does.Not.Contain("StringShapeFact"));
+            Assert.That(preprocessor, Does.Not.Contain("TryInferStringEqualitiesFromLengthConstrainedPredicates"));
+            Assert.That(preprocessor, Does.Contain("InferConcreteStringsForRegexValidation"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
