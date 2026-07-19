@@ -153,16 +153,6 @@ internal readonly record struct AnalyzerConfigurationDefault(
         ? Format(BoundedValue) + " (disabled/bounded), " + Format(DeepValue) + " (deep)"
         : ConstantValue ?? string.Empty;
 
-    internal static AnalyzerConfigurationDefault ForSmtModes(
-        int boundedValue,
-        int deepValue,
-        string unit = "")
-    {
-        if (boundedValue <= 0) throw new ArgumentOutOfRangeException(nameof(boundedValue));
-        if (deepValue <= 0) throw new ArgumentOutOfRangeException(nameof(deepValue));
-        return new AnalyzerConfigurationDefault(null, boundedValue, deepValue, unit ?? string.Empty);
-    }
-
     internal string Resolve(SmtAnalysisMode mode)
     {
         if (!IsModeDependent) return ConstantValue ?? string.Empty;

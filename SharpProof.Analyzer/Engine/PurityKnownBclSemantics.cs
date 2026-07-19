@@ -76,24 +76,6 @@ internal static class PurityKnownBclSemantics
         return true;
     }
 
-    internal static bool IsArrayInterfaceGetEnumeratorInvocation(
-        IInvocationOperation invocationOperation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-        if (targetMethod == null ||
-            targetMethod.Name != "GetEnumerator" ||
-            targetMethod.Parameters.Length != 0)
-            return false;
-
-        return TryGetExplicitlyCastArrayReceiverType(
-            invocationOperation,
-            semanticModel,
-            cancellationToken,
-            out _);
-    }
-
     internal static bool TryGetExplicitlyCastArrayReceiverType(
         IInvocationOperation invocationOperation,
         SemanticModel semanticModel,

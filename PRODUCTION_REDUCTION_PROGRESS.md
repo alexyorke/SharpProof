@@ -362,14 +362,19 @@ Tests are excluded from the metric and must not be deleted.
   declarative simple-removal registry and single MEF export. CodeFixes now uses
   the repository C# 12 level and project-owned global imports; fixable IDs,
   formatting, packaging, VSIX loading, and fix-all behavior remain unchanged.
+- [x] Removed four declaration-only policy/projection helpers found by an exact
+  repository-wide symbol audit: obsolete SMT-mode default construction, an
+  unused array-enumerator special-case wrapper, and two unused EffectSummary
+  freshness/visibility renderers. Architecture coverage prevents these retired
+  entry points from returning while the live inference rules remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 96,566 lines (92,647 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,060 lines; remaining reduction: 8,940.
-  This responsibility split added one maintained line without deleting tests.
+- Maintained production: 96,518 lines (92,599 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,108 lines; remaining reduction: 8,892.
+  This tranche removed 48 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,195 passing tests and two documented Main skips.
+- Six lanes: 6,196 passing tests and two documented Main skips.
 
 ## Milestones
 

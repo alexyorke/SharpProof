@@ -3,21 +3,6 @@ internal static class EffectSummaryClassificationEvidenceRules
     private static readonly string[] CommonFreshResultDisqualifyingEffects =
         ["writes_static_field", "writes_instance_field", "indirect_call", "virtual_call", "block_memory_write"];
 
-    internal static string? GetFreshArrayNote(MethodPurityClassification? classification)
-    {
-        if (classification == null) return "unclassified";
-
-        if (!string.IsNullOrWhiteSpace(classification.FreshnessClassification) &&
-            !string.Equals(classification.FreshnessClassification, "none", StringComparison.Ordinal))
-            return classification.FreshnessClassification;
-
-        if (!classification.HasFreshArrayAllocationEvidence) return "no_fresh_array_allocation_evidence";
-
-        return classification.Classification == "pure"
-            ? "fresh_array_allocation_evidence_present"
-            : "fresh_array_allocation_evidence_present_but_not_proven_pure";
-    }
-
     internal static string GetFreshnessClassification(MethodEffectSummary? summary, string classification)
     {
         if (summary == null) return "none";
@@ -642,23 +627,6 @@ internal static class EffectSummaryClassificationEvidenceRules
 
         if (HasFreshArrayAllocationEvidence(summary) && string.Equals(classification, "pure", StringComparison.Ordinal))
             return "internal_only";
-
-        return "none";
-    }
-
-    internal static string AggregateEffectVisibilityClassification(
-        IReadOnlyList<MethodPurityClassification> classifications)
-    {
-        var values = classifications
-            .Select(static classification => classification.EffectVisibilityClassification)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        if (values.Contains("caller_visible", StringComparer.Ordinal)) return "caller_visible";
-
-        if (values.Contains("unknown", StringComparer.Ordinal)) return "unknown";
-
-        if (values.Contains("internal_only", StringComparer.Ordinal)) return "internal_only";
 
         return "none";
     }

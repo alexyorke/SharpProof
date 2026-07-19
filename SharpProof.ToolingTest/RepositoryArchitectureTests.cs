@@ -446,6 +446,27 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void RetiredProjectionAndPolicyHelpers_DoNotReturn()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var sources = string.Join("\n", new[]
+        {
+            Path.Combine(root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptionRegistry.cs"),
+            Path.Combine(root, "SharpProof.Analyzer", "Engine", "PurityKnownBclSemantics.cs"),
+            Path.Combine(root, "Tools", "SharpProof.EffectSummary",
+                "EffectSummaryClassificationEvidenceRules.cs")
+        }.Select(File.ReadAllText));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sources, Does.Not.Contain("ForSmtModes"));
+            Assert.That(sources, Does.Not.Contain("IsArrayInterfaceGetEnumeratorInvocation"));
+            Assert.That(sources, Does.Not.Contain("GetFreshArrayNote"));
+            Assert.That(sources, Does.Not.Contain("AggregateEffectVisibilityClassification"));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
