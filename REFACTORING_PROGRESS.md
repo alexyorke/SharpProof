@@ -229,12 +229,17 @@ This is the active source of truth for the comprehensive refactor. Read
   and lower-hex encoding now have direct single-purpose owners. Effect-summary
   compatibility reporting remains because it rejects untrusted schema/data;
   it is product validation rather than a legacy shim.
+- [x] Continued the production-reduction follow-up by collapsing seventeen
+  one-method purity-rule dispatch shells into one stateless core-operation
+  policy owner and the registry's single typed boundary. Canonical child
+  traversal owns structurally identical array, inline-array, and null-test
+  behavior; the generic rule-base adapter is deleted.
 
 ## Current evidence
 
 - Branch: `codex/nullable-contract-verification`.
-- Handwritten production source: 101,408 lines across 491 files, 7,983 fewer
-  lines than the immutable starting baseline.
+- Enforced maintained production source: 94,486 lines, 13,140 fewer than the
+  production-reduction baseline and 6,860 from its 20,000-line target.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,147 passing tests and two documented skips.
@@ -246,8 +251,8 @@ This is the active source of truth for the comprehensive refactor. Read
   inventory, and production metrics all verify current. The enforced maintained
   LOC ledger is recorded in `PRODUCTION_REDUCTION_PROGRESS.md`.
 - The six-lane matrix covers exact CLI/package/VSIX, seeded fuzz,
-  EffectSummary, architecture, and public-API boundary fixtures; the Tooling
-  lane contributes 616 passing tests.
+  EffectSummary, architecture, and public-API boundary fixtures; 6,205 tests
+  pass with the same two documented Main skips.
 
 ## Remaining tranches
 
@@ -267,6 +272,5 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-No implementation tranche remains. Keep this file as the historical completion
-record and require the architecture and release gates for subsequent feature
-work.
+The comprehensive architecture refactor remains complete. Continue the
+separate maintained-production reduction from `PRODUCTION_REDUCTION_PROGRESS.md`.

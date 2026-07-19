@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class BinaryOperationPurityRule : PurityRuleBase<IBinaryOperation>
+internal static class BinaryOperationPurityRule
 {
-    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IBinaryOperation binaryOperation,
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IBinaryOperation binaryOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
 

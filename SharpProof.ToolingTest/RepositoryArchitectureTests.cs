@@ -233,6 +233,47 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void AnalyzerAssembly_UsesCanonicalCoreOperationPurityPolicies()
+    {
+        var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
+        var retiredRuleNames = new[]
+        {
+            "ArrayElementReferencePurityRule",
+            "ArrayCreationPurityRule",
+            "CollectionExpressionPurityRule",
+            "CoalesceOperationPurityRule",
+            "ConditionalAccessPurityRule",
+            "EventAssignmentPurityRule",
+            "EventReferencePurityRule",
+            "InlineArrayAccessPurityRule",
+            "IsNullPurityRule",
+            "LockStatementPurityRule",
+            "ObjectOrCollectionInitializerPurityRule",
+            "RecursivePatternPurityRule",
+            "SpreadOperationPurityRule",
+            "SwitchExpressionPurityRule",
+            "SwitchStatementPurityRule",
+            "UnaryOperationPurityRule",
+            "WithOperationPurityRule"
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                assembly.GetType("SharpProof.Analyzer.Engine.Rules.CoreOperationPurityRules", true),
+                Is.Not.Null);
+            Assert.That(
+                assembly.GetType("SharpProof.Analyzer.Engine.Rules.PurityRuleBase`1"),
+                Is.Null);
+            foreach (var ruleName in retiredRuleNames)
+                Assert.That(
+                    assembly.GetType("SharpProof.Analyzer.Engine.Rules." + ruleName),
+                    Is.Null,
+                    ruleName + " must not regain an independent dispatch shell.");
+        });
+    }
+
+    [Test]
     public void EffectSummary_UsesOneByRefLikeViewInferencePath()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

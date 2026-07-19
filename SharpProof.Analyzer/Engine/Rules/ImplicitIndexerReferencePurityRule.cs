@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ImplicitIndexerReferencePurityRule : PurityRuleBase<IImplicitIndexerReferenceOperation>
+internal static class ImplicitIndexerReferencePurityRule
 {
-    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

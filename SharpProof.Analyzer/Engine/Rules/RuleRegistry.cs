@@ -13,9 +13,11 @@ internal static class RuleRegistry
             OperationKind.DynamicObjectCreation, OperationKind.DynamicIndexerAccess);
         Add(rules, new ConstructorInitializerPurityRule().CheckPurity, OperationKind.ConstructorBodyOperation);
         Add(rules, new DelegateCreationPurityRule().CheckPurity, OperationKind.DelegateCreation);
-        Add(rules, new AwaitPurityRule().CheckPurity, OperationKind.Await);
-        Add(rules, new EventReferencePurityRule().CheckPurity, OperationKind.EventReference);
-        Add(rules, new EventAssignmentPurityRule().CheckPurity, OperationKind.EventAssignment);
+        AddTyped<IAwaitOperation>(rules, AwaitPurityRule.CheckTyped, OperationKind.Await);
+        AddTyped<IEventReferenceOperation>(rules, CoreOperationPurityRules.CheckEventReference,
+            OperationKind.EventReference);
+        AddTyped<IEventAssignmentOperation>(rules, CoreOperationPurityRules.CheckEventAssignment,
+            OperationKind.EventAssignment);
 
         Add(rules, new DeconstructionAssignmentPurityRule().CheckPurity, OperationKind.DeconstructionAssignment);
         Add(rules, new AssignmentPurityRule().CheckPurity,
@@ -28,24 +30,31 @@ internal static class RuleRegistry
 
         Add(rules, new ObjectCreationPurityRule().CheckPurity,
             OperationKind.ObjectCreation, OperationKind.TypeParameterObjectCreation);
-        Add(rules, new AnonymousObjectCreationPurityRule().CheckPurity, OperationKind.AnonymousObjectCreation);
-        Add(rules, new ObjectOrCollectionInitializerPurityRule().CheckPurity,
+        AddTyped<IAnonymousObjectCreationOperation>(rules, AnonymousObjectCreationPurityRule.CheckTyped,
+            OperationKind.AnonymousObjectCreation);
+        AddTyped<IObjectOrCollectionInitializerOperation>(rules,
+            CoreOperationPurityRules.CheckObjectOrCollectionInitializer,
             OperationKind.ObjectOrCollectionInitializer);
-        Add(rules, new ArrayCreationPurityRule().CheckPurity, OperationKind.ArrayCreation);
+        AddTyped<IArrayCreationOperation>(rules, CoreOperationPurityRules.CheckArrayCreation,
+            OperationKind.ArrayCreation);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.ArrayInitializer);
-        Add(rules, new ArrayElementReferencePurityRule().CheckPurity, OperationKind.ArrayElementReference);
-        Add(rules, new InlineArrayAccessPurityRule().CheckPurity, OperationKind.InlineArrayAccess);
-        Add(rules, new CollectionExpressionPurityRule().CheckPurity, OperationKind.CollectionExpression);
-        Add(rules, new SpreadOperationPurityRule().CheckPurity, OperationKind.Spread);
+        Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.ArrayElementReference);
+        Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.InlineArrayAccess);
+        AddTyped<ICollectionExpressionOperation>(rules, CoreOperationPurityRules.CheckCollectionExpression,
+            OperationKind.CollectionExpression);
+        AddTyped<ISpreadOperation>(rules, CoreOperationPurityRules.CheckSpread, OperationKind.Spread);
 
-        Add(rules, new BinaryOperationPurityRule().CheckPurity, OperationKind.Binary);
-        Add(rules, new UnaryOperationPurityRule().CheckPurity, OperationKind.Unary);
-        Add(rules, new CoalesceOperationPurityRule().CheckPurity, OperationKind.Coalesce);
-        Add(rules, new ConditionalAccessPurityRule().CheckPurity, OperationKind.ConditionalAccess);
-        Add(rules, new ConditionalOperationPurityRule().CheckPurity, OperationKind.Conditional);
+        AddTyped<IBinaryOperation>(rules, BinaryOperationPurityRule.CheckTyped, OperationKind.Binary);
+        AddTyped<IUnaryOperation>(rules, CoreOperationPurityRules.CheckUnary, OperationKind.Unary);
+        AddTyped<ICoalesceOperation>(rules, CoreOperationPurityRules.CheckCoalesce, OperationKind.Coalesce);
+        AddTyped<IConditionalAccessOperation>(rules, CoreOperationPurityRules.CheckConditionalAccess,
+            OperationKind.ConditionalAccess);
+        AddTyped<IConditionalOperation>(rules, ConditionalOperationPurityRule.CheckTyped,
+            OperationKind.Conditional);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.Range);
-        Add(rules, new ImplicitIndexerReferencePurityRule().CheckPurity, OperationKind.ImplicitIndexerReference);
-        Add(rules, new ConversionPurityRule().CheckPurity, OperationKind.Conversion);
+        AddTyped<IImplicitIndexerReferenceOperation>(rules, ImplicitIndexerReferencePurityRule.CheckTyped,
+            OperationKind.ImplicitIndexerReference);
+        AddTyped<IConversionOperation>(rules, ConversionPurityRule.CheckTyped, OperationKind.Conversion);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.DeclarationExpression);
         Add(rules, AlwaysPure, OperationKind.DefaultValue);
         Add(rules, new InterpolatedStringPurityRule().CheckPurity,
@@ -63,10 +72,11 @@ internal static class RuleRegistry
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure,
             OperationKind.NegatedPattern, OperationKind.PropertySubpattern, OperationKind.RelationalPattern);
         Add(rules, new ListPatternPurityRule().CheckPurity, OperationKind.ListPattern);
-        Add(rules, new RecursivePatternPurityRule().CheckPurity, OperationKind.RecursivePattern);
+        AddTyped<IRecursivePatternOperation>(rules, CoreOperationPurityRules.CheckRecursivePattern,
+            OperationKind.RecursivePattern);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure,
             OperationKind.TypePattern, OperationKind.IsType, OperationKind.IsPattern);
-        Add(rules, new IsNullPurityRule().CheckPurity, OperationKind.IsNull);
+        Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.IsNull);
         Add(rules, AlwaysPure,
             OperationKind.Block, OperationKind.MethodBodyOperation, OperationKind.AnonymousFunction,
             OperationKind.FlowAnonymousFunction, OperationKind.LocalFunction, OperationKind.Try,
@@ -76,17 +86,18 @@ internal static class RuleRegistry
             OperationKind.PropertyInitializer);
 
         Add(rules, AlwaysPure, OperationKind.Branch);
-        Add(rules, new SwitchStatementPurityRule().CheckPurity, OperationKind.Switch);
+        AddTyped<ISwitchOperation>(rules, CoreOperationPurityRules.CheckSwitchStatement, OperationKind.Switch);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.CaseClause);
-        Add(rules, new SwitchExpressionPurityRule().CheckPurity, OperationKind.SwitchExpression);
+        AddTyped<ISwitchExpressionOperation>(rules, CoreOperationPurityRules.CheckSwitchExpression,
+            OperationKind.SwitchExpression);
         Add(rules, new LoopPurityRule().CheckPurity, OperationKind.Loop);
         Add(rules, new UsingStatementPurityRule().CheckPurity,
             OperationKind.Using, OperationKind.UsingDeclaration);
         Add(rules, new ThrowOperationPurityRule().CheckPurity, OperationKind.Throw);
-        Add(rules, new LockStatementPurityRule().CheckPurity, OperationKind.Lock);
+        AddTyped<ILockOperation>(rules, CoreOperationPurityRules.CheckLock, OperationKind.Lock);
         Add(rules, ChildOperationsPurityRule.CheckChildOperationsArePure, OperationKind.YieldReturn);
         Add(rules, new ReturnStatementPurityRule().CheckPurity, OperationKind.Return);
-        Add(rules, new WithOperationPurityRule().CheckPurity, OperationKind.With);
+        AddTyped<IWithOperation>(rules, CoreOperationPurityRules.CheckWith, OperationKind.With);
 
         return rules.ToImmutable();
     }
@@ -101,6 +112,19 @@ internal static class RuleRegistry
             if (!rules.ContainsKey(kind)) rules.Add(kind, handler);
         }
     }
+
+    private static void AddTyped<TOperation>(
+        ImmutableDictionary<OperationKind, PurityRuleHandler>.Builder rules,
+        Func<TOperation, PurityAnalysisContext, PurityAnalysisEngine.PurityAnalysisState,
+            PurityAnalysisEngine.PurityAnalysisResult> handler,
+        params OperationKind[] operationKinds)
+        where TOperation : class, IOperation =>
+        Add(
+            rules,
+            (operation, context, state) => operation is TOperation typed
+                ? handler(typed, context, state)
+                : PurityAnalysisEngine.PurityAnalysisResult.Pure,
+            operationKinds);
 
     private static PurityAnalysisEngine.PurityAnalysisResult AlwaysPure(
         IOperation _,

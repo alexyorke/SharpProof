@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ConversionPurityRule : PurityRuleBase<IConversionOperation>
+internal static class ConversionPurityRule
 {
-    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConversionOperation conversionOperation,
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConversionOperation conversionOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
 

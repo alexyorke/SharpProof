@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class AwaitPurityRule : PurityRuleBase<IAwaitOperation>
+internal static class AwaitPurityRule
 {
-    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IAwaitOperation awaitOperation,
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IAwaitOperation awaitOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
 

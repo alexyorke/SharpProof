@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ConditionalOperationPurityRule : PurityRuleBase<IConditionalOperation>
+internal static class ConditionalOperationPurityRule
 {
-    protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConditionalOperation conditionalOperation,
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConditionalOperation conditionalOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
 
