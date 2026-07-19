@@ -495,11 +495,6 @@
 *REMOVED*static SharpProof.Symbolic.SymbolicSourceInput.FromText(string! sourceText, string? filePath = null) -> SharpProof.Symbolic.SymbolicSourceInput!
 abstract SharpProof.Symbolic.SharpProofQuery.<Clone>$() -> SharpProof.Symbolic.SharpProofQuery!
 abstract SharpProof.Symbolic.SharpProofQueryPayload.<Clone>$() -> SharpProof.Symbolic.SharpProofQueryPayload!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "exact-v2" -> string!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 2 -> int
-const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticVersionPropertyName = "sharpproof.evidence.schema_version" -> string!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 2 -> int
 override sealed SharpProof.Symbolic.CapabilityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
 override sealed SharpProof.Symbolic.ComplexityQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
 override sealed SharpProof.Symbolic.ConditionQueryPayload.Equals(SharpProof.Symbolic.SharpProofQueryPayload? other) -> bool
@@ -674,7 +669,6 @@ SharpProof.Symbolic.SharpProofEvidence.Reason.init -> void
 SharpProof.Symbolic.SharpProofEvidence.SharpProofEvidence(string! Status, string! Reason) -> void
 SharpProof.Symbolic.SharpProofEvidence.Status.get -> string!
 SharpProof.Symbolic.SharpProofEvidence.Status.init -> void
-SharpProof.Symbolic.SharpProofEvidenceSchema
 SharpProof.Symbolic.SharpProofHazard
 SharpProof.Symbolic.SharpProofHazard.<Clone>$() -> SharpProof.Symbolic.SharpProofHazard!
 SharpProof.Symbolic.SharpProofHazard.Deconstruct(out string! Kind, out string! Status, out string! Reason, out string! ExceptionType, out string! Operation, out SharpProof.Symbolic.SharpProofLocation! Location) -> void
@@ -858,7 +852,6 @@ static SharpProof.Symbolic.SharpProofError.operator !=(SharpProof.Symbolic.Sharp
 static SharpProof.Symbolic.SharpProofError.operator ==(SharpProof.Symbolic.SharpProofError? left, SharpProof.Symbolic.SharpProofError? right) -> bool
 static SharpProof.Symbolic.SharpProofEvidence.operator !=(SharpProof.Symbolic.SharpProofEvidence? left, SharpProof.Symbolic.SharpProofEvidence? right) -> bool
 static SharpProof.Symbolic.SharpProofEvidence.operator ==(SharpProof.Symbolic.SharpProofEvidence? left, SharpProof.Symbolic.SharpProofEvidence? right) -> bool
-static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaVersion) -> bool
 static SharpProof.Symbolic.SharpProofHazard.operator !=(SharpProof.Symbolic.SharpProofHazard? left, SharpProof.Symbolic.SharpProofHazard? right) -> bool
 static SharpProof.Symbolic.SharpProofHazard.operator ==(SharpProof.Symbolic.SharpProofHazard? left, SharpProof.Symbolic.SharpProofHazard? right) -> bool
 static SharpProof.Symbolic.SharpProofLocation.operator !=(SharpProof.Symbolic.SharpProofLocation? left, SharpProof.Symbolic.SharpProofLocation? right) -> bool

@@ -1,3 +1,4 @@
+using SharpProof.Schema;
 using SharpProof.Tools.Baseline;
 using SharpProof.Tools.Shared;
 

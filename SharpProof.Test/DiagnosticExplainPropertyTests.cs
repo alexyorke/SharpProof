@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Schema;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Test;

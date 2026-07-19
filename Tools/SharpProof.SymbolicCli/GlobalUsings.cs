@@ -5,5 +5,6 @@ global using System.Text.Json.Serialization;
 global using Microsoft.CodeAnalysis;
 global using SharpProof.Analyzer;
 global using SharpProof.Analyzer.Configuration;
+global using SharpProof.Schema;
 global using SharpProof.Symbolic;
 global using SharpProof.Tools.Shared;

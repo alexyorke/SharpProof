@@ -234,15 +234,21 @@ This is the active source of truth for the comprehensive refactor. Read
   policy owner and the registry's single typed boundary. Canonical child
   traversal owns structurally identical array, inline-array, and null-test
   behavior; the generic rule-base adapter is deleted.
+- [x] Consolidated baseline and proof-evidence schema ownership into Contracts.
+  Analyzer configuration and additional-file validation, the Baseline tool,
+  Symbolic CLI, and EffectSummary now share the immutable DTOs and validation
+  rules directly. The Analyzer JSON/property adapters, Symbolic schema facade,
+  and generic JSON property helper were deleted; characterized JSON, SARIF,
+  suppression, validation-error, and CLI boundaries remain unchanged.
 
 ## Current evidence
 
 - Branch: `codex/nullable-contract-verification`.
-- Enforced maintained production source: 94,486 lines, 13,140 fewer than the
-  production-reduction baseline and 6,860 from its 20,000-line target.
+- Enforced maintained production source: 94,284 lines, 13,342 fewer than the
+  production-reduction baseline and 6,658 from its 20,000-line target.
 - Architecture inventory: zero unassigned files and zero dependency violations.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,147 passing tests and two documented skips.
+- Six lanes: 6,205 passing tests and two documented skips.
 - Package consumers pass with native SMT required on Windows x64.
 - Release validation passes with warnings as errors for ProofCore, Symbolic,
   Attributes, Analyzer, CodeFixes, NuGet packaging, Symbolic CLI, EffectSummary,

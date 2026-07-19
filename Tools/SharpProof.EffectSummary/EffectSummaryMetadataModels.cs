@@ -114,9 +114,9 @@ internal sealed record EffectSummaryDocument(
     GeneratedPurityCatalogDocument? GeneratedPurityCatalog,
     BclFallbackInventoryReport? BclFallbackInventory)
 {
-    public int EvidenceSchemaVersion => ProofEvidenceSchemaContract.CurrentVersion;
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
 
-    public string EvidenceSchemaCompatibility => ProofEvidenceSchemaContract.CompatibilityPolicy;
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 }
 
 internal sealed record AssemblyEffectReport(

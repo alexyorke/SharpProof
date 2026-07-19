@@ -439,12 +439,20 @@ Tests are excluded from the metric and must not be deleted.
   the remaining policies preserve their exact evidence-source names and typed
   behavior. The generic rule-base adapter is deleted, and architecture coverage
   prevents the retired shells from returning.
+- [x] Made Contracts the single baseline and proof-evidence schema owner.
+  Analyzer configuration, additional-file validation, the Baseline tool, the
+  Symbolic CLI, and EffectSummary now share immutable baseline DTOs, schema
+  validation, path normalization, deduplication, identity matching, and
+  diagnostic-property projection. Deleted the Analyzer JSON reader and
+  diagnostic-property adapter, the Symbolic evidence-schema facade, and the
+  remaining generic JSON property reader while preserving baseline JSON, SARIF,
+  suppression, validation-error, and CLI behavior.
 
 ## Current evidence
 
-- Maintained production: 94,486 lines (90,567 C#, 3,189 scripts, and 730
-  specifications); net reduction: 13,140 lines; remaining reduction: 6,860.
-  This tranche removed 200 maintained lines without deleting tests.
+- Maintained production: 94,284 lines (90,365 C#, 3,189 scripts, and 730
+  specifications); net reduction: 13,342 lines; remaining reduction: 6,658.
+  This tranche removed 202 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,205 passing tests and two documented Main skips.
 

@@ -2,9 +2,9 @@ namespace SharpProof.Analyzer;
 
 public static partial class SharpProofDiagnostics
 {
-    public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionPropertyName;
+    public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionProperty;
     public const string EvidenceSchemaCompatibilityProperty =
-        SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName;
+        SharpProofEvidenceSchema.DiagnosticCompatibilityProperty;
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselineSymbolAliasesProperty = "sharpproof.baseline.symbol_aliases";
     public const string BaselinePathProperty = "sharpproof.baseline.path";

@@ -4,18 +4,18 @@ internal sealed class DiagnosticBaseline
 {
     private const string BaselineFileName = "SharpProof.Baseline.json";
 
-    public static readonly DiagnosticBaseline Empty = new(ImmutableArray<BaselineEntry>.Empty);
+    public static readonly DiagnosticBaseline Empty = new(ImmutableArray<ResolvedBaselineEntry>.Empty);
 
-    private readonly ImmutableArray<BaselineEntry> _entries;
+    private readonly ImmutableArray<ResolvedBaselineEntry> _entries;
 
-    private DiagnosticBaseline(ImmutableArray<BaselineEntry> entries)
+    private DiagnosticBaseline(ImmutableArray<ResolvedBaselineEntry> entries)
     {
         _entries = entries;
     }
 
     public static DiagnosticBaseline FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
     {
-        var builder = ImmutableArray.CreateBuilder<BaselineEntry>();
+        var builder = ImmutableArray.CreateBuilder<ResolvedBaselineEntry>();
         foreach (var additionalFile in options.AdditionalFiles)
         {
             if (!string.Equals(Path.GetFileName(additionalFile.Path), BaselineFileName,
@@ -41,7 +41,7 @@ internal sealed class DiagnosticBaseline
         var symbolIds = GetDiagnosticSymbolIds(diagnostic.Properties, symbolId);
         foreach (var entry in _entries)
             foreach (var candidateSymbolId in symbolIds)
-                if (entry.Matches(diagnostic.Id, candidateSymbolId, sourcePath, diagnostic))
+                if (Matches(entry, diagnostic.Id, candidateSymbolId, sourcePath, diagnostic))
                     return true;
 
         return false;
@@ -69,13 +69,7 @@ internal sealed class DiagnosticBaseline
         return GetSymbolIds(symbol)[0];
     }
 
-    internal static string NormalizePath(string path)
-    {
-        var normalized = path.Replace('\\', '/').Trim();
-        while (normalized.StartsWith("./", StringComparison.Ordinal)) normalized = normalized.Substring(2);
-
-        return normalized;
-    }
+    internal static string NormalizePath(string path) => BaselineSchemaContract.NormalizePath(path);
 
     private static string GetCompactMethodId(IMethodSymbol methodSymbol)
     {
@@ -84,47 +78,35 @@ internal sealed class DiagnosticBaseline
         return "M:" + containingType + "." + methodName;
     }
 
-    private static ImmutableArray<BaselineEntry> ParseEntries(string json, string baselinePath)
+    private static ImmutableArray<ResolvedBaselineEntry> ParseEntries(string json, string baselinePath)
     {
-        var builder = ImmutableArray.CreateBuilder<BaselineEntry>();
+        var builder = ImmutableArray.CreateBuilder<ResolvedBaselineEntry>();
         var baseDirectory = GetBaseDirectory(baselinePath);
         try
         {
-            using var document = JsonDocument.Parse(json, BaselineJsonReader.DocumentOptions);
-            if (!BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
-                    document.RootElement,
-                    out _))
+            using var document = JsonDocument.Parse(json, BaselineSchemaContract.DocumentOptions);
+            if (!BaselineSchemaContract.TryValidateTree(document.RootElement, out _))
                 return builder.ToImmutable();
             if (document.RootElement.TryGetProperty("diagnostics", out var diagnostics) &&
                 diagnostics.ValueKind == JsonValueKind.Array)
                 foreach (var entry in diagnostics.EnumerateArray())
                     if (entry.ValueKind == JsonValueKind.Object)
-                        TryAddEntry(entry, baseDirectory, builder);
+                    {
+                        var fields = BaselineSchemaContract.ReadEntryFields(entry);
+                        if (fields.IsValid)
+                        {
+                            var value = fields.ToEntry();
+                            builder.Add(new ResolvedBaselineEntry(
+                                value with { Path = NormalizePath(value.Path) },
+                                MakeAbsolutePath(value.Path, baseDirectory)));
+                        }
+                    }
         }
         catch (JsonException)
         {
         }
 
         return builder.ToImmutable();
-    }
-
-    private static void TryAddEntry(
-        JsonElement element,
-        string baseDirectory,
-        ImmutableArray<BaselineEntry>.Builder builder)
-    {
-        var fields = BaselineJsonReader.ReadEntryFields(element);
-        if (fields.IsValid)
-            builder.Add(new BaselineEntry(
-                fields.Id!,
-                fields.Symbol!,
-                fields.Path!,
-                baseDirectory,
-                fields.Line,
-                fields.Column,
-                fields.ContractText,
-                fields.OperationKind,
-                fields.EvidenceKey));
     }
 
     private static string GetBaseDirectory(string baselinePath)
@@ -167,93 +149,46 @@ internal sealed class DiagnosticBaseline
         return builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
 
-    private readonly struct BaselineEntry(
+    private static bool Matches(
+        ResolvedBaselineEntry resolved,
         string diagnosticId,
         string symbolId,
-        string path,
-        string baseDirectory,
-        int? line,
-        int? column,
-        string? contractText,
-        string? operationKind,
-        string? evidenceKey)
+        string sourcePath,
+        Diagnostic diagnostic)
     {
-        private string DiagnosticId { get; } = diagnosticId;
-        private string SymbolId { get; } = symbolId;
-        private string Path { get; } = NormalizePath(path);
-        private string AbsolutePath { get; } = MakeAbsolutePath(path, baseDirectory);
-        private int? Line { get; } = line;
-        private int? Column { get; } = column;
-        private string? ContractText { get; } = NormalizeOptional(contractText);
-        private string? OperationKind { get; } = NormalizeOptional(operationKind);
-        private string? EvidenceKey { get; } = NormalizeOptional(evidenceKey);
-
-        public bool Matches(string diagnosticId, string symbolId, string sourcePath)
+        var entry = resolved.Entry;
+        var normalizedSourcePath = NormalizePath(sourcePath);
+        int? line = null;
+        int? column = null;
+        if (entry.Line.HasValue || entry.Column.HasValue)
         {
-            return string.Equals(DiagnosticId, diagnosticId, StringComparison.Ordinal) &&
-                   string.Equals(SymbolId, symbolId, StringComparison.Ordinal) &&
-                   MatchesPath(sourcePath);
+            if (diagnostic.Location == Location.None || !diagnostic.Location.IsInSource) return false;
+            var start = diagnostic.Location.GetLineSpan().StartLinePosition;
+            line = start.Line + 1;
+            column = start.Character + 1;
         }
 
-        public bool Matches(
-            string diagnosticId,
-            string symbolId,
-            string sourcePath,
-            Diagnostic diagnostic)
-        {
-            return Matches(diagnosticId, symbolId, sourcePath) &&
-                   MatchesLocation(diagnostic.Location) &&
-                   MatchesOptionalProperty(ContractText, diagnostic, SharpProofDiagnostics.BaselineContractProperty) &&
-                   MatchesOptionalProperty(OperationKind, diagnostic,
-                       SharpProofDiagnostics.BaselineOperationKindProperty) &&
-                   MatchesOptionalProperty(EvidenceKey, diagnostic, SharpProofDiagnostics.BaselineEvidenceKeyProperty);
-        }
-
-        private bool MatchesPath(string sourcePath)
-        {
-            var normalizedSourcePath = NormalizePath(sourcePath);
-            return string.Equals(Path, normalizedSourcePath, StringComparison.OrdinalIgnoreCase) ||
-                   (!string.IsNullOrWhiteSpace(AbsolutePath) &&
-                    string.Equals(AbsolutePath, normalizedSourcePath, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private bool MatchesLocation(Location location)
-        {
-            if (!Line.HasValue && !Column.HasValue) return true;
-
-            if (location == Location.None || !location.IsInSource) return false;
-
-            var lineSpan = location.GetLineSpan();
-            if (lineSpan.Path == null) return false;
-
-            var actualLine = lineSpan.StartLinePosition.Line + 1;
-            var actualColumn = lineSpan.StartLinePosition.Character + 1;
-            return (!Line.HasValue || Line.Value == actualLine) &&
-                   (!Column.HasValue || Column.Value == actualColumn);
-        }
-
-        private static bool MatchesOptionalProperty(
-            string? expected,
-            Diagnostic diagnostic,
-            string propertyName)
-        {
-            return string.IsNullOrWhiteSpace(expected) ||
-                   (TryGetProperty(diagnostic.Properties, propertyName, out var actual) &&
-                    string.Equals(expected, actual, StringComparison.Ordinal));
-        }
-
-        private static string MakeAbsolutePath(string path, string baseDirectory)
-        {
-            if (string.IsNullOrWhiteSpace(baseDirectory)) return string.Empty;
-
-            if (System.IO.Path.IsPathRooted(path)) return NormalizePath(path);
-
-            return NormalizePath(System.IO.Path.Combine(baseDirectory, path));
-        }
-
-        private static string? NormalizeOptional(string? value)
-        {
-            return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-        }
+        return BaselineSchemaContract.Matches(
+            entry,
+            new BaselineEntry(
+                diagnosticId,
+                symbolId,
+                normalizedSourcePath,
+                Line: line,
+                Column: column,
+                Contract: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineContractProperty),
+                OperationKind: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineOperationKindProperty),
+                EvidenceKey: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineEvidenceKeyProperty)),
+            resolved.AbsolutePath);
     }
+
+    private static string? GetOptionalProperty(Diagnostic diagnostic, string propertyName) =>
+        TryGetProperty(diagnostic.Properties, propertyName, out var value) ? value : null;
+
+    private static string MakeAbsolutePath(string path, string baseDirectory) =>
+        string.IsNullOrWhiteSpace(baseDirectory)
+            ? string.Empty
+            : NormalizePath(System.IO.Path.IsPathRooted(path) ? path : System.IO.Path.Combine(baseDirectory, path));
+
+    private readonly record struct ResolvedBaselineEntry(BaselineEntry Entry, string AbsolutePath);
 }

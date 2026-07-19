@@ -710,18 +710,22 @@ public sealed class RepositoryArchitectureTests
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
             root, "Tools", "SharpProof.Baseline.Core", "SharpProofBaseline.cs"));
-        var analyzerReader = File.ReadAllText(Path.Combine(
-            root, "SharpProof.Analyzer", "Configuration", "BaselineJsonReader.cs"));
+        var analyzerReaderPath = Path.Combine(
+            root, "SharpProof.Analyzer", "Configuration", "BaselineJsonReader.cs");
+        var contract = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Contracts", "BaselineSchemaContract.cs"));
 
         Assert.Multiple(() =>
         {
             Assert.That(source, Does.Contain("Deserialize<BaselineDocument>"));
+            Assert.That(source, Does.Contain("BaselineSchemaContract.ValidateTreeOrThrow"));
             Assert.That(source, Does.Not.Contain("LegacyEvidenceSchemaVersion"));
             Assert.That(source, Does.Not.Contain("AddBaselineEntries"));
             Assert.That(source, Does.Not.Contain("TryAddBaselineEntry"));
-            Assert.That(analyzerReader, Does.Not.Contain("VisitJsonTree"));
-            Assert.That(analyzerReader, Does.Not.Contain("diagnosticId"));
-            Assert.That(analyzerReader, Does.Not.Contain("operation_kind"));
+            Assert.That(File.Exists(analyzerReaderPath), Is.False);
+            Assert.That(contract, Does.Contain("TryValidateTree"));
+            Assert.That(contract, Does.Contain("ReadEntryFields"));
+            Assert.That(contract, Does.Contain("Deduplicate"));
         });
     }
 

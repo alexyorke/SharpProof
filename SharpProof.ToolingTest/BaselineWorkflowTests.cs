@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Schema;
 using SharpProof.Symbolic;
 using SharpProof.Tools.Baseline;
 
@@ -13,7 +14,7 @@ public sealed class BaselineWorkflowTests
     public void NormalizePath_CollapsesRedundantSegments()
     {
         Assert.That(
-            SharpProofBaseline.NormalizePath("src//nested/./generated/../File.cs"),
+            BaselineSchemaContract.NormalizePath("src//nested/./generated/../File.cs"),
             Is.EqualTo("src/nested/File.cs"));
     }
 

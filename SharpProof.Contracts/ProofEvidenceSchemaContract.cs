@@ -1,17 +1,24 @@
 namespace SharpProof.Schema;
 
-internal static class ProofEvidenceSchemaContract
+public static class SharpProofEvidenceSchema
 {
-    internal const int CurrentVersion = 2;
-    internal const int MinimumReadCompatibleVersion = CurrentVersion;
-    internal const string CompatibilityPolicy = "exact-v2";
+    public const int CurrentVersion = 2;
+    public const int MinimumReadCompatibleVersion = CurrentVersion;
+    public const string CompatibilityPolicy = "exact-v2";
 
-    internal const string DiagnosticVersionProperty = "sharpproof.evidence.schema_version";
-    internal const string DiagnosticCompatibilityProperty = "sharpproof.evidence.schema_compatibility";
+    public const string DiagnosticVersionProperty = "sharpproof.evidence.schema_version";
+    public const string DiagnosticCompatibilityProperty = "sharpproof.evidence.schema_compatibility";
 
-    internal static bool IsReadCompatible(int schemaVersion)
+    public static bool IsReadCompatible(int schemaVersion)
     {
         return schemaVersion >= MinimumReadCompatibleVersion &&
                schemaVersion <= CurrentVersion;
     }
+
+    internal static ImmutableDictionary<string, string?> AddDiagnosticProperties(
+        ImmutableDictionary<string, string?> properties) => properties
+        .SetItem(
+            DiagnosticVersionProperty,
+            CurrentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        .SetItem(DiagnosticCompatibilityProperty, CompatibilityPolicy);
 }

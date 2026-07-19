@@ -12,7 +12,7 @@ internal static class ExplainDiagnosticProperties
         string? unknownReason = null,
         string? impliedConditionText = null)
     {
-        properties = EvidenceSchemaDiagnosticProperties.Add(properties);
+        properties = SharpProofEvidenceSchema.AddDiagnosticProperties(properties);
 
         if (location != null && location != Location.None && location.IsInSource)
         {

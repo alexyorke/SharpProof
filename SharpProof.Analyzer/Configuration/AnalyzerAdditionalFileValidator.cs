@@ -28,17 +28,24 @@ internal static class AnalyzerAdditionalFileValidator
 
         try
         {
-            using var document = JsonDocument.Parse(text, BaselineJsonReader.DocumentOptions);
+            using var document = JsonDocument.Parse(text, BaselineSchemaContract.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 AddIssue(issues, additionalFile, "unsupported baseline root; evidence v2 requires an object");
                 return;
             }
 
-            if (!ValidateBaselineEvidenceSchemas(additionalFile, document.RootElement, issues))
+            if (!BaselineSchemaContract.TryValidateTree(document.RootElement, out var baselineFailure))
+            {
+                AddIssue(issues, additionalFile, BaselineSchemaContract.FormatValidationIssue(
+                    baselineFailure,
+                    "evidenceSchemaVersion",
+                    "evidenceSchemaCompatibility",
+                    baselineFailure.IsRoot ? "baseline" : "baseline entry"));
                 return;
+            }
 
-            var counts = CountBaselineEntries(document.RootElement);
+            var counts = BaselineSchemaContract.CountEntries(document.RootElement);
             if (counts.CandidateCount == 0)
                 AddIssue(issues, additionalFile, "baseline contains no diagnostic entries");
             else if (counts.ValidCount == 0)
@@ -82,15 +89,20 @@ internal static class AnalyzerAdditionalFileValidator
         {
             var root = document.Root;
 
-            if (!ValidateEvidenceSchema(
-                    additionalFile,
+            if (!BaselineSchemaContract.TryValidate(
                     root,
                     "EvidenceSchemaVersion",
                     "EvidenceSchemaCompatibility",
-                    "effect-summary",
-                    issues,
-                    required: true))
+                    true,
+                    out var effectSummaryFailure))
+            {
+                AddIssue(issues, additionalFile, BaselineSchemaContract.FormatValidationIssue(
+                    effectSummaryFailure,
+                    "EvidenceSchemaVersion",
+                    "EvidenceSchemaCompatibility",
+                    "effect-summary"));
                 return;
+            }
 
             if (root.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalog) &&
                 generatedCatalog.ValueKind == JsonValueKind.Object)
@@ -136,79 +148,6 @@ internal static class AnalyzerAdditionalFileValidator
             var invalidCount = invalidAssemblyCount + invalidMethodCount;
             AddMalformedEntriesIssue(issues, additionalFile, "effect-summary", invalidCount);
         }
-    }
-
-    private static bool ValidateEvidenceSchema(
-        AdditionalText additionalFile,
-        JsonElement element,
-        string versionPropertyName,
-        string compatibilityPropertyName,
-        string surfaceName,
-        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
-        bool required = false)
-    {
-        if (BaselineJsonReader.TryValidateEvidenceSchema(
-                element,
-                versionPropertyName,
-                compatibilityPropertyName,
-                required,
-                out var failure))
-            return true;
-
-        AddEvidenceSchemaIssue(
-            issues,
-            additionalFile,
-            failure,
-            versionPropertyName,
-            compatibilityPropertyName,
-            surfaceName);
-        return false;
-    }
-
-    private static bool ValidateBaselineEvidenceSchemas(
-        AdditionalText additionalFile,
-        JsonElement element,
-        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
-    {
-        if (BaselineJsonReader.TryValidateBaselineEvidenceSchemaTree(
-                element,
-                out var failure))
-            return true;
-
-        AddEvidenceSchemaIssue(
-            issues,
-            additionalFile,
-            failure,
-            "evidenceSchemaVersion",
-            "evidenceSchemaCompatibility",
-            failure.IsRoot ? "baseline" : "baseline entry");
-        return false;
-    }
-
-    private static void AddEvidenceSchemaIssue(
-        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
-        AdditionalText additionalFile,
-        EvidenceSchemaValidationFailure failure,
-        string versionPropertyName,
-        string compatibilityPropertyName,
-        string surfaceName)
-    {
-        var message = failure.Kind switch
-        {
-            EvidenceSchemaValidationFailureKind.Missing =>
-                surfaceName + " is missing required " + versionPropertyName + " and " +
-                compatibilityPropertyName,
-            EvidenceSchemaValidationFailureKind.NonNumericVersion =>
-                surfaceName + " has a non-numeric " + versionPropertyName,
-            EvidenceSchemaValidationFailureKind.UnsupportedVersion =>
-                $"unsupported {surfaceName} {versionPropertyName} '{failure.Version}'; supported versions are " +
-                $"{SharpProofEvidenceSchema.MinimumReadCompatibleVersion}-{SharpProofEvidenceSchema.CurrentVersion}",
-            EvidenceSchemaValidationFailureKind.InvalidCompatibility =>
-                surfaceName + " " + compatibilityPropertyName + " must be '" +
-                SharpProofEvidenceSchema.CompatibilityPolicy + "'",
-            _ => throw new InvalidOperationException("Unknown evidence-schema validation failure.")
-        };
-        AddIssue(issues, additionalFile, message);
     }
 
     private static void ValidateGeneratedPurityCatalog(
@@ -267,34 +206,6 @@ internal static class AnalyzerAdditionalFileValidator
                 $"{source} partially ignored {count} malformed entr{(count == 1 ? "y" : "ies")}");
     }
 
-    private static BaselineEntryCounts CountBaselineEntries(JsonElement element)
-    {
-        var counts = new BaselineEntryCounts();
-        if (!element.TryGetProperty("diagnostics", out var diagnostics) ||
-            diagnostics.ValueKind != JsonValueKind.Array)
-            return counts;
-
-        foreach (var candidate in diagnostics.EnumerateArray())
-        {
-            if (candidate.ValueKind != JsonValueKind.Object)
-            {
-                counts.InvalidCount++;
-                continue;
-            }
-
-            var fields = BaselineJsonReader.ReadEntryFields(candidate);
-            if (fields.HasCandidateProperty)
-            {
-                counts.CandidateCount++;
-                if (fields.IsValid)
-                    counts.ValidCount++;
-                else
-                    counts.InvalidCount++;
-            }
-        }
-        return counts;
-    }
-
     private static bool TryGetText(
         AdditionalText additionalFile,
         CancellationToken cancellationToken,
@@ -330,12 +241,6 @@ internal static class AnalyzerAdditionalFileValidator
         if (!issues.Contains(issue)) issues.Add(issue);
     }
 
-    private struct BaselineEntryCounts
-    {
-        public int CandidateCount;
-        public int ValidCount;
-        public int InvalidCount;
-    }
 }
 
 internal readonly record struct AnalyzerAdditionalFileIssue(
