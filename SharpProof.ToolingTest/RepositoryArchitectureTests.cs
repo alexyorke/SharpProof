@@ -525,6 +525,22 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void FreshMutableOwnership_UsesCanonicalFactsInsteadOfAStatementWalker()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var classifier = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Engine", "Rules", "OwnedFreshMutableObjectClassifier.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(classifier, Does.Contain("HasSymbolicFreshMutableObjectFactForSymbol"));
+            Assert.That(classifier, Does.Not.Contain("IsAssignedFreshMutableObjectOnAllPaths"));
+            Assert.That(classifier, Does.Not.Contain("AnalyzeFreshMutableAssignments"));
+            Assert.That(classifier, Does.Not.Contain("AnalyzeFreshMutableAssignment"));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

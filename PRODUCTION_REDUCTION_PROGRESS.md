@@ -390,14 +390,20 @@ Tests are excluded from the metric and must not be deleted.
   metadata, exit codes, exception classification, and analyzer fallback remain
   characterized, and architecture coverage prevents the duplicate model from
   returning.
+- [x] Replaced the fresh-mutable local all-path statement walker with canonical
+  symbolic freshness and alias facts. Object-typed aliases now use acquisition
+  provenance instead of a static-type prefilter, while disposable lifetime
+  ownership remains a separate semantic domain. Deleted the parallel syntax
+  branch/assignment evaluator; focused object, delegate, lambda, local-function,
+  and resource-lifetime coverage plus an architecture guard preserve the split.
 
 ## Current evidence
 
-- Maintained production: 96,020 lines (92,101 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,606 lines; remaining reduction: 8,394.
-  This tranche removed 28 maintained lines without deleting tests.
+- Maintained production: 95,887 lines (91,968 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,739 lines; remaining reduction: 8,261.
+  This tranche removed 133 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,199 passing tests and two documented Main skips.
+- Six lanes: 6,200 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -429,8 +435,7 @@ FormattableString, Enum/Boolean/IPAddress parsing, and Unsafe routes caused 17
 focused regressions; generated summaries alone do not yet preserve their
 operand, dispatch, out-argument, and compiler-lowering semantics.
 
-The syntax-level fresh-mutable-object all-path assignment fallback and the
-EffectSummary DateTime/DateTimeOffset call-semantic helpers are likewise live
-semantic owners. Removing them caused focused conditional-alias and four
-date/time classification regressions respectively, so they are not legacy
-adapter deletion candidates without a new canonical replacement.
+The EffectSummary DateTime/DateTimeOffset call-semantic helpers remain live
+semantic owners. Removing them caused four focused date/time classification
+regressions, so they are not legacy adapter deletion candidates without a new
+canonical replacement.

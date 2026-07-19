@@ -158,4 +158,14 @@ internal static class PuritySymbolicStateFacts
                     { State: SymbolicResourceLifetimeState.Owned } lifetime &&
                 Equals(lifetime.Resource, term));
 
+    internal static bool HasSymbolicFreshMutableObjectFactForSymbol(
+        ISymbol symbol,
+        PurityAnalysisState currentState) =>
+        SymbolicStateMerger.ExactAliasComponentFactAny(
+            CreateSymbolicReferenceTerm(symbol, currentState), currentState.PathState.Facts,
+            static (fact, term) =>
+                fact.Atom is SymbolicFreshnessAtom freshness &&
+                Equals(freshness.Value, term) &&
+                fact.Provenance.StartsWith("analyzer.object.acquire.", StringComparison.Ordinal));
+
 }
