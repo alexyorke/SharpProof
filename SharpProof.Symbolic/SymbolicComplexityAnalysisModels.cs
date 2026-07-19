@@ -1,22 +1,5 @@
 namespace SharpProof.Symbolic;
 
-internal sealed record ResolvedComplexityTarget(
-    SyntaxTree SyntaxTree,
-    SemanticModel SemanticModel,
-    SyntaxNode Declaration,
-    SyntaxNode BodyNode,
-    IMethodSymbol Symbol,
-    string FilePath,
-    string MethodName,
-    string MethodDisplayName,
-    string DeclarationKind,
-    int SpanStart,
-    int SpanEnd,
-    int StartLine,
-    int StartColumn,
-    int EndLine,
-    int EndColumn);
-
 internal sealed record MethodAnalysisSummary(
     SymbolicCostExpression Cost,
     ImmutableArray<SymbolicComplexityDriverInfo> Drivers,

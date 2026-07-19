@@ -25,12 +25,11 @@ internal sealed class SymbolicCapabilityService
             "Capability queries support point, position, line, or node targets only.",
             "Capability node queries require a node target.",
             static node => SymbolicMethodLikeDeclaration.IsSupported(node),
-            ResolveMethodLikeDeclaration,
             ExecuteAnalysis,
             cancellationToken);
 
     private static SymbolicCapabilityResult ExecuteAnalysis(
-        ResolvedCapabilityTarget target,
+        ResolvedMethodLikeTarget target,
         Compilation compilation,
         CancellationToken cancellationToken) =>
         CreateResult(
@@ -39,13 +38,11 @@ internal sealed class SymbolicCapabilityService
             cancellationToken);
 
     private static SymbolicCapabilityResult CreateResult(
-        ResolvedCapabilityTarget target,
+        ResolvedMethodLikeTarget target,
         CapabilitySummary summary,
         CancellationToken cancellationToken)
     {
-        var syntaxTree = target.Declaration.SyntaxTree;
-        var sourceSpan =
-            SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, target.Declaration.Span, cancellationToken);
+        var syntaxTree = target.SyntaxTree;
         var sites = summary.Sites
             .Select(site =>
             {
@@ -73,35 +70,19 @@ internal sealed class SymbolicCapabilityService
 
         return new SymbolicCapabilityResult(
             syntaxTree.FilePath ?? string.Empty,
-            target.MethodName,
-            target.MethodDisplayName,
-            target.DeclarationKind,
+            target.DeclaredSymbol?.Name ?? string.Empty,
+            target.DeclaredSymbol?.ToDisplayString() ?? target.DeclaredSymbol?.Name ?? string.Empty,
+            target.Declaration.GetType().Name,
             target.Declaration.SpanStart,
             target.Declaration.Span.End,
-            sourceSpan.StartLine,
-            sourceSpan.StartColumn,
-            sourceSpan.EndLine,
-            sourceSpan.EndColumn,
+            target.SourceSpan.StartLine,
+            target.SourceSpan.StartColumn,
+            target.SourceSpan.EndLine,
+            target.SourceSpan.EndColumn,
             summary.Capabilities,
             SymbolicCapabilityFacts.Format(summary.Capabilities),
             sites,
             summary.UnknownReasons.OrderBy(static reason => reason.ToString(), StringComparer.Ordinal).ToArray());
-    }
-
-    private static ResolvedCapabilityTarget ResolveMethodLikeDeclaration(
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbol = semanticModel.GetDeclaredSymbol(declaration, cancellationToken);
-        var methodName = symbol?.Name ?? string.Empty;
-        var methodDisplayName = symbol?.ToDisplayString() ?? methodName;
-        return new ResolvedCapabilityTarget(
-            declaration,
-            semanticModel,
-            methodName,
-            methodDisplayName,
-            declaration.GetType().Name);
     }
 
     private sealed class AnalysisSession(Compilation compilation, CancellationToken cancellationToken)
@@ -533,24 +514,6 @@ internal sealed class SymbolicCapabilityService
             return false;
         }
 
-    }
-
-    private sealed class ResolvedCapabilityTarget(
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        string methodName,
-        string methodDisplayName,
-        string declarationKind)
-    {
-        public SyntaxNode Declaration { get; } = declaration;
-
-        public SemanticModel SemanticModel { get; } = semanticModel;
-
-        public string MethodName { get; } = methodName;
-
-        public string MethodDisplayName { get; } = methodDisplayName;
-
-        public string DeclarationKind { get; } = declarationKind;
     }
 
     private sealed record CapabilitySummary(

@@ -197,6 +197,25 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void SymbolicAssembly_UsesOneMethodLikeQueryTarget()
+    {
+        var assembly = typeof(SharpProofAnalysisSession).Assembly;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                assembly.GetType("SharpProof.Symbolic.ResolvedMethodLikeTarget", true),
+                Is.Not.Null);
+            Assert.That(
+                assembly.GetType("SharpProof.Symbolic.ResolvedComplexityTarget"),
+                Is.Null);
+            Assert.That(
+                assembly.GetType("SharpProof.Symbolic.SymbolicCapabilityService+ResolvedCapabilityTarget"),
+                Is.Null);
+        });
+    }
+
+    [Test]
     public void AnalyzerAssembly_DoesNotRetainDuplicateExceptionFactProjection()
     {
         var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;

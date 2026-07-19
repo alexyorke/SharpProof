@@ -3,29 +3,29 @@ namespace SharpProof.Symbolic;
 internal static class SymbolicComplexityResultProjector
 {
     internal static SymbolicComplexityResult Project(
-        ResolvedComplexityTarget target,
+        ResolvedMethodLikeTarget target,
         MethodAnalysisSummary summary,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var complexity = new SymbolicComplexityInfo(
-            summary.Cost.ToBigOText(target.Symbol),
+            summary.Cost.ToBigOText(target.MethodSymbol!),
             summary.Cost.ToPublicKind(),
             summary.Cost.IsConservative,
             summary.Cost.IsUnknown,
             summary.Cost.IsRecursiveUnknown);
 
         return new SymbolicComplexityResult(
-            target.FilePath,
+            target.SyntaxTree.FilePath ?? string.Empty,
             target.MethodName,
             target.MethodDisplayName,
             target.DeclarationKind,
-            target.SpanStart,
-            target.SpanEnd,
-            target.StartLine,
-            target.StartColumn,
-            target.EndLine,
-            target.EndColumn,
+            target.Declaration.SpanStart,
+            target.Declaration.Span.End,
+            target.SourceSpan.StartLine,
+            target.SourceSpan.StartColumn,
+            target.SourceSpan.EndLine,
+            target.SourceSpan.EndColumn,
             complexity,
             DistinctDrivers(summary.Drivers),
             DistinctUnknownReasons(summary.UnknownReasons),

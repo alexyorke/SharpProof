@@ -428,14 +428,19 @@ Tests are excluded from the metric and must not be deleted.
   the declarative-pure rule object. The immutable handler map preserves ordered
   first-owner selection, typed rule behavior, evidence names, and fuzz-shape
   coverage without duplicating operation ownership in every rule.
+- [x] Made one resolved method-like target the shared input for capability and
+  complexity queries. Deleted both feature-specific target models, their
+  parallel source-span/symbol/body resolution, and the generic target-factory
+  plumbing while preserving feature-specific display names and declaration
+  kinds. Byte-level compact CLI fixtures guard both result shapes.
 
 ## Current evidence
 
-- Maintained production: 94,753 lines (90,834 C#, 3,189 scripts, and 730
-  specifications); net reduction: 12,873 lines; remaining reduction: 7,127.
-  This tranche removed 120 maintained lines without deleting tests.
+- Maintained production: 94,686 lines (90,767 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,940 lines; remaining reduction: 7,060.
+  This tranche removed 67 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,203 passing tests and two documented Main skips.
+- Six lanes: 6,204 passing tests and two documented Main skips.
 
 ## Milestones
 

@@ -74,15 +74,14 @@ internal static class SymbolicSourceInputDispatcher
 
 internal static class SymbolicMethodLikeQueryDispatcher
 {
-    internal static TResult Execute<TResult, TTarget>(
+    internal static TResult Execute<TResult>(
         SymbolicQueryContext request,
         SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
         string unsupportedTargetMessage,
         string nodeTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
-        Func<TTarget, Compilation, CancellationToken, TResult> executeAnalysis,
+        Func<ResolvedMethodLikeTarget, Compilation, CancellationToken, TResult> executeAnalysis,
         CancellationToken cancellationToken)
     {
         return SymbolicSourceInputDispatcher.Execute(
@@ -111,7 +110,6 @@ internal static class SymbolicMethodLikeQueryDispatcher
                 queryTarget,
                 unsupportedTargetMessage,
                 isMethodLikeDeclaration,
-                createTarget,
                 queryCancellationToken);
             return executeAnalysis(resolvedTarget, compilation, queryCancellationToken);
         }
@@ -131,7 +129,6 @@ internal static class SymbolicMethodLikeQueryDispatcher
                 node,
                 semanticModel,
                 isMethodLikeDeclaration,
-                createTarget,
                 queryCancellationToken);
             return executeAnalysis(resolvedTarget, semanticModel.Compilation, queryCancellationToken);
         }
@@ -140,13 +137,12 @@ internal static class SymbolicMethodLikeQueryDispatcher
 
 internal static class SymbolicMethodLikeTargetResolver
 {
-    internal static TTarget Resolve<TTarget>(
+    internal static ResolvedMethodLikeTarget Resolve(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SharpProofTarget target,
         string unsupportedTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
         CancellationToken cancellationToken)
     {
         var root = syntaxTree.GetRoot(cancellationToken);
@@ -164,7 +160,6 @@ internal static class SymbolicMethodLikeTargetResolver
                     semanticModel,
                     position,
                     isMethodLikeDeclaration,
-                    createTarget,
                     cancellationToken);
             case SharpProofTargetKind.Position:
                 return ResolvePosition(
@@ -173,7 +168,6 @@ internal static class SymbolicMethodLikeTargetResolver
                     semanticModel,
                     target.Position!.Value,
                     isMethodLikeDeclaration,
-                    createTarget,
                     cancellationToken);
             case SharpProofTargetKind.Line:
                 return ResolveLine(
@@ -182,32 +176,29 @@ internal static class SymbolicMethodLikeTargetResolver
                     semanticModel,
                     target.Line!.Value,
                     isMethodLikeDeclaration,
-                    createTarget,
                     cancellationToken);
             default:
                 throw new NotSupportedException(unsupportedTargetMessage);
         }
     }
 
-    internal static TTarget ResolveNode<TTarget>(
+    internal static ResolvedMethodLikeTarget ResolveNode(
         SyntaxNode node,
         SemanticModel semanticModel,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
         CancellationToken cancellationToken)
     {
         return isMethodLikeDeclaration(node)
-            ? createTarget(node, semanticModel, cancellationToken)
-            : ResolveContaining(node, semanticModel, isMethodLikeDeclaration, createTarget, cancellationToken);
+            ? ResolvedMethodLikeTarget.Create(node, semanticModel, cancellationToken)
+            : ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
 
-    private static TTarget ResolvePosition<TTarget>(
+    private static ResolvedMethodLikeTarget ResolvePosition(
         SyntaxNode root,
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         int position,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
         CancellationToken cancellationToken)
     {
         var text = syntaxTree.GetText(cancellationToken);
@@ -219,16 +210,15 @@ internal static class SymbolicMethodLikeTargetResolver
             throw new ArgumentException("Could not resolve a method-like body at the requested position.",
                 nameof(position));
 
-        return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, createTarget, cancellationToken);
+        return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
 
-    private static TTarget ResolveLine<TTarget>(
+    private static ResolvedMethodLikeTarget ResolveLine(
         SyntaxNode root,
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         int line,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
         CancellationToken cancellationToken)
     {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
@@ -239,32 +229,81 @@ internal static class SymbolicMethodLikeTargetResolver
             .OrderBy(candidate => candidate.Span.Length)
             .ThenBy(candidate => candidate.SpanStart)
             .FirstOrDefault();
-        if (declaration != null) return createTarget(declaration, semanticModel, cancellationToken);
+        if (declaration != null) return ResolvedMethodLikeTarget.Create(declaration, semanticModel, cancellationToken);
 
         var node = root.FindToken(lineSpan.Start).Parent;
         if (node == null)
             throw new ArgumentException("Could not resolve a method-like body on the requested line.", nameof(line));
 
-        return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, createTarget, cancellationToken);
+        return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
 
-    private static TTarget ResolveContaining<TTarget>(
+    private static ResolvedMethodLikeTarget ResolveContaining(
         SyntaxNode node,
         SemanticModel semanticModel,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        Func<SyntaxNode, SemanticModel, CancellationToken, TTarget> createTarget,
         CancellationToken cancellationToken)
     {
         foreach (var ancestor in node.AncestorsAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (isMethodLikeDeclaration(ancestor))
-                return createTarget(ancestor, semanticModel, cancellationToken);
+                return ResolvedMethodLikeTarget.Create(ancestor, semanticModel, cancellationToken);
         }
 
         throw new ArgumentException("Could not resolve a containing method-like body for the requested target.",
             nameof(node));
     }
+}
+
+internal sealed record ResolvedMethodLikeTarget(
+    SyntaxTree SyntaxTree,
+    SemanticModel SemanticModel,
+    SyntaxNode Declaration,
+    SyntaxNode? BodyNode,
+    ISymbol? DeclaredSymbol,
+    IMethodSymbol? MethodSymbol,
+    NodeSourceSpan SourceSpan)
+{
+    internal string MethodName => !string.IsNullOrWhiteSpace(MethodSymbol?.Name)
+        ? MethodSymbol!.Name
+        : Declaration is AnonymousFunctionExpressionSyntax
+            ? "anonymous_function"
+            : Declaration.Kind().ToString();
+
+    internal string MethodDisplayName =>
+        MethodSymbol?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) ?? MethodName;
+
+    internal string DeclarationKind => Declaration switch
+    {
+        MethodDeclarationSyntax => "method",
+        ConstructorDeclarationSyntax => "constructor",
+        DestructorDeclarationSyntax => "destructor",
+        OperatorDeclarationSyntax => "operator",
+        ConversionOperatorDeclarationSyntax => "conversion_operator",
+        AccessorDeclarationSyntax accessor => "accessor:" + accessor.Keyword.ValueText,
+        PropertyDeclarationSyntax => "property_getter",
+        IndexerDeclarationSyntax => "indexer_getter",
+        LocalFunctionStatementSyntax => "local_function",
+        AnonymousFunctionExpressionSyntax => "anonymous_function",
+        _ => Declaration.Kind().ToString()
+    };
+
+    internal static ResolvedMethodLikeTarget Create(
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
+        new(
+            declaration.SyntaxTree,
+            semanticModel,
+            declaration,
+            SymbolicMethodSourceResolver.GetBodyNode(declaration),
+            semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken),
+            SymbolicSourceLocation.GetNodeSourceSpan(
+                declaration.SyntaxTree,
+                declaration.Span,
+                cancellationToken));
 }
 
 internal static class SymbolicMethodSourceResolver
