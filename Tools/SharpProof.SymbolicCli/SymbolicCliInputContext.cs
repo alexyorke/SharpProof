@@ -2,37 +2,27 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.MSBuild;
 
-internal sealed class SymbolicCliInputContext : IDisposable
+internal sealed class SymbolicCliInputContext(
+    SymbolicSourceInput sourceInput,
+    MSBuildWorkspace? workspace = null,
+    SymbolicProjectQueryContext? projectContext = null,
+    ImmutableArray<string> workspaceDiagnostics = default) : IDisposable
 {
-    private readonly MSBuildWorkspace? _workspace;
+    private readonly MSBuildWorkspace? _workspace = workspace;
 
-    private SymbolicCliInputContext(
-        SymbolicSourceInput sourceInput,
-        MSBuildWorkspace? workspace = null,
-        SymbolicProjectQueryContext? projectContext = null,
-        ImmutableArray<string> workspaceDiagnostics = default)
-    {
-        SourceInput = sourceInput;
-        _workspace = workspace;
-        ProjectContext = projectContext;
-        WorkspaceDiagnostics = workspaceDiagnostics.IsDefault
-            ? ImmutableArray<string>.Empty
-            : workspaceDiagnostics;
-        ConfigurationIssues = projectContext == null
-            ? ImmutableArray<SharpProofProjectConfigurationIssue>.Empty
-            : AnalyzerConfiguration.FromOptions(projectContext.AnalyzerOptions).InvalidConfigurationValues
-                .Select(static issue => new SharpProofProjectConfigurationIssue(
-                    issue.Key, issue.Value, issue.Reason))
-                .ToImmutableArray();
-    }
+    public SymbolicSourceInput SourceInput { get; } = sourceInput;
 
-    public SymbolicSourceInput SourceInput { get; }
+    public SymbolicProjectQueryContext? ProjectContext { get; } = projectContext;
 
-    public SymbolicProjectQueryContext? ProjectContext { get; }
+    public ImmutableArray<string> WorkspaceDiagnostics { get; } = workspaceDiagnostics.IsDefault
+        ? ImmutableArray<string>.Empty
+        : workspaceDiagnostics;
 
-    public ImmutableArray<string> WorkspaceDiagnostics { get; }
-
-    public ImmutableArray<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; }
+    public ImmutableArray<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; } = projectContext == null
+        ? ImmutableArray<SharpProofProjectConfigurationIssue>.Empty
+        : AnalyzerConfiguration.FromOptions(projectContext.AnalyzerOptions).InvalidConfigurationValues
+            .Select(static issue => new SharpProofProjectConfigurationIssue(issue.Key, issue.Value, issue.Reason))
+            .ToImmutableArray();
 
     public static async Task<SymbolicCliInputContext> CreateAsync(
         SymbolicCliOptions options,

@@ -2,20 +2,13 @@ namespace SharpProof.ProofCore.Smt;
 
 internal delegate bool TryResolveSmtIntegerValue(SmtFormula formula, out long value);
 
-internal readonly struct SmtAffineIntegerTerm
+internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
 {
-    internal SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
-    {
-        BaseTerm = scale == 0 ? null : baseTerm;
-        Scale = BaseTerm == null ? 0 : scale;
-        Offset = offset;
-    }
+    internal SmtFormula? BaseTerm { get; } = scale == 0 ? null : baseTerm;
 
-    internal SmtFormula? BaseTerm { get; }
+    internal long Scale { get; } = scale == 0 || baseTerm == null ? 0 : scale;
 
-    internal long Scale { get; }
-
-    internal long Offset { get; }
+    internal long Offset { get; } = offset;
 
     internal static SmtAffineIntegerTerm Constant(long value)
     {

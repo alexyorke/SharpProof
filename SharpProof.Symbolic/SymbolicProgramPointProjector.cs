@@ -1,26 +1,20 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProgramPointQueryContext
+internal sealed class SymbolicProgramPointQueryContext(
+    SemanticModel semanticModel,
+    int position,
+    SyntaxNode node,
+    SymbolicProgramPointAnalysis analysis)
 {
-    internal SymbolicProgramPointQueryContext(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode node,
-        SymbolicProgramPointAnalysis analysis)
-    {
-        SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
-        Position = position;
-        Node = node ?? throw new ArgumentNullException(nameof(node));
-        Analysis = analysis ?? throw new ArgumentNullException(nameof(analysis));
-    }
+    internal SemanticModel SemanticModel { get; } =
+        semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
 
-    internal SemanticModel SemanticModel { get; }
+    internal int Position { get; } = position;
 
-    internal int Position { get; }
+    internal SyntaxNode Node { get; } = node ?? throw new ArgumentNullException(nameof(node));
 
-    internal SyntaxNode Node { get; }
-
-    internal SymbolicProgramPointAnalysis Analysis { get; }
+    internal SymbolicProgramPointAnalysis Analysis { get; } =
+        analysis ?? throw new ArgumentNullException(nameof(analysis));
 }
 
 internal static class SymbolicProgramPointProjector

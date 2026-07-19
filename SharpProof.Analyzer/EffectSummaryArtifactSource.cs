@@ -1,30 +1,21 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class EffectSummaryArtifactSource
+internal sealed class EffectSummaryArtifactSource(
+    string kind,
+    string? framework,
+    string? packageId,
+    string? packageVersion,
+    string? packageAssemblyRelativePath)
 {
-    private EffectSummaryArtifactSource(
-        string kind,
-        string? framework,
-        string? packageId,
-        string? packageVersion,
-        string? packageAssemblyRelativePath)
-    {
-        Kind = kind;
-        Framework = framework;
-        PackageId = packageId;
-        PackageVersion = packageVersion;
-        PackageAssemblyRelativePath = packageAssemblyRelativePath;
-    }
+    private string Kind { get; } = kind;
 
-    private string Kind { get; }
+    private string? Framework { get; } = framework;
 
-    private string? Framework { get; }
+    private string? PackageId { get; } = packageId;
 
-    private string? PackageId { get; }
+    private string? PackageVersion { get; } = packageVersion;
 
-    private string? PackageVersion { get; }
-
-    private string? PackageAssemblyRelativePath { get; }
+    private string? PackageAssemblyRelativePath { get; } = packageAssemblyRelativePath;
 
     internal static EffectSummaryArtifactSource? FromJson(JsonElement element)
     {

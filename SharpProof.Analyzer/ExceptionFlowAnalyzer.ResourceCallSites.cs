@@ -116,26 +116,18 @@ internal static partial class ExceptionFlowAnalyzer
         if (method != null) yield return method;
     }
 
-    private readonly struct UsingResource
+    private readonly struct UsingResource(
+        SyntaxNode site,
+        ExpressionSyntax? expression,
+        ITypeSymbol type,
+        bool isAsync)
     {
-        public UsingResource(
-            SyntaxNode site,
-            ExpressionSyntax? expression,
-            ITypeSymbol type,
-            bool isAsync)
-        {
-            Site = site;
-            Expression = expression;
-            Type = type;
-            IsAsync = isAsync;
-        }
+        public SyntaxNode Site { get; } = site;
 
-        public SyntaxNode Site { get; }
+        public ExpressionSyntax? Expression { get; } = expression;
 
-        public ExpressionSyntax? Expression { get; }
+        public ITypeSymbol Type { get; } = type;
 
-        public ITypeSymbol Type { get; }
-
-        public bool IsAsync { get; }
+        public bool IsAsync { get; } = isAsync;
     }
 }

@@ -12,25 +12,17 @@ internal sealed record SymbolicLoweringProvenance(
     TextSpan SourceSpan,
     string Detail);
 
-internal sealed class SymbolicLoweringResult<T>
+internal sealed class SymbolicLoweringResult<T>(
+    SymbolicLoweringSupport support,
+    T? value,
+    ImmutableArray<SymbolicLoweringProvenance> provenance,
+    SymbolicUnknownReason unknownReason)
     where T : class
 {
-    private SymbolicLoweringResult(
-        SymbolicLoweringSupport support,
-        T? value,
-        ImmutableArray<SymbolicLoweringProvenance> provenance,
-        SymbolicUnknownReason unknownReason)
-    {
-        Support = support;
-        Value = value;
-        Provenance = provenance;
-        UnknownReason = unknownReason;
-    }
-
-    internal SymbolicLoweringSupport Support { get; }
-    internal T? Value { get; }
-    internal ImmutableArray<SymbolicLoweringProvenance> Provenance { get; }
-    internal SymbolicUnknownReason UnknownReason { get; }
+    internal SymbolicLoweringSupport Support { get; } = support;
+    internal T? Value { get; } = value;
+    internal ImmutableArray<SymbolicLoweringProvenance> Provenance { get; } = provenance;
+    internal SymbolicUnknownReason UnknownReason { get; } = unknownReason;
     internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
     internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
     internal bool IsUnsupported => Support == SymbolicLoweringSupport.Unsupported;

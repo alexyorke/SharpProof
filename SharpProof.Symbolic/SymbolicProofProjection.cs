@@ -1,6 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal readonly struct SymbolicProofProjection
+internal readonly struct SymbolicProofProjection(
+    SymbolicProofStatus status,
+    SymbolicProofBackend backend,
+    SymbolicUnknownReason unknownReason)
 {
     internal static SymbolicProofStatus MapStatus(SymbolicTruthValue truthValue) => truthValue switch
     {
@@ -25,21 +28,11 @@ internal readonly struct SymbolicProofProjection
         _ => SymbolicProofStatus.Unknown
     };
 
-    private SymbolicProofProjection(
-        SymbolicProofStatus status,
-        SymbolicProofBackend backend,
-        SymbolicUnknownReason unknownReason)
-    {
-        Status = status;
-        Backend = backend;
-        UnknownReason = unknownReason;
-    }
+    private SymbolicProofStatus Status { get; } = status;
 
-    private SymbolicProofStatus Status { get; }
+    private SymbolicProofBackend Backend { get; } = backend;
 
-    private SymbolicProofBackend Backend { get; }
-
-    private SymbolicUnknownReason UnknownReason { get; }
+    private SymbolicUnknownReason UnknownReason { get; } = unknownReason;
 
     internal static SymbolicProofProjection FromSolverBackedResult(
         SymbolicProofStatus status,

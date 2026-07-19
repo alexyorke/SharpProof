@@ -1,57 +1,59 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicCostExpression
+internal enum SymbolicCostNodeKind
 {
-    private SymbolicCostExpression(
-        CostNodeKind kind,
-        ImmutableSortedDictionary<string, int>? factors = null,
-        ImmutableArray<SymbolicCostExpression>? alternatives = null,
-        SymbolicComplexityUnknownReason unknownReason = SymbolicComplexityUnknownReason.None)
-    {
-        Kind = kind;
-        Factors = factors ?? ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal);
-        Alternatives = alternatives ?? ImmutableArray<SymbolicCostExpression>.Empty;
-        UnknownReason = unknownReason;
-    }
+    Monomial,
+    Max,
+    Unknown,
+    RecursiveUnknown
+}
 
-    private CostNodeKind Kind { get; }
+internal sealed class SymbolicCostExpression(
+    SymbolicCostNodeKind kind,
+    ImmutableSortedDictionary<string, int>? factors = null,
+    ImmutableArray<SymbolicCostExpression>? alternatives = null,
+    SymbolicComplexityUnknownReason unknownReason = SymbolicComplexityUnknownReason.None)
+{
+    private SymbolicCostNodeKind Kind { get; } = kind;
 
-    private ImmutableSortedDictionary<string, int> Factors { get; }
+    private ImmutableSortedDictionary<string, int> Factors { get; } =
+        factors ?? ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal);
 
-    private ImmutableArray<SymbolicCostExpression> Alternatives { get; }
+    private ImmutableArray<SymbolicCostExpression> Alternatives { get; } =
+        alternatives ?? ImmutableArray<SymbolicCostExpression>.Empty;
 
-    public SymbolicComplexityUnknownReason UnknownReason { get; }
+    public SymbolicComplexityUnknownReason UnknownReason { get; } = unknownReason;
 
-    public bool IsUnknown => Kind == CostNodeKind.Unknown;
+    public bool IsUnknown => Kind == SymbolicCostNodeKind.Unknown;
 
-    public bool IsRecursiveUnknown => Kind == CostNodeKind.RecursiveUnknown;
+    public bool IsRecursiveUnknown => Kind == SymbolicCostNodeKind.RecursiveUnknown;
 
-    public bool IsConservative => IsUnknown || IsRecursiveUnknown || (Kind == CostNodeKind.Max &&
+    public bool IsConservative => IsUnknown || IsRecursiveUnknown || (Kind == SymbolicCostNodeKind.Max &&
                                                                       Alternatives.Any(static alternative =>
                                                                           alternative.IsConservative));
 
-    public bool IsConstant => Kind == CostNodeKind.Monomial && Factors.Count == 0;
+    public bool IsConstant => Kind == SymbolicCostNodeKind.Monomial && Factors.Count == 0;
 
     public static SymbolicCostExpression Constant()
     {
-        return new SymbolicCostExpression(CostNodeKind.Monomial);
+        return new SymbolicCostExpression(SymbolicCostNodeKind.Monomial);
     }
 
     public static SymbolicCostExpression Variable(string key)
     {
         return new SymbolicCostExpression(
-            CostNodeKind.Monomial,
+            SymbolicCostNodeKind.Monomial,
             ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal).Add(key, 1));
     }
 
     public static SymbolicCostExpression Unknown(SymbolicComplexityUnknownReason reason)
     {
-        return new SymbolicCostExpression(CostNodeKind.Unknown, unknownReason: reason);
+        return new SymbolicCostExpression(SymbolicCostNodeKind.Unknown, unknownReason: reason);
     }
 
     public static SymbolicCostExpression RecursiveUnknown()
     {
-        return new SymbolicCostExpression(CostNodeKind.RecursiveUnknown,
+        return new SymbolicCostExpression(SymbolicCostNodeKind.RecursiveUnknown,
             unknownReason: SymbolicComplexityUnknownReason.RecursiveCycle);
     }
 
@@ -66,7 +68,7 @@ internal sealed class SymbolicCostExpression
 
             if (expression.IsUnknown) return Unknown(expression.UnknownReason);
 
-            if (expression.Kind == CostNodeKind.Max)
+            if (expression.Kind == SymbolicCostNodeKind.Max)
                 flattened.AddRange(expression.Alternatives);
             else
                 flattened.Add(expression);
@@ -87,7 +89,7 @@ internal sealed class SymbolicCostExpression
 
         if (reduced.Count == 1) return reduced[0];
 
-        return new SymbolicCostExpression(CostNodeKind.Max, alternatives: reduced.ToImmutableArray());
+        return new SymbolicCostExpression(SymbolicCostNodeKind.Max, alternatives: reduced.ToImmutableArray());
     }
 
     public static SymbolicCostExpression Multiply(SymbolicCostExpression left, SymbolicCostExpression right)
@@ -98,10 +100,10 @@ internal sealed class SymbolicCostExpression
 
         if (right.IsUnknown) return Unknown(right.UnknownReason);
 
-        if (left.Kind == CostNodeKind.Max)
+        if (left.Kind == SymbolicCostNodeKind.Max)
             return Max(left.Alternatives.Select(alternative => Multiply(alternative, right)));
 
-        if (right.Kind == CostNodeKind.Max)
+        if (right.Kind == SymbolicCostNodeKind.Max)
             return Max(right.Alternatives.Select(alternative => Multiply(left, alternative)));
 
         var factors = left.Factors;
@@ -110,17 +112,17 @@ internal sealed class SymbolicCostExpression
                 pair.Key,
                 factors.TryGetValue(pair.Key, out var exponent) ? exponent + pair.Value : pair.Value);
 
-        return new SymbolicCostExpression(CostNodeKind.Monomial, factors);
+        return new SymbolicCostExpression(SymbolicCostNodeKind.Monomial, factors);
     }
 
     public SymbolicCostExpression Substitute(Func<string, SymbolicCostExpression?> resolver)
     {
         if (resolver == null) throw new ArgumentNullException(nameof(resolver));
 
-        if (Kind == CostNodeKind.Max)
+        if (Kind == SymbolicCostNodeKind.Max)
             return Max(Alternatives.Select(alternative => alternative.Substitute(resolver)));
 
-        if (Kind != CostNodeKind.Monomial) return this;
+        if (Kind != SymbolicCostNodeKind.Monomial) return this;
 
         var preservedFactors = ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal);
         var substituted = Constant();
@@ -141,7 +143,7 @@ internal sealed class SymbolicCostExpression
 
         if (preservedFactors.Count != 0)
             substituted = Multiply(substituted,
-                new SymbolicCostExpression(CostNodeKind.Monomial, preservedFactors));
+                new SymbolicCostExpression(SymbolicCostNodeKind.Monomial, preservedFactors));
 
         return substituted;
     }
@@ -157,7 +159,7 @@ internal sealed class SymbolicCostExpression
 
         if (IsUnknown) return SymbolicComplexityKind.Unknown;
 
-        if (Kind == CostNodeKind.Max) return SymbolicComplexityKind.Max;
+        if (Kind == SymbolicCostNodeKind.Max) return SymbolicComplexityKind.Max;
 
         if (Factors.Count == 0) return SymbolicComplexityKind.Constant;
 
@@ -181,7 +183,7 @@ internal sealed class SymbolicCostExpression
 
         if (IsUnknown) return "Unknown";
 
-        if (Kind == CostNodeKind.Max)
+        if (Kind == SymbolicCostNodeKind.Max)
             return "max(" + string.Join(", ",
                 Alternatives.Select(alternative => alternative.ToTermText(contextMethod))) + ")";
 
@@ -232,7 +234,7 @@ internal sealed class SymbolicCostExpression
 
     private static bool Dominates(SymbolicCostExpression left, SymbolicCostExpression right)
     {
-        if (left.Kind != CostNodeKind.Monomial || right.Kind != CostNodeKind.Monomial) return false;
+        if (left.Kind != SymbolicCostNodeKind.Monomial || right.Kind != SymbolicCostNodeKind.Monomial) return false;
 
         if (left.Factors.Count == 0) return right.Factors.Count == 0;
 
@@ -245,11 +247,4 @@ internal sealed class SymbolicCostExpression
         return true;
     }
 
-    private enum CostNodeKind
-    {
-        Monomial,
-        Max,
-        Unknown,
-        RecursiveUnknown
-    }
 }

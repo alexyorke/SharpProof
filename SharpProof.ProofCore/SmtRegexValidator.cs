@@ -84,16 +84,10 @@ internal sealed class SmtRegexValidator
         }
     }
 
-    private readonly struct RegexValidationResult
+    private readonly struct RegexValidationResult(bool isSupported, bool isMatch)
     {
-        internal RegexValidationResult(bool isSupported, bool isMatch)
-        {
-            IsSupported = isSupported;
-            IsMatch = isMatch;
-        }
+        internal bool IsSupported { get; } = isSupported;
 
-        internal bool IsSupported { get; }
-
-        internal bool IsMatch { get; }
+        internal bool IsMatch { get; } = isMatch;
     }
 }

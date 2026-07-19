@@ -296,27 +296,18 @@ internal static partial class ExecutionVisibility
         public BoundedConcurrentCache<ConditionTruthCacheKey, bool?> Values { get; } = new(512);
     }
 
-    private readonly struct ConditionTruthCacheKey : IEquatable<ConditionTruthCacheKey>
+    private readonly struct ConditionTruthCacheKey(
+        int expressionStart,
+        int expressionLength,
+        int siteStart,
+        int siteLength,
+        SmtAnalysisService? smtAnalysis) : IEquatable<ConditionTruthCacheKey>
     {
-        public ConditionTruthCacheKey(
-            int expressionStart,
-            int expressionLength,
-            int siteStart,
-            int siteLength,
-            SmtAnalysisService? smtAnalysis)
-        {
-            ExpressionStart = expressionStart;
-            ExpressionLength = expressionLength;
-            SiteStart = siteStart;
-            SiteLength = siteLength;
-            SmtAnalysis = smtAnalysis;
-        }
-
-        public int ExpressionStart { get; }
-        public int ExpressionLength { get; }
-        public int SiteStart { get; }
-        public int SiteLength { get; }
-        public SmtAnalysisService? SmtAnalysis { get; }
+        public int ExpressionStart { get; } = expressionStart;
+        public int ExpressionLength { get; } = expressionLength;
+        public int SiteStart { get; } = siteStart;
+        public int SiteLength { get; } = siteLength;
+        public SmtAnalysisService? SmtAnalysis { get; } = smtAnalysis;
 
         public bool Equals(ConditionTruthCacheKey other)
         {

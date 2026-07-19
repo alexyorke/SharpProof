@@ -274,6 +274,30 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void InternalAnalysisCarriers_UsePrimaryConstructorOwnership()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var expectedDeclarations = new Dictionary<string, string>
+        {
+            ["SharpProof.Analyzer/MethodAnalysisRequest.cs"] = "class MethodAnalysisRequest(",
+            ["SharpProof.Analyzer/GeneratedPurityCatalog.cs"] = "struct PurityEntry(",
+            ["SharpProof.Analyzer/ExceptionSummaryCatalog.cs"] = "class SummaryExceptionInfo(",
+            ["SharpProof.ProofCore/SmtIntegerInterval.cs"] = "struct SmtIntegerInterval(",
+            ["SharpProof.Symbolic/Ir/SymbolicLoweringResult.cs"] = "class SymbolicLoweringResult<T>(",
+            ["SharpProof.Symbolic/SymbolicProgramPointProjector.cs"] =
+                "class SymbolicProgramPointQueryContext(",
+            ["Tools/SharpProof.SymbolicCli/SymbolicCliInputContext.cs"] =
+                "class SymbolicCliInputContext("
+        };
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (path, declaration) in expectedDeclarations)
+                Assert.That(File.ReadAllText(Path.Combine(root, path)), Does.Contain(declaration), path);
+        });
+    }
+
+    [Test]
     public void AnalysisBudgets_UseOneCanonicalModelAndNamedRegistry()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

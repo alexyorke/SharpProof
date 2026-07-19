@@ -167,39 +167,26 @@ internal sealed class DiagnosticBaseline
         return builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
 
-    private readonly struct BaselineEntry
+    private readonly struct BaselineEntry(
+        string diagnosticId,
+        string symbolId,
+        string path,
+        string baseDirectory,
+        int? line,
+        int? column,
+        string? contractText,
+        string? operationKind,
+        string? evidenceKey)
     {
-        public BaselineEntry(
-            string diagnosticId,
-            string symbolId,
-            string path,
-            string baseDirectory,
-            int? line,
-            int? column,
-            string? contractText,
-            string? operationKind,
-            string? evidenceKey)
-        {
-            DiagnosticId = diagnosticId;
-            SymbolId = symbolId;
-            Path = NormalizePath(path);
-            AbsolutePath = MakeAbsolutePath(path, baseDirectory);
-            Line = line;
-            Column = column;
-            ContractText = NormalizeOptional(contractText);
-            OperationKind = NormalizeOptional(operationKind);
-            EvidenceKey = NormalizeOptional(evidenceKey);
-        }
-
-        private string DiagnosticId { get; }
-        private string SymbolId { get; }
-        private string Path { get; }
-        private string AbsolutePath { get; }
-        private int? Line { get; }
-        private int? Column { get; }
-        private string? ContractText { get; }
-        private string? OperationKind { get; }
-        private string? EvidenceKey { get; }
+        private string DiagnosticId { get; } = diagnosticId;
+        private string SymbolId { get; } = symbolId;
+        private string Path { get; } = NormalizePath(path);
+        private string AbsolutePath { get; } = MakeAbsolutePath(path, baseDirectory);
+        private int? Line { get; } = line;
+        private int? Column { get; } = column;
+        private string? ContractText { get; } = NormalizeOptional(contractText);
+        private string? OperationKind { get; } = NormalizeOptional(operationKind);
+        private string? EvidenceKey { get; } = NormalizeOptional(evidenceKey);
 
         public bool Matches(string diagnosticId, string symbolId, string sourcePath)
         {

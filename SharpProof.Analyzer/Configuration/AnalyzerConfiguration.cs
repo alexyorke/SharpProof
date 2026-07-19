@@ -661,30 +661,20 @@ internal enum TrustedBoundaryReviewMode
     All
 }
 
-internal sealed class MissingPuritySuggestionOptions
+internal sealed class MissingPuritySuggestionOptions(
+    bool enabled,
+    MissingPuritySuggestionScope scope,
+    bool excludeGeneratedFiles,
+    bool excludeTestFiles,
+    int minimumComplexity,
+    ImmutableHashSet<string> namespaceFilters)
 {
-    public MissingPuritySuggestionOptions(
-        bool enabled,
-        MissingPuritySuggestionScope scope,
-        bool excludeGeneratedFiles,
-        bool excludeTestFiles,
-        int minimumComplexity,
-        ImmutableHashSet<string> namespaceFilters)
-    {
-        Enabled = enabled;
-        Scope = scope;
-        ExcludeGeneratedFiles = excludeGeneratedFiles;
-        ExcludeTestFiles = excludeTestFiles;
-        MinimumComplexity = minimumComplexity;
-        NamespaceFilters = namespaceFilters;
-    }
-
-    public bool Enabled { get; }
-    public MissingPuritySuggestionScope Scope { get; }
-    public bool ExcludeGeneratedFiles { get; }
-    public bool ExcludeTestFiles { get; }
-    public int MinimumComplexity { get; }
-    public ImmutableHashSet<string> NamespaceFilters { get; }
+    public bool Enabled { get; } = enabled;
+    public MissingPuritySuggestionScope Scope { get; } = scope;
+    public bool ExcludeGeneratedFiles { get; } = excludeGeneratedFiles;
+    public bool ExcludeTestFiles { get; } = excludeTestFiles;
+    public int MinimumComplexity { get; } = minimumComplexity;
+    public ImmutableHashSet<string> NamespaceFilters { get; } = namespaceFilters;
 
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off;
 }

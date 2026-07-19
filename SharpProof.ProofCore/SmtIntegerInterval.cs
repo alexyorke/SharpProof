@@ -1,32 +1,24 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal readonly struct SmtIntegerInterval : IEquatable<SmtIntegerInterval>
+internal readonly struct SmtIntegerInterval(
+    long? lowerBound,
+    long? upperBound,
+    long[] excludedValues,
+    bool isImpossible) : IEquatable<SmtIntegerInterval>
 {
-    private SmtIntegerInterval(
-        long? lowerBound,
-        long? upperBound,
-        long[] excludedValues,
-        bool isImpossible)
-    {
-        LowerBound = lowerBound;
-        UpperBound = upperBound;
-        ExcludedValues = excludedValues;
-        IsImpossible = isImpossible;
-    }
-
     internal static SmtIntegerInterval Unbounded { get; } = new(
         null,
         null,
         Array.Empty<long>(),
         false);
 
-    internal long? LowerBound { get; }
+    internal long? LowerBound { get; } = lowerBound;
 
-    internal long? UpperBound { get; }
+    internal long? UpperBound { get; } = upperBound;
 
-    private long[] ExcludedValues { get; }
+    private long[] ExcludedValues { get; } = excludedValues;
 
-    internal bool IsImpossible { get; }
+    internal bool IsImpossible { get; } = isImpossible;
 
     internal bool IsContradictory =>
         IsImpossible ||

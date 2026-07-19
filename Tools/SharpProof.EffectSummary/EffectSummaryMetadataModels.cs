@@ -244,19 +244,13 @@ internal sealed record ExceptionPropagationSccIndex(
     IReadOnlyDictionary<StructuralMethodIdentity, int> ComponentByIdentity,
     int[][] Dependencies);
 
-internal sealed class ExceptionPropagationTarjanFrame
+internal sealed class ExceptionPropagationTarjanFrame(
+    StructuralMethodIdentity identity,
+    StructuralMethodIdentity? parent)
 {
-    public ExceptionPropagationTarjanFrame(
-        StructuralMethodIdentity identity,
-        StructuralMethodIdentity? parent)
-    {
-        Identity = identity;
-        Parent = parent;
-    }
+    public StructuralMethodIdentity Identity { get; } = identity;
 
-    public StructuralMethodIdentity Identity { get; }
-
-    public StructuralMethodIdentity? Parent { get; }
+    public StructuralMethodIdentity? Parent { get; } = parent;
 
     public bool IsEntered { get; set; }
 

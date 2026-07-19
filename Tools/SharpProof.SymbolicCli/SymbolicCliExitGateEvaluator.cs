@@ -1,16 +1,10 @@
 using SharpProof.Attributes;
 
-internal sealed class SymbolicCliExitGateFailure
+internal sealed class SymbolicCliExitGateFailure(string code, string message)
 {
-    public SymbolicCliExitGateFailure(string code, string message)
-    {
-        Code = code;
-        Message = message;
-    }
+    public string Code { get; } = code;
 
-    public string Code { get; }
-
-    public string Message { get; }
+    public string Message { get; } = message;
 }
 
 internal static class SymbolicCliExitGateEvaluator

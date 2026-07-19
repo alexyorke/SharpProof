@@ -11,36 +11,29 @@ internal static class EffectSummaryCatalogSourcePriorities
     internal const int Additional = 1;
 }
 
-internal abstract class EffectSummaryCatalogEntry : IEffectSummaryCatalogEntry
+internal abstract class EffectSummaryCatalogEntry(
+    string symbol,
+    string displaySymbol,
+    SummaryAssemblyIdentity? assemblyIdentity,
+    SummaryMethodIdentity? methodIdentity,
+    EffectSummaryArtifactSource? artifactSource,
+    int sourcePriority,
+    string? sourcePath,
+    EffectSummaryCompatibilityReporter? compatibilityReporter) : IEffectSummaryCatalogEntry
 {
-    protected EffectSummaryCatalogEntry(
-        string symbol,
-        string displaySymbol,
-        SummaryAssemblyIdentity? assemblyIdentity,
-        SummaryMethodIdentity? methodIdentity,
-        EffectSummaryArtifactSource? artifactSource,
-        int sourcePriority,
-        string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
-        Symbol = symbol;
-        DisplaySymbol = displaySymbol;
-        Trust = new EffectSummaryEntryTrustMetadata(
-            assemblyIdentity,
-            methodIdentity,
-            artifactSource,
-            sourcePriority,
-            EffectSummaryCatalogSourcePriorities.BuiltIn,
-            EffectSummaryCatalogSourcePriorities.Additional,
-            sourcePath,
-            compatibilityReporter);
-    }
+    public string Symbol { get; } = symbol;
 
-    public string Symbol { get; }
+    protected string DisplaySymbol { get; } = displaySymbol;
 
-    protected string DisplaySymbol { get; }
-
-    protected EffectSummaryEntryTrustMetadata Trust { get; }
+    protected EffectSummaryEntryTrustMetadata Trust { get; } = new(
+        assemblyIdentity,
+        methodIdentity,
+        artifactSource,
+        sourcePriority,
+        EffectSummaryCatalogSourcePriorities.BuiltIn,
+        EffectSummaryCatalogSourcePriorities.Additional,
+        sourcePath,
+        compatibilityReporter);
 
     internal SummaryAssemblyIdentity? AssemblyIdentity => Trust.AssemblyIdentity;
 

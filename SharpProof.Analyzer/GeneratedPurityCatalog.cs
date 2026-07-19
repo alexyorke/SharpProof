@@ -524,63 +524,45 @@ internal sealed class GeneratedPurityCatalog
         return ImmutableArray.Create(identity.ToCanonicalKey());
     }
 
-    private sealed class SummaryEntry : EffectSummaryCatalogEntry
+    private sealed class SummaryEntry(
+        string symbol,
+        string displayName,
+        PurityEntry classification,
+        SummaryAssemblyIdentity? assemblyIdentity,
+        SummaryMethodIdentity? methodIdentity,
+        EffectSummaryArtifactSource? artifactSource,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter) : EffectSummaryCatalogEntry(
+            symbol,
+            displayName,
+            assemblyIdentity,
+            methodIdentity,
+            artifactSource,
+            sourcePriority,
+            sourcePath,
+            compatibilityReporter)
     {
-        public SummaryEntry(
-            string symbol,
-            string displayName,
-            PurityEntry classification,
-            SummaryAssemblyIdentity? assemblyIdentity,
-            SummaryMethodIdentity? methodIdentity,
-            EffectSummaryArtifactSource? artifactSource,
-            int sourcePriority,
-            string? sourcePath,
-            EffectSummaryCompatibilityReporter? compatibilityReporter)
-            : base(
-                symbol,
-                displayName,
-                assemblyIdentity,
-                methodIdentity,
-                artifactSource,
-                sourcePriority,
-                sourcePath,
-                compatibilityReporter)
-        {
-            DisplayName = displayName;
-            Classification = classification;
-        }
-
-        public string DisplayName { get; }
-        public PurityEntry Classification { get; }
+        public string DisplayName { get; } = displayName;
+        public PurityEntry Classification { get; } = classification;
     }
 
-    internal readonly struct PurityEntry
+    internal readonly struct PurityEntry(
+        string classification,
+        ImmutableArray<string> categories,
+        string primaryCategory,
+        bool hasFreshArrayAllocationEvidence,
+        string freshnessClassification,
+        bool hasUnsupportedEffects,
+        string effectVisibilityClassification)
     {
-        public PurityEntry(
-            string classification,
-            ImmutableArray<string> categories,
-            string primaryCategory,
-            bool hasFreshArrayAllocationEvidence,
-            string freshnessClassification,
-            bool hasUnsupportedEffects,
-            string effectVisibilityClassification)
-        {
-            Classification = classification;
-            Categories = categories;
-            PrimaryCategory = primaryCategory;
-            HasFreshArrayAllocationEvidence = hasFreshArrayAllocationEvidence;
-            FreshnessClassification = freshnessClassification;
-            HasUnsupportedEffects = hasUnsupportedEffects;
-            EffectVisibilityClassification = effectVisibilityClassification;
-        }
-
-        public string Classification { get; }
-        public ImmutableArray<string> Categories { get; }
-        public string PrimaryCategory { get; }
-        public bool HasFreshArrayAllocationEvidence { get; }
-        public string FreshnessClassification { get; }
-        public bool HasUnsupportedEffects { get; }
-        public string EffectVisibilityClassification { get; }
+        public string Classification { get; } = classification;
+        public ImmutableArray<string> Categories { get; } = categories;
+        public string PrimaryCategory { get; } = primaryCategory;
+        public bool HasFreshArrayAllocationEvidence { get; } = hasFreshArrayAllocationEvidence;
+        public string FreshnessClassification { get; } = freshnessClassification;
+        public bool HasUnsupportedEffects { get; } = hasUnsupportedEffects;
+        public string EffectVisibilityClassification { get; } = effectVisibilityClassification;
         public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
         public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
 
@@ -605,24 +587,16 @@ internal sealed class GeneratedPurityCatalog
              string.Equals(EffectVisibilityClassification, "internal_only", StringComparison.Ordinal));
     }
 
-    internal readonly struct TrustedPurityEntry
+    internal readonly struct TrustedPurityEntry(
+        string source,
+        string value,
+        PurityEntry classification,
+        bool isSelected)
     {
-        internal TrustedPurityEntry(
-            string source,
-            string value,
-            PurityEntry classification,
-            bool isSelected)
-        {
-            Source = source;
-            Value = value;
-            Classification = classification;
-            IsSelected = isSelected;
-        }
-
-        internal string Source { get; }
-        internal string Value { get; }
-        internal PurityEntry Classification { get; }
-        internal bool IsSelected { get; }
+        internal string Source { get; } = source;
+        internal string Value { get; } = value;
+        internal PurityEntry Classification { get; } = classification;
+        internal bool IsSelected { get; } = isSelected;
     }
 
     private sealed class Scope : IDisposable

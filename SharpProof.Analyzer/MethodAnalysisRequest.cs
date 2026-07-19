@@ -1,22 +1,15 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class MethodAnalysisRequest
+internal sealed class MethodAnalysisRequest(
+    SymbolicMethodAnalysisInput symbolicInput,
+    ImmutableArray<IOperation> operationBlocks,
+    IOperation? fallbackRootOperation)
 {
-    private MethodAnalysisRequest(
-        SymbolicMethodAnalysisInput symbolicInput,
-        ImmutableArray<IOperation> operationBlocks,
-        IOperation? fallbackRootOperation)
-    {
-        SymbolicInput = symbolicInput;
-        OperationBlocks = operationBlocks;
-        FallbackRootOperation = fallbackRootOperation;
-    }
+    internal SymbolicMethodAnalysisInput SymbolicInput { get; } = symbolicInput;
 
-    internal SymbolicMethodAnalysisInput SymbolicInput { get; }
+    internal ImmutableArray<IOperation> OperationBlocks { get; } = operationBlocks;
 
-    internal ImmutableArray<IOperation> OperationBlocks { get; }
-
-    internal IOperation? FallbackRootOperation { get; }
+    internal IOperation? FallbackRootOperation { get; } = fallbackRootOperation;
 
     internal static MethodAnalysisRequest Create(
         IMethodSymbol methodSymbol,

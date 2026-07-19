@@ -64,27 +64,19 @@ internal enum SymbolicDomainPredicateKind
     Unsupported
 }
 
-internal sealed class SymbolicIntegerRange
+internal sealed class SymbolicIntegerRange(
+    long? minimum,
+    bool minimumInclusive,
+    long? maximum,
+    bool maximumInclusive)
 {
-    internal SymbolicIntegerRange(
-        long? minimum,
-        bool minimumInclusive,
-        long? maximum,
-        bool maximumInclusive)
-    {
-        Minimum = minimum;
-        MinimumInclusive = minimum.HasValue && minimumInclusive;
-        Maximum = maximum;
-        MaximumInclusive = maximum.HasValue && maximumInclusive;
-    }
+    public long? Minimum { get; } = minimum;
 
-    public long? Minimum { get; }
+    public bool MinimumInclusive { get; } = minimum.HasValue && minimumInclusive;
 
-    public bool MinimumInclusive { get; }
+    public long? Maximum { get; } = maximum;
 
-    public long? Maximum { get; }
-
-    public bool MaximumInclusive { get; }
+    public bool MaximumInclusive { get; } = maximum.HasValue && maximumInclusive;
 
     public bool HasLowerBound => Minimum.HasValue;
 

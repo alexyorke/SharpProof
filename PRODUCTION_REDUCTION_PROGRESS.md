@@ -318,14 +318,24 @@ Tests are excluded from the metric and must not be deleted.
   now owns program-point analysis directly, and source/proof consumers bind to
   that canonical service. Source-map and invariant-summary initialization were
   consolidated without changing locations, evidence, or unknown behavior.
+- [x] Made primary constructors the single initialization owner for 29 more
+  internal Analyzer, ProofCore, Symbolic, CLI, and EffectSummary carriers.
+  Removed repeated constructor parameter, assignment, and property blocks from
+  catalog entries, exception summaries, analysis requests, interval/affine
+  facts, lowering transitions, SMT options, complexity expressions, source
+  contexts, and traversal frames. Normalization, null validation, equality,
+  lazy hashing, JSON field names, and conservative unknown states remain
+  unchanged. Order-sensitive CLI invariant projection retains its explicit
+  constructor, and architecture coverage prevents the consolidated carrier
+  forms from regressing.
 
 ## Current evidence
 
-- Maintained production: 97,492 lines (93,573 C#, 3,189 scripts, and 730
-  specifications); net reduction: 10,134 lines; remaining reduction: 9,866.
+- Maintained production: 97,292 lines (93,373 C#, 3,189 scripts, and 730
+  specifications); net reduction: 10,334 lines; remaining reduction: 9,666.
   This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,191 passing tests and two documented Main skips.
+- Six lanes: 6,192 passing tests and two documented Main skips.
 
 ## Milestones
 

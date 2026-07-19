@@ -7,7 +7,14 @@ internal enum SmtAnalysisMode
     Deep
 }
 
-internal sealed class SmtAnalysisOptions
+internal sealed class SmtAnalysisOptions(
+    SmtAnalysisMode mode,
+    TimeSpan queryTimeout,
+    TimeSpan methodBudget,
+    int maxPathConditions,
+    int maxExpressionNodes,
+    bool useSharedResultCache,
+    SmtSolverLifecycleOptions lifecycle)
 {
     public static readonly SmtAnalysisOptions Default = ForMode(SmtAnalysisMode.Bounded);
 
@@ -29,31 +36,13 @@ internal sealed class SmtAnalysisOptions
     {
     }
 
-    private SmtAnalysisOptions(
-        SmtAnalysisMode mode,
-        TimeSpan queryTimeout,
-        TimeSpan methodBudget,
-        int maxPathConditions,
-        int maxExpressionNodes,
-        bool useSharedResultCache,
-        SmtSolverLifecycleOptions lifecycle)
-    {
-        Mode = mode;
-        QueryTimeout = queryTimeout;
-        MethodBudget = methodBudget;
-        MaxPathConditions = maxPathConditions;
-        MaxExpressionNodes = maxExpressionNodes;
-        UseSharedResultCache = useSharedResultCache;
-        Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
-    }
-
-    public SmtAnalysisMode Mode { get; }
-    public TimeSpan QueryTimeout { get; }
-    public TimeSpan MethodBudget { get; }
-    public int MaxPathConditions { get; }
-    public int MaxExpressionNodes { get; }
-    public bool UseSharedResultCache { get; }
-    public SmtSolverLifecycleOptions Lifecycle { get; }
+    public SmtAnalysisMode Mode { get; } = mode;
+    public TimeSpan QueryTimeout { get; } = queryTimeout;
+    public TimeSpan MethodBudget { get; } = methodBudget;
+    public int MaxPathConditions { get; } = maxPathConditions;
+    public int MaxExpressionNodes { get; } = maxExpressionNodes;
+    public bool UseSharedResultCache { get; } = useSharedResultCache;
+    public SmtSolverLifecycleOptions Lifecycle { get; } = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
     public bool IsEnabled => Mode != SmtAnalysisMode.Off;
 
     public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode)

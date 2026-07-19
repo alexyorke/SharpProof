@@ -1,16 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicIrProofResult
+internal sealed class SymbolicIrProofResult(PurityProofResult? rawResult, SymbolicProofInfo info)
 {
-    private SymbolicIrProofResult(PurityProofResult? rawResult, SymbolicProofInfo info)
-    {
-        RawResult = rawResult;
-        Info = info;
-    }
+    public PurityProofResult? RawResult { get; } = rawResult;
 
-    public PurityProofResult? RawResult { get; }
-
-    public SymbolicProofInfo Info { get; }
+    public SymbolicProofInfo Info { get; } = info;
 
     public static SymbolicIrProofResult Unknown(
         SymbolicUnknownReason reason,

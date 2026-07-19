@@ -1,25 +1,17 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicMethodAnalysisInput
+internal sealed class SymbolicMethodAnalysisInput(
+    IMethodSymbol methodSymbol,
+    SyntaxNode declaration,
+    SemanticModel semanticModel)
 {
-    private SymbolicMethodAnalysisInput(
-        IMethodSymbol methodSymbol,
-        SyntaxNode declaration,
-        SemanticModel semanticModel)
-    {
-        MethodSymbol = methodSymbol;
-        Declaration = declaration;
-        SemanticModel = semanticModel;
-        Source = SymbolicSourceInput.FromNode(declaration, semanticModel);
-    }
+    internal IMethodSymbol MethodSymbol { get; } = methodSymbol;
 
-    internal IMethodSymbol MethodSymbol { get; }
+    internal SyntaxNode Declaration { get; } = declaration;
 
-    internal SyntaxNode Declaration { get; }
+    internal SemanticModel SemanticModel { get; } = semanticModel;
 
-    internal SemanticModel SemanticModel { get; }
-
-    internal SymbolicSourceInput Source { get; }
+    internal SymbolicSourceInput Source { get; } = SymbolicSourceInput.FromNode(declaration, semanticModel);
 
     internal static SymbolicMethodAnalysisInput Create(
         IMethodSymbol methodSymbol,

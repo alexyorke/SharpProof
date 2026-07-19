@@ -352,73 +352,52 @@ internal sealed class ExceptionSummaryCatalog
             : null;
     }
 
-    private sealed class SummaryEntry : EffectSummaryCatalogEntry
+    private sealed class SummaryEntry(
+        string symbol,
+        ImmutableArray<SummaryExceptionInfo> exceptionInfos,
+        SummaryAssemblyIdentity? assemblyIdentity,
+        SummaryMethodIdentity? methodIdentity,
+        EffectSummaryArtifactSource? artifactSource,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter) : EffectSummaryCatalogEntry(
+            symbol,
+            symbol,
+            assemblyIdentity,
+            methodIdentity,
+            artifactSource,
+            sourcePriority,
+            sourcePath,
+            compatibilityReporter)
     {
-        public SummaryEntry(
-            string symbol,
-            ImmutableArray<SummaryExceptionInfo> exceptionInfos,
-            SummaryAssemblyIdentity? assemblyIdentity,
-            SummaryMethodIdentity? methodIdentity,
-            EffectSummaryArtifactSource? artifactSource,
-            int sourcePriority,
-            string? sourcePath,
-            EffectSummaryCompatibilityReporter? compatibilityReporter)
-            : base(
-                symbol,
-                symbol,
-                assemblyIdentity,
-                methodIdentity,
-                artifactSource,
-                sourcePriority,
-                sourcePath,
-                compatibilityReporter)
-        {
-            ExceptionInfos = exceptionInfos;
-        }
-
-        public ImmutableArray<SummaryExceptionInfo> ExceptionInfos { get; }
+        public ImmutableArray<SummaryExceptionInfo> ExceptionInfos { get; } = exceptionInfos;
     }
 
-    internal sealed class SummaryExceptionInfo
+    internal sealed class SummaryExceptionInfo(
+        string exceptionType,
+        ImmutableArray<string> sources,
+        ImmutableArray<SummaryExceptionEdgeInfo> edges)
     {
-        public SummaryExceptionInfo(
-            string exceptionType,
-            ImmutableArray<string> sources,
-            ImmutableArray<SummaryExceptionEdgeInfo> edges)
-        {
-            ExceptionType = exceptionType;
-            Sources = sources;
-            Edges = edges;
-        }
+        public string ExceptionType { get; } = exceptionType;
 
-        public string ExceptionType { get; }
+        public ImmutableArray<string> Sources { get; } = sources;
 
-        public ImmutableArray<string> Sources { get; }
-
-        public ImmutableArray<SummaryExceptionEdgeInfo> Edges { get; }
+        public ImmutableArray<SummaryExceptionEdgeInfo> Edges { get; } = edges;
     }
 
-    internal sealed class SummaryExceptionEdgeInfo
+    internal sealed class SummaryExceptionEdgeInfo(
+        string? sourcePath,
+        ImmutableArray<StructuralMethodIdentity> callChain,
+        StructuralMethodIdentity? calleeIdentity,
+        int? depth)
     {
-        public SummaryExceptionEdgeInfo(
-            string? sourcePath,
-            ImmutableArray<StructuralMethodIdentity> callChain,
-            StructuralMethodIdentity? calleeIdentity,
-            int? depth)
-        {
-            SourcePath = sourcePath;
-            CallChain = callChain;
-            CalleeIdentity = calleeIdentity;
-            Depth = depth;
-        }
+        public string? SourcePath { get; } = sourcePath;
 
-        public string? SourcePath { get; }
+        public ImmutableArray<StructuralMethodIdentity> CallChain { get; } = callChain;
 
-        public ImmutableArray<StructuralMethodIdentity> CallChain { get; }
+        public StructuralMethodIdentity? CalleeIdentity { get; } = calleeIdentity;
 
-        public StructuralMethodIdentity? CalleeIdentity { get; }
-
-        public int? Depth { get; }
+        public int? Depth { get; } = depth;
     }
 
     private sealed class SummaryExceptionEdgeInfoComparer : IEqualityComparer<SummaryExceptionEdgeInfo>
