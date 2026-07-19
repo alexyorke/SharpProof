@@ -9,31 +9,6 @@ internal static class PurityClassificationEngine
 {
     private const int MaxCrossAssemblyClassificationPasses = 8;
 
-    internal static readonly IReadOnlyDictionary<string, string> EmptyTypeParameterOrdinals =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    internal static readonly IReadOnlyDictionary<string, string> SpecialTypeAliases =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["System.Boolean"] = "bool",
-            ["System.Byte"] = "byte",
-            ["System.Char"] = "char",
-            ["System.Double"] = "double",
-            ["System.Int16"] = "short",
-            ["System.Int32"] = "int",
-            ["System.Int64"] = "long",
-            ["System.IntPtr"] = "nint",
-            ["System.Object"] = "object",
-            ["System.SByte"] = "sbyte",
-            ["System.Single"] = "float",
-            ["System.String"] = "string",
-            ["System.UInt16"] = "ushort",
-            ["System.UInt32"] = "uint",
-            ["System.UInt64"] = "ulong",
-            ["System.UIntPtr"] = "nuint",
-            ["System.Void"] = "void"
-        };
-
     internal static readonly ImmutableHashSet<string> SafeEffects = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         "allocates_array",

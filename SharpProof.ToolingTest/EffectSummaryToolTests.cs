@@ -2678,77 +2678,18 @@ public partial class EffectSummaryToolTests
     }
 
     [Test]
-    public async Task EffectSummaryTool_KeyValuePairCatalogNormalization_UsesMetadataPositionalForms()
+    public void EffectSummaryTool_RetiredManualCatalogNormalization_DoesNotReturn()
     {
-        await RunEffectSummaryToolAsync("--help");
-
-        var assemblyPath = Path.Combine(
+        var sourcePath = Path.Combine(
             GetRepositoryRoot(),
             "Tools",
             "SharpProof.EffectSummary",
-            "bin",
-            "Debug",
-            "net8.0",
-            "SharpProof.EffectSummary.dll");
-        Assert.That(File.Exists(assemblyPath), Is.True, assemblyPath);
+            "EffectSummaryCatalogReporting.cs");
+        var source = File.ReadAllText(sourcePath);
 
-        var assembly = Assembly.LoadFrom(assemblyPath);
-        var engineType = assembly.GetType("PurityClassificationEngine", true)!;
-        var normalizeMethod =
-            engineType.GetMethod("NormalizeCatalogSymbol", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var comparisonKeyMethod =
-            engineType.GetMethod("NormalizeCatalogComparisonKey", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.KeyValuePair(TKey, TValue)" })!,
-            Is.EqualTo("System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.Key.get" })!,
-            Is.EqualTo("System.Collections.Generic.KeyValuePair`2.get_Key()"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.Value.get" })!,
-            Is.EqualTo("System.Collections.Generic.KeyValuePair`2.get_Value()"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.IEnumerable<T>.GetEnumerator()" })!,
-            Is.EqualTo("System.Collections.Generic.IEnumerable`1.GetEnumerator()"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[]
-                    { "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)" })!,
-            Is.EqualTo("System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)" })!,
-            Is.EqualTo("System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null,
-                new object[] { "System.Threading.Tasks.Task.FromResult<TResult>(TResult)" })!,
-            Is.EqualTo("System.Threading.Tasks.Task.FromResult(!!0)"));
-        Assert.That(
-            (string)normalizeMethod.Invoke(null, new object[] { "System.Threading.Tasks.ValueTask.AsTask()" })!,
-            Is.EqualTo("System.Threading.Tasks.ValueTask.AsTask()"));
-
-        Assert.That(
-            (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Environment.OSVersion.get" })!,
-            Is.EqualTo((string)comparisonKeyMethod.Invoke(null,
-                new object[] { "System.Environment.get_OSVersion()" })!));
-        Assert.That(
-            (string)comparisonKeyMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.List<T>.Capacity.set" })!,
-            Is.EqualTo((string)comparisonKeyMethod.Invoke(null,
-                new object[] { "System.Collections.Generic.List`1.set_Capacity(int)" })!));
-        Assert.That(
-            (string)comparisonKeyMethod.Invoke(null,
-                new object[] { "System.Collections.Immutable.ImmutableList<T>.this[int].get" })!,
-            Is.EqualTo((string)comparisonKeyMethod.Invoke(null,
-                new object[] { "System.Collections.Immutable.ImmutableList`1.get_Item(int)" })!));
-        Assert.That(
-            (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Threading.Tasks.ValueTask.AsTask()" })!,
-            Is.EqualTo("System.Threading.Tasks.ValueTask.AsTask()"));
+        Assert.That(source, Does.Not.Contain("NormalizeCatalogSymbol"));
+        Assert.That(source, Does.Not.Contain("NormalizeCatalogComparisonKey"));
+        Assert.That(source, Does.Not.Contain("AggregateCatalogClassification"));
     }
 
     [Test]

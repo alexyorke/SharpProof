@@ -699,6 +699,13 @@ namespace TestNamespace {
             Assert.That(root.ValueKind, Is.EqualTo(JsonValueKind.Object), resourceName);
             Assert.That(root.GetProperty("SchemaVersion").GetInt32(), Is.GreaterThanOrEqualTo(1), resourceName);
             Assert.That(root.GetProperty("Assemblies").GetArrayLength(), Is.GreaterThan(0), resourceName);
+            var catalogComparison = root.GetProperty("PurityReport").GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.Zero, resourceName);
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.Zero, resourceName);
+            Assert.That(
+                catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(),
+                Is.Zero,
+                resourceName);
         }
     }
 

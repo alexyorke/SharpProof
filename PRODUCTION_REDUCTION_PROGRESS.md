@@ -214,12 +214,18 @@ Tests are excluded from the metric and must not be deleted.
   narrow `System.Type` list remains explicit because broadening it changed
   reflection diagnostics. A repository test prevents the three migrated
   families from returning to member-by-member maintenance.
+- [x] Removed the dormant manual-catalog comparison normalization and
+  aggregation engine after the inferred-purity migration made all three input
+  catalogs immutable empty sets. The serialized comparison contract still
+  emits its three empty arrays, generated-purity catalog construction remains
+  intact, and architecture and packaging tests prevent the retired normalizers
+  from returning or the boundary shape from drifting.
 
 ## Current evidence
 
-- Maintained production: 101,633 lines (97,714 C#, 3,189 scripts, and 730
-  specifications); net reduction: 5,993 lines; remaining reduction: 14,007.
-  This tranche removed 156 maintained lines without deleting tests.
+- Maintained production: 101,122 lines (97,203 C#, 3,189 scripts, and 730
+  specifications); net reduction: 6,504 lines; remaining reduction: 13,496.
+  This tranche removed 511 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,178 passing tests and two documented skips.
 
