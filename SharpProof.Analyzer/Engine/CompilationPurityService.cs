@@ -30,7 +30,7 @@ internal sealed class CompilationPurityService : IDisposable
         Compilation compilation,
         SmtAnalysisOptions smtOptions,
         SharpProofAttributeIdentityPolicy attributePolicy)
-        : this(compilation, smtOptions, attributePolicy, SymbolicAnalysisLimits.Default)
+        : this(compilation, smtOptions, attributePolicy, SharpProofAnalysisBudget.Default)
     {
     }
 
@@ -38,7 +38,7 @@ internal sealed class CompilationPurityService : IDisposable
         Compilation compilation,
         SmtAnalysisOptions smtOptions,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        SymbolicAnalysisLimits analysisLimits)
+        SharpProofAnalysisBudget analysisLimits)
     {
         _compilation = compilation;
         AttributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
@@ -48,7 +48,7 @@ internal sealed class CompilationPurityService : IDisposable
 
     public SharpProofAttributeIdentityPolicy AttributePolicy { get; }
 
-    public SymbolicAnalysisLimits AnalysisLimits { get; }
+    public SharpProofAnalysisBudget AnalysisLimits { get; }
 
     public SmtAnalysisService SmtAnalysis { get; }
 

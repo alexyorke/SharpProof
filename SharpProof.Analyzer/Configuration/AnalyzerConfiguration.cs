@@ -7,75 +7,52 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Configuration;
 
-internal class AnalyzerConfiguration
+internal class AnalyzerConfiguration(
+    ImmutableHashSet<string> extraImpureMethods,
+    ImmutableHashSet<string> extraPureMethods,
+    ImmutableHashSet<string> extraImpureNamespaces,
+    ImmutableHashSet<string> extraImpureTypes,
+    ImmutableHashSet<string> attributeStubNamespaces,
+    bool suggestMissingEnforcePure,
+    MissingPuritySuggestionOptions missingPuritySuggestions,
+    InferredContractSuggestionOptions inferredContractSuggestions,
+    bool emitExplanations,
+    bool reportBclFallbackGuesses,
+    RuntimeHazardMode runtimeHazardMode,
+    ProvenDiagnosticSuppressionOptions provenDiagnosticSuppressions,
+    bool reportExceptions,
+    bool checkedExceptions,
+    bool enableEffectSummaryJson,
+    string purityProfile,
+    TrustedBoundaryReviewMode trustedBoundaryReviewMode,
+    SmtAnalysisOptions smtOptions,
+    SharpProofAnalysisBudget analysisLimits,
+    ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
 {
     private static readonly ImmutableHashSet<string> EmptyValues =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
-    private AnalyzerConfiguration(
-        ImmutableHashSet<string> extraImpureMethods,
-        ImmutableHashSet<string> extraPureMethods,
-        ImmutableHashSet<string> extraImpureNamespaces,
-        ImmutableHashSet<string> extraImpureTypes,
-        ImmutableHashSet<string> attributeStubNamespaces,
-        bool suggestMissingEnforcePure,
-        MissingPuritySuggestionOptions missingPuritySuggestions,
-        InferredContractSuggestionOptions inferredContractSuggestions,
-        bool emitExplanations,
-        bool reportBclFallbackGuesses,
-        RuntimeHazardMode runtimeHazardMode,
-        ProvenDiagnosticSuppressionOptions provenDiagnosticSuppressions,
-        bool reportExceptions,
-        bool checkedExceptions,
-        bool enableEffectSummaryJson,
-        string purityProfile,
-        TrustedBoundaryReviewMode trustedBoundaryReviewMode,
-        SmtAnalysisOptions smtOptions,
-        SymbolicAnalysisLimits analysisLimits,
-        ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
-    {
-        ExtraKnownImpureMethods = extraImpureMethods;
-        ExtraKnownPureMethods = extraPureMethods;
-        ExtraKnownImpureNamespaces = extraImpureNamespaces;
-        ExtraKnownImpureTypes = extraImpureTypes;
-        AttributeStubNamespaces = attributeStubNamespaces;
-        SuggestMissingEnforcePure = suggestMissingEnforcePure;
-        MissingPuritySuggestions = missingPuritySuggestions;
-        InferredContractSuggestions = inferredContractSuggestions;
-        EmitExplanations = emitExplanations;
-        ReportBclFallbackGuesses = reportBclFallbackGuesses;
-        RuntimeHazardMode = runtimeHazardMode;
-        ProvenDiagnosticSuppressions = provenDiagnosticSuppressions;
-        ReportExceptions = reportExceptions;
-        CheckedExceptions = checkedExceptions;
-        EnableEffectSummaryJson = enableEffectSummaryJson;
-        PurityProfile = purityProfile;
-        TrustedBoundaryReviewMode = trustedBoundaryReviewMode;
-        SmtOptions = smtOptions;
-        AnalysisLimits = analysisLimits;
-        InvalidConfigurationValues = invalidConfigurationValues;
-    }
-
-    public ImmutableHashSet<string> ExtraKnownImpureMethods { get; }
-    public ImmutableHashSet<string> ExtraKnownPureMethods { get; }
-    public ImmutableHashSet<string> ExtraKnownImpureNamespaces { get; }
-    public ImmutableHashSet<string> ExtraKnownImpureTypes { get; }
-    public ImmutableHashSet<string> AttributeStubNamespaces { get; }
-    public bool SuggestMissingEnforcePure { get; }
-    public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
-    public InferredContractSuggestionOptions InferredContractSuggestions { get; }
-    public bool EmitExplanations { get; }
-    public bool ReportBclFallbackGuesses { get; }
-    public RuntimeHazardMode RuntimeHazardMode { get; }
-    public ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions { get; }
-    public bool ReportExceptions { get; }
-    public bool CheckedExceptions { get; }
-    public bool EnableEffectSummaryJson { get; }
-    public string PurityProfile { get; }
-    public TrustedBoundaryReviewMode TrustedBoundaryReviewMode { get; }
-    public SmtAnalysisOptions SmtOptions { get; }
-    public SymbolicAnalysisLimits AnalysisLimits { get; }
-    public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; }
+    public ImmutableHashSet<string> ExtraKnownImpureMethods { get; } = extraImpureMethods;
+    public ImmutableHashSet<string> ExtraKnownPureMethods { get; } = extraPureMethods;
+    public ImmutableHashSet<string> ExtraKnownImpureNamespaces { get; } = extraImpureNamespaces;
+    public ImmutableHashSet<string> ExtraKnownImpureTypes { get; } = extraImpureTypes;
+    public ImmutableHashSet<string> AttributeStubNamespaces { get; } = attributeStubNamespaces;
+    public bool SuggestMissingEnforcePure { get; } = suggestMissingEnforcePure;
+    public MissingPuritySuggestionOptions MissingPuritySuggestions { get; } = missingPuritySuggestions;
+    public InferredContractSuggestionOptions InferredContractSuggestions { get; } = inferredContractSuggestions;
+    public bool EmitExplanations { get; } = emitExplanations;
+    public bool ReportBclFallbackGuesses { get; } = reportBclFallbackGuesses;
+    public RuntimeHazardMode RuntimeHazardMode { get; } = runtimeHazardMode;
+    public ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions { get; } = provenDiagnosticSuppressions;
+    public bool ReportExceptions { get; } = reportExceptions;
+    public bool CheckedExceptions { get; } = checkedExceptions;
+    public bool EnableEffectSummaryJson { get; } = enableEffectSummaryJson;
+    public string PurityProfile { get; } = purityProfile;
+    public TrustedBoundaryReviewMode TrustedBoundaryReviewMode { get; } = trustedBoundaryReviewMode;
+    public SmtAnalysisOptions SmtOptions { get; } = smtOptions;
+    public SharpProofAnalysisBudget AnalysisLimits { get; } = analysisLimits;
+    public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; } =
+        invalidConfigurationValues;
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {

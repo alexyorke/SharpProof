@@ -187,18 +187,41 @@ public sealed record SharpProofAnalysisBudget(
 {
     public static SharpProofAnalysisBudget Default { get; } = new();
 
-    internal SymbolicAnalysisLimits ToEngineLimits() => new(
-        MaxMergedIfElseFacts,
-        MaxMergedSwitchFacts,
-        MaxMergedTryFacts,
-        MaxTryCompletionBranches,
-        MaxFiniteForeachElementFacts,
-        MaxScopedBlockCompletionStatements,
-        MaxStructuralNullStateDepth,
-        MaxMergedPathConditions,
-        MaxMergeableFactsPerTargetPerState,
-        MaxFactChoiceCombinationsPerTarget,
-        MaxGuardFactsPerTargetPerState);
+    private static readonly (string Name, Func<SharpProofAnalysisBudget, int> Read)[] NamedLimits =
+    [
+        ("merged-if-else-facts", static value => value.MaxMergedIfElseFacts),
+        ("merged-switch-facts", static value => value.MaxMergedSwitchFacts),
+        ("merged-try-facts", static value => value.MaxMergedTryFacts),
+        ("try-completion-branches", static value => value.MaxTryCompletionBranches),
+        ("finite-foreach-element-facts", static value => value.MaxFiniteForeachElementFacts),
+        ("scoped-block-completion-statements", static value => value.MaxScopedBlockCompletionStatements),
+        ("structural-null-state-depth", static value => value.MaxStructuralNullStateDepth),
+        ("merged-path-conditions", static value => value.MaxMergedPathConditions),
+        ("mergeable-facts-per-target-per-state", static value => value.MaxMergeableFactsPerTargetPerState),
+        ("fact-choice-combinations-per-target", static value => value.MaxFactChoiceCombinationsPerTarget),
+        ("guard-facts-per-target-per-state", static value => value.MaxGuardFactsPerTargetPerState)
+    ];
+
+    internal static bool IsNamedLimit(string name) =>
+        NamedLimits.Any(limit => string.Equals(limit.Name, name, StringComparison.Ordinal));
+
+    internal static SharpProofAnalysisBudget FromNamedValues(
+        SharpProofAnalysisBudget defaults,
+        Func<string, int, int> getValue)
+    {
+        var values = NamedLimits.Select(limit => getValue(limit.Name, limit.Read(defaults))).ToArray();
+        return new SharpProofAnalysisBudget(
+            values[0], values[1], values[2], values[3], values[4], values[5],
+            values[6], values[7], values[8], values[9], values[10]);
+    }
+
+    internal SharpProofAnalysisBudget Validate()
+    {
+        var invalid = NamedLimits.FirstOrDefault(limit => limit.Read(this) <= 0);
+        if (invalid.Name != null)
+            throw new ArgumentOutOfRangeException(invalid.Name, "Analysis limits must be positive.");
+        return this;
+    }
 }
 
 public sealed record SharpProofRuntimeHazardOptions(
@@ -738,6 +761,6 @@ public sealed class SharpProofAnalysisSession : IDisposable
         return new SymbolicQueryOptions(
                 smtAnalysis: smtAnalysis,
                 impliedConditions: options.ImpliedConditions)
-            .WithAnalysisLimits(options.AnalysisBudget.ToEngineLimits());
+            .WithAnalysisLimits(options.AnalysisBudget.Validate());
     }
 }

@@ -1418,9 +1418,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 target));
     }
 
-    internal static bool UsesDefaultAnalysisLimits(SymbolicAnalysisLimits limits)
+    internal static bool UsesDefaultAnalysisLimits(SharpProofAnalysisBudget limits)
     {
-        var defaults = SymbolicAnalysisLimits.Default;
+        var defaults = SharpProofAnalysisBudget.Default;
         return limits.MaxMergedIfElseFacts == defaults.MaxMergedIfElseFacts &&
                limits.MaxMergedSwitchFacts == defaults.MaxMergedSwitchFacts &&
                limits.MaxMergedTryFacts == defaults.MaxMergedTryFacts &&

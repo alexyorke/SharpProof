@@ -29,9 +29,11 @@ public sealed class SymbolicStateMergerTests
             Equal(second, 4, source)
         });
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(
-                maxMergedPathConditions: 1,
-                maxGuardFactsPerTargetPerState: 1));
+            SharpProofAnalysisBudget.Default with
+            {
+                MaxMergedPathConditions = 1,
+                MaxGuardFactsPerTargetPerState = 1
+            });
 
         Assert.That(trueState.PathConditions, Has.Length.EqualTo(3));
         Assert.That(falseState.PathConditions, Has.Length.EqualTo(3));

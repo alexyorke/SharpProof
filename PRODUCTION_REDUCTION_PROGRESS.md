@@ -179,14 +179,20 @@ Tests are excluded from the metric and must not be deleted.
   and condensed condition-proof projection/copying to immutable leaves; exact
   compact, full-JSON, explain, text, package-consumer, and semantic aggregate
   tests preserve output and conservative proof behavior.
+- [x] Made public `SharpProofAnalysisBudget` the sole analysis-limit model for
+  sessions, Symbolic, Analyzer, project configuration, and CLI. One named
+  registry now applies all eleven CLI overrides and infers analyzer-config keys;
+  the duplicate engine limit class and manual truncation-code table are deleted.
+  Unknown limit kinds remain explicit and architecture coverage prevents the
+  parallel model from returning.
 
 ## Current evidence
 
-- Maintained production: 102,806 lines (98,731 C#, 3,189 scripts, and 886
-  specifications); net reduction: 4,820 lines; remaining reduction: 15,180.
-  This tranche removed 202 maintained lines without deleting tests.
+- Maintained production: 102,605 lines (98,530 C#, 3,189 scripts, and 886
+  specifications); net reduction: 5,021 lines; remaining reduction: 14,979.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,160 passing tests and two documented skips.
+- Six lanes: 6,162 passing tests and two documented skips.
 
 ## Milestones
 

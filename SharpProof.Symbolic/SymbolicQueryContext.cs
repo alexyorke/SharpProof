@@ -15,7 +15,7 @@ internal sealed class SymbolicQueryContext(
 }
 
 internal sealed class SymbolicQueryOptions(
-    SymbolicAnalysisLimits analysisLimits,
+    SharpProofAnalysisBudget analysisLimits,
     IEnumerable<MetadataReference>? references = null,
     SmtAnalysisService? smtAnalysis = null,
     IEnumerable<string>? impliedConditions = null,
@@ -23,7 +23,7 @@ internal sealed class SymbolicQueryOptions(
     bool includeCurrentStatementCompletionFacts = false,
     SymbolicSourceQueryFilter? filter = null)
 {
-    public static readonly SymbolicQueryOptions Default = new(SymbolicAnalysisLimits.Default);
+    public static readonly SymbolicQueryOptions Default = new(SharpProofAnalysisBudget.Default);
 
     public SymbolicQueryOptions(
         IEnumerable<MetadataReference>? references = null,
@@ -33,7 +33,7 @@ internal sealed class SymbolicQueryOptions(
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceQueryFilter? filter = null)
         : this(
-            SymbolicAnalysisLimits.Default,
+            SharpProofAnalysisBudget.Default,
             references,
             smtAnalysis,
             impliedConditions,
@@ -43,20 +43,12 @@ internal sealed class SymbolicQueryOptions(
     {
     }
 
-    public SymbolicAnalysisLimits AnalysisLimits { get; } =
+    public SharpProofAnalysisBudget AnalysisLimits { get; } =
         analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
 
-    public SymbolicQueryOptions WithAnalysisLimits(SymbolicAnalysisLimits analysisLimits)
-    {
-        return new SymbolicQueryOptions(
-            analysisLimits,
-            References,
-            SmtAnalysis,
-            ImpliedConditions,
-            IncludeExpressionProgramPoints,
-            IncludeCurrentStatementCompletionFacts,
-            Filter);
-    }
+    public SymbolicQueryOptions WithAnalysisLimits(SharpProofAnalysisBudget analysisLimits) => new(
+        analysisLimits, References, SmtAnalysis, ImpliedConditions,
+        IncludeExpressionProgramPoints, IncludeCurrentStatementCompletionFacts, Filter);
 
     public ImmutableArray<MetadataReference> References { get; } =
         SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));

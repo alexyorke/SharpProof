@@ -386,7 +386,7 @@ internal sealed class SymbolicCliOptions
 
     private SmtAnalysisOptions? ProjectSmtOptions { get; set; }
 
-    private SymbolicAnalysisLimits? ProjectAnalysisLimits { get; set; }
+    private SharpProofAnalysisBudget? ProjectAnalysisLimits { get; set; }
 
     private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
@@ -982,27 +982,11 @@ internal sealed class SymbolicCliOptions
             .WithAnalysisLimits(CreateAnalysisLimits());
     }
 
-    public SymbolicAnalysisLimits CreateAnalysisLimits()
+    public SharpProofAnalysisBudget CreateAnalysisLimits()
     {
-        var defaults = ProjectAnalysisLimits ?? SymbolicAnalysisLimits.Default;
-        return new SymbolicAnalysisLimits(
-            GetAnalysisLimit("merged-if-else-facts", defaults.MaxMergedIfElseFacts),
-            GetAnalysisLimit("merged-switch-facts", defaults.MaxMergedSwitchFacts),
-            GetAnalysisLimit("merged-try-facts", defaults.MaxMergedTryFacts),
-            GetAnalysisLimit("try-completion-branches", defaults.MaxTryCompletionBranches),
-            GetAnalysisLimit("finite-foreach-element-facts", defaults.MaxFiniteForeachElementFacts),
-            GetAnalysisLimit(
-                "scoped-block-completion-statements",
-                defaults.MaxScopedBlockCompletionStatements),
-            GetAnalysisLimit("structural-null-state-depth", defaults.MaxStructuralNullStateDepth),
-            GetAnalysisLimit("merged-path-conditions", defaults.MaxMergedPathConditions),
-            GetAnalysisLimit(
-                "mergeable-facts-per-target-per-state",
-                defaults.MaxMergeableFactsPerTargetPerState),
-            GetAnalysisLimit(
-                "fact-choice-combinations-per-target",
-                defaults.MaxFactChoiceCombinationsPerTarget),
-            GetAnalysisLimit("guard-facts-per-target-per-state", defaults.MaxGuardFactsPerTargetPerState));
+        return SharpProofAnalysisBudget.FromNamedValues(
+            ProjectAnalysisLimits ?? SharpProofAnalysisBudget.Default,
+            GetAnalysisLimit);
     }
 
     public SharpProofTarget CreateQueryTarget()
@@ -1218,20 +1202,7 @@ internal sealed class SymbolicCliOptions
         return AnalysisLimitOverrides.TryGetValue(name, out var value) ? value : fallback;
     }
 
-    private static bool IsAnalysisLimitName(string name)
-    {
-        return name is "merged-if-else-facts" or
-            "merged-switch-facts" or
-            "merged-try-facts" or
-            "try-completion-branches" or
-            "finite-foreach-element-facts" or
-            "scoped-block-completion-statements" or
-            "structural-null-state-depth" or
-            "merged-path-conditions" or
-            "mergeable-facts-per-target-per-state" or
-            "fact-choice-combinations-per-target" or
-            "guard-facts-per-target-per-state";
-    }
+    private static bool IsAnalysisLimitName(string name) => SharpProofAnalysisBudget.IsNamedLimit(name);
 
     private static bool IsThresholdName(string name)
     {

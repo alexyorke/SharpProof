@@ -74,7 +74,7 @@ internal sealed class SharpProofProjectAnalysisContext
 
     public SmtAnalysisOptions SmtOptions { get; }
 
-    public SymbolicAnalysisLimits AnalysisLimits { get; }
+    public SharpProofAnalysisBudget AnalysisLimits { get; }
 
     public IReadOnlyList<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; }
 

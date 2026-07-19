@@ -465,7 +465,7 @@ static class C
         var statement = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single();
         var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(statement, fixture.SemanticModel);
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedIfElseFacts: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedIfElseFacts = 1 });
 
         var result = SymbolicCfgExecutionTrace.CollectCompletedStatementState(
             statement,
@@ -618,7 +618,7 @@ static class C
         var before = SymbolicReachabilityService.GetStructuralPathCacheInfo(site, fixture.SemanticModel);
 
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
         var actual = SymbolicReachabilityService.CollectPathStateAt(
             site,
             fixture.SemanticModel,
@@ -853,7 +853,7 @@ static class C
             fixture.Root.DescendantNodes().OfType<ParameterSyntax>().Single())!;
         var seed = CreateSeed(fixture, site, "input", SeedKind.Numeric, 17);
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
 
         var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
@@ -1015,7 +1015,7 @@ static class C
             .OfType<InvocationExpressionSyntax>()
             .Single(invocation => invocation.Expression.ToString() == "EnsureValue");
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
 
         var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
@@ -1103,7 +1103,7 @@ static class C
             nameof(CoalesceAssignmentCompletion_CustomLimitsUseStructuralFallback));
         var site = GetCoalesceAssignmentStatement(fixture);
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
 
         var cfg = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
@@ -1734,7 +1734,7 @@ static class C
             nameof(CustomLimitsForInitialEntry_RemainsConservativeFallback));
         var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
 
         var result = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
             forStatement,
@@ -2577,7 +2577,7 @@ static class C
             nameof(FinallyLocalCustomLimits_PublishNoPartialState));
         var site = GetFinallyMarkerSite(fixture);
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxMergedPathConditions: 1));
+            SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(
             site,

@@ -177,7 +177,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         SemanticModel semanticModel,
         SymbolicRuntimeHazardQueryService hazardService,
         SmtAnalysisService smtAnalysis,
-        SymbolicAnalysisLimits analysisLimits,
+        SharpProofAnalysisBudget analysisLimits,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
     {

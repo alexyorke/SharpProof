@@ -5,19 +5,13 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProjectConfiguration
+internal sealed class SymbolicProjectConfiguration(
+    SmtAnalysisOptions smtOptions,
+    SharpProofAnalysisBudget analysisLimits)
 {
-    private SymbolicProjectConfiguration(
-        SmtAnalysisOptions smtOptions,
-        SymbolicAnalysisLimits analysisLimits)
-    {
-        SmtOptions = smtOptions;
-        AnalysisLimits = analysisLimits;
-    }
+    public SmtAnalysisOptions SmtOptions { get; } = smtOptions;
 
-    public SmtAnalysisOptions SmtOptions { get; }
-
-    public SymbolicAnalysisLimits AnalysisLimits { get; }
+    public SharpProofAnalysisBudget AnalysisLimits { get; } = analysisLimits;
 
     public static SymbolicProjectConfiguration FromAnalyzerOptions(AnalyzerOptions analyzerOptions)
     {
@@ -27,28 +21,33 @@ internal sealed class SymbolicProjectConfiguration
         var defaults = SmtAnalysisOptions.ForMode(mode);
         var smtOptions = new SmtAnalysisOptions(
                 mode,
-                TimeSpan.FromMilliseconds(GetPositiveInt(
+                TimeSpan.FromMilliseconds(AnalyzerConfigurationValueReader.GetInteger(
                     analyzerOptions,
                     "sharpproof_smt_timeout_ms",
-                    (int)defaults.QueryTimeout.TotalMilliseconds)),
-                TimeSpan.FromMilliseconds(GetPositiveInt(
+                    (int)defaults.QueryTimeout.TotalMilliseconds,
+                    1)),
+                TimeSpan.FromMilliseconds(AnalyzerConfigurationValueReader.GetInteger(
                     analyzerOptions,
                     "sharpproof_smt_method_budget_ms",
-                    (int)defaults.MethodBudget.TotalMilliseconds)),
-                GetPositiveInt(
+                    (int)defaults.MethodBudget.TotalMilliseconds,
+                    1)),
+                AnalyzerConfigurationValueReader.GetInteger(
                     analyzerOptions,
                     "sharpproof_smt_max_path_conditions",
-                    defaults.MaxPathConditions),
-                GetPositiveInt(
+                    defaults.MaxPathConditions,
+                    1),
+                AnalyzerConfigurationValueReader.GetInteger(
                     analyzerOptions,
                     "sharpproof_smt_max_expression_nodes",
-                    defaults.MaxExpressionNodes),
+                    defaults.MaxExpressionNodes,
+                    1),
                 true)
             .WithLifecycle(new SmtSolverLifecycleOptions(
-                GetNonNegativeInt(
+                AnalyzerConfigurationValueReader.GetInteger(
                     analyzerOptions,
                     "sharpproof_smt_transient_retry_count",
-                    SmtSolverLifecycleOptions.Default.MaxTransientRetries),
+                    SmtSolverLifecycleOptions.Default.MaxTransientRetries,
+                    0),
                 GetBool(
                     analyzerOptions,
                     "sharpproof_smt_recycle_context_on_transient_failure",
@@ -58,76 +57,28 @@ internal sealed class SymbolicProjectConfiguration
                     "sharpproof_smt_dispose_thread_context_on_service_dispose",
                     false)));
 
-        var analysisDefaults = SymbolicAnalysisLimits.Default;
-        var analysisLimits = new SymbolicAnalysisLimits(
-            GetPositiveInt(
+        var analysisLimits = SharpProofAnalysisBudget.FromNamedValues(
+            SharpProofAnalysisBudget.Default,
+            (name, fallback) => AnalyzerConfigurationValueReader.GetInteger(
                 analyzerOptions,
-                "sharpproof_analysis_max_merged_if_else_facts",
-                analysisDefaults.MaxMergedIfElseFacts),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_merged_switch_facts",
-                analysisDefaults.MaxMergedSwitchFacts),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_merged_try_facts",
-                analysisDefaults.MaxMergedTryFacts),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_try_completion_branches",
-                analysisDefaults.MaxTryCompletionBranches),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_finite_foreach_element_facts",
-                analysisDefaults.MaxFiniteForeachElementFacts),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_scoped_block_completion_statements",
-                analysisDefaults.MaxScopedBlockCompletionStatements),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_structural_null_state_depth",
-                analysisDefaults.MaxStructuralNullStateDepth),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_merged_path_conditions",
-                analysisDefaults.MaxMergedPathConditions),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_mergeable_facts_per_target_per_state",
-                analysisDefaults.MaxMergeableFactsPerTargetPerState),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_fact_choice_combinations_per_target",
-                analysisDefaults.MaxFactChoiceCombinationsPerTarget),
-            GetPositiveInt(
-                analyzerOptions,
-                "sharpproof_analysis_max_guard_facts_per_target_per_state",
-                analysisDefaults.MaxGuardFactsPerTargetPerState));
+                "sharpproof_analysis_max_" + name.Replace('-', '_'),
+                fallback,
+                1));
 
         return new SymbolicProjectConfiguration(smtOptions, analysisLimits);
     }
 
     private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)
     {
-        if (!TryGetGlobalOption(options, "sharpproof_smt_mode", out var value)) return fallback;
+        if (!AnalyzerConfigurationValueReader.TryGetGlobalOption(
+                options, "sharpproof_smt_mode", out var value)) return fallback;
 
         return SmtConfigurationValueRegistry.TryParseMode(value, out var mode) ? mode : fallback;
     }
 
-    private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
-    {
-        return AnalyzerConfigurationValueReader.GetInteger(options, key, fallback, 1);
-    }
-
-    private static int GetNonNegativeInt(AnalyzerOptions options, string key, int fallback)
-    {
-        return AnalyzerConfigurationValueReader.GetInteger(options, key, fallback, 0);
-    }
-
     private static bool GetBool(AnalyzerOptions options, string key, bool fallback)
     {
-        if (!TryGetGlobalOption(options, key, out var value)) return fallback;
+        if (!AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out var value)) return fallback;
 
         return value.Trim().ToLowerInvariant() switch
         {
@@ -137,10 +88,6 @@ internal sealed class SymbolicProjectConfiguration
         };
     }
 
-    private static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value)
-    {
-        return AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
-    }
 }
 
 internal sealed class SymbolicProjectQueryContext

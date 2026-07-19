@@ -20,7 +20,7 @@ public sealed class SymbolicAnalysisLimitsTests
     [Test]
     public void AnalysisLimits_DefaultsAndOverridesAreStable()
     {
-        var defaults = SymbolicAnalysisLimits.Default;
+        var defaults = SharpProofAnalysisBudget.Default;
 
         Assert.That(defaults.MaxMergedIfElseFacts, Is.EqualTo(16));
         Assert.That(defaults.MaxMergedSwitchFacts, Is.EqualTo(32));
@@ -34,11 +34,13 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(defaults.MaxFactChoiceCombinationsPerTarget, Is.EqualTo(64));
         Assert.That(defaults.MaxGuardFactsPerTargetPerState, Is.EqualTo(6));
 
-        var overridden = defaults.WithOverrides(
-            maxMergedIfElseFacts: 3,
-            maxFiniteForeachElementFacts: 5,
-            maxStructuralNullStateDepth: 7,
-            maxMergedPathConditions: 11);
+        var overridden = defaults with
+        {
+            MaxMergedIfElseFacts = 3,
+            MaxFiniteForeachElementFacts = 5,
+            MaxStructuralNullStateDepth = 7,
+            MaxMergedPathConditions = 11
+        };
 
         Assert.That(overridden.MaxMergedIfElseFacts, Is.EqualTo(3));
         Assert.That(overridden.MaxFiniteForeachElementFacts, Is.EqualTo(5));
@@ -51,11 +53,20 @@ public sealed class SymbolicAnalysisLimitsTests
     public void AnalysisLimits_RejectNonPositiveValues()
     {
         Assert.That(
-            () => new SymbolicAnalysisLimits(maxMergedIfElseFacts: 0),
+            () => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(),
             Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(
-            () => SymbolicAnalysisLimits.Default.WithOverrides(maxStructuralNullStateDepth: -1),
+            () => (SharpProofAnalysisBudget.Default with { MaxStructuralNullStateDepth = -1 }).Validate(),
             Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void AnalysisLimitEvent_UnknownKindRemainsExplicit()
+    {
+        var item = new SymbolicAnalysisTruncationEvent(
+            (SymbolicAnalysisLimitKind)int.MaxValue, 1, 2, "test", null);
+
+        Assert.That(item.Code, Is.EqualTo("analysis_limit.unknown"));
     }
 
     [Test]
@@ -184,11 +195,13 @@ public sealed class SymbolicAnalysisLimitsTests
         };
 
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(
-                maxMergedPathConditions: 1,
-                maxMergeableFactsPerTargetPerState: 2,
-                maxFactChoiceCombinationsPerTarget: 1,
-                maxGuardFactsPerTargetPerState: 1));
+            SharpProofAnalysisBudget.Default with
+            {
+                MaxMergedPathConditions = 1,
+                MaxMergeableFactsPerTargetPerState = 2,
+                MaxFactChoiceCombinationsPerTarget = 1,
+                MaxGuardFactsPerTargetPerState = 1
+            });
         var merged = SymbolicStateMerger.MergePathConditionsAcrossAll(new[] { first, second });
         var info = scope.Snapshot();
 
@@ -234,7 +247,7 @@ public sealed class SymbolicAnalysisLimitsTests
         };
 
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimits.Default.WithOverrides(maxGuardFactsPerTargetPerState: 1));
+            SharpProofAnalysisBudget.Default with { MaxGuardFactsPerTargetPerState = 1 });
         var merged = SymbolicStateMerger.MergePathConditionsAcrossAll(new[] { first, second });
 
         Assert.That(merged, Has.Length.EqualTo(2));
@@ -272,7 +285,7 @@ public sealed class SymbolicAnalysisLimitsTests
                                   }
                               }
                               """;
-        var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
+        var limits = SharpProofAnalysisBudget.Default with { MaxFiniteForeachElementFacts = 1 };
         var options = new SymbolicQueryOptions().WithAnalysisLimits(limits);
 
         var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
@@ -308,7 +321,7 @@ public sealed class SymbolicAnalysisLimitsTests
                               }
                               """;
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
+        var limits = SharpProofAnalysisBudget.Default with { MaxFiniteForeachElementFacts = 1 };
         var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis).WithAnalysisLimits(limits);
 
         var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
@@ -333,8 +346,8 @@ public sealed class SymbolicAnalysisLimitsTests
     [Test]
     public void ProgramPointQueries_ReportEveryStructuralTruncationFamily()
     {
-        var defaults = SymbolicAnalysisLimits.Default;
-        var cases = new (string Code, string Source, SymbolicAnalysisLimits Limits)[]
+        var defaults = SharpProofAnalysisBudget.Default;
+        var cases = new (string Code, string Source, SharpProofAnalysisBudget Limits)[]
         {
             (
                 "analysis_limit.if_else_fact_merge",
@@ -360,7 +373,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxMergedIfElseFacts: 1)),
+                defaults with { MaxMergedIfElseFacts = 1 }),
             (
                 "analysis_limit.switch_fact_merge",
                 """
@@ -386,7 +399,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxMergedSwitchFacts: 1)),
+                defaults with { MaxMergedSwitchFacts = 1 }),
             (
                 "analysis_limit.try_fact_merge",
                 """
@@ -413,7 +426,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxMergedTryFacts: 1)),
+                defaults with { MaxMergedTryFacts = 1 }),
             (
                 "analysis_limit.try_completion_branches",
                 """
@@ -436,7 +449,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxTryCompletionBranches: 1)),
+                defaults with { MaxTryCompletionBranches = 1 }),
             (
                 "analysis_limit.scoped_block_completion_statements",
                 """
@@ -454,7 +467,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxScopedBlockCompletionStatements: 1)),
+                defaults with { MaxScopedBlockCompletionStatements = 1 }),
             (
                 "analysis_limit.foreach_element_facts",
                 """
@@ -471,7 +484,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxFiniteForeachElementFacts: 1)),
+                defaults with { MaxFiniteForeachElementFacts = 1 }),
             (
                 "analysis_limit.structural_null_state_depth",
                 """
@@ -485,7 +498,7 @@ public sealed class SymbolicAnalysisLimitsTests
                     }
                 }
                 """,
-                defaults.WithOverrides(maxStructuralNullStateDepth: 1))
+                defaults with { MaxStructuralNullStateDepth = 1 })
         };
 
         Assert.Multiple(() =>

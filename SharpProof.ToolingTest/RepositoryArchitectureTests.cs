@@ -203,6 +203,25 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void AnalysisBudgets_UseOneCanonicalModelAndNamedRegistry()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var budgetApi = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SharpProofAnalysisApi.cs"));
+        var symbolicSources = string.Join("\n", Directory.EnumerateFiles(
+            Path.Combine(root, "SharpProof.Symbolic"), "*.cs", SearchOption.AllDirectories)
+            .Select(File.ReadAllText));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(budgetApi, Does.Contain("SharpProofAnalysisBudget FromNamedValues"));
+            Assert.That(budgetApi, Does.Contain("bool IsNamedLimit"));
+            Assert.That(symbolicSources, Does.Not.Contain("class SymbolicAnalysisLimits"));
+            Assert.That(symbolicSources, Does.Not.Contain("new SymbolicAnalysisLimits"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

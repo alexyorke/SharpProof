@@ -2,105 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicAnalysisLimits
-{
-    public static readonly SymbolicAnalysisLimits Default = new();
-
-    public SymbolicAnalysisLimits(
-        int maxMergedIfElseFacts = 16,
-        int maxMergedSwitchFacts = 32,
-        int maxMergedTryFacts = 16,
-        int maxTryCompletionBranches = 8,
-        int maxFiniteForeachElementFacts = 8,
-        int maxScopedBlockCompletionStatements = 32,
-        int maxStructuralNullStateDepth = 4,
-        int maxMergedPathConditions = 32,
-        int maxMergeableFactsPerTargetPerState = 4,
-        int maxFactChoiceCombinationsPerTarget = 64,
-        int maxGuardFactsPerTargetPerState = 6)
-    {
-        MaxMergedIfElseFacts = ValidatePositive(maxMergedIfElseFacts, nameof(maxMergedIfElseFacts));
-        MaxMergedSwitchFacts = ValidatePositive(maxMergedSwitchFacts, nameof(maxMergedSwitchFacts));
-        MaxMergedTryFacts = ValidatePositive(maxMergedTryFacts, nameof(maxMergedTryFacts));
-        MaxTryCompletionBranches = ValidatePositive(maxTryCompletionBranches, nameof(maxTryCompletionBranches));
-        MaxFiniteForeachElementFacts = ValidatePositive(
-            maxFiniteForeachElementFacts,
-            nameof(maxFiniteForeachElementFacts));
-        MaxScopedBlockCompletionStatements = ValidatePositive(
-            maxScopedBlockCompletionStatements,
-            nameof(maxScopedBlockCompletionStatements));
-        MaxStructuralNullStateDepth = ValidatePositive(
-            maxStructuralNullStateDepth,
-            nameof(maxStructuralNullStateDepth));
-        MaxMergedPathConditions = ValidatePositive(maxMergedPathConditions, nameof(maxMergedPathConditions));
-        MaxMergeableFactsPerTargetPerState = ValidatePositive(
-            maxMergeableFactsPerTargetPerState,
-            nameof(maxMergeableFactsPerTargetPerState));
-        MaxFactChoiceCombinationsPerTarget = ValidatePositive(
-            maxFactChoiceCombinationsPerTarget,
-            nameof(maxFactChoiceCombinationsPerTarget));
-        MaxGuardFactsPerTargetPerState = ValidatePositive(
-            maxGuardFactsPerTargetPerState,
-            nameof(maxGuardFactsPerTargetPerState));
-    }
-
-    public int MaxMergedIfElseFacts { get; }
-
-    public int MaxMergedSwitchFacts { get; }
-
-    public int MaxMergedTryFacts { get; }
-
-    public int MaxTryCompletionBranches { get; }
-
-    public int MaxFiniteForeachElementFacts { get; }
-
-    public int MaxScopedBlockCompletionStatements { get; }
-
-    public int MaxStructuralNullStateDepth { get; }
-
-    public int MaxMergedPathConditions { get; }
-
-    public int MaxMergeableFactsPerTargetPerState { get; }
-
-    public int MaxFactChoiceCombinationsPerTarget { get; }
-
-    public int MaxGuardFactsPerTargetPerState { get; }
-
-    public SymbolicAnalysisLimits WithOverrides(
-        int? maxMergedIfElseFacts = null,
-        int? maxMergedSwitchFacts = null,
-        int? maxMergedTryFacts = null,
-        int? maxTryCompletionBranches = null,
-        int? maxFiniteForeachElementFacts = null,
-        int? maxScopedBlockCompletionStatements = null,
-        int? maxStructuralNullStateDepth = null,
-        int? maxMergedPathConditions = null,
-        int? maxMergeableFactsPerTargetPerState = null,
-        int? maxFactChoiceCombinationsPerTarget = null,
-        int? maxGuardFactsPerTargetPerState = null)
-    {
-        return new SymbolicAnalysisLimits(
-            maxMergedIfElseFacts ?? MaxMergedIfElseFacts,
-            maxMergedSwitchFacts ?? MaxMergedSwitchFacts,
-            maxMergedTryFacts ?? MaxMergedTryFacts,
-            maxTryCompletionBranches ?? MaxTryCompletionBranches,
-            maxFiniteForeachElementFacts ?? MaxFiniteForeachElementFacts,
-            maxScopedBlockCompletionStatements ?? MaxScopedBlockCompletionStatements,
-            maxStructuralNullStateDepth ?? MaxStructuralNullStateDepth,
-            maxMergedPathConditions ?? MaxMergedPathConditions,
-            maxMergeableFactsPerTargetPerState ?? MaxMergeableFactsPerTargetPerState,
-            maxFactChoiceCombinationsPerTarget ?? MaxFactChoiceCombinationsPerTarget,
-            maxGuardFactsPerTargetPerState ?? MaxGuardFactsPerTargetPerState);
-    }
-
-    private static int ValidatePositive(int value, string parameterName)
-    {
-        if (value <= 0) throw new ArgumentOutOfRangeException(parameterName, "Analysis limits must be positive.");
-
-        return value;
-    }
-}
-
 internal enum SymbolicAnalysisLimitKind
 {
     IfElseFactMerge,
@@ -116,73 +17,50 @@ internal enum SymbolicAnalysisLimitKind
     GuardFactsPerTargetPerState
 }
 
-internal sealed class SymbolicAnalysisTruncationEvent
+internal sealed class SymbolicAnalysisTruncationEvent(
+    SymbolicAnalysisLimitKind kind,
+    int limit,
+    int observed,
+    string provenance,
+    int? sourceSpanStart)
 {
-    internal SymbolicAnalysisTruncationEvent(
-        SymbolicAnalysisLimitKind kind,
-        int limit,
-        int observed,
-        string provenance,
-        int? sourceSpanStart)
+    public SymbolicAnalysisLimitKind Kind { get; } = kind;
+
+    public string Code { get; } = GetCode(kind);
+
+    public int Limit { get; } = limit;
+
+    public int Observed { get; } = observed;
+
+    public string Provenance { get; } = provenance ?? string.Empty;
+
+    public int? SourceSpanStart { get; } = sourceSpanStart;
+
+    private static string GetCode(SymbolicAnalysisLimitKind value) => "analysis_limit." +
+        (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? ToSnakeCase(value.ToString()) : "unknown");
+
+    private static string ToSnakeCase(string value)
     {
-        Kind = kind;
-        Code = GetCode(kind);
-        Limit = limit;
-        Observed = observed;
-        Provenance = provenance ?? string.Empty;
-        SourceSpanStart = sourceSpanStart;
-    }
-
-    public SymbolicAnalysisLimitKind Kind { get; }
-
-    public string Code { get; }
-
-    public int Limit { get; }
-
-    public int Observed { get; }
-
-    public string Provenance { get; }
-
-    public int? SourceSpanStart { get; }
-
-    private static string GetCode(SymbolicAnalysisLimitKind kind)
-    {
-        return kind switch
+        var result = new System.Text.StringBuilder(value.Length + 8);
+        for (var index = 0; index < value.Length; index++)
         {
-            SymbolicAnalysisLimitKind.IfElseFactMerge => "analysis_limit.if_else_fact_merge",
-            SymbolicAnalysisLimitKind.SwitchFactMerge => "analysis_limit.switch_fact_merge",
-            SymbolicAnalysisLimitKind.TryFactMerge => "analysis_limit.try_fact_merge",
-            SymbolicAnalysisLimitKind.TryCompletionBranches => "analysis_limit.try_completion_branches",
-            SymbolicAnalysisLimitKind.ForeachElementFacts => "analysis_limit.foreach_element_facts",
-            SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements =>
-                "analysis_limit.scoped_block_completion_statements",
-            SymbolicAnalysisLimitKind.StructuralNullStateDepth =>
-                "analysis_limit.structural_null_state_depth",
-            SymbolicAnalysisLimitKind.MergedPathConditions => "analysis_limit.merged_path_conditions",
-            SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState =>
-                "analysis_limit.mergeable_facts_per_target_per_state",
-            SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget =>
-                "analysis_limit.fact_choice_combinations_per_target",
-            SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState =>
-                "analysis_limit.guard_facts_per_target_per_state",
-            _ => "analysis_limit.unknown"
-        };
+            var character = value[index];
+            if (index != 0 && char.IsUpper(character)) result.Append('_');
+            result.Append(char.ToLowerInvariant(character));
+        }
+        return result.ToString();
     }
 }
 
-internal sealed class SymbolicAnalysisTruncationInfo
+internal sealed class SymbolicAnalysisTruncationInfo(
+    IReadOnlyList<SymbolicAnalysisTruncationEvent>? events)
 {
-    public static readonly SymbolicAnalysisTruncationInfo None = new(
-        Array.Empty<SymbolicAnalysisTruncationEvent>());
-
-    internal SymbolicAnalysisTruncationInfo(IReadOnlyList<SymbolicAnalysisTruncationEvent> events)
-    {
-        Events = events ?? Array.Empty<SymbolicAnalysisTruncationEvent>();
-    }
+    public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());
 
     public bool IsTruncated => Events.Count != 0;
 
-    public IReadOnlyList<SymbolicAnalysisTruncationEvent> Events { get; }
+    public IReadOnlyList<SymbolicAnalysisTruncationEvent> Events { get; } =
+        events ?? Array.Empty<SymbolicAnalysisTruncationEvent>();
 
     internal static SymbolicAnalysisTruncationInfo Combine(
         IEnumerable<SymbolicAnalysisTruncationInfo> truncations)
@@ -205,23 +83,23 @@ internal static class SymbolicAnalysisLimitContext
 {
     private static readonly AsyncLocal<Scope?> CurrentScope = new();
 
-    internal static SymbolicAnalysisLimits Limits => CurrentScope.Value?.Limits ?? SymbolicAnalysisLimits.Default;
+    internal static SharpProofAnalysisBudget Limits => CurrentScope.Value?.Limits ?? SharpProofAnalysisBudget.Default;
 
-    internal static Scope Push(SymbolicAnalysisLimits? limits = null, SyntaxNode? sourceNode = null)
+    internal static Scope Push(SharpProofAnalysisBudget? limits = null, SyntaxNode? sourceNode = null)
         => Push(limits, sourceNode, propagateEvents: true);
 
-    internal static Scope PushIsolated(SymbolicAnalysisLimits? limits = null, SyntaxNode? sourceNode = null)
+    internal static Scope PushIsolated(SharpProofAnalysisBudget? limits = null, SyntaxNode? sourceNode = null)
         => Push(limits, sourceNode, propagateEvents: false);
 
     private static Scope Push(
-        SymbolicAnalysisLimits? limits,
+        SharpProofAnalysisBudget? limits,
         SyntaxNode? sourceNode,
         bool propagateEvents)
     {
         var parent = CurrentScope.Value;
         var scope = new Scope(
             parent,
-            limits ?? parent?.Limits ?? SymbolicAnalysisLimits.Default,
+            limits ?? parent?.Limits ?? SharpProofAnalysisBudget.Default,
             sourceNode?.SpanStart ?? parent?.DefaultSourceSpanStart,
             propagateEvents);
         CurrentScope.Value = scope;
@@ -255,28 +133,20 @@ internal static class SymbolicAnalysisLimitContext
         return false;
     }
 
-    internal sealed class Scope : IDisposable
+    internal sealed class Scope(
+        Scope? parent,
+        SharpProofAnalysisBudget limits,
+        int? defaultSourceSpanStart,
+        bool propagateEvents) : IDisposable
     {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();
-        private readonly Scope? _parent;
-        private readonly bool _propagateEvents;
+        private readonly Scope? _parent = parent;
+        private readonly bool _propagateEvents = propagateEvents;
         private bool _disposed;
 
-        internal Scope(
-            Scope? parent,
-            SymbolicAnalysisLimits limits,
-            int? defaultSourceSpanStart,
-            bool propagateEvents)
-        {
-            _parent = parent;
-            _propagateEvents = propagateEvents;
-            Limits = limits;
-            DefaultSourceSpanStart = defaultSourceSpanStart;
-        }
+        internal SharpProofAnalysisBudget Limits { get; } = limits;
 
-        internal SymbolicAnalysisLimits Limits { get; }
-
-        internal int? DefaultSourceSpanStart { get; }
+        internal int? DefaultSourceSpanStart { get; } = defaultSourceSpanStart;
 
         internal SymbolicAnalysisTruncationInfo Snapshot()
         {
