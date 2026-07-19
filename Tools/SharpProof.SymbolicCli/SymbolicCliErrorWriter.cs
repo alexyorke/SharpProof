@@ -15,7 +15,7 @@ internal static class SymbolicCliErrorWriter
         else
         {
             Console.Error.WriteLine($"{error.Code} [{error.Category}]: {error.Message}");
-            if (error.Category == SymbolicErrorCategory.Usage)
+            if (error.Category == SharpProofErrorCategory.Usage)
                 Console.Error.WriteLine(SymbolicCliOptions.Usage);
         }
 
@@ -24,7 +24,7 @@ internal static class SymbolicCliErrorWriter
 
     public static SymbolicQueryException CreateException(
         string code,
-        SymbolicErrorCategory category,
+        SharpProofErrorCategory category,
         string message,
         int exitCode,
         string? detailName = null,
@@ -37,7 +37,14 @@ internal static class SymbolicCliErrorWriter
             {
                 new KeyValuePair<string, string>(detailName!, detailValue ?? string.Empty)
             };
-        var error = new SymbolicError(code, category, message, exitCode, details: details);
+        var error = new SharpProofError(
+            code,
+            category,
+            message,
+            exitCode,
+            false,
+            details?.ToImmutableDictionary(StringComparer.Ordinal) ??
+            ImmutableDictionary<string, string>.Empty);
         return innerException == null
             ? new SymbolicQueryException(error)
             : new SymbolicQueryException(error, innerException);

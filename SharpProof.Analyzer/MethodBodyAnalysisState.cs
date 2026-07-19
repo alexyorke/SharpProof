@@ -103,7 +103,7 @@ internal static class AnalyzerSymbolicQueryBoundary
         if (outcome.IsSuccess && outcome.Value != null) return outcome.Value;
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (outcome.Error?.Category == SymbolicErrorCategory.Cancellation)
+        if (outcome.Error?.Category == SharpProofErrorCategory.Cancellation)
             throw new OperationCanceledException(outcome.Error.Message);
 
         var reason = outcome.Error == null

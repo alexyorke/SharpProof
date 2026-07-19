@@ -44,7 +44,7 @@ internal sealed record SymbolicCliExplainReport(
         if (invariant.ProgramPoints.Count != 1)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
-                SymbolicErrorCategory.Unsupported,
+                SharpProofErrorCategory.Unsupported,
                 $"Explain requires one source program point; the query returned {invariant.ScopeKind}.",
                 SymbolicErrorExitCodes.InvalidData,
                 "resultKind",

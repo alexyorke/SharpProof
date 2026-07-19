@@ -430,7 +430,7 @@ internal sealed class SymbolicCliOptions
             if (!options.IsProjectAware && options.FilePath != null && !File.Exists(CliHost.GetFullPath(options.FilePath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.SourceNotFound,
-                    SymbolicErrorCategory.Input,
+                    SharpProofErrorCategory.Input,
                     "--file does not exist: " + options.FilePath,
                     SymbolicErrorExitCodes.MissingInput,
                     "path",
@@ -451,7 +451,7 @@ internal sealed class SymbolicCliOptions
             if (options.ProjectPath != null && !File.Exists(CliHost.GetFullPath(options.ProjectPath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.ProjectLoadFailed,
-                    SymbolicErrorCategory.Project,
+                    SharpProofErrorCategory.Project,
                     "--project does not exist: " + options.ProjectPath,
                     SymbolicErrorExitCodes.MissingInput,
                     "path",
@@ -460,7 +460,7 @@ internal sealed class SymbolicCliOptions
             if (options.SolutionPath != null && !File.Exists(CliHost.GetFullPath(options.SolutionPath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.ProjectLoadFailed,
-                    SymbolicErrorCategory.Project,
+                    SharpProofErrorCategory.Project,
                     "--solution does not exist: " + options.SolutionPath,
                     SymbolicErrorExitCodes.MissingInput,
                     "path",
@@ -566,7 +566,7 @@ internal sealed class SymbolicCliOptions
                 if (!File.Exists(CliHost.GetFullPath(referencePath)))
                     throw SymbolicCliErrorWriter.CreateException(
                         SymbolicErrorCodes.ReferenceNotFound,
-                        SymbolicErrorCategory.Input,
+                        SharpProofErrorCategory.Input,
                         "--reference does not exist: " + referencePath,
                         SymbolicErrorExitCodes.MissingInput,
                         "path",

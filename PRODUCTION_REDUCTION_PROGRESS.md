@@ -383,14 +383,21 @@ Tests are excluded from the metric and must not be deleted.
   evidence, and serialized property order remain characterized, while
   architecture coverage prevents the three parallel proof layers from
   returning.
+- [x] Made public `SharpProofError` and its typed category the single error
+  contract across the preview session API, Symbolic executor, Analyzer, and
+  CLI. Deleted the parallel internal error class, category enum, validation
+  graph, and session conversion adapter. Exact JSON category text, retry
+  metadata, exit codes, exception classification, and analyzer fallback remain
+  characterized, and architecture coverage prevents the duplicate model from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 96,048 lines (92,129 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,578 lines; remaining reduction: 8,422.
-  This tranche removed 204 maintained lines without deleting tests.
+- Maintained production: 96,020 lines (92,101 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,606 lines; remaining reduction: 8,394.
+  This tranche removed 28 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,198 passing tests and two documented Main skips.
+- Six lanes: 6,199 passing tests and two documented Main skips.
 
 ## Milestones
 

@@ -489,9 +489,22 @@ public sealed record SharpProofSmtMetadata(
 
 public sealed record SharpProofEvidence(string Status, string Reason);
 
+public enum SharpProofErrorCategory
+{
+    Usage,
+    Input,
+    Unsupported,
+    Parse,
+    Project,
+    Solver,
+    Timeout,
+    Cancellation,
+    Internal
+}
+
 public sealed record SharpProofError(
     string Code,
-    string Category,
+    SharpProofErrorCategory Category,
     string Message,
     int RecommendedExitCode,
     bool IsRetryable,
@@ -628,7 +641,7 @@ public sealed class SharpProofAnalysisSession : IDisposable
         {
             var error = SymbolicErrorClassifier.FromException(exception);
             return new SharpProofQueryResult(
-                error.Category == SymbolicErrorCategory.Cancellation
+                error.Category == SharpProofErrorCategory.Cancellation
                     ? SharpProofQueryStatus.Canceled
                     : SharpProofQueryStatus.Failed,
                 query,
@@ -637,7 +650,7 @@ public sealed class SharpProofAnalysisSession : IDisposable
                 new SharpProofBudgetMetadata(ImmutableArray<SharpProofTruncationReason>.Empty),
                 ImmutableArray<SharpProofEvidence>.Empty,
                 null,
-                ToError(error));
+                error);
         }
     }
 
@@ -686,14 +699,6 @@ public sealed class SharpProofAnalysisSession : IDisposable
     {
         if (_disposed) throw new ObjectDisposedException(nameof(SharpProofAnalysisSession));
     }
-
-    private static SharpProofError ToError(SymbolicError error) => new(
-        error.Code,
-        error.Category.ToString(),
-        error.Message,
-        error.RecommendedExitCode,
-        error.IsRetryable,
-        error.Details.ToImmutableDictionary(StringComparer.Ordinal));
 
     private static SymbolicQueryOptions CreateQueryOptions(
         SharpProofAnalysisOptions options,

@@ -28,104 +28,40 @@ internal static class SymbolicErrorExitCodes
     public const int Canceled = 130;
 }
 
-internal enum SymbolicErrorCategory
-{
-    Usage,
-    Input,
-    Unsupported,
-    Parse,
-    Project,
-    Solver,
-    Timeout,
-    Cancellation,
-    Internal
-}
-
-internal sealed class SymbolicError(
-    string code,
-    SymbolicErrorCategory category,
-    string message,
-    int recommendedExitCode,
-    bool isRetryable = false,
-    IEnumerable<KeyValuePair<string, string>>? details = null)
-{
-    public string Code { get; } = NormalizeRequired(code, nameof(code), "Error code is required.");
-
-    public SymbolicErrorCategory Category { get; } = ValidateCategory(category);
-
-    public string Message { get; } = NormalizeRequired(message, nameof(message), "Error message is required.");
-
-    public int RecommendedExitCode { get; } = ValidateExitCode(recommendedExitCode);
-
-    public bool IsRetryable { get; } = isRetryable;
-
-    public IReadOnlyDictionary<string, string> Details { get; } = NormalizeDetails(details);
-
-    private static string NormalizeRequired(string? value, string parameterName, string message) =>
-        string.IsNullOrWhiteSpace(value) ? throw new ArgumentException(message, parameterName) : value!.Trim();
-
-    private static SymbolicErrorCategory ValidateCategory(SymbolicErrorCategory value) =>
-        Enum.IsDefined(typeof(SymbolicErrorCategory), value)
-            ? value
-            : throw new ArgumentOutOfRangeException("category", value, "Error category is not defined.");
-
-    private static int ValidateExitCode(int value) => value is >= 1 and <= 255
-        ? value
-        : throw new ArgumentOutOfRangeException(
-            "recommendedExitCode", value, "Recommended exit code must be between 1 and 255.");
-
-    private static IReadOnlyDictionary<string, string> NormalizeDetails(
-        IEnumerable<KeyValuePair<string, string>>? details)
-    {
-        if (details == null) return ImmutableDictionary<string, string>.Empty;
-
-        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-        foreach (var detail in details)
-        {
-            if (string.IsNullOrWhiteSpace(detail.Key))
-                throw new ArgumentException("Error detail keys cannot be empty.", nameof(details));
-
-            builder[detail.Key.Trim()] = detail.Value ?? string.Empty;
-        }
-
-        return builder.ToImmutable();
-    }
-}
-
-internal sealed class SymbolicErrorEnvelope(SymbolicError error)
+internal sealed class SymbolicErrorEnvelope(SharpProofError error)
 {
     public string Kind => "error";
 
     public int SchemaVersion => 1;
 
-    public SymbolicError Error { get; } = error ?? throw new ArgumentNullException(nameof(error));
+    public SharpProofError Error { get; } = error ?? throw new ArgumentNullException(nameof(error));
 }
 
 internal sealed class SymbolicQueryException : Exception
 {
-    public SymbolicQueryException(SymbolicError error)
+    public SymbolicQueryException(SharpProofError error)
         : base(error?.Message)
     {
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
-    public SymbolicQueryException(SymbolicError error, Exception innerException)
+    public SymbolicQueryException(SharpProofError error, Exception innerException)
         : base(error?.Message, innerException)
     {
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
-    public SymbolicError Error { get; }
+    public SharpProofError Error { get; }
 }
 
-internal sealed class SymbolicOperationResult<T>(T? value, SymbolicError? error)
+internal sealed class SymbolicOperationResult<T>(T? value, SharpProofError? error)
     where T : class
 {
     public bool IsSuccess => Error == null;
 
     public T? Value { get; } = value;
 
-    public SymbolicError? Error { get; } = error;
+    public SharpProofError? Error { get; } = error;
 
     public static SymbolicOperationResult<T> Success(T value)
     {
@@ -134,7 +70,7 @@ internal sealed class SymbolicOperationResult<T>(T? value, SymbolicError? error)
             null);
     }
 
-    public static SymbolicOperationResult<T> Failure(SymbolicError error)
+    public static SymbolicOperationResult<T> Failure(SharpProofError error)
     {
         return new SymbolicOperationResult<T>(
             null,
@@ -144,7 +80,7 @@ internal sealed class SymbolicOperationResult<T>(T? value, SymbolicError? error)
 
 internal static class SymbolicErrorClassifier
 {
-    public static SymbolicError FromException(Exception exception)
+    public static SharpProofError FromException(Exception exception)
     {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
 
@@ -153,104 +89,113 @@ internal static class SymbolicErrorClassifier
 
         var exceptionDetails = CreateExceptionDetails(relevant);
         if (relevant is OperationCanceledException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.Canceled,
-                SymbolicErrorCategory.Cancellation,
+                SharpProofErrorCategory.Cancellation,
                 "The symbolic query was canceled.",
                 SymbolicErrorExitCodes.Canceled,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is TimeoutException || IsExceptionType(relevant, "System.Text.RegularExpressions.RegexMatchTimeoutException"))
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.TimedOut,
-                SymbolicErrorCategory.Timeout,
+                SharpProofErrorCategory.Timeout,
                 string.IsNullOrWhiteSpace(relevant.Message) ? "The symbolic query timed out." : relevant.Message,
                 SymbolicErrorExitCodes.TemporaryFailure,
                 true,
                 exceptionDetails);
 
         if (IsNativeSolverLoadFailure(relevant))
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.NativeSolverUnavailable,
-                SymbolicErrorCategory.Solver,
+                SharpProofErrorCategory.Solver,
                 "The native SMT solver could not be loaded: " + relevant.Message,
                 SymbolicErrorExitCodes.Unavailable,
                 false,
                 exceptionDetails);
 
         if (IsZ3Exception(relevant))
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.SolverFailed,
-                SymbolicErrorCategory.Solver,
+                SharpProofErrorCategory.Solver,
                 "The SMT solver failed: " + relevant.Message,
                 SymbolicErrorExitCodes.TemporaryFailure,
                 true,
                 exceptionDetails);
 
         if (relevant is NotSupportedException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.UnsupportedTarget,
-                SymbolicErrorCategory.Unsupported,
+                SharpProofErrorCategory.Unsupported,
                 relevant.Message,
                 SymbolicErrorExitCodes.InvalidData,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is FileNotFoundException fileNotFound)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.SourceNotFound,
-                SymbolicErrorCategory.Input,
+                SharpProofErrorCategory.Input,
                 relevant.Message,
                 SymbolicErrorExitCodes.MissingInput,
-                details: AddPath(exceptionDetails, fileNotFound.FileName));
+                false,
+                AddPath(exceptionDetails, fileNotFound.FileName));
 
         if (relevant is DirectoryNotFoundException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.SourceNotFound,
-                SymbolicErrorCategory.Input,
+                SharpProofErrorCategory.Input,
                 relevant.Message,
                 SymbolicErrorExitCodes.MissingInput,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is ArgumentOutOfRangeException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.InvalidTarget,
-                SymbolicErrorCategory.Input,
+                SharpProofErrorCategory.Input,
                 relevant.Message,
                 SymbolicErrorExitCodes.InvalidData,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is FormatException or InvalidDataException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.ParseFailed,
-                SymbolicErrorCategory.Parse,
+                SharpProofErrorCategory.Parse,
                 relevant.Message,
                 SymbolicErrorExitCodes.InvalidData,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is BadImageFormatException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.ParseFailed,
-                SymbolicErrorCategory.Parse,
+                SharpProofErrorCategory.Parse,
                 relevant.Message,
                 SymbolicErrorExitCodes.InvalidData,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
         if (relevant is ArgumentException)
-            return new SymbolicError(
+            return new SharpProofError(
                 SymbolicErrorCodes.InvalidRequest,
-                SymbolicErrorCategory.Usage,
+                SharpProofErrorCategory.Usage,
                 relevant.Message,
                 SymbolicErrorExitCodes.Usage,
-                details: exceptionDetails);
+                false,
+                exceptionDetails);
 
-        return new SymbolicError(
+        return new SharpProofError(
             SymbolicErrorCodes.InternalFailure,
-            SymbolicErrorCategory.Internal,
+            SharpProofErrorCategory.Internal,
             string.IsNullOrWhiteSpace(relevant.Message)
                 ? "The symbolic query failed unexpectedly."
                 : relevant.Message,
             SymbolicErrorExitCodes.InternalFailure,
-            details: exceptionDetails);
+            false,
+            exceptionDetails);
     }
 
     public static bool IsFatal(Exception exception)
@@ -279,19 +224,19 @@ internal static class SymbolicErrorClassifier
         }
     }
 
-    private static IReadOnlyDictionary<string, string> CreateExceptionDetails(Exception exception)
+    private static ImmutableDictionary<string, string> CreateExceptionDetails(Exception exception)
     {
         return ImmutableDictionary<string, string>.Empty
             .Add("exceptionType", exception.GetType().FullName ?? exception.GetType().Name);
     }
 
-    private static IReadOnlyDictionary<string, string> AddPath(
-        IReadOnlyDictionary<string, string> details,
+    private static ImmutableDictionary<string, string> AddPath(
+        ImmutableDictionary<string, string> details,
         string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return details;
 
-        return details.ToImmutableDictionary(StringComparer.Ordinal).SetItem("path", path!);
+        return details.SetItem("path", path!);
     }
 
     private static bool IsNativeSolverLoadFailure(Exception exception)

@@ -68,7 +68,7 @@ internal sealed class SymbolicCliInputContext(
             var document = FindDocument(project, sourcePath) ??
                            throw SymbolicCliErrorWriter.CreateException(
                                SymbolicErrorCodes.UnsupportedTarget,
-                               SymbolicErrorCategory.Unsupported,
+                               SharpProofErrorCategory.Unsupported,
                                $"Source file '{sourcePath}' is not compiled by project '{project.Name}'.",
                                SymbolicErrorExitCodes.InvalidData,
                                "path",
@@ -76,7 +76,7 @@ internal sealed class SymbolicCliInputContext(
             var syntaxTree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false) ??
                              throw SymbolicCliErrorWriter.CreateException(
                                  SymbolicErrorCodes.ParseFailed,
-                                 SymbolicErrorCategory.Parse,
+                                 SharpProofErrorCategory.Parse,
                                  $"Could not parse project document '{sourcePath}'.",
                                  SymbolicErrorExitCodes.InvalidData,
                                  "path",
@@ -84,7 +84,7 @@ internal sealed class SymbolicCliInputContext(
             var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false) ??
                               throw SymbolicCliErrorWriter.CreateException(
                                   SymbolicErrorCodes.ProjectLoadFailed,
-                                  SymbolicErrorCategory.Project,
+                                  SharpProofErrorCategory.Project,
                                   $"Could not create a compilation for project '{project.Name}'.",
                                   SymbolicErrorExitCodes.InvalidData,
                                   "project",
@@ -119,7 +119,7 @@ internal sealed class SymbolicCliInputContext(
             workspace.Dispose();
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.ProjectLoadFailed,
-                SymbolicErrorCategory.Project,
+                SharpProofErrorCategory.Project,
                 "Could not load the MSBuild project context: " + exception.Message,
                 SymbolicErrorExitCodes.InvalidData,
                 innerException: exception);
@@ -187,7 +187,7 @@ internal sealed class SymbolicCliInputContext(
 
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.SourceNotFound,
-                SymbolicErrorCategory.Input,
+                SharpProofErrorCategory.Input,
                 "--file does not exist: " + rootedPath,
                 SymbolicErrorExitCodes.MissingInput,
                 "path",
@@ -202,7 +202,7 @@ internal sealed class SymbolicCliInputContext(
 
         throw SymbolicCliErrorWriter.CreateException(
             SymbolicErrorCodes.SourceNotFound,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             $"--file does not exist relative to the current directory or project container: {sourcePath}",
             SymbolicErrorExitCodes.MissingInput,
             "path",

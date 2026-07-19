@@ -82,7 +82,7 @@ internal static class MethodCapabilityAnalyzer
 
     private static Diagnostic CreateQueryFailureDiagnostic(
         IMethodSymbol methodSymbol,
-        SymbolicError error,
+        SharpProofError error,
         SyntaxTree syntaxTree)
     {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, CancellationToken.None);

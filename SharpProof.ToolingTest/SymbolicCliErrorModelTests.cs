@@ -21,7 +21,7 @@ public sealed class SymbolicCliErrorModelTests
         AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.InvalidRequest,
-            SymbolicErrorCategory.Usage,
+            SharpProofErrorCategory.Usage,
             SymbolicErrorExitCodes.Usage);
     }
 
@@ -35,7 +35,7 @@ public sealed class SymbolicCliErrorModelTests
         AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.ParseFailed,
-            SymbolicErrorCategory.Parse,
+            SharpProofErrorCategory.Parse,
             SymbolicErrorExitCodes.InvalidData);
     }
 
@@ -55,7 +55,7 @@ public sealed class SymbolicCliErrorModelTests
         var error = AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.SourceNotFound,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             SymbolicErrorExitCodes.MissingInput);
         Assert.That(error.GetProperty("details").GetProperty("path").GetString(), Is.EqualTo(missingPath));
     }
@@ -78,7 +78,7 @@ public sealed class SymbolicCliErrorModelTests
         var error = AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.ReferenceNotFound,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             SymbolicErrorExitCodes.MissingInput);
         Assert.That(error.GetProperty("details").GetProperty("path").GetString(), Is.EqualTo(missingPath));
     }
@@ -96,7 +96,7 @@ public sealed class SymbolicCliErrorModelTests
         AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.InvalidTarget,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             SymbolicErrorExitCodes.InvalidData);
     }
 
@@ -118,7 +118,7 @@ public sealed class SymbolicCliErrorModelTests
         AssertErrorEnvelope(
             result,
             SymbolicErrorCodes.ProjectLoadFailed,
-            SymbolicErrorCategory.Project,
+            SharpProofErrorCategory.Project,
             SymbolicErrorExitCodes.MissingInput);
     }
 
@@ -161,7 +161,7 @@ public sealed class SymbolicCliErrorModelTests
     private static JsonElement AssertErrorEnvelope(
         (int ExitCode, string StandardOutput, string StandardError) result,
         string expectedCode,
-        SymbolicErrorCategory expectedCategory,
+        SharpProofErrorCategory expectedCategory,
         int expectedExitCode)
     {
         Assert.That(result.ExitCode, Is.EqualTo(expectedExitCode), result.StandardError);

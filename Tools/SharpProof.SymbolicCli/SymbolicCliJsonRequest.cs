@@ -42,7 +42,7 @@ internal sealed class SymbolicCliJsonRequest
         {
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.ParseFailed,
-                SymbolicErrorCategory.Parse,
+                SharpProofErrorCategory.Parse,
                 "Invalid JSON request envelope: " + exception.Message,
                 SymbolicErrorExitCodes.InvalidData,
                 "input",

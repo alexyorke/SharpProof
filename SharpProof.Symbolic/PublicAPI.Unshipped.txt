@@ -640,11 +640,11 @@ SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.get -> System.Collectio
 SharpProof.Symbolic.SharpProofBudgetMetadata.Truncations.init -> void
 SharpProof.Symbolic.SharpProofError
 SharpProof.Symbolic.SharpProofError.<Clone>$() -> SharpProof.Symbolic.SharpProofError!
-SharpProof.Symbolic.SharpProofError.Category.get -> string!
+SharpProof.Symbolic.SharpProofError.Category.get -> SharpProof.Symbolic.SharpProofErrorCategory
 SharpProof.Symbolic.SharpProofError.Category.init -> void
 SharpProof.Symbolic.SharpProofError.Code.get -> string!
 SharpProof.Symbolic.SharpProofError.Code.init -> void
-SharpProof.Symbolic.SharpProofError.Deconstruct(out string! Code, out string! Category, out string! Message, out int RecommendedExitCode, out bool IsRetryable, out System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
+SharpProof.Symbolic.SharpProofError.Deconstruct(out string! Code, out SharpProof.Symbolic.SharpProofErrorCategory Category, out string! Message, out int RecommendedExitCode, out bool IsRetryable, out System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
 SharpProof.Symbolic.SharpProofError.Details.get -> System.Collections.Immutable.ImmutableDictionary<string!, string!>!
 SharpProof.Symbolic.SharpProofError.Details.init -> void
 SharpProof.Symbolic.SharpProofError.Equals(SharpProof.Symbolic.SharpProofError? other) -> bool
@@ -654,7 +654,17 @@ SharpProof.Symbolic.SharpProofError.Message.get -> string!
 SharpProof.Symbolic.SharpProofError.Message.init -> void
 SharpProof.Symbolic.SharpProofError.RecommendedExitCode.get -> int
 SharpProof.Symbolic.SharpProofError.RecommendedExitCode.init -> void
-SharpProof.Symbolic.SharpProofError.SharpProofError(string! Code, string! Category, string! Message, int RecommendedExitCode, bool IsRetryable, System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
+SharpProof.Symbolic.SharpProofError.SharpProofError(string! Code, SharpProof.Symbolic.SharpProofErrorCategory Category, string! Message, int RecommendedExitCode, bool IsRetryable, System.Collections.Immutable.ImmutableDictionary<string!, string!>! Details) -> void
+SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Cancellation = 7 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Input = 1 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Internal = 8 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Parse = 3 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Project = 4 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Solver = 5 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Timeout = 6 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Unsupported = 2 -> SharpProof.Symbolic.SharpProofErrorCategory
+SharpProof.Symbolic.SharpProofErrorCategory.Usage = 0 -> SharpProof.Symbolic.SharpProofErrorCategory
 SharpProof.Symbolic.SharpProofEvidence
 SharpProof.Symbolic.SharpProofEvidence.<Clone>$() -> SharpProof.Symbolic.SharpProofEvidence!
 SharpProof.Symbolic.SharpProofEvidence.Deconstruct(out string! Status, out string! Reason) -> void

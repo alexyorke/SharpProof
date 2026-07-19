@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 
@@ -10,7 +11,7 @@ internal sealed class SymbolicErrorModelTests
     public void SymbolicErrorClassifier_MapsStableFailureFamilies(
         Exception exception,
         string expectedCode,
-        SymbolicErrorCategory expectedCategory,
+        SharpProofErrorCategory expectedCategory,
         int expectedExitCode)
     {
         var error = SymbolicErrorClassifier.FromException(exception);
@@ -25,17 +26,20 @@ internal sealed class SymbolicErrorModelTests
     [Test]
     public void SymbolicQueryException_PreservesExplicitProjectAndReferenceErrors()
     {
-        var referenceError = new SymbolicError(
+        var referenceError = new SharpProofError(
             SymbolicErrorCodes.ReferenceNotFound,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             "Reference was not found.",
             SymbolicErrorExitCodes.MissingInput,
-            details: new[] { new KeyValuePair<string, string>("path", "Missing.dll") });
-        var projectError = new SymbolicError(
+            false,
+            ImmutableDictionary<string, string>.Empty.Add("path", "Missing.dll"));
+        var projectError = new SharpProofError(
             SymbolicErrorCodes.ProjectLoadFailed,
-            SymbolicErrorCategory.Project,
+            SharpProofErrorCategory.Project,
             "Project load failed.",
-            SymbolicErrorExitCodes.InvalidData);
+            SymbolicErrorExitCodes.InvalidData,
+            false,
+            ImmutableDictionary<string, string>.Empty);
 
         Assert.That(
             SymbolicErrorClassifier.FromException(new SymbolicQueryException(referenceError)),
@@ -91,7 +95,7 @@ internal sealed class SymbolicErrorModelTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Error!.Code, Is.EqualTo(SymbolicErrorCodes.InvalidRequest));
-        Assert.That(result.Error.Category, Is.EqualTo(SymbolicErrorCategory.Usage));
+        Assert.That(result.Error.Category, Is.EqualTo(SharpProofErrorCategory.Usage));
     }
 
     [Test]
@@ -136,54 +140,54 @@ internal sealed class SymbolicErrorModelTests
         yield return Case(
             new ArgumentException("invalid options"),
             SymbolicErrorCodes.InvalidRequest,
-            SymbolicErrorCategory.Usage,
+            SharpProofErrorCategory.Usage,
             SymbolicErrorExitCodes.Usage);
         yield return Case(
             new ArgumentOutOfRangeException("line", "invalid target"),
             SymbolicErrorCodes.InvalidTarget,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             SymbolicErrorExitCodes.InvalidData);
         yield return Case(
             new NotSupportedException("unsupported target"),
             SymbolicErrorCodes.UnsupportedTarget,
-            SymbolicErrorCategory.Unsupported,
+            SharpProofErrorCategory.Unsupported,
             SymbolicErrorExitCodes.InvalidData);
         yield return Case(
             new FileNotFoundException("source missing", "Missing.cs"),
             SymbolicErrorCodes.SourceNotFound,
-            SymbolicErrorCategory.Input,
+            SharpProofErrorCategory.Input,
             SymbolicErrorExitCodes.MissingInput);
         yield return Case(
             new FormatException("parse failed"),
             SymbolicErrorCodes.ParseFailed,
-            SymbolicErrorCategory.Parse,
+            SharpProofErrorCategory.Parse,
             SymbolicErrorExitCodes.InvalidData);
         yield return Case(
             new BadImageFormatException("metadata parse failed"),
             SymbolicErrorCodes.ParseFailed,
-            SymbolicErrorCategory.Parse,
+            SharpProofErrorCategory.Parse,
             SymbolicErrorExitCodes.InvalidData);
         yield return Case(
             new DllNotFoundException("libz3 was not found"),
             SymbolicErrorCodes.NativeSolverUnavailable,
-            SymbolicErrorCategory.Solver,
+            SharpProofErrorCategory.Solver,
             SymbolicErrorExitCodes.Unavailable);
         yield return Case(
             new TimeoutException("query timed out"),
             SymbolicErrorCodes.TimedOut,
-            SymbolicErrorCategory.Timeout,
+            SharpProofErrorCategory.Timeout,
             SymbolicErrorExitCodes.TemporaryFailure);
         yield return Case(
             new OperationCanceledException(),
             SymbolicErrorCodes.Canceled,
-            SymbolicErrorCategory.Cancellation,
+            SharpProofErrorCategory.Cancellation,
             SymbolicErrorExitCodes.Canceled);
     }
 
     private static TestCaseData Case(
         Exception exception,
         string expectedCode,
-        SymbolicErrorCategory expectedCategory,
+        SharpProofErrorCategory expectedCategory,
         int expectedExitCode)
     {
         return new TestCaseData(exception, expectedCode, expectedCategory, expectedExitCode)

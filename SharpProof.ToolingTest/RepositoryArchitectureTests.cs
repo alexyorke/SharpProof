@@ -507,6 +507,24 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ErrorMetadata_HasOneContractOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var symbolicRoot = Path.Combine(root, "SharpProof.Symbolic");
+        var api = File.ReadAllText(Path.Combine(symbolicRoot, "SharpProofAnalysisApi.cs"));
+        var errors = File.ReadAllText(Path.Combine(symbolicRoot, "SymbolicErrors.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(api, Does.Contain("public sealed record SharpProofError("));
+            Assert.That(api, Does.Contain("public enum SharpProofErrorCategory"));
+            Assert.That(api, Does.Not.Contain("ToError("));
+            Assert.That(errors, Does.Not.Contain("class SymbolicError("));
+            Assert.That(errors, Does.Not.Contain("enum SymbolicErrorCategory"));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
