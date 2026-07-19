@@ -114,14 +114,14 @@ internal sealed class SymbolicInvariantService
         var shouldCheckState = HasPathStateFacts(pathState) || formulas.Count != 0;
         var stateProof = smtAnalysis == null || !shouldCheckState
             ? null
-            : SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-        if (stateProof?.Info.Status == SymbolicProofStatus.Unreachable)
+            : new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState);
+        if (stateProof?.Status == SymbolicProofStatus.Unreachable)
             return new SymbolicProgramPointAnalysis(
                 spanStart,
                 formulas,
                 pathState,
                 SymbolicReachability.Unreachable,
-                stateProof.Info.Reason,
+                stateProof.Reason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 sourceNode,
                 stateProof.RawResult,
@@ -134,8 +134,8 @@ internal sealed class SymbolicInvariantService
                     spanStart,
                     formulas,
                     pathState,
-                    MapReachability(stateProof.Info.Status),
-                    stateProof.Info.Reason,
+                    MapReachability(stateProof.Status),
+                    stateProof.Reason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis),
                     sourceNode,
                     stateProof.RawResult,
@@ -156,8 +156,8 @@ internal sealed class SymbolicInvariantService
             spanStart,
             formulas,
             pathState,
-            stateProof == null ? SymbolicReachability.NotChecked : MapReachability(stateProof.Info.Status),
-            stateProof?.Info.Reason ?? "reachability_not_checked",
+            stateProof == null ? SymbolicReachability.NotChecked : MapReachability(stateProof.Status),
+            stateProof?.Reason ?? "reachability_not_checked",
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
             sourceNode,
             stateProof?.RawResult,

@@ -112,7 +112,7 @@ internal static partial class ExecutionVisibility
             site,
             semanticModel,
             cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
+        return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(pathState, condition).Status ==
                expectedStatus;
     }
 
@@ -281,7 +281,7 @@ internal static partial class ExecutionVisibility
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is not { IsExact: true, Value: { } condition }) return null;
 
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status
+        return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(pathState, condition).Status
             switch
             {
                 SymbolicProofStatus.ProvenTrue => true,

@@ -198,7 +198,9 @@ internal sealed class SymbolicUnknownReasonTaxonomyTests
             SymbolicUnknownReason.Timeout,
             "smt_timeout",
             false,
-            null);
+            null,
+            SymbolicProofStage.SmtExecution,
+            SymbolicProofSupport.Exact);
 
         Assert.Multiple(() =>
         {

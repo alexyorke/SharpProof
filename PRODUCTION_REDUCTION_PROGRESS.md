@@ -375,14 +375,22 @@ Tests are excluded from the metric and must not be deleted.
   concurrent roots, custom budgets, cancellation, and conservative loop
   fallback; architecture coverage prevents the duplicate trace cache from
   returning.
+- [x] Made immutable `SymbolicProofInfo` the single internal proof-result and
+  projection owner. Deleted the nested IR proof wrapper, status-projection
+  struct, solver-pipeline adapter, and four reachability-service forwarding
+  methods; the proof service now owns raw solver execution and mapping directly.
+  Raw results, typed unknown reasons, stage/support metadata, budgets, cache
+  evidence, and serialized property order remain characterized, while
+  architecture coverage prevents the three parallel proof layers from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 96,252 lines (92,333 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,374 lines; remaining reduction: 8,626.
-  This tranche removed 266 maintained lines without deleting tests.
+- Maintained production: 96,048 lines (92,129 C#, 3,189 scripts, and 730
+  specifications); net reduction: 11,578 lines; remaining reduction: 8,422.
+  This tranche removed 204 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,197 passing tests and two documented Main skips.
+- Six lanes: 6,198 passing tests and two documented Main skips.
 
 ## Milestones
 

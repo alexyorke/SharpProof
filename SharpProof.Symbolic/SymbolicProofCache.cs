@@ -31,10 +31,10 @@ internal sealed class SymbolicProofCache
     internal long MissCount => _values.MissCount;
     internal long EvictionCount => _values.EvictionCount;
 
-    internal bool TryGetResult(string key, out SymbolicIrProofResult result)
+    internal bool TryGetResult(string key, out SymbolicProofInfo result)
     {
         if (_values.TryGetValue(ResultPrefix + key, out var value) &&
-            value is SymbolicIrProofResult cached)
+            value is SymbolicProofInfo cached)
         {
             result = cached;
             return true;
@@ -44,7 +44,7 @@ internal sealed class SymbolicProofCache
         return false;
     }
 
-    internal void TryAddResult(string key, SymbolicIrProofResult result)
+    internal void TryAddResult(string key, SymbolicProofInfo result)
     {
         _values.TryAdd(ResultPrefix + key, result);
     }

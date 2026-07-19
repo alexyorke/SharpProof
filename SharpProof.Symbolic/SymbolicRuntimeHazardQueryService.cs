@@ -237,7 +237,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     private static SymbolicInputWitness CreateTriggerWitness(
         SymbolicProgramPointAnalysis analysis,
         SymbolicCondition triggerCondition,
-        SymbolicIrProofResult? triggerProof,
+        SymbolicProofInfo? triggerProof,
         SmtAnalysisService smtAnalysis,
         SemanticModel semanticModel,
         int position,
@@ -251,12 +251,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (!SymbolicIrFormulaEncoder.TryEncode(triggerCondition, out var encodedTrigger))
             return SymbolicInputWitnessFactory.None("unsupported_typed_projection");
 
-        var triggerFeasibility = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
-            analysis.PathState,
-            triggerCondition,
-            smtAnalysis);
-        if (triggerFeasibility.Info.Status == SymbolicProofStatus.Unreachable)
-            return SymbolicInputWitnessFactory.None(triggerFeasibility.Info.Reason);
+        var triggerFeasibility = new SymbolicProofService(smtAnalysis)
+            .ClassifyBranchFeasibility(analysis.PathState, triggerCondition);
+        if (triggerFeasibility.Status == SymbolicProofStatus.Unreachable)
+            return SymbolicInputWitnessFactory.None(triggerFeasibility.Reason);
 
         return SymbolicInputWitnessFactory.Create(
             triggerFeasibility.RawResult?.PathCheck.Witness,
@@ -271,7 +269,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardStatus Status,
         string Reason,
         SymbolicProofInfo? Proof,
-        SymbolicIrProofResult? RawProof) ClassifyTriggerCore(
+        SymbolicProofInfo? RawProof) ClassifyTriggerCore(
         SymbolicProgramPointAnalysis analysis,
         SymbolicCondition triggerCondition,
         SymbolicFact triggerPrecondition,
@@ -302,22 +300,20 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardStatus Status,
         string Reason,
         SymbolicProofInfo Proof,
-        SymbolicIrProofResult RawProof) ClassifyIrTrigger(
+        SymbolicProofInfo RawProof) ClassifyIrTrigger(
         SymbolicProgramPointAnalysis analysis,
         SymbolicFact triggerPrecondition,
         SmtAnalysisService smtAnalysis)
     {
-        var proof = SymbolicReachabilityService.ClassifyStateHazardTrigger(
-            analysis.PathState,
-            triggerPrecondition,
-            smtAnalysis);
-        if (proof.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason, proof.Info, proof);
+        var proof = new SymbolicProofService(smtAnalysis)
+            .ClassifyHazardTrigger(analysis.PathState, triggerPrecondition);
+        if (proof.Status == SymbolicProofStatus.ProvenTrue)
+            return (SymbolicRuntimeHazardStatus.Proven, proof.Reason, proof, proof);
 
-        if (proof.Info.Status == SymbolicProofStatus.Unreachable)
-            return (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason, proof.Info, proof);
+        if (proof.Status == SymbolicProofStatus.Unreachable)
+            return (SymbolicRuntimeHazardStatus.Unreachable, proof.Reason, proof, proof);
 
-        return (SymbolicRuntimeHazardStatus.Unknown, proof.Info.Reason, proof.Info, proof);
+        return (SymbolicRuntimeHazardStatus.Unknown, proof.Reason, proof, proof);
     }
 }
 
@@ -497,7 +493,7 @@ internal sealed class SymbolicRuntimeHazard(
         SymbolicRuntimeHazardKind kind,
         SymbolicProofInfo? proofInfo)
     {
-        var proofStatus = SymbolicProofProjection.MapStatus(status);
+        var proofStatus = SymbolicProofInfo.MapStatus(status);
         if (proofInfo == null)
         {
             var isSolverBacked = status != SymbolicRuntimeHazardStatus.Unsupported &&
@@ -505,29 +501,25 @@ internal sealed class SymbolicRuntimeHazard(
                                      statusReason,
                                      "unsupported_typed_projection",
                                      StringComparison.Ordinal);
-            return SymbolicProofProjection
-                .FromSolverBackedResult(
-                    proofStatus,
-                    isSolverBacked,
-                    proofStatus == SymbolicProofStatus.Unknown ? statusReason : null)
-                .CreateInfo(
-                    statusReason,
-                    false,
-                    null,
-                    category,
-                    triggerCondition,
-                    kind.ToString());
-        }
-
-        return SymbolicProofProjection
-            .FromExisting(proofStatus, proofInfo)
-            .CreateInfo(
-                string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
-                proofInfo.CacheHit,
-                proofInfo.Budget,
+            return SymbolicProofInfo.Project(
+                proofStatus,
+                isSolverBacked,
+                statusReason,
+                false,
+                null,
                 category,
                 triggerCondition,
-                kind.ToString());
+                kind.ToString(),
+                proofStatus == SymbolicProofStatus.Unknown ? statusReason : null);
+        }
+
+        return SymbolicProofInfo.Project(
+            proofStatus,
+            proofInfo,
+            string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
+            category,
+            triggerCondition,
+            kind.ToString());
     }
 }
 

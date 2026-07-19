@@ -11,7 +11,7 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-internal class SymbolicProofPipelineTests
+internal class SymbolicProofModelTests
 {
     [TestCase(SymbolicTruthValue.Unknown, SymbolicProofStatus.Unknown)]
     [TestCase(SymbolicTruthValue.ProvenTrue, SymbolicProofStatus.ProvenTrue)]
@@ -22,7 +22,7 @@ internal class SymbolicProofPipelineTests
         SymbolicTruthValue value,
         SymbolicProofStatus expected)
     {
-        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
     }
 
     [TestCase(SymbolicConditionProofSummaryStatus.None, SymbolicProofStatus.Unknown)]
@@ -36,7 +36,7 @@ internal class SymbolicProofPipelineTests
         SymbolicConditionProofSummaryStatus value,
         SymbolicProofStatus expected)
     {
-        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
     }
 
     [TestCase(SymbolicRuntimeHazardStatus.Proven, SymbolicProofStatus.ProvenTrue)]
@@ -48,7 +48,7 @@ internal class SymbolicProofPipelineTests
         SymbolicRuntimeHazardStatus value,
         SymbolicProofStatus expected)
     {
-        Assert.That(SymbolicProofProjection.MapStatus(value), Is.EqualTo(expected));
+        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
     }
 
     [Test]
@@ -73,11 +73,11 @@ internal class SymbolicProofPipelineTests
             .ClassifyConditionTruth(new SymbolicState(), condition);
 
         Assert.That(session.ClassificationCount, Is.EqualTo(1));
-        Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
-        Assert.That(result.Info.Reason, Is.EqualTo("ir_condition_true_branch_feasibility_unknown"));
-        Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
-        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.SmtExecution));
-        Assert.That(result.Info.Support, Is.EqualTo(SymbolicProofSupport.Exact));
+        Assert.That(result.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+        Assert.That(result.Reason, Is.EqualTo("ir_condition_true_branch_feasibility_unknown"));
+        Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
+        Assert.That(result.Stage, Is.EqualTo(SymbolicProofStage.SmtExecution));
+        Assert.That(result.Support, Is.EqualTo(SymbolicProofSupport.Exact));
     }
 
     [Test]
@@ -88,9 +88,9 @@ internal class SymbolicProofPipelineTests
         var result = new SymbolicProofService(service)
             .ClassifyReachability(new SymbolicState());
 
-        Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
-        Assert.That(result.Info.Support, Is.EqualTo(SymbolicProofSupport.Exact));
-        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.SyntacticClassification));
+        Assert.That(result.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
+        Assert.That(result.Support, Is.EqualTo(SymbolicProofSupport.Exact));
+        Assert.That(result.Stage, Is.EqualTo(SymbolicProofStage.SyntacticClassification));
     }
 
     [Test]
@@ -111,13 +111,13 @@ internal class SymbolicProofPipelineTests
         var cachedLast = proofService.ClassifyReachability(lastState!);
         var recomputedFirst = proofService.ClassifyReachability(firstState);
 
-        Assert.That(cachedLast.Info.CacheHit, Is.True);
-        Assert.That(cachedLast.Info.Budget?.Cache, Is.Not.Null);
-        Assert.That(cachedLast.Info.Budget!.Cache!.Entries, Is.LessThanOrEqualTo(2048));
-        Assert.That(cachedLast.Info.Budget.Cache.Evictions, Is.GreaterThan(0));
-        Assert.That(recomputedFirst.Info.CacheHit, Is.False);
-        Assert.That(recomputedFirst.Info.Status, Is.EqualTo(first.Info.Status));
-        Assert.That(recomputedFirst.Info.Reason, Is.EqualTo(first.Info.Reason));
+        Assert.That(cachedLast.CacheHit, Is.True);
+        Assert.That(cachedLast.Budget?.Cache, Is.Not.Null);
+        Assert.That(cachedLast.Budget!.Cache!.Entries, Is.LessThanOrEqualTo(2048));
+        Assert.That(cachedLast.Budget.Cache.Evictions, Is.GreaterThan(0));
+        Assert.That(recomputedFirst.CacheHit, Is.False);
+        Assert.That(recomputedFirst.Status, Is.EqualTo(first.Status));
+        Assert.That(recomputedFirst.Reason, Is.EqualTo(first.Reason));
     }
 
     [Test]

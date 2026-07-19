@@ -487,6 +487,26 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ProofMetadata_HasOneResultAndProjectionOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var symbolicRoot = Path.Combine(root, "SharpProof.Symbolic");
+        var proofModel = File.ReadAllText(Path.Combine(symbolicRoot, "SymbolicPublicModels.cs"));
+        var reachability = File.ReadAllText(Path.Combine(symbolicRoot, "SymbolicReachabilityService.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(symbolicRoot, "SymbolicIrProofResult.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(symbolicRoot, "SymbolicProofProjection.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(symbolicRoot, "SymbolicProofPipeline.cs")), Is.False);
+            Assert.That(proofModel, Does.Contain("internal sealed record SymbolicProofInfo"));
+            Assert.That(proofModel, Does.Contain("internal PurityProofResult? RawResult"));
+            Assert.That(reachability, Does.Not.Contain("ClassifyStateFeasibility"));
+            Assert.That(reachability, Does.Not.Contain("ClassifyStateConditionTruth"));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

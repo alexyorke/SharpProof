@@ -137,7 +137,7 @@ internal static partial class ExecutionVisibility
             if (ReferenceEquals(nextState, pathState)) continue;
 
             pathState = nextState;
-            if (SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
+            if (new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
                 SymbolicProofStatus.Unreachable)
                 return true;
         }

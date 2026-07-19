@@ -49,56 +49,171 @@ internal enum SymbolicUnknownReason
     Unknown
 }
 
-internal sealed class SymbolicBudgetInfo(
-    int maxPathConditions,
-    int maxExpressionNodes,
-    int timeoutMilliseconds,
-    int methodBudgetMilliseconds,
-    int executedQueryCount,
-    int cacheEntryCount,
-    SymbolicCacheInfo? cache = null)
-{
-    public int MaxPathConditions { get; } = maxPathConditions;
-    public int MaxExpressionNodes { get; } = maxExpressionNodes;
-    public int TimeoutMilliseconds { get; } = timeoutMilliseconds;
-    public int MethodBudgetMilliseconds { get; } = methodBudgetMilliseconds;
-    public int ExecutedQueryCount { get; } = executedQueryCount;
-    public int CacheEntryCount { get; } = cacheEntryCount;
-    public SymbolicCacheInfo? Cache { get; } = cache;
-}
+internal sealed record SymbolicBudgetInfo(
+    int MaxPathConditions,
+    int MaxExpressionNodes,
+    int TimeoutMilliseconds,
+    int MethodBudgetMilliseconds,
+    int ExecutedQueryCount,
+    int CacheEntryCount,
+    SymbolicCacheInfo? Cache = null);
 
-internal sealed class SymbolicCacheInfo(long hits, long misses, int entries, long evictions)
-{
-    public long Hits { get; } = hits;
-    public long Misses { get; } = misses;
-    public int Entries { get; } = entries;
-    public long Evictions { get; } = evictions;
-}
+internal sealed record SymbolicCacheInfo(long Hits, long Misses, int Entries, long Evictions);
 
-internal sealed class SymbolicProofInfo(
-    SymbolicProofStatus status,
-    SymbolicProofBackend backend,
-    SymbolicUnknownReason unknownReason,
-    string reason,
-    bool cacheHit,
-    SymbolicBudgetInfo? budget,
-    SymbolicProofStage stage,
-    SymbolicProofSupport support,
-    string? target = null,
-    string? conditionText = null,
-    string? displayKind = null)
+internal sealed record SymbolicProofInfo(
+    SymbolicProofStatus Status,
+    SymbolicProofBackend Backend,
+    SymbolicUnknownReason UnknownReason,
+    string Reason,
+    bool CacheHit,
+    SymbolicBudgetInfo? Budget,
+    SymbolicProofStage Stage,
+    SymbolicProofSupport Support,
+    string? Target = null,
+    string? ConditionText = null,
+    string? DisplayKind = null)
 {
-    public SymbolicProofInfo(
+    public SymbolicProofStatus Status { get; init; } = Status;
+    public SymbolicProofBackend Backend { get; init; } = Backend;
+    public SymbolicUnknownReason UnknownReason { get; init; } = UnknownReason;
+    public string Reason { get; init; } = Reason ?? string.Empty;
+
+    public SymbolicUnknownReasonInfo UnknownReasonInfo =>
+        SymbolicUnknownReasonTaxonomy.ForProof(UnknownReason, Reason);
+
+    public bool CacheHit { get; init; } = CacheHit;
+    public SymbolicBudgetInfo? Budget { get; init; } = Budget;
+    public SymbolicProofStage Stage { get; init; } = Stage;
+    public SymbolicProofSupport Support { get; init; } = Support;
+    public string Target { get; init; } = Target ?? string.Empty;
+
+    public string ConditionText { get; init; } = ConditionText ?? string.Empty;
+
+    public string DisplayKind { get; init; } = DisplayKind ?? Backend.ToString();
+
+    internal PurityProofResult? RawResult { get; init; }
+
+    internal static SymbolicProofInfo Unknown(
+        SymbolicUnknownReason reason,
+        SymbolicProofStage stage = SymbolicProofStage.Lowering,
+        SymbolicProofSupport support = SymbolicProofSupport.Unsupported,
+        string? detail = null) => new(
+        SymbolicProofStatus.Unknown,
+        SymbolicProofBackend.None,
+        reason,
+        detail ?? reason.ToString(),
+        false,
+        null,
+        stage,
+        support);
+
+    internal static SymbolicProofInfo Syntactic(SymbolicProofStatus status, string reason) => new(
+        status,
+        SymbolicProofBackend.Syntactic,
+        SymbolicUnknownReason.None,
+        reason,
+        false,
+        null,
+        SymbolicProofStage.SyntacticClassification,
+        SymbolicProofSupport.Exact);
+
+    internal SymbolicProofInfo WithCacheHit(SymbolicBudgetInfo? budget) => this with
+    {
+        CacheHit = true,
+        Budget = budget ?? Budget
+    };
+
+    internal SymbolicProofInfo WithStatus(SymbolicProofStatus status, string? reason = null) => this with
+    {
+        Status = status,
+        UnknownReason = status == SymbolicProofStatus.Unknown && UnknownReason == SymbolicUnknownReason.None
+            ? SymbolicUnknownReason.Unknown
+            : UnknownReason,
+        Reason = reason ?? Reason
+    };
+
+    internal static SymbolicProofInfo FromReachability(
+        PurityProofResult result,
+        SymbolicBudgetInfo? budget) =>
+        FromResult(
+            result,
+            result.PathCheck.Feasibility switch
+            {
+                Feasibility.Satisfiable => SymbolicProofStatus.Reachable,
+                Feasibility.Unsatisfiable => SymbolicProofStatus.Unreachable,
+                _ => SymbolicProofStatus.Unknown
+            },
+            budget);
+
+    internal static SymbolicProofInfo FromImplication(
+        PurityProofResult result,
+        SymbolicBudgetInfo? budget) =>
+        FromResult(
+            result,
+            result.Outcome switch
+            {
+                PurityProofOutcome.ProvablyPure => SymbolicProofStatus.ProvenTrue,
+                PurityProofOutcome.ProvablyImpure => SymbolicProofStatus.ProvenFalse,
+                _ => SymbolicProofStatus.Unknown
+            },
+            budget);
+
+    internal static SymbolicProofInfo FromConditionTruth(
+        PurityProofResult result,
         SymbolicProofStatus status,
-        SymbolicProofBackend backend,
-        SymbolicUnknownReason unknownReason,
+        SymbolicBudgetInfo? budget) => FromResult(result, status, budget);
+
+    private static SymbolicProofInfo FromResult(
+        PurityProofResult result,
+        SymbolicProofStatus status,
+        SymbolicBudgetInfo? budget) => new(
+        status,
+        SymbolicProofBackend.Smt,
+        status == SymbolicProofStatus.Unknown
+            ? SymbolicUnknownReasonClassifier.Classify(result.Reason)
+            : SymbolicUnknownReason.None,
+        result.Reason,
+        false,
+        budget,
+        status == SymbolicProofStatus.Unknown
+            ? result.Reason is "smt_method_budget_exceeded" or
+                "smt_path_condition_budget_exceeded" or
+                "smt_expression_budget_exceeded" or "smt_disabled"
+                ? SymbolicProofStage.Budgeting
+                : SymbolicProofStage.SmtExecution
+            : SymbolicProofStage.ResultMapping,
+        SymbolicProofSupport.Exact)
+    { RawResult = result };
+
+    internal static SymbolicProofStatus MapStatus<TStatus>(TStatus value)
+        where TStatus : struct, Enum => (object)value switch
+    {
+        SymbolicTruthValue.ProvenTrue or SymbolicConditionProofSummaryStatus.AlwaysTrue or
+            SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
+        SymbolicTruthValue.ProvenFalse or SymbolicConditionProofSummaryStatus.AlwaysFalse =>
+            SymbolicProofStatus.ProvenFalse,
+        SymbolicTruthValue.Unreachable or SymbolicConditionProofSummaryStatus.UnreachableOnly or
+            SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
+        _ => SymbolicProofStatus.Unknown
+    };
+
+    internal static SymbolicProofInfo Project(
+        SymbolicProofStatus status,
+        bool isSolverBacked,
         string reason,
         bool cacheHit,
         SymbolicBudgetInfo? budget,
         string? target = null,
         string? conditionText = null,
-        string? displayKind = null)
-        : this(
+        string? displayKind = null,
+        string? rawUnknownReason = null)
+    {
+        var backend = isSolverBacked ? SymbolicProofBackend.Smt :
+            status == SymbolicProofStatus.Unknown ? SymbolicProofBackend.None : SymbolicProofBackend.Syntactic;
+        var unknownReason = status == SymbolicProofStatus.Unknown && rawUnknownReason != null
+            ? SymbolicUnknownReasonClassifier.Classify(rawUnknownReason)
+            : SymbolicUnknownReason.None;
+        return new SymbolicProofInfo(
             status,
             backend,
             unknownReason,
@@ -116,34 +231,26 @@ internal sealed class SymbolicProofInfo(
                 : SymbolicProofSupport.Exact,
             target,
             conditionText,
-            displayKind)
-    {
+            displayKind);
     }
 
-    public SymbolicProofStatus Status { get; } = status;
-
-    public SymbolicProofBackend Backend { get; } = backend;
-
-    public SymbolicUnknownReason UnknownReason { get; } = unknownReason;
-
-    public string Reason { get; } = reason ?? string.Empty;
-
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
-        SymbolicUnknownReasonTaxonomy.ForProof(unknownReason, reason ?? string.Empty);
-
-    public bool CacheHit { get; } = cacheHit;
-
-    public SymbolicBudgetInfo? Budget { get; } = budget;
-
-    public SymbolicProofStage Stage { get; } = stage;
-
-    public SymbolicProofSupport Support { get; } = support;
-
-    public string Target { get; } = target ?? string.Empty;
-
-    public string ConditionText { get; } = conditionText ?? string.Empty;
-
-    public string DisplayKind { get; } = displayKind ?? backend.ToString();
+    internal static SymbolicProofInfo Project(
+        SymbolicProofStatus status,
+        SymbolicProofInfo source,
+        string reason,
+        string? target = null,
+        string? conditionText = null,
+        string? displayKind = null) => source with
+    {
+        Status = status,
+        UnknownReason = status == SymbolicProofStatus.Unknown
+            ? source.UnknownReason
+            : SymbolicUnknownReason.None,
+        Reason = reason,
+        Target = target ?? string.Empty,
+        ConditionText = conditionText ?? string.Empty,
+        DisplayKind = displayKind ?? source.Backend.ToString()
+    };
 }
 
 internal sealed class SymbolicFactInfo(

@@ -14,7 +14,7 @@ internal static partial class ExecutionVisibility
             syntaxNode,
             semanticModel,
             cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
+        return new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
                SymbolicProofStatus.Unreachable;
     }
 }

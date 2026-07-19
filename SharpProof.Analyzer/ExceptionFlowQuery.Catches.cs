@@ -63,7 +63,7 @@ internal static partial class ExceptionFlowEngine
         }
 
         private bool IsReachable(SymbolicState state) =>
-            SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis).Info.Status !=
+            new SymbolicProofService(smtAnalysis).ClassifyReachability(state).Status !=
             SymbolicProofStatus.Unreachable;
 
         private bool IsShadowedByFinally(SyntaxNode site, SymbolicState pathState)
@@ -127,10 +127,9 @@ internal static partial class ExceptionFlowEngine
                 filter,
                 new SymbolicLoweringContext(semanticModel, cancellationToken));
             return lowering is { IsExact: true, Value: { } condition } &&
-                   SymbolicReachabilityService.ClassifyStateConditionTruth(
-                       GetPathState(site),
-                       condition,
-                       smtAnalysis).Info.Status == SymbolicProofStatus.ProvenTrue;
+                   new SymbolicProofService(smtAnalysis)
+                       .ClassifyConditionTruth(GetPathState(site), condition).Status ==
+                   SymbolicProofStatus.ProvenTrue;
         }
     }
 }

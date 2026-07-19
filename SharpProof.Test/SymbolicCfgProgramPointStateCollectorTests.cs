@@ -267,7 +267,7 @@ static class C
 
         Assert.That(actual.IsUnsupported, Is.True, actual.Provenance.Single().Detail);
         Assert.That(
-            SymbolicReachabilityService.ClassifyStateFeasibility(routed, null).Info.Status,
+            new SymbolicProofService(null).ClassifyReachability(routed).Status,
             Is.EqualTo(SymbolicProofStatus.Unreachable),
             routed.NormalizedProofKey + Environment.NewLine +
             completion.Provenance.Single().Detail + Environment.NewLine +
@@ -2026,8 +2026,8 @@ static class C
         var proofService = new SymbolicProofService(smt);
         var expectedProof = proofService.ClassifyConditionTruth(expected, lowering.Value!);
         var actualProof = proofService.ClassifyConditionTruth(actual.Value!, lowering.Value!);
-        Assert.That(actualProof.Info.Status, Is.EqualTo(expectedProof.Info.Status));
-        Assert.That(actualProof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), actualProof.Info.Reason);
+        Assert.That(actualProof.Status, Is.EqualTo(expectedProof.Status));
+        Assert.That(actualProof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), actualProof.Reason);
     }
 
     [Test]

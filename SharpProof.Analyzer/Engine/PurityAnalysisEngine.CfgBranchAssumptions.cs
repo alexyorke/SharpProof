@@ -240,7 +240,7 @@ internal partial class PurityAnalysisEngine
         if (!transition.IsExact)
             return false;
 
-        return SymbolicReachabilityService.ClassifyStateFeasibility(transition.State, smtAnalysis).Info.Status ==
+        return new SymbolicProofService(smtAnalysis).ClassifyReachability(transition.State).Status ==
                SymbolicProofStatus.Unreachable;
     }
 
@@ -248,7 +248,7 @@ internal partial class PurityAnalysisEngine
         SymbolicState pathState,
         SmtAnalysisService smtAnalysis)
     {
-        return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
+        return new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
                SymbolicProofStatus.Unreachable;
     }
 

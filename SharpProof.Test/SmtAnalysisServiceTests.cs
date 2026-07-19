@@ -1078,15 +1078,14 @@ public class SmtAnalysisServiceTests
                 new SymbolicIntegerConstantTerm(0)),
             SyntaxFactory.ParseExpression("budget_value == 0"),
             "test.budget");
-        var proof = SymbolicReachabilityService.ClassifyStateFeasibility(
-            new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }),
-            smtAnalysis);
+        var proof = new SymbolicProofService(smtAnalysis).ClassifyReachability(
+            new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }));
 
         Assert.That(diagnostics.QueryTimeoutMs, Is.EqualTo(int.MaxValue));
         Assert.That(diagnostics.MethodBudgetMs, Is.EqualTo(int.MaxValue));
-        Assert.That(proof.Info.Budget, Is.Not.Null);
-        Assert.That(proof.Info.Budget!.TimeoutMilliseconds, Is.EqualTo(int.MaxValue));
-        Assert.That(proof.Info.Budget.MethodBudgetMilliseconds, Is.EqualTo(int.MaxValue));
+        Assert.That(proof.Budget, Is.Not.Null);
+        Assert.That(proof.Budget!.TimeoutMilliseconds, Is.EqualTo(int.MaxValue));
+        Assert.That(proof.Budget.MethodBudgetMilliseconds, Is.EqualTo(int.MaxValue));
     }
 
     [Test]

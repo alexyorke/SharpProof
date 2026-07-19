@@ -86,7 +86,7 @@ public sealed class SymbolicIrTests
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var proof = new SymbolicProofService(smt).ClassifyConditionTruth(state, condition);
 
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), proof.Info.Reason);
+        Assert.That(proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), proof.Reason);
     }
 
     [Test]

@@ -405,12 +405,16 @@ internal sealed record SymbolicConditionProofResult(
 
     public string Reason { get; init; } = reason ?? string.Empty;
 
-    public SymbolicProofInfo Proof => SymbolicProofProjection
-        .FromSolverBackedResult(
-            SymbolicProofProjection.MapStatus(TruthValue),
-            IsSolverBacked,
-            TruthValue == SymbolicTruthValue.Unknown ? Reason : null)
-        .CreateInfo(Reason, false, null, Target, FormulaText, DisplayKind);
+    public SymbolicProofInfo Proof => SymbolicProofInfo.Project(
+        SymbolicProofInfo.MapStatus(TruthValue),
+        IsSolverBacked,
+        Reason,
+        false,
+        null,
+        Target,
+        FormulaText,
+        DisplayKind,
+        TruthValue == SymbolicTruthValue.Unknown ? Reason : null);
 
     public string? FilePath { get; init; } = string.IsNullOrWhiteSpace(filePath) ? null : filePath;
 

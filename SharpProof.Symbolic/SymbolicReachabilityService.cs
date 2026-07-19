@@ -44,38 +44,6 @@ internal static class SymbolicReachabilityService
         return state;
     }
 
-    internal static SymbolicIrProofResult ClassifyStateFeasibility(
-        SymbolicState state,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyReachability(state);
-    }
-
-
-    internal static SymbolicIrProofResult ClassifyStateBranchFeasibility(
-        SymbolicState state,
-        SymbolicCondition branchCondition,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyBranchFeasibility(state, branchCondition);
-    }
-
-    internal static SymbolicIrProofResult ClassifyStateConditionTruth(
-        SymbolicState state,
-        SymbolicCondition condition,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition);
-    }
-
-    internal static SymbolicIrProofResult ClassifyStateHazardTrigger(
-        SymbolicState state,
-        SymbolicFact triggerPrecondition,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyHazardTrigger(state, triggerPrecondition);
-    }
-
     internal static bool IsForInitialEntryConditionAlwaysFalse(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -93,8 +61,9 @@ internal static class SymbolicReachabilityService
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is not { IsExact: true, Value: { } initialEntryCondition }) return false;
 
-        var proof = ClassifyStateConditionTruth(initialEntryState, initialEntryCondition, smtAnalysis);
-        return proof.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
+        var proof = new SymbolicProofService(smtAnalysis)
+            .ClassifyConditionTruth(initialEntryState, initialEntryCondition);
+        return proof.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
     }
 
     internal static SymbolicState CollectForInitialEntryState(

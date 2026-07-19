@@ -198,19 +198,19 @@ internal sealed class SymbolicConditionProofEngine
 
         if (analysis.Reachability == SymbolicReachability.NotChecked)
         {
-            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibility(
-                analysis.PathState, smtAnalysis);
-            if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
+            var reachabilityProof = new SymbolicProofService(smtAnalysis)
+                .ClassifyReachability(analysis.PathState);
+            if (reachabilityProof.Status == SymbolicProofStatus.Unreachable)
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.Unreachable,
-                    reachabilityProof.Info.Reason,
+                    reachabilityProof.Reason,
                     conditionFormula);
         }
 
-        var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            analysis.PathState, symbolicCondition, smtAnalysis);
-        var truthValue = truthProof.Info.Status switch
+        var truthProof = new SymbolicProofService(smtAnalysis)
+            .ClassifyConditionTruth(analysis.PathState, symbolicCondition);
+        var truthValue = truthProof.Status switch
         {
             SymbolicProofStatus.ProvenTrue => SymbolicTruthValue.ProvenTrue,
             SymbolicProofStatus.ProvenFalse => SymbolicTruthValue.ProvenFalse,
@@ -230,13 +230,13 @@ internal sealed class SymbolicConditionProofEngine
     private static SymbolicConditionProofResult CreateResult(
         string conditionText,
         SymbolicTruthValue truthValue,
-        SymbolicIrProofResult proof,
+        SymbolicProofInfo proof,
         SmtFormula conditionFormula,
         SymbolicProgramPointAnalysis analysis,
         SemanticModel? semanticModel,
         int position)
     {
-        var reason = proof.RawResult?.Reason ?? proof.Info.Reason;
+        var reason = proof.RawResult?.Reason ?? proof.Reason;
         if (truthValue == SymbolicTruthValue.Unreachable)
             return new SymbolicConditionProofResult(
                 conditionText,
@@ -251,11 +251,11 @@ internal sealed class SymbolicConditionProofEngine
             : conditionFormula;
         var unknownTrueBranch = truthValue == SymbolicTruthValue.Unknown &&
                                 string.Equals(
-                                    proof.Info.Reason,
+                                    proof.Reason,
                                     "ir_condition_true_branch_feasibility_unknown",
                                     StringComparison.Ordinal);
         var unknownFalseBranch = truthValue == SymbolicTruthValue.Unknown &&
-                                 proof.Info.Reason is
+                                 proof.Reason is
                                      "ir_condition_false_branch_feasibility_unknown" or
                                      "ir_condition_both_branches_feasible";
         var selectedModel = unknownTrueBranch

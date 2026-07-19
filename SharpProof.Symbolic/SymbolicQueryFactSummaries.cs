@@ -595,11 +595,16 @@ internal static class SymbolicConditionProofProjection
         var target = metadataProof?.Target ?? string.Empty;
         var formulaKind = metadataProof?.DisplayKind ?? "Unknown";
         var formulaText = metadataProof?.FormulaText ?? condition;
-        var proof = SymbolicProofProjection.FromSolverBackedResult(
-                SymbolicProofProjection.MapStatus(status),
-                metadataProof?.IsSolverBacked ?? false,
-                reasons.FirstOrDefault(static reason => reason.TruthValue == SymbolicTruthValue.Unknown)?.Reason)
-            .CreateInfo(summary, false, null, target, formulaText, formulaKind);
+        var proof = SymbolicProofInfo.Project(
+            SymbolicProofInfo.MapStatus(status),
+            metadataProof?.IsSolverBacked ?? false,
+            summary,
+            false,
+            null,
+            target,
+            formulaText,
+            formulaKind,
+            reasons.FirstOrDefault(static reason => reason.TruthValue == SymbolicTruthValue.Unknown)?.Reason);
         return new SymbolicConditionProofSummary(
             condition,
             target,
