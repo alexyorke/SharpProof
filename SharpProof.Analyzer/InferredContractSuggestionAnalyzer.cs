@@ -227,7 +227,9 @@ internal static class InferredContractSuggestionAnalyzer
             result = context.State.GetOrCreateSymbolicQueryResult(
                 "exception-flow",
                 () => ExceptionFlowEngine.AnalyzeMethod(
-                    context.Snapshot.Input,
+                    context.MethodSymbol,
+                    context.Node,
+                    context.SemanticModel,
                     context.CancellationToken,
                     session.EffectSummaryCatalog,
                     session.PurityService.SmtAnalysis,

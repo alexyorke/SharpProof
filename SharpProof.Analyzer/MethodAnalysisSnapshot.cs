@@ -1,41 +1,44 @@
 namespace SharpProof.Analyzer;
 
 internal sealed record MethodAnalysisSnapshot(
-    SymbolicMethodAnalysisInput Input,
+    IMethodSymbol MethodSymbol,
+    SyntaxNode Declaration,
+    SemanticModel SemanticModel,
+    SymbolicSourceInput Source,
     ImmutableArray<IOperation> OperationBlocks,
     IOperation? RootOperation,
-    ImmutableArray<IOperation> VisibleOperations,
-    MethodBodySemanticFacts SemanticFacts)
+    ImmutableArray<IOperation> VisibleOperations)
 {
-    internal IMethodSymbol MethodSymbol => Input.MethodSymbol;
-
-    internal SyntaxNode Declaration => Input.Declaration;
-
-    internal SemanticModel SemanticModel => Input.SemanticModel;
-
-    internal SymbolicSourceInput Source => Input.Source;
-
-    internal static MethodAnalysisSnapshot Create(MethodAnalysisRequest request)
+    internal static MethodAnalysisSnapshot Create(
+        IMethodSymbol methodSymbol,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        ImmutableArray<IOperation> operationBlocks,
+        CancellationToken cancellationToken)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
-
-        var blocks = request.OperationBlocks;
-        var root = request.FallbackRootOperation ?? SelectRootOperation(blocks);
+        if (methodSymbol == null) throw new ArgumentNullException(nameof(methodSymbol));
+        if (declaration == null) throw new ArgumentNullException(nameof(declaration));
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+        if (declaration.SyntaxTree != semanticModel.SyntaxTree)
+            throw new ArgumentException(
+                "The method declaration and semantic model must belong to the same syntax tree.",
+                nameof(semanticModel));
+        cancellationToken.ThrowIfCancellationRequested();
+        var blocks = operationBlocks.IsDefault ? ImmutableArray<IOperation>.Empty : operationBlocks;
+        var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+                       declaration, semanticModel, cancellationToken) ??
+                   SelectRootOperation(blocks);
         var visibleOperations = root == null
             ? ImmutableArray<IOperation>.Empty
             : ExecutionVisibility.VisibleDescendants(root).ToImmutableArray();
-        var semanticFacts = new MethodBodySemanticFacts(
-            blocks.Length,
-            visibleOperations.Length,
-            visibleOperations.Count(static operation => operation is IReturnOperation),
-            visibleOperations.Any(static operation => operation is ILocalFunctionOperation),
-            root != null);
         return new MethodAnalysisSnapshot(
-            request.SymbolicInput,
+            methodSymbol,
+            declaration,
+            semanticModel,
+            SymbolicSourceInput.FromNode(declaration, semanticModel),
             blocks,
             root,
-            visibleOperations,
-            semanticFacts);
+            visibleOperations);
     }
 
     private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks)
@@ -47,10 +50,3 @@ internal sealed record MethodAnalysisSnapshot(
             .First();
     }
 }
-
-internal sealed record MethodBodySemanticFacts(
-    int OperationBlockCount,
-    int VisibleOperationCount,
-    int ReturnOperationCount,
-    bool ContainsLocalFunction,
-    bool HasRootOperation);

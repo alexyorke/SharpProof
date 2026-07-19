@@ -67,12 +67,12 @@ internal sealed class SymbolicErrorModelTests
         const string source = "class C { int M(int value) => value; }";
         var service = new SymbolicQueryExecutor();
 
-        var success = service.TryQuery(new SymbolicQueryContext(
+        var success = Capture(() => service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
-            SharpProofTarget.Point(1, 1)));
-        var failure = service.TryQuery(new SymbolicQueryContext(
+            SharpProofTarget.Point(1, 1))));
+        var failure = Capture(() => service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
-            SharpProofTarget.Point(99, 1)));
+            SharpProofTarget.Point(99, 1))));
 
         Assert.That(success.IsSuccess, Is.True);
         Assert.That(success.Value, Is.Not.Null);
@@ -91,7 +91,7 @@ internal sealed class SymbolicErrorModelTests
             SharpProofTarget.Point(1, 1),
             SymbolicQueryOptions.Default);
 
-        var result = new SymbolicQueryExecutor().TryProve(context, "value >= 0");
+        var result = Capture(() => new SymbolicQueryExecutor().Prove(context, "value >= 0"));
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Error!.Code, Is.EqualTo(SymbolicErrorCodes.InvalidRequest));
@@ -124,11 +124,11 @@ internal sealed class SymbolicErrorModelTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var result = new SymbolicQueryExecutor().TryQuery(
+        var result = Capture(() => new SymbolicQueryExecutor().Query(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "Canceled.cs"),
                 SharpProofTarget.Point(1, 1)),
-            cancellation.Token);
+            cancellation.Token));
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Error!.Code, Is.EqualTo(SymbolicErrorCodes.Canceled));
@@ -182,6 +182,23 @@ internal sealed class SymbolicErrorModelTests
             SymbolicErrorCodes.Canceled,
             SharpProofErrorCategory.Cancellation,
             SymbolicErrorExitCodes.Canceled);
+    }
+
+    private static TestOutcome<T> Capture<T>(Func<T> operation) where T : class
+    {
+        try
+        {
+            return new TestOutcome<T>(operation(), null);
+        }
+        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
+        {
+            return new TestOutcome<T>(null, SymbolicErrorClassifier.FromException(exception));
+        }
+    }
+
+    private sealed record TestOutcome<T>(T? Value, SharpProofError? Error) where T : class
+    {
+        internal bool IsSuccess => Error == null;
     }
 
     private static TestCaseData Case(

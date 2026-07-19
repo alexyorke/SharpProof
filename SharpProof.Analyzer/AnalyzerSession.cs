@@ -89,13 +89,12 @@ internal sealed class AnalyzerSession : IDisposable
             methodSymbol,
             _ => new Lazy<MethodBodyAnalysisState>(
                 () => new MethodBodyAnalysisState(
-                    MethodAnalysisRequest.Create(
+                    MethodAnalysisSnapshot.Create(
                         methodSymbol,
                         declaration,
                         semanticModel,
                         operationBlocks,
-                        cancellationToken),
-                    cancellationToken),
+                        cancellationToken)),
                 LazyThreadSafetyMode.ExecutionAndPublication));
         try
         {

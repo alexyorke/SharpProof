@@ -118,13 +118,13 @@ internal static class MethodRequiresAnalyzer
                     continue;
                 }
 
-                var proofOutcome = queryExecutor.TryProve(
-                    new SymbolicQueryContext(
-                        source,
-                        SharpProofTarget.Point(line, column),
-                        options),
-                    rewrittenCondition,
-                    context.CancellationToken);
+                var proofOutcome = AnalyzerSymbolicQueryBoundary.TryExecute(() => queryExecutor.Prove(
+                        new SymbolicQueryContext(
+                            source,
+                            SharpProofTarget.Point(line, column),
+                            options),
+                        rewrittenCondition,
+                        context.CancellationToken));
                 var proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
                     proofOutcome,
                     rewrittenCondition,

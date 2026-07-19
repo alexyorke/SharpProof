@@ -3386,24 +3386,12 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/MethodAnalysisRequest.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodAnalysisRequest"
-                                              ],
-                            "referencingFixtureCount":  2,
-                            "referencedTokens":  [
-                                                     "MethodAnalysisRequest"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/MethodAnalysisSnapshot.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "MethodAnalysisSnapshot",
-                                                  "MethodBodySemanticFacts"
+                                                  "MethodAnalysisSnapshot"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "MethodAnalysisSnapshot"
                                                  ]
@@ -3412,6 +3400,7 @@
                             "path":  "SharpProof.Analyzer/MethodBodyAnalysisState.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
+                                                  "AnalyzerQueryOutcome",
                                                   "AnalyzerSymbolicQueryBoundary",
                                                   "MethodBodyAnalysisContext",
                                                   "MethodBodyAnalysisState"
@@ -5559,17 +5548,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicComplexityService.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicComplexityService"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/SymbolicConditionProofEngine.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5633,7 +5611,6 @@
                                                   "SymbolicErrorCodes",
                                                   "SymbolicErrorEnvelope",
                                                   "SymbolicErrorExitCodes",
-                                                  "SymbolicOperationResult",
                                                   "SymbolicQueryException"
                                               ],
                             "referencingFixtureCount":  7,
@@ -5642,7 +5619,6 @@
                                                      "SymbolicErrorCodes",
                                                      "SymbolicErrorEnvelope",
                                                      "SymbolicErrorExitCodes",
-                                                     "SymbolicOperationResult",
                                                      "SymbolicQueryException"
                                                  ]
                         },
@@ -5767,17 +5743,6 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicMethodAnalysisInput.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicMethodAnalysisInput"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "SymbolicMethodAnalysisInput"
                                                  ]
                         },
                         {
@@ -8436,27 +8401,16 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/MethodAnalysisRequest.cs",
+                                    "path":  "SharpProof.Analyzer/MethodAnalysisSnapshot.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "OperationBlockPipelineTests",
                                                                  "RepositoryArchitectureTests"
                                                              ],
                                     "tokens":  [
-                                                   "MethodAnalysisRequest"
-                                               ],
-                                    "fixtureCount":  2
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/MethodAnalysisSnapshot.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "RepositoryArchitectureTests"
-                                                             ],
-                                    "tokens":  [
                                                    "MethodAnalysisSnapshot"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/MethodBodyAnalysisState.cs",
@@ -9904,7 +9858,6 @@
                                                    "SymbolicErrorCodes",
                                                    "SymbolicErrorEnvelope",
                                                    "SymbolicErrorExitCodes",
-                                                   "SymbolicOperationResult",
                                                    "SymbolicQueryException"
                                                ],
                                     "fixtureCount":  7
@@ -10016,17 +9969,6 @@
                                                    "SymbolicInvariantTargetFilter"
                                                ],
                                     "fixtureCount":  2
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/SymbolicMethodAnalysisInput.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ExceptionFlowResultGraphTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicMethodAnalysisInput"
-                                               ],
-                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicMethodQueryInfrastructure.cs",

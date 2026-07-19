@@ -493,8 +493,7 @@ internal static class NullableContractAnalyzer
         string condition,
         bool includeCurrentStatementCompletionFacts)
     {
-        var outcome = context.Snapshot.Input.TryProveAtNode(
-            context.State.QueryExecutor,
+        var outcome = context.State.TryProveAtNode(
             node,
             condition,
             session.PurityService.SmtAnalysis,
@@ -512,8 +511,7 @@ internal static class NullableContractAnalyzer
         SymbolicState initialState,
         bool includeCurrentStatementCompletionFacts)
     {
-        var outcome = context.Snapshot.Input.TryProveAtNode(
-            context.State.QueryExecutor,
+        var outcome = context.State.TryProveAtNode(
             node,
             condition,
             symbolicCondition,

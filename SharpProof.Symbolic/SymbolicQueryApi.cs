@@ -3,7 +3,6 @@ namespace SharpProof.Symbolic;
 internal sealed partial class SymbolicQueryExecutor
 {
     private readonly SymbolicCapabilityService _capabilityService;
-    private readonly SymbolicComplexityService _complexityService;
     private readonly SymbolicConditionProofEngine _conditionProofEngine;
     private readonly SymbolicInvariantService _invariantService;
     private readonly SymbolicRuntimeHazardQueryService _runtimeHazardService;
@@ -19,7 +18,6 @@ internal sealed partial class SymbolicQueryExecutor
             _conditionProofEngine);
         _rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(_programPointExecutor);
         _runtimeHazardService = new SymbolicRuntimeHazardQueryService(_invariantService);
-        _complexityService = new SymbolicComplexityService();
         _capabilityService = new SymbolicCapabilityService();
     }
 
@@ -36,13 +34,6 @@ internal sealed partial class SymbolicQueryExecutor
         });
     }
 
-    public SymbolicOperationResult<SymbolicQueryResult> TryQuery(
-        SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => Query(context, cancellationToken));
-    }
-
     public SymbolicConditionProofResult Prove(
         SymbolicQueryContext context,
         string conditionText,
@@ -56,14 +47,6 @@ internal sealed partial class SymbolicQueryExecutor
             ProveSource(request, conditionText, token));
     }
 
-    public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
-        SymbolicQueryContext context,
-        string conditionText,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => Prove(context, conditionText, cancellationToken));
-    }
-
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
         SemanticModel semanticModel,
         SyntaxNode node,
@@ -79,23 +62,6 @@ internal sealed partial class SymbolicQueryExecutor
             smtAnalysis,
             includeCurrentStatementCompletionFacts,
             cancellationToken);
-    }
-
-    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtSyntaxNode(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => ProveAtSyntaxNode(
-            semanticModel,
-            node,
-            conditionText,
-            smtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            cancellationToken));
     }
 
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
@@ -117,27 +83,6 @@ internal sealed partial class SymbolicQueryExecutor
             smtAnalysis,
             includeCurrentStatementCompletionFacts,
             cancellationToken);
-    }
-
-    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtSyntaxNode(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        string conditionText,
-        SymbolicCondition symbolicCondition,
-        SymbolicState initialState,
-        SmtAnalysisService smtAnalysis,
-        bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => ProveAtSyntaxNode(
-            semanticModel,
-            node,
-            conditionText,
-            symbolicCondition,
-            initialState,
-            smtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            cancellationToken));
     }
 
     public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
@@ -158,14 +103,29 @@ internal sealed partial class SymbolicQueryExecutor
         CancellationToken cancellationToken = default)
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-            _complexityService.Query(request, token));
+            SymbolicMethodLikeQueryDispatcher.Execute(
+                request,
+                SymbolicSourceCompilationKind.Complexity,
+                "Complexity source kind is not supported.",
+                "Complexity queries support point, position, line, or node targets only.",
+                "Complexity node queries require a node target.",
+                static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
+                ExecuteComplexityAnalysis,
+                token));
     }
 
-    public SymbolicOperationResult<SymbolicComplexityResult> TryQueryComplexity(
-        SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
+    private static SymbolicComplexityResult ExecuteComplexityAnalysis(
+        ResolvedMethodLikeTarget target,
+        Compilation compilation,
+        CancellationToken cancellationToken)
     {
-        return TryExecute(() => QueryComplexity(context, cancellationToken));
+        if (target.BodyNode == null)
+            throw new ArgumentException("The requested method-like declaration does not have a body.");
+        if (target.MethodSymbol == null)
+            throw new ArgumentException("Could not resolve the symbol for the requested method-like body.");
+
+        var summary = new SymbolicComplexityAnalysisSession(compilation, cancellationToken).Analyze(target);
+        return SymbolicComplexityResultProjector.Project(target, summary, cancellationToken);
     }
 
     public SymbolicCapabilityResult QueryCapabilities(
@@ -174,26 +134,6 @@ internal sealed partial class SymbolicQueryExecutor
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
             _capabilityService.Query(request, token));
-    }
-
-    public SymbolicOperationResult<SymbolicCapabilityResult> TryQueryCapabilities(
-        SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
-    {
-        return TryExecute(() => QueryCapabilities(context, cancellationToken));
-    }
-
-    private static SymbolicOperationResult<T> TryExecute<T>(Func<T> operation)
-        where T : class
-    {
-        try
-        {
-            return SymbolicOperationResult<T>.Success(operation());
-        }
-        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
-        {
-            return SymbolicOperationResult<T>.Failure(SymbolicErrorClassifier.FromException(exception));
-        }
     }
 
     private static TResult ExecuteWithLimits<TResult>(

@@ -374,7 +374,6 @@ public sealed class RepositoryArchitectureTests
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var expectedDeclarations = new Dictionary<string, string>
         {
-            ["SharpProof.Analyzer/MethodAnalysisRequest.cs"] = "class MethodAnalysisRequest(",
             ["SharpProof.Analyzer/EffectSummaryCatalog.cs"] = "struct PurityEntry(",
             ["SharpProof.ProofCore/SmtIntegerInterval.cs"] = "struct SmtIntegerInterval(",
             ["SharpProof.Symbolic/Ir/SymbolicLoweringResult.cs"] = "class SymbolicLoweringResult<T>(",
@@ -393,6 +392,18 @@ public sealed class RepositoryArchitectureTests
                 Does.Contain("record SummaryExceptionInfo("));
             Assert.That(File.Exists(Path.Combine(
                 root, "SharpProof.Analyzer", "ExceptionSummaryCatalog.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "MethodAnalysisRequest.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Symbolic", "SymbolicMethodAnalysisInput.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Symbolic", "SymbolicComplexityService.cs")), Is.False);
+            var queryApi = File.ReadAllText(Path.Combine(
+                root, "SharpProof.Symbolic", "SymbolicQueryApi.cs"));
+            Assert.That(queryApi, Does.Not.Contain("TryQuery("));
+            Assert.That(queryApi, Does.Not.Contain("TryProve("));
+            Assert.That(queryApi, Does.Not.Contain("TryQueryComplexity"));
+            Assert.That(queryApi, Does.Not.Contain("TryQueryCapabilities"));
             Assert.That(File.Exists(Path.Combine(
                 root, "SharpProof.Analyzer", "GeneratedPurityCatalog.cs")), Is.False);
             Assert.That(File.Exists(Path.Combine(

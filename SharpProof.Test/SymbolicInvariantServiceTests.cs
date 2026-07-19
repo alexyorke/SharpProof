@@ -119,15 +119,13 @@ public class TestClass
         var (returnStatement, semanticModel, condition) = CreateGuardedReturnContext(source, "return value;");
 
         var linePosition = returnStatement.GetLocation().GetLineSpan().StartLinePosition;
-        var outcome = new SymbolicQueryExecutor().TryProve(
+        var exception = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(semanticModel.SyntaxTree, semanticModel.Compilation),
                 SharpProofTarget.Point(linePosition.Line + 1, linePosition.Character + 1)),
-            SymbolicFormulaDisplay.Format(condition));
+            SymbolicFormulaDisplay.Format(condition)));
 
-        Assert.That(outcome.IsSuccess, Is.False);
-        Assert.That(outcome.Error, Is.Not.Null);
-        Assert.That(outcome.Error!.Message, Does.Contain("SMT analysis"));
+        Assert.That(exception!.Message, Does.Contain("SMT analysis"));
     }
 
     [Test]

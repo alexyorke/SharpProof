@@ -118,17 +118,14 @@ This is the active source of truth for the comprehensive refactor. Read
   capabilities, ensures, complexity, requires, placement, and common bugs.
   `SharpProofDiagnostics` now owns only stable IDs/properties and descriptor
   factories, while `AnalyzerDiagnosticCatalog` remains the sole index.
-- [x] Analyzer method requests now compose a canonical immutable
-  `SymbolicMethodAnalysisInput` (method identity, declaration, semantic model,
-  and source) with analyzer-owned operation blocks and resolved root.
-  `MethodAnalysisSnapshot` consumes that request, and cached capability and
-  complexity queries use the shared node-query context instead of rebuilding
-  source/target pairs.
+- [x] `MethodAnalysisSnapshot` is the single immutable analyzer method-analysis
+  owner for method identity, declaration, semantic model, source, operation
+  blocks, root, and visible operations. The preceding request/input carriers
+  and their test-only semantic-count projection are deleted.
 - [x] Exception-flow (including recursive source callees), inferred exception
-  contracts, ensures proofs, and nullable proofs now consume the canonical
-  method input. Subnode proof validation is centralized on that input, and the
-  parallel node/semantic-model/method tuples were deleted without weakening
-  unknown or unsupported outcomes.
+  contracts, ensures proofs, and nullable proofs consume the snapshot or their
+  direct source target. Subnode proof validation and nonfatal error mapping are
+  analyzer-owned boundaries; symbolic execution exposes only its throwing API.
 - [x] `SymbolicIrProofResult` owns proof-result construction, cache-hit/status
   projection, SMT outcome mapping, proof-stage classification, and structured
   unknown-reason mapping. `SymbolicProofService` no longer owns result
@@ -185,10 +182,11 @@ This is the active source of truth for the comprehensive refactor. Read
   overload. Its nonfatal predicate and typed error writer remain authoritative,
   fatal exceptions still escape, and the local top-level catch adapter was
   deleted.
-- [x] The canonical method-analysis path has one `MethodAnalysisRequest`
-  construction point, one immutable `MethodAnalysisSnapshot` construction
-  point, and one session-owned cache. Analyzer features and symbolic
-  capability/complexity queries consume the snapshot's shared symbolic input.
+- [x] The canonical method-analysis path has one immutable
+  `MethodAnalysisSnapshot` construction point and one session-owned cache.
+  Analyzer features and symbolic capability/complexity queries consume its
+  shared source directly; the duplicate request and symbolic-input types are
+  absent.
 - [x] `SymbolicQueryContext` now owns the immutable source/target/options
   request boundary, and `SymbolicQueryOptions` owns normalized references,
   limits, implied conditions, and SMT dependencies in its own file. These

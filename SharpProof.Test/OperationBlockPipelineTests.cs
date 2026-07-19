@@ -158,13 +158,12 @@ public sealed class OperationBlockPipelineTests
             semanticModel,
             CancellationToken.None)!;
         var state = new MethodBodyAnalysisState(
-            MethodAnalysisRequest.Create(
+            MethodAnalysisSnapshot.Create(
                 methodSymbol,
                 declaration,
                 semanticModel,
                 ImmutableArray.Create(rootOperation),
-                CancellationToken.None),
-            CancellationToken.None);
+                CancellationToken.None));
 
         var firstCapability = state.GetCapabilityOutcome(CancellationToken.None);
         var secondCapability = state.GetCapabilityOutcome(CancellationToken.None);
@@ -179,21 +178,23 @@ public sealed class OperationBlockPipelineTests
             Assert.That(firstComplexity.IsSuccess, Is.True);
             Assert.That(state.GetSymbolicQueryExecutionCount("capability"), Is.EqualTo(1));
             Assert.That(state.GetSymbolicQueryExecutionCount("complexity"), Is.EqualTo(1));
-            Assert.That(state.Snapshot.SemanticFacts.OperationBlockCount, Is.EqualTo(1));
-            Assert.That(state.Snapshot.SemanticFacts.HasRootOperation, Is.True);
-            Assert.That(state.Snapshot.SemanticFacts.VisibleOperationCount, Is.GreaterThan(0));
-            Assert.That(state.Snapshot.SemanticFacts.ReturnOperationCount, Is.EqualTo(1));
+            Assert.That(state.Snapshot.OperationBlocks, Has.Length.EqualTo(1));
+            Assert.That(state.Snapshot.RootOperation, Is.Not.Null);
+            Assert.That(state.Snapshot.VisibleOperations, Is.Not.Empty);
+            Assert.That(state.Snapshot.VisibleOperations.Count(static operation => operation is IReturnOperation),
+                Is.EqualTo(1));
         });
 
         using (var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default))
         {
-            var failedProof = state.QueryExecutor.TryProveAtSyntaxNode(
-                semanticModel,
-                declaration,
-                " ",
-                smtAnalysis,
-                false,
-                CancellationToken.None);
+            var failedProof = AnalyzerSymbolicQueryBoundary.TryExecute(() =>
+                state.QueryExecutor.ProveAtSyntaxNode(
+                    semanticModel,
+                    declaration,
+                    " ",
+                    smtAnalysis,
+                    false,
+                    CancellationToken.None));
             var conservativeProof = AnalyzerSymbolicQueryBoundary.ResolveProof(
                 failedProof,
                 " ",

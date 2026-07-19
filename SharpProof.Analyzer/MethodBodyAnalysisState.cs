@@ -1,5 +1,10 @@
 namespace SharpProof.Analyzer;
 
+internal sealed record AnalyzerQueryOutcome<T>(T? Value, SharpProofError? Error) where T : class
+{
+    internal bool IsSuccess => Error == null;
+}
+
 internal sealed class MethodBodyAnalysisState
 {
     private readonly ConcurrentDictionary<string, int> _queryExecutionCounts =
@@ -8,50 +13,86 @@ internal sealed class MethodBodyAnalysisState
     private readonly ConcurrentDictionary<string, Lazy<object>> _symbolicQueryResults =
         new(StringComparer.Ordinal);
 
-    internal MethodBodyAnalysisState(
-        MethodAnalysisRequest request,
-        CancellationToken cancellationToken)
+    internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot)
     {
-        Snapshot = MethodAnalysisSnapshot.Create(request);
-        cancellationToken.ThrowIfCancellationRequested();
+        Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
     }
 
     internal MethodAnalysisSnapshot Snapshot { get; }
 
     internal SymbolicQueryExecutor QueryExecutor { get; } = new();
 
-    internal SymbolicOperationResult<SymbolicCapabilityResult> GetCapabilityOutcome(
+    internal AnalyzerQueryOutcome<SymbolicCapabilityResult> GetCapabilityOutcome(
         CancellationToken cancellationToken)
-    {
-        return GetNodeQueryOutcome(
-            "capability",
-            cancellationToken,
-            static (queryExecutor, input, token) => queryExecutor.TryQueryCapabilities(
-                input.CreateNodeQuery(),
-                token));
-    }
-
-    internal SymbolicOperationResult<SymbolicComplexityResult> GetComplexityOutcome(
-        CancellationToken cancellationToken)
-    {
-        return GetNodeQueryOutcome(
-            "complexity",
-            cancellationToken,
-            static (queryExecutor, input, token) => queryExecutor.TryQueryComplexity(
-                input.CreateNodeQuery(),
-                token));
-    }
-
-    private SymbolicOperationResult<TResult> GetNodeQueryOutcome<TResult>(
-        string queryKey,
-        CancellationToken cancellationToken,
-        Func<SymbolicQueryExecutor, SymbolicMethodAnalysisInput, CancellationToken,
-            SymbolicOperationResult<TResult>> query)
-        where TResult : class
     {
         return GetOrCreateSymbolicQueryResult(
-            queryKey,
-            () => query(QueryExecutor, Snapshot.Input, cancellationToken));
+            "capability",
+            () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryCapabilities(
+                new SymbolicQueryContext(Snapshot.Source, SharpProofTarget.Node()),
+                cancellationToken)));
+    }
+
+    internal AnalyzerQueryOutcome<SymbolicComplexityResult> GetComplexityOutcome(
+        CancellationToken cancellationToken)
+    {
+        return GetOrCreateSymbolicQueryResult(
+            "complexity",
+            () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryComplexity(
+                new SymbolicQueryContext(Snapshot.Source, SharpProofTarget.Node()),
+                cancellationToken)));
+    }
+
+    internal AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+        SyntaxNode node,
+        string condition,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        return TryProveAtNode(node, () => QueryExecutor.ProveAtSyntaxNode(
+            Snapshot.SemanticModel,
+            node,
+            condition,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken));
+    }
+
+    internal AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+        SyntaxNode node,
+        string condition,
+        SymbolicCondition symbolicCondition,
+        SymbolicState initialState,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken)
+    {
+        return TryProveAtNode(node, () => QueryExecutor.ProveAtSyntaxNode(
+            Snapshot.SemanticModel,
+            node,
+            condition,
+            symbolicCondition,
+            initialState,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken));
+    }
+
+    private AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+        SyntaxNode node,
+        Func<SymbolicConditionProofResult> prove)
+    {
+        ValidateNode(node);
+        return AnalyzerSymbolicQueryBoundary.TryExecute(prove);
+    }
+
+    private void ValidateNode(SyntaxNode node)
+    {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        if (node.SyntaxTree != Snapshot.Declaration.SyntaxTree)
+            throw new ArgumentException(
+                "The proof node must belong to the analyzed method syntax tree.",
+                nameof(node));
     }
 
     internal T GetOrCreateSymbolicQueryResult<T>(
@@ -95,8 +136,20 @@ internal sealed class MethodBodyAnalysisState
 
 internal static class AnalyzerSymbolicQueryBoundary
 {
+    internal static AnalyzerQueryOutcome<T> TryExecute<T>(Func<T> operation) where T : class
+    {
+        try
+        {
+            return new AnalyzerQueryOutcome<T>(operation(), null);
+        }
+        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
+        {
+            return new AnalyzerQueryOutcome<T>(null, SymbolicErrorClassifier.FromException(exception));
+        }
+    }
+
     internal static SymbolicConditionProofResult ResolveProof(
-        SymbolicOperationResult<SymbolicConditionProofResult> outcome,
+        AnalyzerQueryOutcome<SymbolicConditionProofResult> outcome,
         string condition,
         CancellationToken cancellationToken)
     {

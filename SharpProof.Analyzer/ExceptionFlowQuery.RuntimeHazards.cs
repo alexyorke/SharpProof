@@ -18,11 +18,12 @@ internal static partial class ExceptionFlowEngine
         bool BeforeCallees = false);
 
     internal static ExceptionFlowResult AnalyzeHazards(
-        SymbolicMethodAnalysisInput input,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis) =>
         new(ImmutableArray<ExceptionFlowSite>.Empty,
-            QueryRuntimeHazards(input.Declaration, input.SemanticModel, cancellationToken, smtAnalysis));
+            QueryRuntimeHazards(declaration, semanticModel, cancellationToken, smtAnalysis));
 
     private static ImmutableArray<SymbolicRuntimeHazard> QueryRuntimeHazards(
         SyntaxNode methodNode,

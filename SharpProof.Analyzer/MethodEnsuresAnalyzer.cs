@@ -62,7 +62,6 @@ internal static class MethodEnsuresAnalyzer
                 context.CancellationToken);
         if (completionSites.Length == 0) return;
 
-        var queryExecutor = context.State.QueryExecutor;
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var contract in contracts)
@@ -174,8 +173,7 @@ internal static class MethodEnsuresAnalyzer
                         out var initialState,
                         out var oldFailureReason))
                 {
-                    var proofOutcome = context.Snapshot.Input.TryProveAtNode(
-                        queryExecutor,
+                    var proofOutcome = context.State.TryProveAtNode(
                         completionSite.QueryNode,
                         proofCondition,
                         symbolicCondition,
@@ -190,8 +188,7 @@ internal static class MethodEnsuresAnalyzer
                 }
                 else if (oldFailureReason == null)
                 {
-                    var proofOutcome = context.Snapshot.Input.TryProveAtNode(
-                            queryExecutor,
+                    var proofOutcome = context.State.TryProveAtNode(
                             completionSite.QueryNode,
                             proofCondition,
                             purityService.SmtAnalysis,

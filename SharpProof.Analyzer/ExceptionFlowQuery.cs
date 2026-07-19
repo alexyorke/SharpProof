@@ -3,17 +3,18 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowEngine
 {
     internal static ExceptionFlowResult AnalyzeMethod(
-        SymbolicMethodAnalysisInput input,
+        IMethodSymbol methodSymbol,
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
         CancellationToken cancellationToken,
         EffectSummaryCatalog exceptionSummaryCatalog,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         HashSet<IMethodSymbol>? visitedMethods = null)
     {
-        if (input == null) throw new ArgumentNullException(nameof(input));
-        var methodNode = input.Declaration;
-        var semanticModel = input.SemanticModel;
-        var methodSymbol = input.MethodSymbol;
+        if (methodSymbol == null) throw new ArgumentNullException(nameof(methodSymbol));
+        if (methodNode == null) throw new ArgumentNullException(nameof(methodNode));
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
         var isRoot = visitedMethods == null;
         visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEq.Default)
         {

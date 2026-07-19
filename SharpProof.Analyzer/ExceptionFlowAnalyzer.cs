@@ -54,7 +54,9 @@ internal static partial class ExceptionFlowAnalyzer
                     queryResult = context.State.GetOrCreateSymbolicQueryResult(
                         "exception-flow",
                         () => ExceptionFlowEngine.AnalyzeMethod(
-                            context.Snapshot.Input,
+                            context.MethodSymbol,
+                            context.Node,
+                            context.SemanticModel,
                             context.CancellationToken,
                             exceptionSummaryCatalog,
                             purityService.SmtAnalysis,
@@ -65,7 +67,8 @@ internal static partial class ExceptionFlowAnalyzer
                     var hazardResult = queryResult ?? context.State.GetOrCreateSymbolicQueryResult(
                         "unknown-runtime-hazards",
                         () => ExceptionFlowEngine.AnalyzeHazards(
-                            context.Snapshot.Input,
+                            context.Node,
+                            context.SemanticModel,
                             context.CancellationToken,
                             purityService.SmtAnalysis));
                     unknownRuntimeHazards = hazardResult.RawHazards

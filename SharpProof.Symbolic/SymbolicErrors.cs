@@ -54,30 +54,6 @@ internal sealed class SymbolicQueryException : Exception
     public SharpProofError Error { get; }
 }
 
-internal sealed class SymbolicOperationResult<T>(T? value, SharpProofError? error)
-    where T : class
-{
-    public bool IsSuccess => Error == null;
-
-    public T? Value { get; } = value;
-
-    public SharpProofError? Error { get; } = error;
-
-    public static SymbolicOperationResult<T> Success(T value)
-    {
-        return new SymbolicOperationResult<T>(
-            value ?? throw new ArgumentNullException(nameof(value)),
-            null);
-    }
-
-    public static SymbolicOperationResult<T> Failure(SharpProofError error)
-    {
-        return new SymbolicOperationResult<T>(
-            null,
-            error ?? throw new ArgumentNullException(nameof(error)));
-    }
-}
-
 internal static class SymbolicErrorClassifier
 {
     public static SharpProofError FromException(Exception exception)
@@ -87,115 +63,59 @@ internal static class SymbolicErrorClassifier
         var relevant = Unwrap(exception);
         if (relevant is SymbolicQueryException queryException) return queryException.Error;
 
-        var exceptionDetails = CreateExceptionDetails(relevant);
         if (relevant is OperationCanceledException)
-            return new SharpProofError(
-                SymbolicErrorCodes.Canceled,
-                SharpProofErrorCategory.Cancellation,
-                "The symbolic query was canceled.",
-                SymbolicErrorExitCodes.Canceled,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.Canceled, SharpProofErrorCategory.Cancellation,
+                "The symbolic query was canceled.", SymbolicErrorExitCodes.Canceled, false, relevant);
 
         if (relevant is TimeoutException || IsExceptionType(relevant, "System.Text.RegularExpressions.RegexMatchTimeoutException"))
-            return new SharpProofError(
-                SymbolicErrorCodes.TimedOut,
-                SharpProofErrorCategory.Timeout,
+            return Create(SymbolicErrorCodes.TimedOut, SharpProofErrorCategory.Timeout,
                 string.IsNullOrWhiteSpace(relevant.Message) ? "The symbolic query timed out." : relevant.Message,
-                SymbolicErrorExitCodes.TemporaryFailure,
-                true,
-                exceptionDetails);
+                SymbolicErrorExitCodes.TemporaryFailure, true, relevant);
 
         if (IsNativeSolverLoadFailure(relevant))
-            return new SharpProofError(
-                SymbolicErrorCodes.NativeSolverUnavailable,
-                SharpProofErrorCategory.Solver,
+            return Create(SymbolicErrorCodes.NativeSolverUnavailable, SharpProofErrorCategory.Solver,
                 "The native SMT solver could not be loaded: " + relevant.Message,
-                SymbolicErrorExitCodes.Unavailable,
-                false,
-                exceptionDetails);
+                SymbolicErrorExitCodes.Unavailable, false, relevant);
 
         if (IsZ3Exception(relevant))
-            return new SharpProofError(
-                SymbolicErrorCodes.SolverFailed,
-                SharpProofErrorCategory.Solver,
+            return Create(SymbolicErrorCodes.SolverFailed, SharpProofErrorCategory.Solver,
                 "The SMT solver failed: " + relevant.Message,
-                SymbolicErrorExitCodes.TemporaryFailure,
-                true,
-                exceptionDetails);
+                SymbolicErrorExitCodes.TemporaryFailure, true, relevant);
 
         if (relevant is NotSupportedException)
-            return new SharpProofError(
-                SymbolicErrorCodes.UnsupportedTarget,
-                SharpProofErrorCategory.Unsupported,
-                relevant.Message,
-                SymbolicErrorExitCodes.InvalidData,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.UnsupportedTarget, SharpProofErrorCategory.Unsupported,
+                relevant.Message, SymbolicErrorExitCodes.InvalidData, false, relevant);
 
         if (relevant is FileNotFoundException fileNotFound)
-            return new SharpProofError(
-                SymbolicErrorCodes.SourceNotFound,
-                SharpProofErrorCategory.Input,
-                relevant.Message,
-                SymbolicErrorExitCodes.MissingInput,
-                false,
-                AddPath(exceptionDetails, fileNotFound.FileName));
+            return Create(SymbolicErrorCodes.SourceNotFound, SharpProofErrorCategory.Input,
+                relevant.Message, SymbolicErrorExitCodes.MissingInput, false, relevant,
+                AddPath(CreateExceptionDetails(relevant), fileNotFound.FileName));
 
         if (relevant is DirectoryNotFoundException)
-            return new SharpProofError(
-                SymbolicErrorCodes.SourceNotFound,
-                SharpProofErrorCategory.Input,
-                relevant.Message,
-                SymbolicErrorExitCodes.MissingInput,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.SourceNotFound, SharpProofErrorCategory.Input,
+                relevant.Message, SymbolicErrorExitCodes.MissingInput, false, relevant);
 
         if (relevant is ArgumentOutOfRangeException)
-            return new SharpProofError(
-                SymbolicErrorCodes.InvalidTarget,
-                SharpProofErrorCategory.Input,
-                relevant.Message,
-                SymbolicErrorExitCodes.InvalidData,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.InvalidTarget, SharpProofErrorCategory.Input,
+                relevant.Message, SymbolicErrorExitCodes.InvalidData, false, relevant);
 
         if (relevant is FormatException or InvalidDataException)
-            return new SharpProofError(
-                SymbolicErrorCodes.ParseFailed,
-                SharpProofErrorCategory.Parse,
-                relevant.Message,
-                SymbolicErrorExitCodes.InvalidData,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.ParseFailed, SharpProofErrorCategory.Parse,
+                relevant.Message, SymbolicErrorExitCodes.InvalidData, false, relevant);
 
         if (relevant is BadImageFormatException)
-            return new SharpProofError(
-                SymbolicErrorCodes.ParseFailed,
-                SharpProofErrorCategory.Parse,
-                relevant.Message,
-                SymbolicErrorExitCodes.InvalidData,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.ParseFailed, SharpProofErrorCategory.Parse,
+                relevant.Message, SymbolicErrorExitCodes.InvalidData, false, relevant);
 
         if (relevant is ArgumentException)
-            return new SharpProofError(
-                SymbolicErrorCodes.InvalidRequest,
-                SharpProofErrorCategory.Usage,
-                relevant.Message,
-                SymbolicErrorExitCodes.Usage,
-                false,
-                exceptionDetails);
+            return Create(SymbolicErrorCodes.InvalidRequest, SharpProofErrorCategory.Usage,
+                relevant.Message, SymbolicErrorExitCodes.Usage, false, relevant);
 
-        return new SharpProofError(
-            SymbolicErrorCodes.InternalFailure,
-            SharpProofErrorCategory.Internal,
+        return Create(SymbolicErrorCodes.InternalFailure, SharpProofErrorCategory.Internal,
             string.IsNullOrWhiteSpace(relevant.Message)
                 ? "The symbolic query failed unexpectedly."
                 : relevant.Message,
-            SymbolicErrorExitCodes.InternalFailure,
-            false,
-            exceptionDetails);
+            SymbolicErrorExitCodes.InternalFailure, false, relevant);
     }
 
     public static bool IsFatal(Exception exception)
@@ -229,6 +149,16 @@ internal static class SymbolicErrorClassifier
         return ImmutableDictionary<string, string>.Empty
             .Add("exceptionType", exception.GetType().FullName ?? exception.GetType().Name);
     }
+
+    private static SharpProofError Create(
+        string code,
+        SharpProofErrorCategory category,
+        string message,
+        int exitCode,
+        bool retryable,
+        Exception exception,
+        ImmutableDictionary<string, string>? details = null) =>
+        new(code, category, message, exitCode, retryable, details ?? CreateExceptionDetails(exception));
 
     private static ImmutableDictionary<string, string> AddPath(
         ImmutableDictionary<string, string> details,

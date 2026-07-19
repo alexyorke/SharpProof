@@ -60,7 +60,9 @@ public sealed class ExceptionFlowResultGraphTests
         var methodSymbol = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return ExceptionFlowEngine.AnalyzeMethod(
-            SymbolicMethodAnalysisInput.Create(methodSymbol, method, model),
+            methodSymbol,
+            method,
+            model,
             CancellationToken.None,
             EffectSummaryCatalog.Empty,
             smt,

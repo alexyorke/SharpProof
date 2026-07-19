@@ -507,12 +507,19 @@ Tests are excluded from the metric and must not be deleted.
   typed boundary; deleted both analyzer-local JSON property/identity walkers
   while preserving per-entry malformed-input isolation, trust metadata, and
   serialized schema behavior.
+- [x] Made `MethodAnalysisSnapshot` the sole analyzer method-analysis carrier
+  and the analyzer the sole owner of nonfatal query-to-unknown conversion.
+  Deleted the preceding request/input carriers, the test-only semantic-count
+  projection, six symbolic `Try*` execution adapters, their generic result
+  wrapper, and the one-method complexity service. Exception flow, contract
+  proofs, capability/complexity caching, CLI error classification, and public
+  session results retain their characterized behavior.
 
 ## Current evidence
 
-- Maintained production: 92,866 lines (88,947 C#, 3,189 scripts, and 730
-  specifications); net reduction: 14,760 lines; remaining reduction: 5,240.
-  This tranche removed 119 maintained lines without deleting tests.
+- Maintained production: 92,665 lines (88,746 C#, 3,189 scripts, and 730
+  specifications); net reduction: 14,961 lines; remaining reduction: 5,039.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,211 passing tests and two documented Main skips.
 
