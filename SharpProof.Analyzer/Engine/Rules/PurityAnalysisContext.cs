@@ -8,7 +8,6 @@ internal sealed record PurityAnalysisContext(
     HashSet<IMethodSymbol> VisitedMethods,
     Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> PurityCache,
     IMethodSymbol ContainingMethodSymbol,
-    ImmutableList<IPurityRule> PurityRules,
     CancellationToken CancellationToken,
     CompilationPurityService? PurityService,
     SmtAnalysisService? smtAnalysis = null,

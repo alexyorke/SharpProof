@@ -1,11 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class AssignmentPurityRule : IPurityRule
+internal partial class AssignmentPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.SimpleAssignment,
-        OperationKind.CompoundAssignment, OperationKind.CoalesceAssignment, OperationKind.Increment,
-        OperationKind.Decrement);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

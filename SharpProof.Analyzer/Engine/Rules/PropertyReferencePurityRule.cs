@@ -1,10 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule : IPurityRule
+internal partial class PropertyReferencePurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.PropertyReference);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

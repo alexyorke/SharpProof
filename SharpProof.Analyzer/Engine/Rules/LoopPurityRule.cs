@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class LoopPurityRule : IPurityRule
+internal class LoopPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Loop);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

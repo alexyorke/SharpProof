@@ -1,17 +1,11 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class DynamicOperationPurityRule : IPurityRule
+internal sealed class DynamicOperationPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.DynamicInvocation,
-        OperationKind.DynamicMemberReference,
-        OperationKind.DynamicObjectCreation,
-        OperationKind.DynamicIndexerAccess);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
         IOperation operation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
+        PurityAnalysisContext _,
+        PurityAnalysisEngine.PurityAnalysisState __)
     {
         return PurityAnalysisEngine.ImpureResult(
             operation,

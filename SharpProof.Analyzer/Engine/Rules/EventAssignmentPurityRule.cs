@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class EventAssignmentPurityRule : PurityRuleBase<IEventAssignmentOperation>
 {
-    protected override OperationKind Kind => OperationKind.EventAssignment;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IEventAssignmentOperation eventAssignment,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

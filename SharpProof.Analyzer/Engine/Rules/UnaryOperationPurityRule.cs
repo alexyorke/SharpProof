@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class UnaryOperationPurityRule : PurityRuleBase<IUnaryOperation>
 {
-    protected override OperationKind Kind => OperationKind.Unary;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IUnaryOperation unaryOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

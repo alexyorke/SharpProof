@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class ArrayElementReferencePurityRule : PurityRuleBase<IArrayElementReferenceOperation>
 {
-    protected override OperationKind Kind => OperationKind.ArrayElementReference;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IArrayElementReferenceOperation arrayElementReference, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

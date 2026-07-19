@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class CoalesceOperationPurityRule : PurityRuleBase<ICoalesceOperation>
 {
-    protected override OperationKind Kind => OperationKind.Coalesce;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ICoalesceOperation coalesceOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

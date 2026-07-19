@@ -2,12 +2,8 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ObjectCreationPurityRule : IPurityRule
+internal class ObjectCreationPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.ObjectCreation,
-        OperationKind.TypeParameterObjectCreation);
-
     public PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisState currentState)
     {

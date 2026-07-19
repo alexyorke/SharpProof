@@ -1,24 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ChildOperationsPurityRule : IPurityRule
+internal static class ChildOperationsPurityRule
 {
-    private readonly ImmutableArray<OperationKind> _applicableOperationKinds;
-
-    public ChildOperationsPurityRule(params OperationKind[] applicableOperationKinds)
-    {
-        _applicableOperationKinds = ImmutableArray.Create(applicableOperationKinds);
-    }
-
-    public IEnumerable<OperationKind> ApplicableOperationKinds => _applicableOperationKinds;
-
-    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
-        IOperation operation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        return CheckChildOperationsArePure(operation, context, currentState);
-    }
-
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckChildOperationsArePure(
         IOperation operation,
         PurityAnalysisContext context,

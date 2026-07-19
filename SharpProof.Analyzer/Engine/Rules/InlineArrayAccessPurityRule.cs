@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class InlineArrayAccessPurityRule : PurityRuleBase<IInlineArrayAccessOperation>
 {
-    protected override OperationKind Kind => OperationKind.InlineArrayAccess;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IInlineArrayAccessOperation inlineArrayAccessOperation,
         PurityAnalysisContext context,

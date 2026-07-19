@@ -422,12 +422,18 @@ Tests are excluded from the metric and must not be deleted.
   derived unknown and truncation metadata. Explicit JSON ordering and ignored
   internal span coordinates preserve compact, full, and explain output bytes;
   architecture coverage prevents the assignment-heavy forms from returning.
+- [x] Made `RuleRegistry` the sole operation-kind dispatch owner for purity
+  analysis. Deleted `IPurityRule`, the unused session rule list, per-rule
+  applicable-kind declarations, the runtime list-to-dictionary adapter, and
+  the declarative-pure rule object. The immutable handler map preserves ordered
+  first-owner selection, typed rule behavior, evidence names, and fuzz-shape
+  coverage without duplicating operation ownership in every rule.
 
 ## Current evidence
 
-- Maintained production: 94,873 lines (90,954 C#, 3,189 scripts, and 730
-  specifications); net reduction: 12,753 lines; remaining reduction: 7,247.
-  This tranche removed 204 maintained lines without deleting tests.
+- Maintained production: 94,753 lines (90,834 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,873 lines; remaining reduction: 7,127.
+  This tranche removed 120 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,203 passing tests and two documented Main skips.
 

@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class ConditionalAccessPurityRule : PurityRuleBase<IConditionalAccessOperation>
 {
-    protected override OperationKind Kind => OperationKind.ConditionalAccess;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IConditionalAccessOperation conditionalAccessOperation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

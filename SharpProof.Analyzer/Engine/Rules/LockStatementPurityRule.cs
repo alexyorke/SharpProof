@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class LockStatementPurityRule : PurityRuleBase<ILockOperation>
 {
-    protected override OperationKind Kind => OperationKind.Lock;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ILockOperation lockOp,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

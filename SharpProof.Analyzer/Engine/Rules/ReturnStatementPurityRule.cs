@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule : IPurityRule
+internal partial class ReturnStatementPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Return);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

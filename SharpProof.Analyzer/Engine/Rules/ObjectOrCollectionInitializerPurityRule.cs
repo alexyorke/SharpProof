@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class ObjectOrCollectionInitializerPurityRule : PurityRuleBase<IObjectOrCollectionInitializerOperation>
 {
-    protected override OperationKind Kind => OperationKind.ObjectOrCollectionInitializer;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IObjectOrCollectionInitializerOperation initializer, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

@@ -1,12 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class InterpolatedStringPurityRule : IPurityRule
+internal class InterpolatedStringPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
-        OperationKind.InterpolatedString,
-        OperationKind.InterpolatedStringHandlerCreation,
-        OperationKind.InterpolatedStringHandlerArgumentPlaceholder);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

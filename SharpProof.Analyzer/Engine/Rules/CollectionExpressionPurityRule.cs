@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class CollectionExpressionPurityRule : PurityRuleBase<ICollectionExpressionOperation>
 {
-    protected override OperationKind Kind => OperationKind.CollectionExpression;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         ICollectionExpressionOperation collectionExpression, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

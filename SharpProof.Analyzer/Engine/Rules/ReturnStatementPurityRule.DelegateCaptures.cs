@@ -1,6 +1,6 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule : IPurityRule
+internal partial class ReturnStatementPurityRule
 {
     private static bool TryFindReturnedDelegateCapture(
         IOperation? returnedValue,

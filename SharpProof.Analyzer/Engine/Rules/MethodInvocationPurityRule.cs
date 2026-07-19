@@ -5,10 +5,8 @@ using static SharpProof.Analyzer.Engine.Rules.InvocationEvidence;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule : IPurityRule
+internal partial class MethodInvocationPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Invocation);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

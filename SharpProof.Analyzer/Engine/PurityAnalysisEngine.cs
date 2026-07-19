@@ -22,14 +22,8 @@ internal partial class PurityAnalysisEngine
     internal static SymbolDisplayFormat SignatureFormat => _signatureFormat;
 
 
-    private static readonly ImmutableList<IPurityRule> _purityRules = RuleRegistry.GetDefaultRules();
-
-    /// <summary>
-    ///     First registry rule per <see cref="OperationKind" />; matches former <c>FirstOrDefault</c> over
-    ///     <see cref="_purityRules" />.
-    /// </summary>
-    private static readonly ImmutableDictionary<OperationKind, IPurityRule> _firstRuleByOperationKind =
-        BuildFirstRuleByOperationKind(_purityRules);
+    private static readonly ImmutableDictionary<OperationKind, PurityRuleHandler> _firstRuleByOperationKind =
+        RuleRegistry.GetDefaultRules();
 
     private readonly SharpProofAttributeIdentityPolicy _attributePolicy;
     private readonly CompilationPurityService? _purityService;
@@ -47,18 +41,6 @@ internal partial class PurityAnalysisEngine
     {
         _smtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
         _attributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
-    }
-
-    private static ImmutableDictionary<OperationKind, IPurityRule> BuildFirstRuleByOperationKind(
-        ImmutableList<IPurityRule> rules)
-    {
-        var builder = ImmutableDictionary.CreateBuilder<OperationKind, IPurityRule>();
-        foreach (var rule in rules)
-            foreach (var kind in rule.ApplicableOperationKinds)
-                if (!builder.ContainsKey(kind))
-                    builder.Add(kind, rule);
-
-        return builder.ToImmutable();
     }
 
     private static SyntaxNode? GetDeclaringSyntax(

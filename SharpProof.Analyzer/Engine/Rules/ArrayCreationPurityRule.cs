@@ -4,8 +4,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class ArrayCreationPurityRule : PurityRuleBase<IArrayCreationOperation>
 {
-    protected override OperationKind Kind => OperationKind.ArrayCreation;
-
     protected override PurityAnalysisResult CheckTyped(IArrayCreationOperation arrayCreation,
         PurityAnalysisContext context, PurityAnalysisState currentState)
     {

@@ -165,7 +165,7 @@ internal partial class PurityAnalysisEngine
 
         if (applicableRule != null)
         {
-            var ruleResult = applicableRule.CheckPurity(operation, context, currentState);
+            var ruleResult = applicableRule(operation, context, currentState);
 
             if (!ruleResult.IsPure)
             {

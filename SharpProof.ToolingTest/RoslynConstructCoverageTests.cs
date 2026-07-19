@@ -1,12 +1,11 @@
-using System.Collections;
 using System.Collections.Immutable;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Attributes;
 using SharpProof.Tools.CorpusReport;
 using SharpProof.Tools.Fuzz;
@@ -47,20 +46,9 @@ public class RoslynConstructCoverageTests
 
         Assert.That(unknownRegisteredKinds, Is.Empty);
 
-        var allowedDuplicateOwners = new Dictionary<OperationKind, ImmutableHashSet<string>>
-        {
-            [OperationKind.Binary] =
-                ImmutableHashSet.Create(StringComparer.Ordinal, "BinaryOperationPurityRule", "IsNullPurityRule"),
-            [OperationKind.LocalFunction] = ImmutableHashSet.Create(StringComparer.Ordinal,
-                "LocalFunctionOperationPurityRule", "StructuralPurityRule")
-        };
-
         var unexpectedDuplicates = registeredKinds
             .GroupBy(item => item.OperationKind)
             .Where(group => group.Select(item => item.RuleName).Distinct(StringComparer.Ordinal).Count() > 1)
-            .Where(group =>
-                !allowedDuplicateOwners.TryGetValue(group.Key, out var expectedOwners) ||
-                !expectedOwners.SetEquals(group.Select(item => item.RuleName)))
             .Select(group => group.Key + ":" + string.Join(",",
                 group.Select(item => item.RuleName).OrderBy(name => name, StringComparer.Ordinal)))
             .ToArray();
@@ -70,7 +58,7 @@ public class RoslynConstructCoverageTests
     }
 
     [Test]
-    public void RuleRegistry_AlwaysPureOperationsUseDeclarativeDescriptors()
+    public void RuleRegistry_AlwaysPureOperationsUseSharedHandler()
     {
         var expectedDeclarativeKinds = new[]
         {
@@ -106,7 +94,7 @@ public class RoslynConstructCoverageTests
         };
 
         var declarativeKinds = GetRegisteredRuleOperationKinds()
-            .Where(static item => item.RuleName == "DeclarativePureOperationRule")
+            .Where(static item => item.RuleName == "RuleRegistry.AlwaysPure")
             .Select(static item => item.OperationKind)
             .ToArray();
 
@@ -264,25 +252,11 @@ public class RoslynConstructCoverageTests
 
     private static ImmutableArray<RegisteredRuleOperationKind> GetRegisteredRuleOperationKinds()
     {
-        var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
-        var registryType = analyzerAssembly.GetType("SharpProof.Analyzer.Engine.Rules.RuleRegistry", true)!;
-        var getDefaultRulesMethod =
-            registryType.GetMethod("GetDefaultRules", BindingFlags.Public | BindingFlags.Static)!;
-        var rules = (IEnumerable)getDefaultRulesMethod.Invoke(null, null)!;
-        var builder = ImmutableArray.CreateBuilder<RegisteredRuleOperationKind>();
-
-        foreach (var rule in rules)
-        {
-            var applicableOperationKindsProperty = rule.GetType().GetProperty(
-                "ApplicableOperationKinds",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
-            var operationKinds = (IEnumerable)applicableOperationKindsProperty.GetValue(rule)!;
-
-            foreach (OperationKind operationKind in operationKinds)
-                builder.Add(new RegisteredRuleOperationKind(rule.GetType().Name, operationKind));
-        }
-
-        return builder.ToImmutable();
+        return RuleRegistry.GetDefaultRules()
+            .Select(static pair => new RegisteredRuleOperationKind(
+                pair.Value.Method.DeclaringType!.Name + "." + pair.Value.Method.Name,
+                pair.Key))
+            .ToImmutableArray();
     }
 
     private static ImmutableHashSet<OperationKind> GetOperationKinds(string source, bool allowUnsafe)

@@ -161,7 +161,6 @@ internal partial class PurityAnalysisEngine
                 visited,
                 purityCache,
                 methodSymbol,
-                _purityRules,
                 cancellationToken,
                 purityService,
                 activeSmtAnalysis,

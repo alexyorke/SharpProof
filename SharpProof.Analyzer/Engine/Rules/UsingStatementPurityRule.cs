@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class UsingStatementPurityRule : IPurityRule
+internal class UsingStatementPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => [OperationKind.Using, OperationKind.UsingDeclaration];
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ThrowOperationPurityRule : IPurityRule
+internal class ThrowOperationPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Throw);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {

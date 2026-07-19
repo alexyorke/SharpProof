@@ -336,12 +336,7 @@ public static class RoslynShapeManifest
 
     private static ImmutableHashSet<OperationKind> GetRegisteredRuleOperationKinds()
     {
-        var builder = ImmutableHashSet.CreateBuilder<OperationKind>();
-        foreach (var rule in RuleRegistry.GetDefaultRules())
-        foreach (var operationKind in rule.ApplicableOperationKinds)
-            builder.Add(operationKind);
-
-        return builder.ToImmutable();
+        return RuleRegistry.GetDefaultRules().Keys.ToImmutableHashSet();
     }
 
     private static bool IsTokenOnlyKind(string name)

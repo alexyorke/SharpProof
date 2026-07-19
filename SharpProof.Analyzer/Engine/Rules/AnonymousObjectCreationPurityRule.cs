@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class AnonymousObjectCreationPurityRule : PurityRuleBase<IAnonymousObjectCreationOperation>
 {
-    protected override OperationKind Kind => OperationKind.AnonymousObjectCreation;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IAnonymousObjectCreationOperation anonymousObjectCreationOperation,
         PurityAnalysisContext context,

@@ -678,7 +678,6 @@ internal sealed class SymbolicOperationTransferModelTests
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
-            ImmutableList<IPurityRule>.Empty,
             CancellationToken.None,
             PurityService: null,
             smtAnalysis);
@@ -1260,7 +1259,6 @@ internal sealed class SymbolicOperationTransferModelTests
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default),
             containingMethod,
-            ImmutableList<IPurityRule>.Empty,
             CancellationToken.None,
             PurityService: null,
             smtAnalysis);

@@ -4,8 +4,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal class IsNullPurityRule : PurityRuleBase<IIsNullOperation>
 {
-    protected override OperationKind Kind => OperationKind.IsNull;
-
     protected override PurityAnalysisResult CheckTyped(IIsNullOperation isNullOperation,
         PurityAnalysisContext context, PurityAnalysisState currentState)
     {

@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class WithOperationPurityRule : PurityRuleBase<IWithOperation>
 {
-    protected override OperationKind Kind => OperationKind.With;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IWithOperation withOperation,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

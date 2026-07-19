@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class RecursivePatternPurityRule : PurityRuleBase<IRecursivePatternOperation>
 {
-    protected override OperationKind Kind => OperationKind.RecursivePattern;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IRecursivePatternOperation recursivePatternOperation,
         PurityAnalysisContext context,

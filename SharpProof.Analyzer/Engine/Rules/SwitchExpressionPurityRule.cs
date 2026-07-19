@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class SwitchExpressionPurityRule : PurityRuleBase<ISwitchExpressionOperation>
 {
-    protected override OperationKind Kind => OperationKind.SwitchExpression;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(ISwitchExpressionOperation switchExpression,
         PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
     {

@@ -2,8 +2,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal sealed class SpreadOperationPurityRule : PurityRuleBase<ISpreadOperation>
 {
-    protected override OperationKind Kind => OperationKind.Spread;
-
     protected override PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         ISpreadOperation spreadOperation,
         PurityAnalysisContext context,

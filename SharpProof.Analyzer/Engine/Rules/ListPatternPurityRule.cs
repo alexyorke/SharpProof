@@ -1,10 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ListPatternPurityRule : IPurityRule
+internal sealed class ListPatternPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.ListPattern);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
         IOperation operation,
         PurityAnalysisContext context,

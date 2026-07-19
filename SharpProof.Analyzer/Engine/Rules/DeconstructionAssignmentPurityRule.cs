@@ -1,10 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class DeconstructionAssignmentPurityRule : IPurityRule
+internal sealed class DeconstructionAssignmentPurityRule
 {
-    public IEnumerable<OperationKind> ApplicableOperationKinds =>
-        ImmutableArray.Create(OperationKind.DeconstructionAssignment);
-
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
         IOperation operation,
         PurityAnalysisContext context,
