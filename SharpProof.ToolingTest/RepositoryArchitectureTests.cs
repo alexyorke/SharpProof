@@ -151,6 +151,23 @@ public sealed class RepositoryArchitectureTests
             "The supported .NET boundary is SharpProofAnalysisSession/query/result; legacy DTOs and raw SMT types stay internal.");
     }
 
+    [Test]
+    public void AnalyzerAssembly_DoesNotRetainDuplicateExceptionFactProjection()
+    {
+        var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
+        var catalog = assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog", true)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                assembly.GetType("SharpProof.Analyzer.ExceptionSummaryCatalog+SummaryExceptionFact"),
+                Is.Null);
+            Assert.That(catalog.GetMethod(
+                "ParseExceptionFacts",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic), Is.Null);
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

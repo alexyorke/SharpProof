@@ -164,14 +164,19 @@ Tests are excluded from the metric and must not be deleted.
   source, range, program-point, hazard, capability, and complexity execution
   instead of being expanded into parallel option parameter lists. Architecture
   coverage prevents all four superseded adapter types from returning.
+- [x] Removed ExceptionSummaryCatalog's unreachable second exception-fact graph.
+  The live `SummaryExceptionInfo` and structured edge projection remains the sole
+  owner consumed by diagnostics; focused source/edge tests preserve direct and
+  transitive evidence, and architecture coverage prevents the duplicate fact
+  model and parser from returning.
 
 ## Current evidence
 
-- Maintained production: 103,290 lines (99,215 C#, 3,189 scripts, and 886
-  specifications); net reduction: 4,336 lines; remaining reduction: 15,664.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 103,070 lines (98,995 C#, 3,189 scripts, and 886
+  specifications); net reduction: 4,556 lines; remaining reduction: 15,444.
+  This tranche removed 220 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,156 passing tests and two documented skips.
+- Six lanes: 6,158 passing tests and two documented skips.
 
 ## Milestones
 

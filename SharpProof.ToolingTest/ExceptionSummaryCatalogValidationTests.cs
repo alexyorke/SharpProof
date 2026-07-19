@@ -692,7 +692,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 thrownExceptionTypesJson: "[]",
                 transitiveThrownExceptionTypesJson: "[]",
                 transitiveThrownExceptionEdgesJson:
-                $$"""[ { "ExceptionType": "System.InvalidOperationException", "CallPath": "{{expectedSourceChain}}", "Depth": 3 } ]"""),
+                $$"""[ { "ExceptionType": "System.InvalidOperationException", "SourcePath": "{{expectedSourceChain}}", "Depth": 3 } ]"""),
             references);
 
         var summaryDiagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
@@ -2290,7 +2290,7 @@ public partial class ExceptionSummaryCatalogValidationTests
     }
 
     [Test]
-    public void ExceptionSummaryCatalog_TryGetExceptionFacts_PreservesDirectAndTransitiveOrigins()
+    public void ExceptionSummaryCatalog_TryGetExceptionInfos_PreservesSourcesAndEdges()
     {
         var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
         var compilation = CreateLibraryCallCompilation();
@@ -2375,10 +2375,12 @@ public partial class ExceptionSummaryCatalogValidationTests
                     .Select(edge =>
                     {
                         var edgeType = edge.GetType();
+                        var calleeIdentity = edgeType.GetProperty("CalleeIdentity")!.GetValue(edge);
                         return (
                             ExceptionType: exceptionType,
                             SourcePath: (string)edgeType.GetProperty("SourcePath")!.GetValue(edge)!,
-                            CalleeExactSymbolKey: (string?)edgeType.GetProperty("CalleeExactSymbolKey")!.GetValue(edge),
+                            CalleeExactSymbolKey: (string?)calleeIdentity?.GetType()
+                                .GetProperty("Name")!.GetValue(calleeIdentity),
                             Depth: (int?)edgeType.GetProperty("Depth")!.GetValue(edge));
                     });
                 return sources.Concat(edges);
