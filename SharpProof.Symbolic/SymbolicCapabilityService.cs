@@ -20,15 +20,11 @@ internal sealed class SymbolicCapabilityService
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public SymbolicCapabilityResult Query(
-        SymbolicSourceInput source,
-        SharpProofTarget target,
-        SymbolicQueryOptions options,
+        SymbolicQueryContext request,
         CancellationToken cancellationToken)
     {
         return SymbolicMethodLikeQueryDispatcher.Execute(
-            source,
-            target,
-            options,
+            request,
             SymbolicSourceCompilationKind.Capabilities,
             "Capability source kind is not supported.",
             "Capability queries support point, position, line, or node targets only.",

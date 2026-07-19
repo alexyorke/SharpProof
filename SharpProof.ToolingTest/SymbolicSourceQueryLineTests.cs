@@ -523,6 +523,10 @@ internal class TestClass
         Assert.That(typeof(SymbolicQueryExecutor).IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicQueryService"), Is.Null);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService"), Is.Null);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicConditionProofDispatcher"), Is.Null);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryDispatcher"), Is.Null);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryDispatcher"), Is.Null);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.ValidatedSymbolicQueryRequest"), Is.Null);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
         Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.False);

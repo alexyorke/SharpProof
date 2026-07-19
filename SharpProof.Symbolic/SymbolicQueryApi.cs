@@ -5,31 +5,26 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicQueryExecutor
+internal sealed partial class SymbolicQueryExecutor
 {
     private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicComplexityService _complexityService;
-    private readonly SymbolicConditionProofDispatcher _conditionProofDispatcher;
-    private readonly SymbolicRuntimeHazardQueryDispatcher _runtimeHazardDispatcher;
-    private readonly SymbolicSourceQueryDispatcher _sourceQueryDispatcher;
+    private readonly SymbolicConditionProofEngine _conditionProofEngine;
+    private readonly SymbolicInvariantService _invariantService;
+    private readonly SymbolicRuntimeHazardQueryService _runtimeHazardService;
+    private readonly SymbolicSourceProgramPointExecutor _programPointExecutor;
+    private readonly SymbolicSourceRangeQueryExecutor _rangeQueryExecutor;
 
     internal SymbolicQueryExecutor()
     {
-        var invariantService = new SymbolicInvariantService();
-        var programPointAnalyzer = new SymbolicProgramPointAnalyzer(invariantService);
-        var conditionProofEngine = new SymbolicConditionProofEngine(programPointAnalyzer);
-        var programPointExecutor = new SymbolicSourceProgramPointExecutor(
+        _invariantService = new SymbolicInvariantService();
+        var programPointAnalyzer = new SymbolicProgramPointAnalyzer(_invariantService);
+        _conditionProofEngine = new SymbolicConditionProofEngine(programPointAnalyzer);
+        _programPointExecutor = new SymbolicSourceProgramPointExecutor(
             programPointAnalyzer,
-            conditionProofEngine);
-        var rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(programPointExecutor);
-        _sourceQueryDispatcher = new SymbolicSourceQueryDispatcher(
-            invariantService,
-            programPointExecutor,
-            rangeQueryExecutor,
-            conditionProofEngine);
-        _conditionProofDispatcher = new SymbolicConditionProofDispatcher(conditionProofEngine);
-        _runtimeHazardDispatcher = new SymbolicRuntimeHazardQueryDispatcher(
-            new SymbolicRuntimeHazardQueryService(invariantService));
+            _conditionProofEngine);
+        _rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(_programPointExecutor);
+        _runtimeHazardService = new SymbolicRuntimeHazardQueryService(_invariantService);
         _complexityService = new SymbolicComplexityService();
         _capabilityService = new SymbolicCapabilityService();
     }
@@ -40,7 +35,7 @@ internal sealed class SymbolicQueryExecutor
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
         {
-            var result = _sourceQueryDispatcher.Query(request, token);
+            var result = QuerySource(request, token);
             return request.Options.Filter == null || request.Options.Filter.IsEmpty
                 ? result
                 : result.Filter(request.Options.Filter);
@@ -59,12 +54,12 @@ internal sealed class SymbolicQueryExecutor
         string conditionText,
         CancellationToken cancellationToken = default)
     {
-        var validatedRequest = ValidatedSymbolicQueryRequest.Create(context);
+        if (context == null) throw new ArgumentNullException(nameof(context));
         if (string.IsNullOrWhiteSpace(conditionText))
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
 
-        return ExecuteWithLimits(validatedRequest, cancellationToken, (request, token) =>
-            _conditionProofDispatcher.Prove(request, conditionText, token));
+        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
+            ProveSource(request, conditionText, token));
     }
 
     public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
@@ -83,7 +78,7 @@ internal sealed class SymbolicQueryExecutor
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        return _conditionProofDispatcher.ProveAtSyntaxNode(
+        return _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,
@@ -119,7 +114,7 @@ internal sealed class SymbolicQueryExecutor
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        return _conditionProofDispatcher.ProveAtSyntaxNode(
+        return _conditionProofEngine.ProveAtSyntaxNode(
             semanticModel,
             node,
             conditionText,
@@ -159,8 +154,8 @@ internal sealed class SymbolicQueryExecutor
         hazardOptions ??= SymbolicRuntimeHazardQueryOptions.Default;
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
         {
-            var smtAnalysis = request.RequireSmt("Runtime hazard queries require SMT analysis.");
-            return _runtimeHazardDispatcher.Query(request, smtAnalysis, hazardOptions, token);
+            var smtAnalysis = RequireSmt(request, "Runtime hazard queries require SMT analysis.");
+            return QueryRuntimeHazardsSource(request, smtAnalysis, hazardOptions, token);
         });
     }
 
@@ -169,7 +164,7 @@ internal sealed class SymbolicQueryExecutor
         CancellationToken cancellationToken = default)
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-            _complexityService.Query(request.Source, request.Target, request.Options, token));
+            _complexityService.Query(request, token));
     }
 
     public SymbolicOperationResult<SymbolicComplexityResult> TryQueryComplexity(
@@ -184,7 +179,7 @@ internal sealed class SymbolicQueryExecutor
         CancellationToken cancellationToken = default)
     {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-            _capabilityService.Query(request.Source, request.Target, request.Options, token));
+            _capabilityService.Query(request, token));
     }
 
     public SymbolicOperationResult<SymbolicCapabilityResult> TryQueryCapabilities(
@@ -210,21 +205,11 @@ internal sealed class SymbolicQueryExecutor
     private static TResult ExecuteWithLimits<TResult>(
         SymbolicQueryContext context,
         CancellationToken cancellationToken,
-        Func<ValidatedSymbolicQueryRequest, CancellationToken, TResult> operation)
+        Func<SymbolicQueryContext, CancellationToken, TResult> operation)
     {
-        return ExecuteWithLimits(
-            ValidatedSymbolicQueryRequest.Create(context),
-            cancellationToken,
-            operation);
-    }
-
-    private static TResult ExecuteWithLimits<TResult>(
-        ValidatedSymbolicQueryRequest request,
-        CancellationToken cancellationToken,
-        Func<ValidatedSymbolicQueryRequest, CancellationToken, TResult> operation)
-    {
-        using var limitScope = SymbolicAnalysisLimitContext.Push(request.Options.AnalysisLimits);
-        return operation(request, cancellationToken);
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        using var limitScope = SymbolicAnalysisLimitContext.Push(context.Options.AnalysisLimits);
+        return operation(context, cancellationToken);
     }
 
 }

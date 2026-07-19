@@ -3,26 +3,20 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicSourceProgramPointExecutor
+internal sealed class SymbolicSourceProgramPointExecutor(
+    SymbolicProgramPointAnalyzer programPointAnalyzer,
+    SymbolicConditionProofEngine conditionProofEngine)
 {
-    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer;
-    private readonly SymbolicConditionProofEngine _conditionProofEngine;
-
-    internal SymbolicSourceProgramPointExecutor(
-        SymbolicProgramPointAnalyzer programPointAnalyzer,
-        SymbolicConditionProofEngine conditionProofEngine)
-    {
-        _programPointAnalyzer = programPointAnalyzer ??
-                                throw new ArgumentNullException(nameof(programPointAnalyzer));
-        _conditionProofEngine = conditionProofEngine ??
-                                throw new ArgumentNullException(nameof(conditionProofEngine));
-    }
+    private readonly SymbolicProgramPointAnalyzer _programPointAnalyzer =
+        programPointAnalyzer ?? throw new ArgumentNullException(nameof(programPointAnalyzer));
+    private readonly SymbolicConditionProofEngine _conditionProofEngine =
+        conditionProofEngine ?? throw new ArgumentNullException(nameof(conditionProofEngine));
 
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int position,
-        SmtAnalysisService? smtAnalysis,
+        SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
         var text = syntaxTree.GetText(cancellationToken);
@@ -32,17 +26,16 @@ internal sealed class SymbolicSourceProgramPointExecutor
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _programPointAnalyzer.Analyze(semanticModel, position, node, smtAnalysis, cancellationToken);
+        return _programPointAnalyzer.Analyze(
+            semanticModel, position, node, options.SmtAnalysis, cancellationToken);
     }
 
     internal SymbolicProgramPointResult AnalyzeAndProjectNode(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SyntaxNode node,
-        IEnumerable<string>? impliedConditions,
-        SmtAnalysisService? smtAnalysis,
+        SymbolicQueryOptions options,
         CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts,
         int? requestedLine = null,
         int? requestedColumn = null,
         int? requestedPosition = null,
@@ -53,9 +46,9 @@ internal sealed class SymbolicSourceProgramPointExecutor
             semanticModel,
             node.SpanStart,
             node,
-            smtAnalysis,
+            options.SmtAnalysis,
             cancellationToken,
-            includeCurrentStatementCompletionFacts);
+            options.IncludeCurrentStatementCompletionFacts);
         var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
             syntaxTree,
             query.Position,
@@ -66,8 +59,7 @@ internal sealed class SymbolicSourceProgramPointExecutor
             query,
             lineColumn.Line,
             lineColumn.Column,
-            impliedConditions,
-            smtAnalysis,
+            options,
             cancellationToken,
             requestedLine,
             requestedColumn,
@@ -81,8 +73,7 @@ internal sealed class SymbolicSourceProgramPointExecutor
         SymbolicProgramPointQueryContext query,
         int line,
         int column,
-        IEnumerable<string>? impliedConditions,
-        SmtAnalysisService? smtAnalysis,
+        SymbolicQueryOptions options,
         CancellationToken cancellationToken,
         int? requestedLine = null,
         int? requestedColumn = null,
@@ -95,8 +86,8 @@ internal sealed class SymbolicSourceProgramPointExecutor
             query.Position,
             query.Node,
             query.Analysis,
-            impliedConditions,
-            smtAnalysis,
+            options.ImpliedConditions,
+            options.SmtAnalysis,
             cancellationToken);
         return SymbolicProgramPointProjector.Project(
             syntaxTree,
@@ -104,7 +95,7 @@ internal sealed class SymbolicSourceProgramPointExecutor
             line,
             column,
             conditionProofs,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
+            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
             cancellationToken,
             requestedLine,
             requestedColumn,

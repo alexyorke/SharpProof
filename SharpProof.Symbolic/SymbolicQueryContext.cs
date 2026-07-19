@@ -4,28 +4,26 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicQueryContext
+internal sealed class SymbolicQueryContext(
+    SymbolicSourceInput source,
+    SharpProofTarget target,
+    SymbolicQueryOptions? options = null)
 {
-    public SymbolicQueryContext(
-        SymbolicSourceInput source,
-        SharpProofTarget target,
-        SymbolicQueryOptions? options = null)
-    {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Options = options ?? SymbolicQueryOptions.Default;
-    }
-
-    public SymbolicSourceInput Source { get; }
-
-    public SharpProofTarget Target { get; }
-
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicSourceInput Source { get; } = source ?? throw new ArgumentNullException(nameof(source));
+    public SharpProofTarget Target { get; } = target ?? throw new ArgumentNullException(nameof(target));
+    public SymbolicQueryOptions Options { get; } = options ?? SymbolicQueryOptions.Default;
 }
 
-internal sealed class SymbolicQueryOptions
+internal sealed class SymbolicQueryOptions(
+    SymbolicAnalysisLimits analysisLimits,
+    IEnumerable<MetadataReference>? references = null,
+    SmtAnalysisService? smtAnalysis = null,
+    IEnumerable<string>? impliedConditions = null,
+    bool includeExpressionProgramPoints = false,
+    bool includeCurrentStatementCompletionFacts = false,
+    SymbolicSourceQueryFilter? filter = null)
 {
-    public static readonly SymbolicQueryOptions Default = new();
+    public static readonly SymbolicQueryOptions Default = new(SymbolicAnalysisLimits.Default);
 
     public SymbolicQueryOptions(
         IEnumerable<MetadataReference>? references = null,
@@ -45,28 +43,8 @@ internal sealed class SymbolicQueryOptions
     {
     }
 
-    private SymbolicQueryOptions(
-        SymbolicAnalysisLimits analysisLimits,
-        IEnumerable<MetadataReference>? references = null,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceQueryFilter? filter = null)
-    {
-        AnalysisLimits = analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
-        References = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
-        SmtAnalysis = smtAnalysis;
-        ImpliedConditions = impliedConditions?
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(static condition => condition.Trim())
-            .ToImmutableArray() ?? ImmutableArray<string>.Empty;
-        IncludeExpressionProgramPoints = includeExpressionProgramPoints;
-        IncludeCurrentStatementCompletionFacts = includeCurrentStatementCompletionFacts;
-        Filter = filter;
-    }
-
-    public SymbolicAnalysisLimits AnalysisLimits { get; }
+    public SymbolicAnalysisLimits AnalysisLimits { get; } =
+        analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
 
     public SymbolicQueryOptions WithAnalysisLimits(SymbolicAnalysisLimits analysisLimits)
     {
@@ -80,17 +58,16 @@ internal sealed class SymbolicQueryOptions
             Filter);
     }
 
-    public ImmutableArray<MetadataReference> References { get; }
-
-    public SmtAnalysisService? SmtAnalysis { get; }
-
-    public ImmutableArray<string> ImpliedConditions { get; }
-
-    public bool IncludeExpressionProgramPoints { get; }
-
-    public bool IncludeCurrentStatementCompletionFacts { get; }
-
-    public SymbolicSourceQueryFilter? Filter { get; }
+    public ImmutableArray<MetadataReference> References { get; } =
+        SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
+    public SmtAnalysisService? SmtAnalysis { get; } = smtAnalysis;
+    public ImmutableArray<string> ImpliedConditions { get; } = impliedConditions?
+        .Where(static condition => !string.IsNullOrWhiteSpace(condition))
+        .Select(static condition => condition.Trim())
+        .ToImmutableArray() ?? ImmutableArray<string>.Empty;
+    public bool IncludeExpressionProgramPoints { get; } = includeExpressionProgramPoints;
+    public bool IncludeCurrentStatementCompletionFacts { get; } = includeCurrentStatementCompletionFacts;
+    public SymbolicSourceQueryFilter? Filter { get; } = filter;
 }
 
 internal static class SymbolicQueryOptionHelpers

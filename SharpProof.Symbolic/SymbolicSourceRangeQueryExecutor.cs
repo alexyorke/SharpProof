@@ -3,25 +3,17 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicSourceRangeQueryExecutor
+internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPointExecutor programPointExecutor)
 {
-    private readonly SymbolicSourceProgramPointExecutor _programPointExecutor;
-
-    internal SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPointExecutor programPointExecutor)
-    {
-        _programPointExecutor = programPointExecutor ??
-                                throw new ArgumentNullException(nameof(programPointExecutor));
-    }
+    private readonly SymbolicSourceProgramPointExecutor _programPointExecutor =
+        programPointExecutor ?? throw new ArgumentNullException(nameof(programPointExecutor));
 
     internal SymbolicQueryResult QueryLine(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int line,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        IEnumerable<string>? impliedConditions,
-        bool includeExpressionProgramPoints,
-        bool includeCurrentStatementCompletionFacts)
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
     {
         Validate(syntaxTree, compilation);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -29,23 +21,21 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             syntaxTree,
             line,
             cancellationToken,
-            includeExpressionProgramPoints);
+            options.IncludeExpressionProgramPoints);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
                 syntaxTree,
                 semanticModel,
                 node,
-                impliedConditions,
-                smtAnalysis,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts))
+                options,
+                cancellationToken))
             .ToArray();
 
         return SymbolicQueryResult.FromLine(
             syntaxTree.FilePath,
             line,
             results,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
     }
 
     internal SymbolicProgramPointResult QueryLinePoint(
@@ -53,11 +43,8 @@ internal sealed class SymbolicSourceRangeQueryExecutor
         Compilation compilation,
         int line,
         int column,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        IEnumerable<string>? impliedConditions,
-        bool includeExpressionProgramPoints,
-        bool includeCurrentStatementCompletionFacts)
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
     {
         Validate(syntaxTree, compilation);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -66,7 +53,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             syntaxTree,
             line,
             cancellationToken,
-            includeExpressionProgramPoints);
+            options.IncludeExpressionProgramPoints);
         if (nodes.Count == 0) throw new ArgumentException("No program points found on --line.", nameof(line));
 
         var node = SymbolicSourceTargetSelector.SelectNearest(nodes, position);
@@ -74,10 +61,8 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             syntaxTree,
             semanticModel,
             node,
-            impliedConditions,
-            smtAnalysis,
+            options,
             cancellationToken,
-            includeCurrentStatementCompletionFacts,
             line,
             column,
             position,
@@ -90,11 +75,8 @@ internal sealed class SymbolicSourceRangeQueryExecutor
         Compilation compilation,
         int spanStart,
         int spanEnd,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        IEnumerable<string>? impliedConditions,
-        bool includeExpressionProgramPoints,
-        bool includeCurrentStatementCompletionFacts)
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
     {
         Validate(syntaxTree, compilation);
         var sourceSpan = SymbolicSourceLocation.GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
@@ -102,17 +84,15 @@ internal sealed class SymbolicSourceRangeQueryExecutor
         var nodes = SymbolicSourceTargetSelector.FindInSpan(
             syntaxTree,
             sourceSpan,
-            includeExpressionProgramPoints,
+            options.IncludeExpressionProgramPoints,
             cancellationToken);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
                 syntaxTree,
                 semanticModel,
                 node,
-                impliedConditions,
-                smtAnalysis,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts))
+                options,
+                cancellationToken))
             .ToArray();
         var start = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, sourceSpan.Start, cancellationToken, true);
         var end = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, sourceSpan.End, cancellationToken, true);
@@ -126,7 +106,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             end.Line,
             end.Column,
             results,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
     }
 
     internal SymbolicQueryResult QueryLineSpan(
@@ -136,11 +116,8 @@ internal sealed class SymbolicSourceRangeQueryExecutor
         int startColumn,
         int endLine,
         int endColumn,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        IEnumerable<string>? impliedConditions,
-        bool includeExpressionProgramPoints,
-        bool includeCurrentStatementCompletionFacts)
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
     {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         var spanStart = SymbolicSourceLocation.GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
@@ -150,21 +127,15 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             compilation,
             spanStart,
             spanEnd,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
+            options,
+            cancellationToken);
     }
 
     internal SymbolicQueryResult QueryAllLines(
         SyntaxTree syntaxTree,
         Compilation compilation,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        IEnumerable<string>? impliedConditions,
-        bool includeExpressionProgramPoints,
-        bool includeCurrentStatementCompletionFacts)
+        SymbolicQueryOptions options,
+        CancellationToken cancellationToken)
     {
         Validate(syntaxTree, compilation);
         var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
@@ -175,11 +146,8 @@ internal sealed class SymbolicSourceRangeQueryExecutor
                 syntaxTree,
                 compilation,
                 line,
-                cancellationToken,
-                smtAnalysis,
-                impliedConditions,
-                includeExpressionProgramPoints,
-                includeCurrentStatementCompletionFacts);
+                options,
+                cancellationToken);
             if (lineResult.ProgramPoints.Count != 0)
                 lineResults.Add(new SymbolicQueryLineGroup(line, lineResult.ProgramPoints));
         }
@@ -188,7 +156,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor
             syntaxTree.FilePath,
             lineCount,
             lineResults,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
     }
 
     private static void Validate(SyntaxTree syntaxTree, Compilation compilation)

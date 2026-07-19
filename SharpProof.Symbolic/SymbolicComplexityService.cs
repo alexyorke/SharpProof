@@ -11,15 +11,11 @@ namespace SharpProof.Symbolic;
 internal sealed class SymbolicComplexityService
 {
     public SymbolicComplexityResult Query(
-        SymbolicSourceInput source,
-        SharpProofTarget target,
-        SymbolicQueryOptions options,
+        SymbolicQueryContext request,
         CancellationToken cancellationToken)
     {
         return SymbolicMethodLikeQueryDispatcher.Execute(
-            source,
-            target,
-            options,
+            request,
             SymbolicSourceCompilationKind.Complexity,
             "Complexity source kind is not supported.",
             "Complexity queries support point, position, line, or node targets only.",

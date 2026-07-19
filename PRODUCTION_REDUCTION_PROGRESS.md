@@ -158,12 +158,18 @@ Tests are excluded from the metric and must not be deleted.
   class identity and normalization semantics, and made the two witness property
   orders that mix stored and computed values explicit so CLI JSON remains
   byte-identical instead of depending on compiler metadata order.
+- [x] Removed the condition-proof, source-query, and runtime-hazard dispatcher
+  objects plus their duplicate validated-request carrier. The query executor now
+  owns orchestration directly, and one immutable query context flows through
+  source, range, program-point, hazard, capability, and complexity execution
+  instead of being expanded into parallel option parameter lists. Architecture
+  coverage prevents all four superseded adapter types from returning.
 
 ## Current evidence
 
-- Maintained production: 103,491 lines (99,416 C#, 3,189 scripts, and 886
-  specifications); net reduction: 4,135 lines; remaining reduction: 15,865.
-  This tranche removed 203 maintained lines without deleting tests.
+- Maintained production: 103,290 lines (99,215 C#, 3,189 scripts, and 886
+  specifications); net reduction: 4,336 lines; remaining reduction: 15,664.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,156 passing tests and two documented skips.
 

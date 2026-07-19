@@ -78,9 +78,7 @@ internal static class SymbolicSourceInputDispatcher
 internal static class SymbolicMethodLikeQueryDispatcher
 {
     internal static TResult Execute<TResult, TTarget>(
-        SymbolicSourceInput source,
-        SharpProofTarget target,
-        SymbolicQueryOptions options,
+        SymbolicQueryContext request,
         SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
         string unsupportedTargetMessage,
@@ -91,9 +89,9 @@ internal static class SymbolicMethodLikeQueryDispatcher
         CancellationToken cancellationToken)
     {
         return SymbolicSourceInputDispatcher.Execute(
-            source,
-            target,
-            options,
+            request.Source,
+            request.Target,
+            request.Options,
             compilationKind,
             unsupportedSourceMessage,
             QuerySyntaxTree,
