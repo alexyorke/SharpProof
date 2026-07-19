@@ -665,6 +665,27 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void FuzzCoverageManifest_InfersRoslynFamiliesInsteadOfRepeatingTables()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var fuzzRoot = Path.Combine(root, "Tools", "SharpProof.Fuzz.Core");
+        var manifest = File.ReadAllText(Path.Combine(fuzzRoot, "RoslynShapeManifest.cs"));
+        var models = File.ReadAllText(Path.Combine(fuzzRoot, "FuzzModels.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(manifest, Does.Contain("RuleRegistry.GetDefaultRules"));
+            Assert.That(manifest, Does.Contain("FuzzCaseGenerator.RegistryEntries"));
+            Assert.That(manifest, Does.Contain("Enum.GetValues<OperationKind>()"));
+            Assert.That(manifest, Does.Contain("Enum.GetValues<SyntaxKind>()"));
+            Assert.That(manifest, Does.Not.Contain("ParentHandledOperationKinds"));
+            Assert.That(manifest, Does.Not.Contain("SyntaxShadowKindNames"));
+            Assert.That(manifest, Does.Not.Contain("AnalyzerActionSurfaceDecision"));
+            Assert.That(models, Does.Contain("public sealed record FuzzRunSummary("));
+        });
+    }
+
+    [Test]
     public void EffectSummaryGeneratedPurityRules_HaveOneDeclarativeOwner()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

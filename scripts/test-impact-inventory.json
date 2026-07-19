@@ -3186,7 +3186,7 @@
                             "declaredTypes":  [
                                                   "RuleRegistry"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "RuleRegistry"
                                                  ]
@@ -7072,7 +7072,7 @@
                                                   "FuzzFinding",
                                                   "FuzzRunSummary"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "FuzzCase",
                                                      "FuzzCaseAnalysis",
@@ -7129,14 +7129,12 @@
                             "path":  "Tools/SharpProof.Fuzz.Core/RoslynShapeManifest.cs",
                             "module":  "FuzzCore",
                             "declaredTypes":  [
-                                                  "AnalyzerActionSurfaceDecision",
-                                                  "AnalyzerActionSurfaceManifestEntry",
                                                   "RoslynShapeManifest",
                                                   "RoslynShapeManifestEntry",
                                                   "RoslynShapeSurface",
                                                   "ShapeClassification"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "RoslynShapeManifest"
                                                  ]
@@ -8318,12 +8316,13 @@
                                     "path":  "SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "RepositoryArchitectureTests",
                                                                  "RoslynConstructCoverageTests"
                                                              ],
                                     "tokens":  [
                                                    "RuleRegistry"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
@@ -10801,6 +10800,7 @@
                                     "module":  "FuzzCore",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "RoslynShapeManifestCoverageTests"
                                                              ],
                                     "tokens":  [
@@ -10808,7 +10808,7 @@
                                                    "FuzzCaseAnalysis",
                                                    "FuzzRunSummary"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "Tools/SharpProof.Fuzz.Core/FuzzOptions.cs",
@@ -10849,13 +10849,14 @@
                                     "module":  "FuzzCore",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "RoslynConstructCoverageTests",
                                                                  "RoslynShapeManifestCoverageTests"
                                                              ],
                                     "tokens":  [
                                                    "RoslynShapeManifest"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "Tools/SharpProof.Fuzz.Core/ShapeRegistryEntry.cs",

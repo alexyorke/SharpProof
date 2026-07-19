@@ -47,46 +47,29 @@ public sealed record FuzzExpectation(
 
     public bool IsConservative => Bucket == ConservativeBucket;
 
-    public static FuzzExpectation DefinitelyPure()
-    {
-        return Create(
-            Sp0002ExpectationKind.MustNotEmit,
-            Sp0010ExpectationKind.Ignore);
-    }
+    public static FuzzExpectation DefinitelyPure() => Create(
+        Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.Ignore);
 
-    public static FuzzExpectation DefinitelyImpure()
-    {
-        return Create(
-            Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.Ignore);
-    }
+    public static FuzzExpectation DefinitelyImpure() => Create(
+        Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.Ignore);
 
-    public static FuzzExpectation Conservative()
-    {
-        return Create(
-            Sp0002ExpectationKind.MayEmitConservatively,
-            Sp0010ExpectationKind.Ignore);
-    }
+    public static FuzzExpectation Conservative() => Create(
+        Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.Ignore);
 
     internal static FuzzExpectation Create(
         Sp0002ExpectationKind sp0002,
-        Sp0010ExpectationKind sp0010)
-    {
-        return new FuzzExpectation(
+        Sp0010ExpectationKind sp0010) =>
+        new(
             sp0002,
             sp0010,
             DefaultSp0002Properties,
             DefaultSp0010Properties,
             ImmutableArray<string>.Empty);
-    }
 
-    public FuzzExpectation RequireExceptionEdgesOnAnySp0010()
+    public FuzzExpectation RequireExceptionEdgesOnAnySp0010() => this with
     {
-        return this with
-        {
-            RequiredAnySp0010Properties = ImmutableArray.Create(SharpProofDiagnostics.ExceptionEdgesProperty)
-        };
-    }
+        RequiredAnySp0010Properties = ImmutableArray.Create(SharpProofDiagnostics.ExceptionEdgesProperty)
+    };
 }
 
 public sealed record ShapeRegistryEntry(

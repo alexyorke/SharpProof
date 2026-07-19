@@ -104,9 +104,7 @@ public class RoslynConstructCoverageTests
     [Test]
     public void AnalyzerActionSurfaceCoverageTests()
     {
-        var surfaces =
-            RoslynShapeManifest.ActionSurfaceEntries.ToImmutableDictionary(surface => surface.Name,
-                StringComparer.Ordinal);
+        var surfaces = RoslynShapeManifest.ActionSurfaceEntries;
         var expectedSurfaces = new[]
         {
             "CompilationStart",
@@ -121,16 +119,15 @@ public class RoslynConstructCoverageTests
         };
 
         Assert.That(surfaces.Keys, Is.EquivalentTo(expectedSurfaces));
-        Assert.That(surfaces["CompilationStart"].Decision.ToString(), Is.EqualTo("Used"));
-        Assert.That(surfaces["CompilationEnd"].Decision.ToString(), Is.EqualTo("Used"));
-        Assert.That(surfaces["SyntaxNode"].Decision.ToString(), Is.EqualTo("Used"));
-        Assert.That(surfaces["SyntaxTree"].Decision.ToString(), Is.EqualTo("Used"));
-        Assert.That(surfaces["OperationBlock"].Decision.ToString(), Is.EqualTo("Used"));
-        Assert.That(surfaces["Operation"].Decision.ToString(), Is.EqualTo("NotUsed"));
-        Assert.That(surfaces["OperationBlockStart"].Decision.ToString(), Is.EqualTo("NotUsed"));
-        Assert.That(surfaces["SemanticModel"].Decision.ToString(), Is.EqualTo("NotUsed"));
-        Assert.That(surfaces["Symbol"].Decision.ToString(), Is.EqualTo("NotUsed"));
-        Assert.That(surfaces.Values.Select(surface => surface.Rationale), Has.All.Not.Empty);
+        Assert.That(surfaces["CompilationStart"], Is.True);
+        Assert.That(surfaces["CompilationEnd"], Is.True);
+        Assert.That(surfaces["SyntaxNode"], Is.True);
+        Assert.That(surfaces["SyntaxTree"], Is.True);
+        Assert.That(surfaces["OperationBlock"], Is.True);
+        Assert.That(surfaces["Operation"], Is.False);
+        Assert.That(surfaces["OperationBlockStart"], Is.False);
+        Assert.That(surfaces["SemanticModel"], Is.False);
+        Assert.That(surfaces["Symbol"], Is.False);
     }
 
     [TestCaseSource(nameof(OperationCorpusSnippets))]

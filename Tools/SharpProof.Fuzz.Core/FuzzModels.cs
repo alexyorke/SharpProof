@@ -39,89 +39,40 @@ internal static class FuzzDictionaryExtensions
         values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
 }
 
-public sealed record FuzzRunSummary
-{
-    public string SchemaVersion { get; init; } = "1.3";
-
-    public int Seed { get; init; }
-
-    public int? IterationsRequested { get; init; }
-
-    public double? DurationSecondsRequested { get; init; }
-
-    public int Parallelism { get; init; }
-
-    public string OutputDirectory { get; init; } = "";
-
-    public DateTimeOffset StartedUtc { get; init; }
-
-    public DateTimeOffset CompletedUtc { get; init; }
-
-    public double ElapsedSeconds { get; init; }
-
-    public int CasesAnalyzed { get; init; }
-
-    public int CompilationErrorCount { get; init; }
-
-    public int AnalyzerExceptionCount { get; init; }
-
-    public int FindingCount { get; init; }
-
-    public int UniqueFindingCount { get; init; }
-
-    public int InterestingCasesSaved { get; init; }
-
-    public int Sp0002Count { get; init; }
-
-    public int Sp0004Count { get; init; }
-
-    public int Sp0009Count { get; init; }
-
-    public int Sp0010Count { get; init; }
-
-    public ImmutableSortedDictionary<string, int> FamilyCounts { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableSortedDictionary<string, int> OperationKinds { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableSortedDictionary<string, int> SyntaxKinds { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableArray<string> UnobservedOperationKinds { get; init; } =
-        ImmutableArray<string>.Empty;
-
-    public ImmutableArray<string> ActionableUnobservedOperationKinds { get; init; } =
-        ImmutableArray<string>.Empty;
-
-    public string SamplerMode { get; init; } = "";
-
-    public ImmutableSortedDictionary<string, int> ManifestSurfaceCounts { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableSortedDictionary<string, int> ManifestClassificationCounts { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableSortedDictionary<string, int> RegistryExpectationCounts { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public int DefiniteRegistryFamilyCount { get; init; }
-
-    public int ConservativeRegistryFamilyCount { get; init; }
-
-    public ImmutableArray<string> ConservativeRegistryFamilies { get; init; } =
-        ImmutableArray<string>.Empty;
-
-    public int GeneratorBackedShapeCount { get; init; }
-
-    public int GeneratorBackedShapesWithRegistryCount { get; init; }
-
-    public ImmutableArray<string> UnobservedGeneratorBackedShapes { get; init; } =
-        ImmutableArray<string>.Empty;
-
-    public ImmutableSortedDictionary<string, int> PrimaryShapeCounts { get; init; } =
-        ImmutableSortedDictionary<string, int>.Empty;
-
-    public ImmutableArray<FuzzFinding> Findings { get; init; } =
-        ImmutableArray<FuzzFinding>.Empty;
-}
+public sealed record FuzzRunSummary(
+    string SchemaVersion,
+    int Seed,
+    int? IterationsRequested,
+    double? DurationSecondsRequested,
+    int Parallelism,
+    string OutputDirectory,
+    DateTimeOffset StartedUtc,
+    DateTimeOffset CompletedUtc,
+    double ElapsedSeconds,
+    int CasesAnalyzed,
+    int CompilationErrorCount,
+    int AnalyzerExceptionCount,
+    int FindingCount,
+    int UniqueFindingCount,
+    int InterestingCasesSaved,
+    int Sp0002Count,
+    int Sp0004Count,
+    int Sp0009Count,
+    int Sp0010Count,
+    ImmutableSortedDictionary<string, int> FamilyCounts,
+    ImmutableSortedDictionary<string, int> OperationKinds,
+    ImmutableSortedDictionary<string, int> SyntaxKinds,
+    ImmutableArray<string> UnobservedOperationKinds,
+    ImmutableArray<string> ActionableUnobservedOperationKinds,
+    string SamplerMode,
+    ImmutableSortedDictionary<string, int> ManifestSurfaceCounts,
+    ImmutableSortedDictionary<string, int> ManifestClassificationCounts,
+    ImmutableSortedDictionary<string, int> RegistryExpectationCounts,
+    int DefiniteRegistryFamilyCount,
+    int ConservativeRegistryFamilyCount,
+    ImmutableArray<string> ConservativeRegistryFamilies,
+    int GeneratorBackedShapeCount,
+    int GeneratorBackedShapesWithRegistryCount,
+    ImmutableArray<string> UnobservedGeneratorBackedShapes,
+    ImmutableSortedDictionary<string, int> PrimaryShapeCounts,
+    ImmutableArray<FuzzFinding> Findings);

@@ -68,21 +68,16 @@ public sealed record FuzzOptions
         return options;
     }
 
-    private static int ReadInt(ToolArgumentReader reader, string option)
-    {
-        var value = reader.RequiredValue(option, $"{option} expects a value.");
-        return int.TryParse(value, out var parsed)
+    private static int ReadInt(ToolArgumentReader reader, string option) =>
+        int.TryParse(reader.RequiredValue(option, $"{option} expects a value."), out var parsed)
             ? parsed
             : throw new ArgumentException($"{option} expects an integer.");
-    }
 
-    private static double ReadDouble(ToolArgumentReader reader, string option)
-    {
-        var value = reader.RequiredValue(option, $"{option} expects a value.");
-        return double.TryParse(value, out var parsed) && double.IsFinite(parsed) && parsed >= 0
+    private static double ReadDouble(ToolArgumentReader reader, string option) =>
+        double.TryParse(reader.RequiredValue(option, $"{option} expects a value."), out var parsed) &&
+        double.IsFinite(parsed) && parsed >= 0
             ? parsed
             : throw new ArgumentException($"{option} expects a finite non-negative number.");
-    }
 
     private static TimeSpan ReadDuration(
         ToolArgumentReader reader,
@@ -100,11 +95,7 @@ public sealed record FuzzOptions
         }
     }
 
-    private static string DefaultOutputDirectory() =>
-        Path.Combine(
-            Environment.CurrentDirectory,
-            "artifacts",
-            "fuzz",
-            DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
+    private static string DefaultOutputDirectory() => Path.Combine(
+        Environment.CurrentDirectory, "artifacts", "fuzz", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
 
 }

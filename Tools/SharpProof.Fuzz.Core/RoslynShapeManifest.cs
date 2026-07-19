@@ -22,337 +22,177 @@ public enum ShapeClassification
     CSharpNotApplicable
 }
 
-public enum AnalyzerActionSurfaceDecision
-{
-    Used,
-    NotUsed
-}
-
 public sealed record RoslynShapeManifestEntry(
     RoslynShapeSurface Surface,
     string ShapeId,
     string DisplayName,
-    ShapeClassification Classification,
-    string Rationale);
-
-public sealed record AnalyzerActionSurfaceManifestEntry(
-    string Name,
-    AnalyzerActionSurfaceDecision Decision,
-    string Rationale);
+    ShapeClassification Classification);
 
 public static class RoslynShapeManifest
 {
-    private static readonly ImmutableHashSet<OperationKind> NonActionableConservativeOperationKinds =
-        ImmutableHashSet.Create(
-            OperationKind.Invalid,
-            OperationKind.InterpolatedStringAppendInvalid);
+    private static readonly ImmutableHashSet<OperationKind> RegisteredRuleKinds =
+        RuleRegistry.GetDefaultRules().Keys.ToImmutableHashSet();
 
-    private static readonly ImmutableHashSet<OperationKind> ParentHandledOperationKinds =
-        ImmutableHashSet.Create(
-            OperationKind.None,
-            OperationKind.MethodReference,
-            OperationKind.UnaryOperator,
-            OperationKind.BinaryOperator,
-            OperationKind.BinaryPattern,
-            OperationKind.Branch,
-            OperationKind.Parenthesized,
-            OperationKind.ConditionalAccessInstance,
-            OperationKind.Empty,
-            OperationKind.FlowAnonymousFunction,
-            OperationKind.Labeled,
-            OperationKind.Loop,
-            OperationKind.MemberInitializer,
-            OperationKind.PropertyInitializer,
-            OperationKind.TranslatedQuery,
-            OperationKind.DeclarationExpression,
-            OperationKind.OmittedArgument,
-            OperationKind.ParameterInitializer,
-            OperationKind.SwitchCase,
-            OperationKind.InterpolatedStringText,
-            OperationKind.Interpolation,
-            OperationKind.TupleBinary,
-            OperationKind.TupleBinaryOperator,
-            OperationKind.MethodBody,
-            OperationKind.ConstructorBody,
-            OperationKind.Discard,
-            OperationKind.FlowCapture,
-            OperationKind.FlowCaptureReference,
-            OperationKind.IsNull,
-            OperationKind.CaughtException,
-            OperationKind.StaticLocalInitializationSemaphore,
-            OperationKind.SwitchExpressionArm,
-            OperationKind.YieldBreak,
-            OperationKindValue("CollectionElementInitializer"));
+    private static readonly ImmutableHashSet<string> GeneratorBackedOperationShapeIds =
+        FuzzCaseGenerator.RegistryEntries
+            .SelectMany(static entry => entry.PrimaryShapeIds)
+            .Where(static shapeId => shapeId.StartsWith("operation:", StringComparison.Ordinal))
+            .ToImmutableHashSet(StringComparer.Ordinal);
 
-    private static readonly ImmutableHashSet<OperationKind> CSharpNotApplicableOperationKinds =
-        ImmutableHashSet.Create(
-            OperationKind.Stop,
-            OperationKind.End,
-            OperationKind.RaiseEvent,
-            OperationKind.ReDim,
-            OperationKind.ReDimClause);
+    public static ImmutableArray<RoslynShapeManifestEntry> OperationEntries { get; } =
+        Enum.GetValues<OperationKind>().Select(CreateOperationEntry).ToImmutableArray();
 
-    private static readonly ImmutableHashSet<OperationKind> SyntaxShadowOperationKinds =
-        ImmutableHashSet.Create(OperationKind.Attribute);
-
-    private static readonly ImmutableHashSet<OperationKind> ConservativeOperationKinds =
-        ImmutableHashSet.Create(
-            OperationKind.Invalid,
-            OperationKind.AddressOf,
-            OperationKind.InterpolatedStringHandlerCreation,
-            OperationKind.InterpolatedStringAddition,
-            OperationKind.InterpolatedStringAppendLiteral,
-            OperationKind.InterpolatedStringAppendFormatted,
-            OperationKind.InterpolatedStringAppendInvalid,
-            OperationKind.InterpolatedStringHandlerArgumentPlaceholder,
-            OperationKind.FunctionPointerInvocation);
-
-    public static bool IsActionableUnobservedOperationKind(OperationKind kind)
-    {
-        if (ParentHandledOperationKinds.Contains(kind) ||
-            CSharpNotApplicableOperationKinds.Contains(kind) ||
-            SyntaxShadowOperationKinds.Contains(kind) ||
-            NonActionableConservativeOperationKinds.Contains(kind))
-            return false;
-
-        var shapeId = OperationShapeId(kind);
-        return EntriesByShapeId.TryGetValue(shapeId, out var entry) &&
-               entry.Classification != ShapeClassification.ParentHandled &&
-               entry.Classification != ShapeClassification.CSharpNotApplicable &&
-               entry.Classification != ShapeClassification.SyntaxShadow;
-    }
-
-    private static readonly ImmutableHashSet<string> SyntaxShadowKindNames =
-        ImmutableHashSet.Create(
-            StringComparer.Ordinal,
-            nameof(SyntaxKind.Attribute),
-            nameof(SyntaxKind.AttributeList),
-            nameof(SyntaxKind.AttributeArgument),
-            nameof(SyntaxKind.AttributeArgumentList),
-            nameof(SyntaxKind.ClassDeclaration),
-            nameof(SyntaxKind.RecordDeclaration),
-            nameof(SyntaxKind.RecordStructDeclaration),
-            nameof(SyntaxKind.StructDeclaration),
-            nameof(SyntaxKind.InterfaceDeclaration),
-            nameof(SyntaxKind.EnumDeclaration),
-            nameof(SyntaxKind.DelegateDeclaration),
-            nameof(SyntaxKind.NamespaceDeclaration),
-            nameof(SyntaxKind.FileScopedNamespaceDeclaration),
-            nameof(SyntaxKind.UsingDirective),
-            nameof(SyntaxKind.ExternAliasDirective),
-            nameof(SyntaxKind.GlobalStatement),
-            nameof(SyntaxKind.SingleLineDocumentationCommentTrivia),
-            nameof(SyntaxKind.MultiLineDocumentationCommentTrivia),
-            nameof(SyntaxKind.DocumentationCommentExteriorTrivia),
-            nameof(SyntaxKind.XmlElement),
-            nameof(SyntaxKind.XmlEmptyElement),
-            nameof(SyntaxKind.XmlText),
-            nameof(SyntaxKind.XmlTextLiteralToken),
-            nameof(SyntaxKind.XmlName),
-            nameof(SyntaxKind.XmlPrefix),
-            nameof(SyntaxKind.XmlCDataSection),
-            nameof(SyntaxKind.XmlComment),
-            nameof(SyntaxKind.XmlProcessingInstruction),
-            nameof(SyntaxKind.XmlElementStartTag),
-            nameof(SyntaxKind.XmlElementEndTag),
-            nameof(SyntaxKind.DefineDirectiveTrivia),
-            nameof(SyntaxKind.UndefDirectiveTrivia),
-            nameof(SyntaxKind.IfDirectiveTrivia),
-            nameof(SyntaxKind.ElifDirectiveTrivia),
-            nameof(SyntaxKind.ElseDirectiveTrivia),
-            nameof(SyntaxKind.EndIfDirectiveTrivia),
-            nameof(SyntaxKind.RegionDirectiveTrivia),
-            nameof(SyntaxKind.EndRegionDirectiveTrivia),
-            nameof(SyntaxKind.ErrorDirectiveTrivia),
-            nameof(SyntaxKind.WarningDirectiveTrivia),
-            nameof(SyntaxKind.LineDirectiveTrivia),
-            nameof(SyntaxKind.PragmaWarningDirectiveTrivia),
-            nameof(SyntaxKind.PragmaChecksumDirectiveTrivia),
-            nameof(SyntaxKind.ReferenceDirectiveTrivia),
-            nameof(SyntaxKind.LoadDirectiveTrivia),
-            nameof(SyntaxKind.ShebangDirectiveTrivia),
-            nameof(SyntaxKind.NullableDirectiveTrivia),
-            nameof(SyntaxKind.BadDirectiveTrivia),
-            nameof(SyntaxKind.SkippedTokensTrivia),
-            nameof(SyntaxKind.PrimaryConstructorBaseType));
-
-    public static ImmutableArray<RoslynShapeManifestEntry> OperationEntries { get; } = BuildOperationEntries();
-
-    public static ImmutableArray<RoslynShapeManifestEntry> SyntaxEntries { get; } = BuildSyntaxEntries();
+    public static ImmutableArray<RoslynShapeManifestEntry> SyntaxEntries { get; } =
+        Enum.GetValues<SyntaxKind>().Select(CreateSyntaxEntry).ToImmutableArray();
 
     public static ImmutableDictionary<string, RoslynShapeManifestEntry> EntriesByShapeId { get; } =
-        OperationEntries
-            .Concat(SyntaxEntries)
-            .ToImmutableDictionary(entry => entry.ShapeId, StringComparer.Ordinal);
+        OperationEntries.Concat(SyntaxEntries).ToImmutableDictionary(static entry => entry.ShapeId, StringComparer.Ordinal);
 
-    public static ImmutableArray<AnalyzerActionSurfaceManifestEntry> ActionSurfaceEntries { get; } =
-        ImmutableArray.Create(
-            new AnalyzerActionSurfaceManifestEntry("CompilationStart", AnalyzerActionSurfaceDecision.Used,
-                "Analyzer configuration and shared state are initialized at compilation start."),
-            new AnalyzerActionSurfaceManifestEntry("CompilationEnd", AnalyzerActionSurfaceDecision.Used,
-                "Compilation-wide configuration and additional-file issues are reported before shared state is disposed."),
-            new AnalyzerActionSurfaceManifestEntry("Operation", AnalyzerActionSurfaceDecision.NotUsed,
-                "Feature checks consume one cached method-body snapshot instead of registering independent operation callbacks."),
-            new AnalyzerActionSurfaceManifestEntry("OperationBlock", AnalyzerActionSurfaceDecision.Used,
-                "Executable method-like bodies create one shared root, semantic-fact snapshot, and symbolic-query cache."),
-            new AnalyzerActionSurfaceManifestEntry("OperationBlockStart", AnalyzerActionSurfaceDecision.NotUsed,
-                "A one-shot operation-block action is sufficient; features do not need separate incremental operation callbacks."),
-            new AnalyzerActionSurfaceManifestEntry("SemanticModel", AnalyzerActionSurfaceDecision.NotUsed,
-                "Semantic-model actions are not directly registered; semantic models are consumed from other action contexts."),
-            new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.NotUsed,
-                "Method ownership comes from operation blocks; declarations without executable blocks use syntax fallbacks."),
-            new AnalyzerActionSurfaceManifestEntry("SyntaxNode", AnalyzerActionSurfaceDecision.Used,
-                "Attribute placement, requires call sites, and property, indexer, local-function, or bodyless fallbacks remain syntax-based."),
-            new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.Used,
-                "Per-tree analyzer configuration is validated through a syntax-tree action."));
+    public static ImmutableDictionary<string, bool> ActionSurfaceEntries { get; } =
+        new[]
+        {
+            "CompilationStart", "CompilationEnd", "Operation", "OperationBlock", "OperationBlockStart",
+            "SemanticModel", "Symbol", "SyntaxNode", "SyntaxTree"
+        }.ToImmutableDictionary(static name => name, IsActionSurfaceUsed, StringComparer.Ordinal);
 
     public static ImmutableArray<string> GeneratorBackedShapeIds { get; } =
         EntriesByShapeId.Values
-            .Where(entry => entry.Classification == ShapeClassification.GeneratorBacked)
-            .Select(entry => entry.ShapeId)
-            .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
+            .Where(static entry => entry.Classification == ShapeClassification.GeneratorBacked)
+            .Select(static entry => entry.ShapeId)
+            .OrderBy(static shapeId => shapeId, StringComparer.Ordinal)
             .ToImmutableArray();
 
-    public static string OperationShapeId(OperationKind operationKind)
+    public static bool IsActionableUnobservedOperationKind(OperationKind kind)
     {
-        return "operation:" + operationKind;
+        if (kind is OperationKind.Invalid or OperationKind.InterpolatedStringAppendInvalid ||
+            IsParentHandled(kind))
+            return false;
+
+        return EntriesByShapeId.TryGetValue(OperationShapeId(kind), out var entry) &&
+               entry.Classification is not (ShapeClassification.ParentHandled or
+                   ShapeClassification.CSharpNotApplicable or ShapeClassification.SyntaxShadow);
     }
 
-    public static string SyntaxShapeId(SyntaxKind syntaxKind)
+    public static string OperationShapeId(OperationKind operationKind) => "operation:" + operationKind;
+
+    public static string SyntaxShapeId(SyntaxKind syntaxKind) => "syntax:" + syntaxKind;
+
+    private static RoslynShapeManifestEntry CreateOperationEntry(OperationKind kind)
     {
-        return "syntax:" + syntaxKind;
+        var classification = ClassifyOperation(kind);
+        return new RoslynShapeManifestEntry(
+            RoslynShapeSurface.OperationKind,
+            OperationShapeId(kind),
+            kind.ToString(),
+            classification);
     }
 
-    private static ImmutableArray<RoslynShapeManifestEntry> BuildOperationEntries()
+    private static ShapeClassification ClassifyOperation(OperationKind kind)
     {
-        var registeredRuleKinds = GetRegisteredRuleOperationKinds();
-        var generatorBackedShapeIds = FuzzCaseGenerator.RegistryEntries
-            .SelectMany(entry => entry.PrimaryShapeIds)
-            .Where(shapeId => shapeId.StartsWith("operation:", StringComparison.Ordinal))
-            .ToImmutableHashSet(StringComparer.Ordinal);
-
-        var builder = ImmutableArray.CreateBuilder<RoslynShapeManifestEntry>();
-        foreach (var operationKind in Enum.GetValues<OperationKind>())
-        {
-            var shapeId = OperationShapeId(operationKind);
-            ShapeClassification classification;
-            string rationale;
-            if (generatorBackedShapeIds.Contains(shapeId))
-            {
-                classification = ShapeClassification.GeneratorBacked;
-                rationale = "Deterministically targetable through the manifest-backed fuzz registry.";
-            }
-            else if (registeredRuleKinds.Contains(operationKind))
-            {
-                classification = ShapeClassification.Handled;
-                rationale = "Handled by a registered analyzer rule, but not a primary fuzz target.";
-            }
-            else if (ParentHandledOperationKinds.Contains(operationKind))
-            {
-                classification = ShapeClassification.ParentHandled;
-                rationale = "Covered through the containing operation or control-flow structure.";
-            }
-            else if (SyntaxShadowOperationKinds.Contains(operationKind))
-            {
-                classification = ShapeClassification.SyntaxShadow;
-                rationale =
-                    "Declaration-only coverage is handled by syntax or attribute checks rather than executable fuzz generation.";
-            }
-            else if (CSharpNotApplicableOperationKinds.Contains(operationKind))
-            {
-                classification = ShapeClassification.CSharpNotApplicable;
-                rationale = "Visual Basic-only surface; explicitly out of scope for C# shape generation.";
-            }
-            else if (ConservativeOperationKinds.Contains(operationKind))
-            {
-                classification = ShapeClassification.IntentionallyConservative;
-                rationale = "Known executable surface that remains conservative until a tighter rule is implemented.";
-            }
-            else
-            {
-                classification = ShapeClassification.IntentionallyConservative;
-                rationale = "Explicitly classified but not yet assigned a dedicated generator or parent-handled rule.";
-            }
-
-            builder.Add(new RoslynShapeManifestEntry(
-                RoslynShapeSurface.OperationKind,
-                shapeId,
-                operationKind.ToString(),
-                classification,
-                rationale));
-        }
-
-        return builder.ToImmutable();
+        if (GeneratorBackedOperationShapeIds.Contains(OperationShapeId(kind)))
+            return ShapeClassification.GeneratorBacked;
+        if (RegisteredRuleKinds.Contains(kind))
+            return ShapeClassification.Handled;
+        if (IsParentHandled(kind))
+            return ShapeClassification.ParentHandled;
+        if (kind == OperationKind.Attribute)
+            return ShapeClassification.SyntaxShadow;
+        if (kind is OperationKind.Stop or OperationKind.End or OperationKind.RaiseEvent or
+            OperationKind.ReDim or OperationKind.ReDimClause)
+            return ShapeClassification.CSharpNotApplicable;
+        return ShapeClassification.IntentionallyConservative;
     }
 
-    private static ImmutableArray<RoslynShapeManifestEntry> BuildSyntaxEntries()
+    private static bool IsParentHandled(OperationKind kind) => kind is
+        OperationKind.None or
+        OperationKind.MethodReference or
+        OperationKind.UnaryOperator or
+        OperationKind.BinaryOperator or
+        OperationKind.BinaryPattern or
+        OperationKind.Branch or
+        OperationKind.Parenthesized or
+        OperationKind.ConditionalAccessInstance or
+        OperationKind.Empty or
+        OperationKind.FlowAnonymousFunction or
+        OperationKind.Labeled or
+        OperationKind.Loop or
+        OperationKind.MemberInitializer or
+        OperationKind.PropertyInitializer or
+        OperationKind.TranslatedQuery or
+        OperationKind.DeclarationExpression or
+        OperationKind.OmittedArgument or
+        OperationKind.ParameterInitializer or
+        OperationKind.SwitchCase or
+        OperationKind.InterpolatedStringText or
+        OperationKind.Interpolation or
+        OperationKind.TupleBinary or
+        OperationKind.TupleBinaryOperator or
+        OperationKind.MethodBody or
+        OperationKind.ConstructorBody or
+        OperationKind.Discard or
+        OperationKind.FlowCapture or
+        OperationKind.FlowCaptureReference or
+        OperationKind.IsNull or
+        OperationKind.CaughtException or
+        OperationKind.StaticLocalInitializationSemaphore or
+        OperationKind.SwitchExpressionArm or
+        OperationKind.YieldBreak ||
+        kind == OperationKindValue("CollectionElementInitializer");
+
+    private static RoslynShapeManifestEntry CreateSyntaxEntry(SyntaxKind kind)
     {
-        var builder = ImmutableArray.CreateBuilder<RoslynShapeManifestEntry>();
-        foreach (var syntaxKind in Enum.GetValues<SyntaxKind>())
-        {
-            var shapeId = SyntaxShapeId(syntaxKind);
-            var name = syntaxKind.ToString();
-            ShapeClassification classification;
-            string rationale;
-            if (syntaxKind == SyntaxKind.None)
-            {
-                classification = ShapeClassification.CSharpNotApplicable;
-                rationale = "Sentinel syntax value; no parseable source shape exists.";
-            }
-            else if (SyntaxShadowKindNames.Contains(name))
-            {
-                classification = ShapeClassification.SyntaxShadow;
-                rationale =
-                    "Declaration, directive, or structured-trivia syntax is tracked outside executable operation generation.";
-            }
-            else if (IsTriviaOnlyKind(name))
-            {
-                classification = ShapeClassification.TriviaOnly;
-                rationale = "Trivia or structured-trivia syntax is not an executable fuzz target.";
-            }
-            else if (IsTokenOnlyKind(name))
-            {
-                classification = ShapeClassification.TokenOnly;
-                rationale =
-                    "Token-level syntax is covered as part of containing parse trees, not standalone generation targets.";
-            }
-            else
-            {
-                classification = ShapeClassification.ParentHandled;
-                rationale =
-                    "Executable or parser-level syntax is covered through the containing operation tree or generated program shape.";
-            }
-
-            builder.Add(new RoslynShapeManifestEntry(
-                RoslynShapeSurface.SyntaxKind,
-                shapeId,
-                name,
-                classification,
-                rationale));
-        }
-
-        return builder.ToImmutable();
+        var name = kind.ToString();
+        var classification = kind == SyntaxKind.None
+            ? ShapeClassification.CSharpNotApplicable
+            : IsSyntaxShadow(name)
+                ? ShapeClassification.SyntaxShadow
+                : IsTriviaOnlyKind(name)
+                    ? ShapeClassification.TriviaOnly
+                    : IsTokenOnlyKind(name)
+                        ? ShapeClassification.TokenOnly
+                        : ShapeClassification.ParentHandled;
+        return new RoslynShapeManifestEntry(
+            RoslynShapeSurface.SyntaxKind,
+            SyntaxShapeId(kind),
+            name,
+            classification);
     }
 
-    private static ImmutableHashSet<OperationKind> GetRegisteredRuleOperationKinds()
-    {
-        return RuleRegistry.GetDefaultRules().Keys.ToImmutableHashSet();
-    }
+    private static bool IsSyntaxShadow(string name) =>
+        name.StartsWith("Xml", StringComparison.Ordinal) ||
+        name.EndsWith("DirectiveTrivia", StringComparison.Ordinal) ||
+        name is nameof(SyntaxKind.Attribute) or
+            nameof(SyntaxKind.AttributeList) or
+            nameof(SyntaxKind.AttributeArgument) or
+            nameof(SyntaxKind.AttributeArgumentList) or
+            nameof(SyntaxKind.ClassDeclaration) or
+            nameof(SyntaxKind.RecordDeclaration) or
+            nameof(SyntaxKind.RecordStructDeclaration) or
+            nameof(SyntaxKind.StructDeclaration) or
+            nameof(SyntaxKind.InterfaceDeclaration) or
+            nameof(SyntaxKind.EnumDeclaration) or
+            nameof(SyntaxKind.DelegateDeclaration) or
+            nameof(SyntaxKind.NamespaceDeclaration) or
+            nameof(SyntaxKind.FileScopedNamespaceDeclaration) or
+            nameof(SyntaxKind.UsingDirective) or
+            nameof(SyntaxKind.ExternAliasDirective) or
+            nameof(SyntaxKind.GlobalStatement) or
+            nameof(SyntaxKind.SingleLineDocumentationCommentTrivia) or
+            nameof(SyntaxKind.MultiLineDocumentationCommentTrivia) or
+            nameof(SyntaxKind.DocumentationCommentExteriorTrivia) or
+            nameof(SyntaxKind.BadDirectiveTrivia) or
+            nameof(SyntaxKind.SkippedTokensTrivia) or
+            nameof(SyntaxKind.PrimaryConstructorBaseType);
 
-    private static bool IsTokenOnlyKind(string name)
-    {
-        return name.EndsWith("Token", StringComparison.Ordinal) ||
-               name.EndsWith("Keyword", StringComparison.Ordinal);
-    }
+    private static bool IsActionSurfaceUsed(string name) =>
+        name is "CompilationStart" or "CompilationEnd" or "OperationBlock" or "SyntaxNode" or "SyntaxTree";
 
-    private static bool IsTriviaOnlyKind(string name)
-    {
-        return name.EndsWith("Trivia", StringComparison.Ordinal) ||
-               name.StartsWith("Xml", StringComparison.Ordinal);
-    }
+    private static bool IsTokenOnlyKind(string name) =>
+        name.EndsWith("Token", StringComparison.Ordinal) || name.EndsWith("Keyword", StringComparison.Ordinal);
 
-    private static OperationKind OperationKindValue(string name)
-    {
-        return (OperationKind)Enum.Parse(typeof(OperationKind), name);
-    }
+    private static bool IsTriviaOnlyKind(string name) =>
+        name.EndsWith("Trivia", StringComparison.Ordinal) || name.StartsWith("Xml", StringComparison.Ordinal);
+
+    private static OperationKind OperationKindValue(string name) =>
+        (OperationKind)Enum.Parse(typeof(OperationKind), name);
 }

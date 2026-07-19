@@ -3,6 +3,7 @@ namespace SharpProof.Tools.Fuzz;
 internal sealed class FuzzRunSummaryBuilder
 {
     private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _diagnosticCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
     private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
     private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
@@ -14,11 +15,6 @@ internal sealed class FuzzRunSummaryBuilder
     private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
 
     private int _compilationErrorCount;
-    private int _sp0002Count;
-    private int _sp0004Count;
-    private int _sp0009Count;
-    private int _sp0010Count;
-
     public FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc, string samplerMode)
     {
         _options = options;
@@ -41,14 +37,7 @@ internal sealed class FuzzRunSummaryBuilder
         _compilationErrorCount += analysis.CompilationErrors.Length > 0 ? 1 : 0;
         foreach (var finding in analysis.Findings) AddFinding(analysis.NormalizedSourceHash, finding);
 
-        foreach (var diagnostic in analysis.Diagnostics)
-            if (diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-                _sp0002Count++;
-            else if (diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                _sp0004Count++;
-            else if (diagnostic.Id == SharpProofDiagnostics.PurityExplanationId)
-                _sp0009Count++;
-            else if (diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId) _sp0010Count++;
+        foreach (var diagnostic in analysis.Diagnostics) _diagnosticCounts.Increment(diagnostic.Id);
     }
 
     public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory,
@@ -78,7 +67,7 @@ internal sealed class FuzzRunSummaryBuilder
         {
             [RoslynShapeSurface.OperationKind.ToString()] = RoslynShapeManifest.OperationEntries.Length,
             [RoslynShapeSurface.SyntaxKind.ToString()] = RoslynShapeManifest.SyntaxEntries.Length,
-            ["AnalyzerActionSurface"] = RoslynShapeManifest.ActionSurfaceEntries.Length
+            ["AnalyzerActionSurface"] = RoslynShapeManifest.ActionSurfaceEntries.Count
         };
         var manifestClassificationCounts = RoslynShapeManifest.EntriesByShapeId.Values
             .GroupBy(entry => entry.Classification.ToString(), StringComparer.Ordinal)
@@ -102,61 +91,61 @@ internal sealed class FuzzRunSummaryBuilder
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToImmutableArray();
 
-        return new FuzzRunSummary
-        {
-            Seed = _options.Seed,
-            IterationsRequested = _options.Iterations,
-            DurationSecondsRequested = _options.Duration?.TotalSeconds,
-            Parallelism = _options.Parallelism,
-            OutputDirectory = outputDirectory,
-            StartedUtc = _startedUtc,
-            CompletedUtc = completedUtc,
-            ElapsedSeconds = elapsed.TotalSeconds,
-            CasesAnalyzed = CasesAnalyzed,
-            CompilationErrorCount = _compilationErrorCount,
-            AnalyzerExceptionCount = analyzerExceptionCount,
-            FindingCount = totalFindingCount,
-            UniqueFindingCount = findings.Length,
-            InterestingCasesSaved = interestingCasesSaved,
-            Sp0002Count = _sp0002Count,
-            Sp0004Count = _sp0004Count,
-            Sp0009Count = _sp0009Count,
-            Sp0010Count = _sp0010Count,
-            FamilyCounts = _familyCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
-            OperationKinds = _operationKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
-            SyntaxKinds = _syntaxKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
-            UnobservedOperationKinds = unobservedOperationKinds,
-            ActionableUnobservedOperationKinds = actionableUnobservedOperationKinds,
-            SamplerMode = _samplerMode,
-            ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
-            ManifestClassificationCounts = manifestClassificationCounts,
-            RegistryExpectationCounts = registryExpectationCounts,
-            DefiniteRegistryFamilyCount = registryExpectationCounts[FuzzExpectation.DefinitelyPureBucket] +
-                                          registryExpectationCounts[FuzzExpectation.DefinitelyImpureBucket],
-            ConservativeRegistryFamilyCount = conservativeRegistryFamilies.Length,
-            ConservativeRegistryFamilies = conservativeRegistryFamilies,
-            GeneratorBackedShapeCount = RoslynShapeManifest.GeneratorBackedShapeIds.Length,
-            GeneratorBackedShapesWithRegistryCount = registryCoveredShapeIds.Count,
-            UnobservedGeneratorBackedShapes = unobservedGeneratorBackedShapes,
-            PrimaryShapeCounts = _primaryShapeCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
-            Findings = findings
-        };
+        return new FuzzRunSummary(
+            "1.3",
+            _options.Seed,
+            _options.Iterations,
+            _options.Duration?.TotalSeconds,
+            _options.Parallelism,
+            outputDirectory,
+            _startedUtc,
+            completedUtc,
+            elapsed.TotalSeconds,
+            CasesAnalyzed,
+            _compilationErrorCount,
+            analyzerExceptionCount,
+            totalFindingCount,
+            findings.Length,
+            interestingCasesSaved,
+            DiagnosticCount(SharpProofDiagnostics.PurityNotVerifiedId),
+            DiagnosticCount(SharpProofDiagnostics.MissingEnforcePureAttributeId),
+            DiagnosticCount(SharpProofDiagnostics.PurityExplanationId),
+            DiagnosticCount(SharpProofDiagnostics.ExceptionSummaryId),
+            _familyCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            _operationKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            _syntaxKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            unobservedOperationKinds,
+            actionableUnobservedOperationKinds,
+            _samplerMode,
+            manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            manifestClassificationCounts,
+            registryExpectationCounts,
+            registryExpectationCounts[FuzzExpectation.DefinitelyPureBucket] +
+            registryExpectationCounts[FuzzExpectation.DefinitelyImpureBucket],
+            conservativeRegistryFamilies.Length,
+            conservativeRegistryFamilies,
+            RoslynShapeManifest.GeneratorBackedShapeIds.Length,
+            registryCoveredShapeIds.Count,
+            unobservedGeneratorBackedShapes,
+            _primaryShapeCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            findings);
     }
 
     private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts()
     {
-        var counts = new SortedDictionary<string, int>(StringComparer.Ordinal)
+        var buckets = new[]
         {
-            [FuzzExpectation.ConservativeBucket] = 0,
-            [FuzzExpectation.DefinitelyImpureBucket] = 0,
-            [FuzzExpectation.DefinitelyPureBucket] = 0
+            FuzzExpectation.ConservativeBucket,
+            FuzzExpectation.DefinitelyImpureBucket,
+            FuzzExpectation.DefinitelyPureBucket
         };
-
-        foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-            counts.Increment(entry.Expectation.Bucket);
-
-        return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
+        return buckets.ToImmutableSortedDictionary(
+            static bucket => bucket,
+            static bucket => FuzzCaseGenerator.RegistryEntries.Count(entry => entry.Expectation.Bucket == bucket),
+            StringComparer.Ordinal);
     }
+
+    private int DiagnosticCount(string id) => _diagnosticCounts.GetValueOrDefault(id);
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding)
     {

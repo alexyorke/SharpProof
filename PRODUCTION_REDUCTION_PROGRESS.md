@@ -495,14 +495,20 @@ Tests are excluded from the metric and must not be deleted.
   cross-tree semantic models through one bounded cache. Cache, concurrency,
   recursion, dispatch, and metadata tests retain every case through typed seams,
   and architecture coverage prevents the prepass types and fields from returning.
+- [x] Replaced the fuzz coverage manifest's parallel Roslyn operation, syntax,
+  and analyzer-action tables with inference from the fuzz registry, analyzer
+  rule registry, Roslyn enums, and stable kind families. The run summary is now
+  one immutable positional record, and diagnostic counts share one keyed
+  accumulator. Focused manifest, deterministic corpus, smoke-fuzz, JSON
+  round-trip, and architecture tests preserve coverage artifacts and output.
 
 ## Current evidence
 
-- Maintained production: 93,186 lines (89,267 C#, 3,189 scripts, and 730
-  specifications); net reduction: 14,440 lines; remaining reduction: 5,560.
-  This tranche removed 450 maintained lines without deleting tests.
+- Maintained production: 92,985 lines (89,066 C#, 3,189 scripts, and 730
+  specifications); net reduction: 14,641 lines; remaining reduction: 5,359.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,209 passing tests and two documented Main skips.
+- Six lanes: 6,210 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -526,6 +532,10 @@ groups, concrete-fact index, or impacted-test orchestration owners without new
 call-site ownership or generic-instantiation evidence. The fact index remains
 necessary for C#-sound division/remainder preprocessing, regex validation, and
 solver-free contradictions; it is no longer a parallel hazard proof engine.
+
+The inferred fuzz coverage manifest is now a canonical owner as well. Do not
+restore parallel Roslyn-kind or analyzer-action tables; extend the registry,
+rule ownership, or compact family inference when Roslyn adds a new shape.
 
 The analyzer's remaining BCL invocation overrides are also characterized as
 semantic owners, not adapters. Removing the Type, StringComparer,
