@@ -1,8 +1,10 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
@@ -54,32 +56,25 @@ public sealed class ProjectAnalysisContextTests
             additionalFiles,
             autoEnableEffectSummaryJsonForAdditionalFiles: false);
 
-        var context = new SharpProofProjectAnalysisContext(
+        var context = new SymbolicProjectQueryContext(
             compilation,
             syntaxTree,
             analyzerOptions,
             "ProjectFixture",
             Path.GetFullPath("ProjectFixture.csproj"),
             analyzerConfigPaths: new[] { Path.GetFullPath(".editorconfig") });
-        var diagnostics = await context.GetAnalyzerDiagnosticsAsync(CancellationToken.None);
+        var diagnostics = await compilation.WithAnalyzers(
+                ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer()), analyzerOptions)
+            .GetAnalyzerDiagnosticsAsync(CancellationToken.None);
 
         Assert.That(context.SourceInput.Compilation, Is.SameAs(compilation));
         Assert.That(context.SourceInput.SyntaxTree, Is.SameAs(syntaxTree));
-        Assert.That(context.Compilation, Is.SameAs(context.SymbolicContext.Compilation));
-        Assert.That(context.SyntaxTree, Is.SameAs(context.SymbolicContext.SyntaxTree));
-        Assert.That(context.AnalyzerOptions, Is.SameAs(context.SymbolicContext.AnalyzerOptions));
-        Assert.That(context.ProjectName, Is.EqualTo(context.SymbolicContext.ProjectName));
-        Assert.That(context.ProjectFilePath, Is.EqualTo(context.SymbolicContext.ProjectFilePath));
-        Assert.That(context.SolutionFilePath, Is.EqualTo(context.SymbolicContext.SolutionFilePath));
-        Assert.That(context.AnalyzerConfigPaths, Is.EqualTo(context.SymbolicContext.AnalyzerConfigPaths));
-        Assert.That(context.AdditionalFilePaths, Is.EqualTo(context.SymbolicContext.AdditionalFilePaths));
-        Assert.That(context.SmtOptions.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
-        Assert.That(context.SmtOptions.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(1234)));
-        Assert.That(context.AnalysisLimits.MaxMergedIfElseFacts, Is.EqualTo(17));
-        Assert.That(context.SymbolicContext.Configuration.SmtOptions, Is.EqualTo(context.SmtOptions));
+        Assert.That(context.Configuration.SmtOptions.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
+        Assert.That(context.Configuration.SmtOptions.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(1234)));
+        Assert.That(context.Configuration.AnalysisLimits.MaxMergedIfElseFacts, Is.EqualTo(17));
         Assert.That(
-            context.SymbolicContext.CreateQueryOptions().AnalysisLimits,
-            Is.EqualTo(context.AnalysisLimits));
+            context.CreateQueryOptions().AnalysisLimits,
+            Is.EqualTo(context.Configuration.AnalysisLimits));
         Assert.That(context.HasBaseline, Is.True);
         Assert.That(context.EffectSummaryFileCount, Is.EqualTo(1));
         Assert.That(context.AnalyzerConfigPaths, Has.Count.EqualTo(1));

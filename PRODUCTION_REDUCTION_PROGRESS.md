@@ -294,14 +294,22 @@ Tests are excluded from the metric and must not be deleted.
   covers source and EffectSummary constructor initializers plus handler
   construction, and architecture coverage prevents the removed syntax paths
   from returning.
+- [x] Made primary constructors the single initialization owner for internal
+  program-point, invariant, query, runtime-hazard, error, and project-context
+  result carriers. Deleted the analyzer's duplicate project-analysis context;
+  Symbolic CLI now consumes `SymbolicProjectQueryContext` directly and owns only
+  its analyzer-diagnostic and configuration-issue projections. Property order,
+  validation, diagnostics, exact CLI JSON, and conservative unknown/truncation
+  behavior remain unchanged, and architecture coverage prevents the adapter
+  and assignment-heavy carrier forms from returning.
 
 ## Current evidence
 
-- Maintained production: 98,977 lines (95,058 C#, 3,189 scripts, and 730
-  specifications); net reduction: 8,649 lines; remaining reduction: 11,351.
-  This tranche removed 203 maintained lines without deleting tests.
+- Maintained production: 98,776 lines (94,857 C#, 3,189 scripts, and 730
+  specifications); net reduction: 8,850 lines; remaining reduction: 11,150.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,189 passing tests and two documented Main skips.
+- Six lanes: 6,190 passing tests and two documented Main skips.
 
 ## Milestones
 

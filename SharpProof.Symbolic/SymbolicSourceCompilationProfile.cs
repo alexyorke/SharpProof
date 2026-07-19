@@ -4,51 +4,36 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicSourceCompilationProfile
+internal sealed class SymbolicSourceCompilationProfile(
+    LanguageVersion languageVersion = LanguageVersion.Preview,
+    IEnumerable<string>? preprocessorSymbols = null,
+    NullableContextOptions nullableContext = NullableContextOptions.Disable,
+    bool allowUnsafe = false,
+    DocumentationMode documentationMode = DocumentationMode.Parse,
+    Platform platform = Platform.AnyCpu,
+    OptimizationLevel optimizationLevel = OptimizationLevel.Debug,
+    string? assemblyName = null)
 {
     public static readonly SymbolicSourceCompilationProfile Default = new();
 
-    public SymbolicSourceCompilationProfile(
-        LanguageVersion languageVersion = LanguageVersion.Preview,
-        IEnumerable<string>? preprocessorSymbols = null,
-        NullableContextOptions nullableContext = NullableContextOptions.Disable,
-        bool allowUnsafe = false,
-        DocumentationMode documentationMode = DocumentationMode.Parse,
-        Platform platform = Platform.AnyCpu,
-        OptimizationLevel optimizationLevel = OptimizationLevel.Debug,
-        string? assemblyName = null)
-    {
-        ValidateDefinedEnum(languageVersion, nameof(languageVersion));
+    public LanguageVersion LanguageVersion { get; } = ValidateDefinedEnum(languageVersion, nameof(languageVersion));
+
+    public ImmutableArray<string> PreprocessorSymbols { get; } = NormalizePreprocessorSymbols(preprocessorSymbols);
+
+    public NullableContextOptions NullableContext { get; } =
         ValidateDefinedEnum(nullableContext, nameof(nullableContext));
+
+    public bool AllowUnsafe { get; } = allowUnsafe;
+
+    public DocumentationMode DocumentationMode { get; } =
         ValidateDefinedEnum(documentationMode, nameof(documentationMode));
-        ValidateDefinedEnum(platform, nameof(platform));
+
+    public Platform Platform { get; } = ValidateDefinedEnum(platform, nameof(platform));
+
+    public OptimizationLevel OptimizationLevel { get; } =
         ValidateDefinedEnum(optimizationLevel, nameof(optimizationLevel));
 
-        LanguageVersion = languageVersion;
-        PreprocessorSymbols = NormalizePreprocessorSymbols(preprocessorSymbols);
-        NullableContext = nullableContext;
-        AllowUnsafe = allowUnsafe;
-        DocumentationMode = documentationMode;
-        Platform = platform;
-        OptimizationLevel = optimizationLevel;
-        AssemblyName = NormalizeAssemblyName(assemblyName);
-    }
-
-    public LanguageVersion LanguageVersion { get; }
-
-    public ImmutableArray<string> PreprocessorSymbols { get; }
-
-    public NullableContextOptions NullableContext { get; }
-
-    public bool AllowUnsafe { get; }
-
-    public DocumentationMode DocumentationMode { get; }
-
-    public Platform Platform { get; }
-
-    public OptimizationLevel OptimizationLevel { get; }
-
-    public string? AssemblyName { get; }
+    public string? AssemblyName { get; } = NormalizeAssemblyName(assemblyName);
 
     private static ImmutableArray<string> NormalizePreprocessorSymbols(IEnumerable<string>? symbols)
     {
@@ -83,10 +68,11 @@ internal sealed class SymbolicSourceCompilationProfile
         return assemblyName.Trim();
     }
 
-    private static void ValidateDefinedEnum<TEnum>(TEnum value, string parameterName)
+    private static TEnum ValidateDefinedEnum<TEnum>(TEnum value, string parameterName)
         where TEnum : struct
     {
         if (!Enum.IsDefined(typeof(TEnum), value))
             throw new ArgumentOutOfRangeException(parameterName, value, "Value is not defined.");
+        return value;
     }
 }

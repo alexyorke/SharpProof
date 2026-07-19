@@ -348,189 +348,152 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
     }
 }
 
-internal sealed class SymbolicRuntimeHazardQueryResult
+internal sealed class SymbolicRuntimeHazardQueryResult(
+    string filePath,
+    int lineCount,
+    int? scopeStart,
+    int? scopeEnd,
+    int? line,
+    IReadOnlyList<SymbolicRuntimeHazard> hazards,
+    SymbolicSmtDiagnostics? smtDiagnostics = null)
 {
-    internal SymbolicRuntimeHazardQueryResult(
-        string filePath,
-        int lineCount,
-        int? scopeStart,
-        int? scopeEnd,
-        int? line,
-        IReadOnlyList<SymbolicRuntimeHazard> hazards,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
-    {
-        FilePath = filePath;
-        LineCount = lineCount;
-        ScopeStart = scopeStart;
-        ScopeEnd = scopeEnd;
-        Line = line;
-        Hazards = hazards ?? throw new ArgumentNullException(nameof(hazards));
-        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
-            Hazards.Select(static hazard => hazard.AnalysisTruncation));
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        TriggerWitnesses = Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
-        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(TriggerWitnesses);
-    }
+    public string FilePath { get; } = filePath;
 
-    public string FilePath { get; }
+    public int LineCount { get; } = lineCount;
 
-    public int LineCount { get; }
+    public int? ScopeStart { get; } = scopeStart;
 
-    public int? ScopeStart { get; }
+    public int? ScopeEnd { get; } = scopeEnd;
 
-    public int? ScopeEnd { get; }
+    public int? Line { get; } = line;
 
-    public int? Line { get; }
-
-    public IReadOnlyList<SymbolicRuntimeHazard> Hazards { get; }
+    public IReadOnlyList<SymbolicRuntimeHazard> Hazards { get; } =
+        hazards ?? throw new ArgumentNullException(nameof(hazards));
 
     public int HazardCount => Hazards.Count;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
+        SymbolicAnalysisTruncationInfo.Combine(
+            (hazards ?? throw new ArgumentNullException(nameof(hazards)))
+            .Select(static hazard => hazard.AnalysisTruncation));
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicSmtDiagnostics SmtDiagnostics { get; } =
+        smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses { get; }
+    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses { get; } =
+        (hazards ?? throw new ArgumentNullException(nameof(hazards)))
+        .Select(static hazard => hazard.TriggerWitness).ToArray();
 
-    public SymbolicInputDomainSummary InputDomainSummary { get; }
+    public SymbolicInputDomainSummary InputDomainSummary { get; } =
+        SymbolicInputWitnessFactory.MergeAlternatives(
+            (hazards ?? throw new ArgumentNullException(nameof(hazards)))
+            .Select(static hazard => hazard.TriggerWitness).ToArray());
 
 }
 
-internal sealed class SymbolicRuntimeHazard
+internal sealed class SymbolicRuntimeHazard(
+    string filePath,
+    SymbolicHazardOperation descriptor,
+    SymbolicRuntimeHazardStatus status,
+    string statusReason,
+    string nodeKind,
+    string operationText,
+    int spanStart,
+    int spanEnd,
+    int line,
+    int column,
+    int nodeStartLine,
+    int nodeStartColumn,
+    int nodeEndLine,
+    int nodeEndColumn,
+    string triggerCondition,
+    SymbolicFactInfo? triggerPrecondition,
+    string mergedInvariantText,
+    IReadOnlyList<string> pathConditions,
+    IReadOnlyList<SymbolicFactInfo> symbolicFacts,
+    SymbolicReachability reachability,
+    string reachabilityReason,
+    SymbolicProofInfo? proofInfo,
+    SymbolicSmtDiagnostics? smtDiagnostics = null,
+    SymbolicInputWitness? triggerWitness = null,
+    SymbolicAnalysisTruncationInfo? analysisTruncation = null)
 {
-    internal SymbolicRuntimeHazard(
-        string filePath,
-        SymbolicHazardOperation descriptor,
-        SymbolicRuntimeHazardStatus status,
-        string statusReason,
-        string nodeKind,
-        string operationText,
-        int spanStart,
-        int spanEnd,
-        int line,
-        int column,
-        int nodeStartLine,
-        int nodeStartColumn,
-        int nodeEndLine,
-        int nodeEndColumn,
-        string triggerCondition,
-        SymbolicFactInfo? triggerPrecondition,
-        string mergedInvariantText,
-        IReadOnlyList<string> pathConditions,
-        IReadOnlyList<SymbolicFactInfo> symbolicFacts,
-        SymbolicReachability reachability,
-        string reachabilityReason,
-        SymbolicProofInfo? proofInfo,
-        SymbolicSmtDiagnostics? smtDiagnostics = null,
-        SymbolicInputWitness? triggerWitness = null,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-    {
-        Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
-        FilePath = filePath;
-        Kind = descriptor.HazardKind;
-        Status = status;
-        StatusReason = statusReason;
-        ExceptionType = descriptor.ExceptionType;
-        Category = descriptor.Category;
-        NodeKind = nodeKind;
-        OperationText = operationText;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        SpanLength = spanEnd - spanStart;
-        Line = line;
-        Column = column;
-        NodeStartLine = nodeStartLine;
-        NodeStartColumn = nodeStartColumn;
-        NodeEndLine = nodeEndLine;
-        NodeEndColumn = nodeEndColumn;
-        TriggerCondition = triggerCondition;
-        TriggerPrecondition = triggerPrecondition;
-        MergedInvariantText = mergedInvariantText;
-        PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
-        PathConditionCount = pathConditions.Count;
-        SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
-        Reachability = reachability;
-        ReachabilityReason = reachabilityReason;
-        TriggerWitness = triggerWitness ?? SymbolicInputWitnessFactory.Unsupported(
-            "runtime_hazard_trigger_witness_unavailable");
-        Proof = CreateProofInfo(status, statusReason, Category, triggerCondition, Kind, proofInfo);
-        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
-            status,
-            StatusReason,
-            Proof.UnknownReason);
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariantText,
-            SymbolicFacts,
-            new[] { Proof },
-            SymbolicInvariantMergeKind.Conjunction,
-            PathConditionCount);
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-    }
+    public string FilePath { get; } = filePath;
 
-    public string FilePath { get; }
+    internal SymbolicHazardOperation Descriptor { get; } =
+        descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    internal SymbolicHazardOperation Descriptor { get; }
+    public SymbolicRuntimeHazardKind Kind { get; } = descriptor.HazardKind;
 
-    public SymbolicRuntimeHazardKind Kind { get; }
+    public SymbolicRuntimeHazardStatus Status { get; } = status;
 
-    public SymbolicRuntimeHazardStatus Status { get; }
+    public string StatusReason { get; } = statusReason;
 
-    public string StatusReason { get; }
+    public string ExceptionType { get; } = descriptor.ExceptionType;
 
-    public string ExceptionType { get; }
+    public string Category { get; } = descriptor.Category;
 
-    public string Category { get; }
+    public string NodeKind { get; } = nodeKind;
 
-    public string NodeKind { get; }
+    public string OperationText { get; } = operationText;
 
-    public string OperationText { get; }
+    public int SpanStart { get; } = spanStart;
 
-    public int SpanStart { get; }
+    public int SpanEnd { get; } = spanEnd;
 
-    public int SpanEnd { get; }
+    public int SpanLength { get; } = spanEnd - spanStart;
 
-    public int SpanLength { get; }
+    public int Line { get; } = line;
 
-    public int Line { get; }
+    public int Column { get; } = column;
 
-    public int Column { get; }
+    public int NodeStartLine { get; } = nodeStartLine;
 
-    public int NodeStartLine { get; }
+    public int NodeStartColumn { get; } = nodeStartColumn;
 
-    public int NodeStartColumn { get; }
+    public int NodeEndLine { get; } = nodeEndLine;
 
-    public int NodeEndLine { get; }
+    public int NodeEndColumn { get; } = nodeEndColumn;
 
-    public int NodeEndColumn { get; }
+    public string TriggerCondition { get; } = triggerCondition;
 
-    public string TriggerCondition { get; }
+    public SymbolicFactInfo? TriggerPrecondition { get; } = triggerPrecondition;
 
-    public SymbolicFactInfo? TriggerPrecondition { get; }
+    public string MergedInvariantText { get; } = mergedInvariantText;
 
-    public string MergedInvariantText { get; }
+    internal IReadOnlyList<string> PathConditions { get; } =
+        pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
 
-    internal IReadOnlyList<string> PathConditions { get; }
+    public int PathConditionCount { get; } = pathConditions.Count;
 
-    public int PathConditionCount { get; }
+    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } =
+        symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
 
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+    public SymbolicProofInfo Proof { get; } = CreateProofInfo(
+        status, statusReason, descriptor.Category, triggerCondition, descriptor.HazardKind, proofInfo);
 
-    public SymbolicProofInfo Proof { get; }
+    public SymbolicUnknownReasonInfo UnknownReasonInfo => SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
+        Status, StatusReason, Proof.UnknownReason);
 
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
+    public SymbolicInvariantInfo InvariantInfo => new(
+        MergedInvariantText,
+        SymbolicFacts,
+        new[] { Proof },
+        SymbolicInvariantMergeKind.Conjunction,
+        PathConditionCount);
 
-    public SymbolicInvariantInfo InvariantInfo { get; }
+    public SymbolicReachability Reachability { get; } = reachability;
 
-    public SymbolicReachability Reachability { get; }
+    public string ReachabilityReason { get; } = reachabilityReason;
 
-    public string ReachabilityReason { get; }
+    public SymbolicSmtDiagnostics SmtDiagnostics { get; } =
+        smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
+        analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public SymbolicInputWitness TriggerWitness { get; }
+    public SymbolicInputWitness TriggerWitness { get; } = triggerWitness ??
+        SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
     public string GetDisplayStatusReason()
     {

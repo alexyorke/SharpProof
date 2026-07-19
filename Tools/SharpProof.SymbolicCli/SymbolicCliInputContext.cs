@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.MSBuild;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
 internal sealed class SymbolicCliInputContext : IDisposable
@@ -11,7 +13,7 @@ internal sealed class SymbolicCliInputContext : IDisposable
     private SymbolicCliInputContext(
         SymbolicSourceInput sourceInput,
         MSBuildWorkspace? workspace = null,
-        SharpProofProjectAnalysisContext? projectContext = null,
+        SymbolicProjectQueryContext? projectContext = null,
         ImmutableArray<string> workspaceDiagnostics = default)
     {
         SourceInput = sourceInput;
@@ -20,13 +22,21 @@ internal sealed class SymbolicCliInputContext : IDisposable
         WorkspaceDiagnostics = workspaceDiagnostics.IsDefault
             ? ImmutableArray<string>.Empty
             : workspaceDiagnostics;
+        ConfigurationIssues = projectContext == null
+            ? ImmutableArray<SharpProofProjectConfigurationIssue>.Empty
+            : AnalyzerConfiguration.FromOptions(projectContext.AnalyzerOptions).InvalidConfigurationValues
+                .Select(static issue => new SharpProofProjectConfigurationIssue(
+                    issue.Key, issue.Value, issue.Reason))
+                .ToImmutableArray();
     }
 
     public SymbolicSourceInput SourceInput { get; }
 
-    public SharpProofProjectAnalysisContext? ProjectContext { get; }
+    public SymbolicProjectQueryContext? ProjectContext { get; }
 
     public ImmutableArray<string> WorkspaceDiagnostics { get; }
+
+    public ImmutableArray<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; }
 
     public static async Task<SymbolicCliInputContext> CreateAsync(
         SymbolicCliOptions options,
@@ -98,7 +108,7 @@ internal sealed class SymbolicCliInputContext : IDisposable
                 .Where(static path => !string.IsNullOrWhiteSpace(path))
                 .Select(static path => path!)
                 .ToArray();
-            var context = new SharpProofProjectAnalysisContext(
+            var context = new SymbolicProjectQueryContext(
                 compilation,
                 syntaxTree,
                 project.AnalyzerOptions,
@@ -133,6 +143,17 @@ internal sealed class SymbolicCliInputContext : IDisposable
     public void Dispose()
     {
         _workspace?.Dispose();
+    }
+
+    internal async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+        CancellationToken cancellationToken)
+    {
+        if (ProjectContext == null) return ImmutableArray<Diagnostic>.Empty;
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
+        return await ProjectContext.Compilation
+            .WithAnalyzers(analyzers, ProjectContext.AnalyzerOptions)
+            .GetAnalyzerDiagnosticsAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static Project SelectSolutionProject(
@@ -210,3 +231,5 @@ internal sealed class SymbolicCliInputContext : IDisposable
         return string.Equals(CliHost.GetFullPath(left), CliHost.GetFullPath(right), comparison);
     }
 }
+
+internal sealed record SharpProofProjectConfigurationIssue(string Key, string Value, string Reason);

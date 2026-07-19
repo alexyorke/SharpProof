@@ -54,41 +54,32 @@ internal readonly struct SymbolicBoundedProjection<T>(IReadOnlyList<T> items, in
     public bool IsTruncated => OmittedCount != 0;
 }
 
-internal sealed class SymbolicConservativeUnknownDiagnostic
+internal sealed class SymbolicConservativeUnknownDiagnostic(
+    string target,
+    string unknownText,
+    string reason,
+    IReadOnlyList<string> maybeFacts,
+    int candidateProgramPointCount,
+    int unreachableProgramPointCount)
 {
-    public SymbolicConservativeUnknownDiagnostic(
-        string target,
-        string unknownText,
-        string reason,
-        IReadOnlyList<string> maybeFacts,
-        int candidateProgramPointCount,
-        int unreachableProgramPointCount)
-    {
-        Target = string.IsNullOrWhiteSpace(target) ? "path" : target;
-        UnknownText = string.IsNullOrWhiteSpace(unknownText)
-            ? SymbolicMergedPathFacts.FormatConservativeUnknown(Target)
-            : unknownText;
-        Reason = string.IsNullOrWhiteSpace(reason)
-            ? "not_common_to_all_candidate_program_points"
-            : reason;
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        CandidateProgramPointCount = candidateProgramPointCount;
-        UnreachableProgramPointCount = unreachableProgramPointCount;
-    }
+    public string Target { get; } = string.IsNullOrWhiteSpace(target) ? "path" : target;
 
-    public string Target { get; }
+    public string UnknownText { get; } = string.IsNullOrWhiteSpace(unknownText)
+        ? SymbolicMergedPathFacts.FormatConservativeUnknown(string.IsNullOrWhiteSpace(target) ? "path" : target)
+        : unknownText;
 
-    public string UnknownText { get; }
+    public string Reason { get; } = string.IsNullOrWhiteSpace(reason)
+        ? "not_common_to_all_candidate_program_points"
+        : reason;
 
-    public string Reason { get; }
-
-    public IReadOnlyList<string> MaybeFacts { get; }
+    public IReadOnlyList<string> MaybeFacts { get; } =
+        maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
 
     public int MaybeFactCount => MaybeFacts.Count;
 
-    public int CandidateProgramPointCount { get; }
+    public int CandidateProgramPointCount { get; } = candidateProgramPointCount;
 
-    public int UnreachableProgramPointCount { get; }
+    public int UnreachableProgramPointCount { get; } = unreachableProgramPointCount;
 
     public string GetDisplayReason()
     {
@@ -96,50 +87,42 @@ internal sealed class SymbolicConservativeUnknownDiagnostic
     }
 }
 
-internal sealed class SymbolicMergedPathFacts
+internal sealed class SymbolicMergedPathFacts(
+    IReadOnlyList<string> alwaysFacts,
+    IReadOnlyList<string> maybeFacts,
+    IReadOnlyList<string> conservativeUnknowns,
+    IReadOnlyList<SymbolicConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
+    IReadOnlyList<string> mergedFacts,
+    string mergedInvariantText,
+    int candidateProgramPointCount,
+    int unreachableProgramPointCount,
+    bool isUnreachable)
 {
-    private SymbolicMergedPathFacts(
-        IReadOnlyList<string> alwaysFacts,
-        IReadOnlyList<string> maybeFacts,
-        IReadOnlyList<string> conservativeUnknowns,
-        IReadOnlyList<SymbolicConservativeUnknownDiagnostic> conservativeUnknownDiagnostics,
-        IReadOnlyList<string> mergedFacts,
-        string mergedInvariantText,
-        int candidateProgramPointCount,
-        int unreachableProgramPointCount,
-        bool isUnreachable)
-    {
-        AlwaysFacts = alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
-        MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
-        ConservativeUnknowns = conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
-        ConservativeUnknownDiagnostics = conservativeUnknownDiagnostics ??
-                                         throw new ArgumentNullException(nameof(conservativeUnknownDiagnostics));
-        MergedFacts = mergedFacts ?? throw new ArgumentNullException(nameof(mergedFacts));
-        MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
-        CandidateProgramPointCount = candidateProgramPointCount;
-        UnreachableProgramPointCount = unreachableProgramPointCount;
-        IsUnreachable = isUnreachable;
-    }
+    public IReadOnlyList<string> AlwaysFacts { get; } =
+        alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
 
-    public IReadOnlyList<string> AlwaysFacts { get; }
+    public IReadOnlyList<string> MaybeFacts { get; } =
+        maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
 
-    public IReadOnlyList<string> MaybeFacts { get; }
+    public IReadOnlyList<string> ConservativeUnknowns { get; } =
+        conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
 
-    public IReadOnlyList<string> ConservativeUnknowns { get; }
-
-    public IReadOnlyList<SymbolicConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; }
+    public IReadOnlyList<SymbolicConservativeUnknownDiagnostic> ConservativeUnknownDiagnostics { get; } =
+        conservativeUnknownDiagnostics ?? throw new ArgumentNullException(nameof(conservativeUnknownDiagnostics));
 
     public int ConservativeUnknownCount => ConservativeUnknowns.Count;
 
-    public IReadOnlyList<string> MergedFacts { get; }
+    public IReadOnlyList<string> MergedFacts { get; } =
+        mergedFacts ?? throw new ArgumentNullException(nameof(mergedFacts));
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText { get; } =
+        mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
 
-    public int CandidateProgramPointCount { get; }
+    public int CandidateProgramPointCount { get; } = candidateProgramPointCount;
 
-    public int UnreachableProgramPointCount { get; }
+    public int UnreachableProgramPointCount { get; } = unreachableProgramPointCount;
 
-    public bool IsUnreachable { get; }
+    public bool IsUnreachable { get; } = isUnreachable;
 
     public static SymbolicMergedPathFacts FromProgramPoints(
         IEnumerable<SymbolicProgramPointResult> programPoints)

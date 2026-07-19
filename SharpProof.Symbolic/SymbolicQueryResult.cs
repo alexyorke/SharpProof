@@ -4,58 +4,18 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicQueryResult
+internal sealed class SymbolicQueryResult(
+    SymbolicQueryScope scope,
+    IReadOnlyList<SymbolicProgramPointResult> programPoints,
+    SymbolicInvariantResult observedInvariant,
+    SymbolicInvariantResult mergedInvariant,
+    SymbolicMergedPathFacts mergedPathFacts,
+    SymbolicQueryMetrics metrics,
+    IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+    SymbolicSmtDiagnostics smtDiagnostics,
+    IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
 {
-    private SymbolicQueryResult(
-        SymbolicQueryScope scope,
-        IReadOnlyList<SymbolicProgramPointResult> programPoints,
-        SymbolicInvariantResult observedInvariant,
-        SymbolicInvariantResult mergedInvariant,
-        SymbolicMergedPathFacts mergedPathFacts,
-        SymbolicQueryMetrics metrics,
-        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
-        SymbolicSmtDiagnostics smtDiagnostics,
-        IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
-    {
-        Scope = scope ?? throw new ArgumentNullException(nameof(scope));
-        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
-        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
-            ProgramPoints.Select(static point => point.AnalysisTruncation));
-        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
-        MergedInvariant = mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
-        MergedPathFacts = mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
-        Metrics = metrics;
-        Reachability = new SymbolicReachabilitySummary(
-            metrics.ReachabilityNotCheckedCount,
-            metrics.ReachabilityUnknownCount,
-            metrics.ReachableCount,
-            metrics.UnreachableCount);
-        ProgramPointSummary = new SymbolicProgramPointSummary(
-            metrics.ProgramPointCount,
-            metrics.TotalPathConditionCount,
-            metrics.MaxPathConditionCount,
-            Reachability,
-            new SymbolicProofOutcomeSummary(
-                metrics.ProofTotalCount,
-                metrics.ProofUnknownCount,
-                metrics.ProofProvenTrueCount,
-                metrics.ProofProvenFalseCount,
-                metrics.ProofUnreachableCount));
-        ConditionProofs = conditionProofs;
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        LineGroups = lineGroups ?? Array.Empty<SymbolicQueryLineGroup>();
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariant.MergedInvariantText,
-            SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
-            ProgramPoints.SelectMany(static point => point.ConditionProofs)
-                .Select(static proof => proof.Proof).ToArray(),
-            MergedInvariant.MergeKind,
-            MergedInvariant.ConditionCount);
-        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
-        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
-    }
-
-    public SymbolicQueryScope Scope { get; }
+    public SymbolicQueryScope Scope { get; } = scope ?? throw new ArgumentNullException(nameof(scope));
 
     public string ScopeKind => Scope.Kind.ToString().ToLowerInvariant();
 
@@ -73,35 +33,71 @@ internal sealed class SymbolicQueryResult
 
     public int? LineCount => Scope.LineCount;
 
-    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; } =
+        programPoints ?? throw new ArgumentNullException(nameof(programPoints));
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
+        SymbolicAnalysisTruncationInfo.Combine(
+            (programPoints ?? throw new ArgumentNullException(nameof(programPoints)))
+            .Select(static point => point.AnalysisTruncation));
 
     public int ProgramPointCount => ProgramPoints.Count;
 
-    public SymbolicInvariantResult ObservedInvariant { get; }
+    public SymbolicInvariantResult ObservedInvariant { get; } =
+        observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
 
-    internal SymbolicInvariantResult MergedInvariant { get; }
+    internal SymbolicInvariantResult MergedInvariant { get; } =
+        mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
 
-    public SymbolicInvariantInfo InvariantInfo { get; }
+    public SymbolicInvariantInfo InvariantInfo { get; } = new(
+        mergedInvariant.MergedInvariantText,
+        SymbolicFactInfo.Distinct(programPoints.SelectMany(static point => point.SymbolicFacts)),
+        programPoints.SelectMany(static point => point.ConditionProofs)
+            .Select(static proof => proof.Proof).ToArray(),
+        mergedInvariant.MergeKind,
+        mergedInvariant.ConditionCount);
 
-    public SymbolicMergedPathFacts MergedPathFacts { get; }
+    public SymbolicMergedPathFacts MergedPathFacts { get; } =
+        mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
 
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
+    public SymbolicProgramPointSummary ProgramPointSummary { get; } = new(
+        metrics.ProgramPointCount,
+        metrics.TotalPathConditionCount,
+        metrics.MaxPathConditionCount,
+        new SymbolicReachabilitySummary(
+            metrics.ReachabilityNotCheckedCount,
+            metrics.ReachabilityUnknownCount,
+            metrics.ReachableCount,
+            metrics.UnreachableCount),
+        new SymbolicProofOutcomeSummary(
+            metrics.ProofTotalCount,
+            metrics.ProofUnknownCount,
+            metrics.ProofProvenTrueCount,
+            metrics.ProofProvenFalseCount,
+            metrics.ProofUnreachableCount));
 
-    public SymbolicReachabilitySummary Reachability { get; }
+    public SymbolicReachabilitySummary Reachability { get; } = new(
+        metrics.ReachabilityNotCheckedCount,
+        metrics.ReachabilityUnknownCount,
+        metrics.ReachableCount,
+        metrics.UnreachableCount);
 
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; } = conditionProofs;
 
-    internal SymbolicQueryMetrics Metrics { get; }
+    internal SymbolicQueryMetrics Metrics { get; } = metrics;
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicSmtDiagnostics SmtDiagnostics { get; } =
+        smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; } =
+        programPoints.Select(static point => point.ReachabilityWitness).ToArray();
 
-    public SymbolicInputDomainSummary InputDomainSummary { get; }
+    public SymbolicInputDomainSummary InputDomainSummary { get; } =
+        SymbolicInputWitnessFactory.MergeAlternatives(
+            programPoints.Select(static point => point.ReachabilityWitness).ToArray());
 
-    internal IReadOnlyList<SymbolicQueryLineGroup> LineGroups { get; }
+    internal IReadOnlyList<SymbolicQueryLineGroup> LineGroups { get; } =
+        lineGroups ?? Array.Empty<SymbolicQueryLineGroup>();
 
     internal IReadOnlyList<string> Facts =>
         ObservedInvariant.Conditions.Select(static condition => condition.Text).ToArray();

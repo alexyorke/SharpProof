@@ -530,7 +530,7 @@ internal class TestClass
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
         Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.False);
-        Assert.That(typeof(SymbolicProgramPointResult).GetConstructors(), Is.Empty);
+        Assert.That(typeof(SymbolicProgramPointResult).IsVisible, Is.False);
         Assert.That(typeof(SymbolicConditionProofResult).IsVisible, Is.False);
     }
 

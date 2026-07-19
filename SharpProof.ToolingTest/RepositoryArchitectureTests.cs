@@ -204,6 +204,27 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void SymbolicQueryResults_UseCanonicalContextAndPrimaryConstructorOwners()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var symbolicRoot = Path.Combine(root, "SharpProof.Symbolic");
+        var programPoints = File.ReadAllText(Path.Combine(symbolicRoot, "SymbolicProgramPointResult.cs"));
+        var queryResult = File.ReadAllText(Path.Combine(symbolicRoot, "SymbolicQueryResult.cs"));
+        var runtimeHazards = File.ReadAllText(Path.Combine(
+            symbolicRoot, "SymbolicRuntimeHazardQueryService.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Analyzer", "SharpProofProjectAnalysisContext.cs")), Is.False);
+            Assert.That(programPoints, Does.Contain("class SymbolicProgramPointResult("));
+            Assert.That(queryResult, Does.Contain("class SymbolicQueryResult("));
+            Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazardQueryResult("));
+            Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazard("));
+        });
+    }
+
+    [Test]
     public void AnalysisBudgets_UseOneCanonicalModelAndNamedRegistry()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

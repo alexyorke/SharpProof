@@ -90,53 +90,37 @@ internal sealed class SymbolicProjectConfiguration(
 
 }
 
-internal sealed class SymbolicProjectQueryContext
+internal sealed class SymbolicProjectQueryContext(
+    Compilation compilation,
+    SyntaxTree syntaxTree,
+    AnalyzerOptions analyzerOptions,
+    string projectName,
+    string? projectFilePath = null,
+    string? solutionFilePath = null,
+    IEnumerable<string>? analyzerConfigPaths = null)
 {
-    private readonly ImmutableArray<string> _analyzerConfigPaths;
-    private readonly ImmutableArray<string> _additionalFilePaths;
+    private readonly ImmutableArray<string> _analyzerConfigPaths = NormalizePaths(analyzerConfigPaths);
+    private readonly ImmutableArray<string> _additionalFilePaths = NormalizePaths(
+        (analyzerOptions ?? throw new ArgumentNullException(nameof(analyzerOptions)))
+        .AdditionalFiles.Select(static file => file.Path));
 
-    public SymbolicProjectQueryContext(
-        Compilation compilation,
-        SyntaxTree syntaxTree,
-        AnalyzerOptions analyzerOptions,
-        string projectName,
-        string? projectFilePath = null,
-        string? solutionFilePath = null,
-        IEnumerable<string>? analyzerConfigPaths = null)
-    {
-        Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-        SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
-        AnalyzerOptions = analyzerOptions ?? throw new ArgumentNullException(nameof(analyzerOptions));
-        if (string.IsNullOrWhiteSpace(projectName))
-            throw new ArgumentException("Project name is required.", nameof(projectName));
+    public Compilation Compilation { get; } = ValidateCompilation(compilation, syntaxTree);
 
-        if (!compilation.SyntaxTrees.Contains(syntaxTree))
-            throw new ArgumentException("Syntax tree must belong to the project compilation.", nameof(syntaxTree));
+    public SyntaxTree SyntaxTree { get; } = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
 
-        ProjectName = projectName.Trim();
-        ProjectFilePath = NormalizeOptionalPath(projectFilePath);
-        SolutionFilePath = NormalizeOptionalPath(solutionFilePath);
-        _analyzerConfigPaths = NormalizePaths(analyzerConfigPaths);
-        _additionalFilePaths = NormalizePaths(analyzerOptions.AdditionalFiles.Select(static file => file.Path));
-        SourceInput = SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation);
-        Configuration = SymbolicProjectConfiguration.FromAnalyzerOptions(analyzerOptions);
-    }
+    public AnalyzerOptions AnalyzerOptions { get; } =
+        analyzerOptions ?? throw new ArgumentNullException(nameof(analyzerOptions));
 
-    public Compilation Compilation { get; }
+    public SymbolicSourceInput SourceInput { get; } = SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation);
 
-    public SyntaxTree SyntaxTree { get; }
+    public SymbolicProjectConfiguration Configuration { get; } =
+        SymbolicProjectConfiguration.FromAnalyzerOptions(analyzerOptions);
 
-    public AnalyzerOptions AnalyzerOptions { get; }
+    public string ProjectName { get; } = NormalizeProjectName(projectName);
 
-    public SymbolicSourceInput SourceInput { get; }
+    public string? ProjectFilePath { get; } = NormalizeOptionalPath(projectFilePath);
 
-    public SymbolicProjectConfiguration Configuration { get; }
-
-    public string ProjectName { get; }
-
-    public string? ProjectFilePath { get; }
-
-    public string? SolutionFilePath { get; }
+    public string? SolutionFilePath { get; } = NormalizeOptionalPath(solutionFilePath);
 
     public IReadOnlyList<string> AnalyzerConfigPaths => _analyzerConfigPaths;
 
@@ -174,6 +158,20 @@ internal sealed class SymbolicProjectQueryContext
                    .OrderBy(static path => path, PathComparer)
                    .ToImmutableArray() ?? ImmutableArray<string>.Empty;
     }
+
+    private static Compilation ValidateCompilation(Compilation? compilation, SyntaxTree? syntaxTree)
+    {
+        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
+        if (!compilation.SyntaxTrees.Contains(syntaxTree))
+            throw new ArgumentException("Syntax tree must belong to the project compilation.", nameof(syntaxTree));
+        return compilation;
+    }
+
+    private static string NormalizeProjectName(string? projectName) =>
+        string.IsNullOrWhiteSpace(projectName)
+            ? throw new ArgumentException("Project name is required.", nameof(projectName))
+            : projectName!.Trim();
 
     private static string? NormalizeOptionalPath(string? path)
     {

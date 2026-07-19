@@ -12,157 +12,141 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProgramPointResult
+internal sealed class SymbolicProgramPointResult(
+    string filePath,
+    int line,
+    int column,
+    int position,
+    int nodeSpanStart,
+    string nodeKind,
+    IReadOnlyList<string> facts,
+    SymbolicReachability reachability = SymbolicReachability.NotChecked,
+    string reachabilityReason = "reachability_not_checked",
+    IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
+    SymbolicSmtDiagnostics? smtDiagnostics = null,
+    string? mergedInvariantText = null,
+    SymbolicInvariantResult? invariant = null,
+    int? nodeSpanEnd = null,
+    int? nodeStartLine = null,
+    int? nodeStartColumn = null,
+    int? nodeEndLine = null,
+    int? nodeEndColumn = null,
+    string? methodName = null,
+    string? programPointKind = null,
+    int? requestedLine = null,
+    int? requestedColumn = null,
+    int? requestedPosition = null,
+    int? requestedPositionDistance = null,
+    bool? containsRequestedPosition = null,
+    IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
+    SymbolicInputWitness? reachabilityWitness = null,
+    SymbolicAnalysisTruncationInfo? analysisTruncation = null)
 {
-    internal SymbolicProgramPointResult(
-        string filePath,
-        int line,
-        int column,
-        int position,
-        int nodeSpanStart,
-        string nodeKind,
-        IReadOnlyList<string> facts,
-        SymbolicReachability reachability = SymbolicReachability.NotChecked,
-        string reachabilityReason = "reachability_not_checked",
-        IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
-        SymbolicSmtDiagnostics? smtDiagnostics = null,
-        string? mergedInvariantText = null,
-        SymbolicInvariantResult? invariant = null,
-        int? nodeSpanEnd = null,
-        int? nodeStartLine = null,
-        int? nodeStartColumn = null,
-        int? nodeEndLine = null,
-        int? nodeEndColumn = null,
-        string? methodName = null,
-        string? programPointKind = null,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null,
-        IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
-        SymbolicInputWitness? reachabilityWitness = null,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-    {
-        FilePath = filePath;
-        Line = line;
-        Column = column;
-        Position = position;
-        RequestedLine = requestedLine;
-        RequestedColumn = requestedColumn;
-        RequestedPosition = requestedPosition;
-        RequestedPositionDistance = requestedPositionDistance;
-        ContainsRequestedPosition = containsRequestedPosition;
-        NodeSpanStart = nodeSpanStart;
-        NodeSpanEnd = nodeSpanEnd ?? nodeSpanStart;
-        NodeSpanLength = Math.Max(0, NodeSpanEnd - NodeSpanStart);
-        NodeStartLine = nodeStartLine ?? line;
-        NodeStartColumn = nodeStartColumn ?? column;
-        NodeEndLine = nodeEndLine ?? NodeStartLine;
-        NodeEndColumn = nodeEndColumn ?? NodeStartColumn + NodeSpanLength;
-        NodeKind = nodeKind;
-        MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-        ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
-        Facts = facts ?? Array.Empty<string>();
-        SymbolicFacts = symbolicFacts ?? Array.Empty<SymbolicFactInfo>();
-        MergedInvariantText = mergedInvariantText ?? invariant?.MergedInvariantText ?? FormatMergedInvariantText(Facts);
-        Invariant = invariant == null
-            ? SymbolicInvariantResult.FromFacts(
-                Facts,
-                MergedInvariantText,
-                SymbolicInvariantMergeKind.Conjunction)
-            : invariant;
-        Reachability = reachability;
-        ReachabilityReason = reachabilityReason;
-        ReachabilityWitness = reachabilityWitness ?? SymbolicInputWitnessFactory.CreateReachability(
-            null,
-            Array.Empty<SmtFormula>(),
-            null,
-            position,
-            reachability,
-            reachabilityReason);
-        ConditionProofs = AttachProgramPointMetadata(conditionProofs ?? Array.Empty<SymbolicConditionProofResult>());
-        ProofOutcomes = new SymbolicProofOutcomeSummary(
-            ConditionProofs.Count,
-            ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown),
-            ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue),
-            ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenFalse),
-            ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unreachable));
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariantText,
-            SymbolicFacts,
-            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
-            Invariant.MergeKind,
-            Invariant.ConditionCount);
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-    }
+    public string FilePath { get; } = filePath;
 
-    public string FilePath { get; }
+    public int Line { get; } = line;
 
-    public int Line { get; }
+    public int Column { get; } = column;
 
-    public int Column { get; }
+    public int Position { get; } = position;
 
-    public int Position { get; }
+    public int? RequestedLine { get; } = requestedLine;
 
-    public int? RequestedLine { get; }
+    public int? RequestedColumn { get; } = requestedColumn;
 
-    public int? RequestedColumn { get; }
+    public int? RequestedPosition { get; } = requestedPosition;
 
-    public int? RequestedPosition { get; }
+    public int? RequestedPositionDistance { get; } = requestedPositionDistance;
 
-    public int? RequestedPositionDistance { get; }
+    public bool? ContainsRequestedPosition { get; } = containsRequestedPosition;
 
-    public bool? ContainsRequestedPosition { get; }
+    public int NodeSpanStart { get; } = nodeSpanStart;
 
-    public int NodeSpanStart { get; }
+    public int NodeSpanEnd { get; } = nodeSpanEnd ?? nodeSpanStart;
 
-    public int NodeSpanEnd { get; }
+    public int NodeSpanLength => Math.Max(0, NodeSpanEnd - NodeSpanStart);
 
-    public int NodeSpanLength { get; }
+    public int NodeStartLine { get; } = nodeStartLine ?? line;
 
-    public int NodeStartLine { get; }
+    public int NodeStartColumn { get; } = nodeStartColumn ?? column;
 
-    public int NodeStartColumn { get; }
+    public int NodeEndLine { get; } = nodeEndLine ?? nodeStartLine ?? line;
 
-    public int NodeEndLine { get; }
+    public int NodeEndColumn { get; } = nodeEndColumn ??
+        (nodeStartColumn ?? column) + Math.Max(0, (nodeSpanEnd ?? nodeSpanStart) - nodeSpanStart);
 
-    public int NodeEndColumn { get; }
+    public string NodeKind { get; } = nodeKind;
 
-    public string NodeKind { get; }
+    public string? MethodName { get; } = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
 
-    public string? MethodName { get; }
+    public string ProgramPointKind { get; } = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
 
-    public string ProgramPointKind { get; }
+    public IReadOnlyList<string> Facts { get; } = facts ?? Array.Empty<string>();
 
-    public IReadOnlyList<string> Facts { get; }
+    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } = symbolicFacts ?? Array.Empty<SymbolicFactInfo>();
 
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+    public string MergedInvariantText { get; } = mergedInvariantText ?? invariant?.MergedInvariantText ??
+        FormatMergedInvariantText(facts ?? Array.Empty<string>());
 
-    public string MergedInvariantText { get; }
+    public SymbolicInvariantResult Invariant { get; } = invariant ?? SymbolicInvariantResult.FromFacts(
+        facts ?? Array.Empty<string>(),
+        mergedInvariantText ?? FormatMergedInvariantText(facts ?? Array.Empty<string>()),
+        SymbolicInvariantMergeKind.Conjunction);
 
-    public SymbolicInvariantResult Invariant { get; }
-
-    public SymbolicInvariantInfo InvariantInfo { get; }
+    public SymbolicInvariantInfo InvariantInfo => new(
+        MergedInvariantText,
+        SymbolicFacts,
+        ConditionProofs.Select(static proof => proof.Proof).ToArray(),
+        Invariant.MergeKind,
+        Invariant.ConditionCount);
 
     public int PathConditionCount => InvariantInfo.ConditionCount;
 
-    public SymbolicReachability Reachability { get; }
+    public SymbolicReachability Reachability { get; } = reachability;
 
-    public string ReachabilityReason { get; }
+    public string ReachabilityReason { get; } = reachabilityReason;
 
-    public SymbolicInputWitness ReachabilityWitness { get; }
+    public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness ??
+        SymbolicInputWitnessFactory.CreateReachability(
+            null, Array.Empty<SmtFormula>(), null, position, reachability, reachabilityReason);
 
     public SymbolicInputDomainSummary InputDomainSummary => ReachabilityWitness.DomainSummary;
 
-    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
+    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } =
+        (conditionProofs ?? Array.Empty<SymbolicConditionProofResult>())
+        .Select(proof => proof.WithProgramPointMetadata(
+            filePath,
+            line,
+            column,
+            position,
+            nodeSpanStart,
+            nodeSpanEnd ?? nodeSpanStart,
+            nodeStartLine ?? line,
+            nodeStartColumn ?? column,
+            nodeEndLine ?? nodeStartLine ?? line,
+            nodeEndColumn ?? (nodeStartColumn ?? column) +
+            Math.Max(0, (nodeSpanEnd ?? nodeSpanStart) - nodeSpanStart),
+            nodeKind,
+            string.IsNullOrWhiteSpace(methodName) ? null : methodName,
+            SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind),
+            requestedLine,
+            requestedColumn,
+            requestedPosition,
+            requestedPositionDistance,
+            containsRequestedPosition))
+        .ToArray();
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => new(
+        ConditionProofs.Count,
+        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown),
+        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue),
+        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenFalse),
+        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unreachable));
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
+        analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
 
     private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
     {
@@ -173,48 +157,15 @@ internal sealed class SymbolicProgramPointResult
         return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
     }
 
-    private IReadOnlyList<SymbolicConditionProofResult> AttachProgramPointMetadata(
-        IReadOnlyList<SymbolicConditionProofResult> proofs)
-    {
-        if (proofs.Count == 0) return proofs;
-
-        return proofs
-            .Select(proof => proof.WithProgramPointMetadata(
-                FilePath,
-                Line,
-                Column,
-                Position,
-                NodeSpanStart,
-                NodeSpanEnd,
-                NodeStartLine,
-                NodeStartColumn,
-                NodeEndLine,
-                NodeEndColumn,
-                NodeKind,
-                MethodName,
-                ProgramPointKind,
-                RequestedLine,
-                RequestedColumn,
-                RequestedPosition,
-                RequestedPositionDistance,
-                ContainsRequestedPosition))
-            .ToArray();
-    }
 }
 
-internal sealed class SymbolicInvariantResult
+internal sealed class SymbolicInvariantResult(
+    IReadOnlyList<SymbolicInvariantCondition> conditions,
+    string mergedInvariantText,
+    SymbolicInvariantMergeKind mergeKind)
 {
-    private SymbolicInvariantResult(
-        IReadOnlyList<SymbolicInvariantCondition> conditions,
-        string mergedInvariantText,
-        SymbolicInvariantMergeKind mergeKind)
-    {
-        Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
-        MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
-        MergeKind = mergeKind;
-    }
-
-    public IReadOnlyList<SymbolicInvariantCondition> Conditions { get; }
+    public IReadOnlyList<SymbolicInvariantCondition> Conditions { get; } =
+        conditions ?? throw new ArgumentNullException(nameof(conditions));
 
     public int ConditionCount => Conditions.Count;
 
@@ -222,9 +173,10 @@ internal sealed class SymbolicInvariantResult
 
     public bool HasConservativeUnknowns => ConservativeUnknownCount != 0;
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText { get; } =
+        mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
 
-    public SymbolicInvariantMergeKind MergeKind { get; }
+    public SymbolicInvariantMergeKind MergeKind { get; } = mergeKind;
 
     public bool IsTrivial =>
         Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
@@ -279,42 +231,30 @@ internal sealed class SymbolicInvariantResult
     }
 }
 
-internal sealed class SymbolicInvariantCondition
+internal sealed class SymbolicInvariantCondition(
+    int index,
+    string text,
+    string formulaKind,
+    string valueKind,
+    bool isSolverBacked,
+    string target,
+    bool isConservativeUnknown)
 {
-    private SymbolicInvariantCondition(
-        int index,
-        string text,
-        string formulaKind,
-        string valueKind,
-        bool isSolverBacked,
-        string target,
-        bool isConservativeUnknown)
-    {
-        Index = index;
-        Text = text ?? throw new ArgumentNullException(nameof(text));
-        FormulaKind = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
-        ValueKind = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
-        IsSolverBacked = isSolverBacked;
-        DisplayKind = FormulaKind;
-        Target = target ?? string.Empty;
-        IsConservativeUnknown = isConservativeUnknown;
-    }
+    public int Index { get; } = index;
 
-    public int Index { get; }
+    public string Text { get; } = text ?? throw new ArgumentNullException(nameof(text));
 
-    public string Text { get; }
+    public string DisplayKind { get; } = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
 
-    public string DisplayKind { get; }
+    public string ValueKind { get; } = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
 
-    public string ValueKind { get; }
+    public bool IsSolverBacked { get; } = isSolverBacked;
 
-    public bool IsSolverBacked { get; }
+    internal string FormulaKind { get; } = formulaKind;
 
-    internal string FormulaKind { get; }
+    public string Target { get; } = target ?? string.Empty;
 
-    public string Target { get; }
-
-    public bool IsConservativeUnknown { get; }
+    public bool IsConservativeUnknown { get; } = isConservativeUnknown;
 
     public static SymbolicInvariantCondition FromText(int index, string text)
     {

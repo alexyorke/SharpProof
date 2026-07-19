@@ -806,10 +806,10 @@ internal sealed class SymbolicCliOptions
                 SourceMapOriginalColumn));
     }
 
-    public void ApplyProjectConfiguration(SharpProofProjectAnalysisContext? context)
+    public void ApplyProjectConfiguration(SymbolicProjectQueryContext? context)
     {
-        ProjectSmtOptions = context?.SmtOptions;
-        ProjectAnalysisLimits = context?.AnalysisLimits;
+        ProjectSmtOptions = context?.Configuration.SmtOptions;
+        ProjectAnalysisLimits = context?.Configuration.AnalysisLimits;
     }
 
     public SymbolicSourceQueryFilter CreateResultFilter()

@@ -43,50 +43,38 @@ internal enum SymbolicErrorCategory
     Internal
 }
 
-internal sealed class SymbolicError
+internal sealed class SymbolicError(
+    string code,
+    SymbolicErrorCategory category,
+    string message,
+    int recommendedExitCode,
+    bool isRetryable = false,
+    IEnumerable<KeyValuePair<string, string>>? details = null)
 {
-    public SymbolicError(
-        string code,
-        SymbolicErrorCategory category,
-        string message,
-        int recommendedExitCode,
-        bool isRetryable = false,
-        IEnumerable<KeyValuePair<string, string>>? details = null)
-    {
-        if (string.IsNullOrWhiteSpace(code))
-            throw new ArgumentException("Error code is required.", nameof(code));
+    public string Code { get; } = NormalizeRequired(code, nameof(code), "Error code is required.");
 
-        if (!Enum.IsDefined(typeof(SymbolicErrorCategory), category))
-            throw new ArgumentOutOfRangeException(nameof(category), category, "Error category is not defined.");
+    public SymbolicErrorCategory Category { get; } = ValidateCategory(category);
 
-        if (string.IsNullOrWhiteSpace(message))
-            throw new ArgumentException("Error message is required.", nameof(message));
+    public string Message { get; } = NormalizeRequired(message, nameof(message), "Error message is required.");
 
-        if (recommendedExitCode is < 1 or > 255)
-            throw new ArgumentOutOfRangeException(
-                nameof(recommendedExitCode),
-                recommendedExitCode,
-                "Recommended exit code must be between 1 and 255.");
+    public int RecommendedExitCode { get; } = ValidateExitCode(recommendedExitCode);
 
-        Code = code.Trim();
-        Category = category;
-        Message = message.Trim();
-        RecommendedExitCode = recommendedExitCode;
-        IsRetryable = isRetryable;
-        Details = NormalizeDetails(details);
-    }
+    public bool IsRetryable { get; } = isRetryable;
 
-    public string Code { get; }
+    public IReadOnlyDictionary<string, string> Details { get; } = NormalizeDetails(details);
 
-    public SymbolicErrorCategory Category { get; }
+    private static string NormalizeRequired(string? value, string parameterName, string message) =>
+        string.IsNullOrWhiteSpace(value) ? throw new ArgumentException(message, parameterName) : value!.Trim();
 
-    public string Message { get; }
+    private static SymbolicErrorCategory ValidateCategory(SymbolicErrorCategory value) =>
+        Enum.IsDefined(typeof(SymbolicErrorCategory), value)
+            ? value
+            : throw new ArgumentOutOfRangeException("category", value, "Error category is not defined.");
 
-    public int RecommendedExitCode { get; }
-
-    public bool IsRetryable { get; }
-
-    public IReadOnlyDictionary<string, string> Details { get; }
+    private static int ValidateExitCode(int value) => value is >= 1 and <= 255
+        ? value
+        : throw new ArgumentOutOfRangeException(
+            "recommendedExitCode", value, "Recommended exit code must be between 1 and 255.");
 
     private static IReadOnlyDictionary<string, string> NormalizeDetails(
         IEnumerable<KeyValuePair<string, string>>? details)
@@ -106,18 +94,13 @@ internal sealed class SymbolicError
     }
 }
 
-internal sealed class SymbolicErrorEnvelope
+internal sealed class SymbolicErrorEnvelope(SymbolicError error)
 {
-    public SymbolicErrorEnvelope(SymbolicError error)
-    {
-        Error = error ?? throw new ArgumentNullException(nameof(error));
-    }
-
     public string Kind => "error";
 
     public int SchemaVersion => 1;
 
-    public SymbolicError Error { get; }
+    public SymbolicError Error { get; } = error ?? throw new ArgumentNullException(nameof(error));
 }
 
 internal sealed class SymbolicQueryException : Exception
@@ -137,20 +120,14 @@ internal sealed class SymbolicQueryException : Exception
     public SymbolicError Error { get; }
 }
 
-internal sealed class SymbolicOperationResult<T>
+internal sealed class SymbolicOperationResult<T>(T? value, SymbolicError? error)
     where T : class
 {
-    private SymbolicOperationResult(T? value, SymbolicError? error)
-    {
-        Value = value;
-        Error = error;
-    }
-
     public bool IsSuccess => Error == null;
 
-    public T? Value { get; }
+    public T? Value { get; } = value;
 
-    public SymbolicError? Error { get; }
+    public SymbolicError? Error { get; } = error;
 
     public static SymbolicOperationResult<T> Success(T value)
     {

@@ -68,7 +68,7 @@ internal sealed record SymbolicCliExplainReport(
             new SymbolicQueryContext(source, requestedTarget, queryOptions), cancellationToken);
         var diagnostics = await SymbolicCliExplainDiagnostics.CreateAsync(
             options,
-            inputContext.ProjectContext,
+            inputContext,
             options.ReportMaxDiagnostics,
             cancellationToken).ConfigureAwait(false);
         var project = SymbolicCliExplainProject.Create(inputContext, options.ReportMaxItems);
@@ -361,7 +361,7 @@ internal sealed record SymbolicCliExplainProject(
         var analyzerConfigs = SymbolicCompactProjection.Project(context.AnalyzerConfigPaths, limit);
         var additionalFiles = SymbolicCompactProjection.Project(context.AdditionalFilePaths, limit);
         var workspaceDiagnostics = SymbolicCompactProjection.Project(input.WorkspaceDiagnostics, limit);
-        var configurationIssues = SymbolicCompactProjection.Project(context.ConfigurationIssues, limit);
+        var configurationIssues = SymbolicCompactProjection.Project(input.ConfigurationIssues, limit);
         return new SymbolicCliExplainProject(
             context.ProjectName,
             context.ProjectFilePath,
@@ -389,12 +389,13 @@ internal sealed record SymbolicCliExplainDiagnostics(
 {
     internal static async Task<SymbolicCliExplainDiagnostics> CreateAsync(
         SymbolicCliOptions options,
-        SharpProofProjectAnalysisContext? context,
+        SymbolicCliInputContext input,
         int limit,
         CancellationToken cancellationToken)
     {
+        var context = input.ProjectContext;
         if (context == null) return new SymbolicCliExplainDiagnostics(0, 0, Array.Empty<SymbolicCliExplainDiagnostic>(), false);
-        var diagnostics = await context.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+        var diagnostics = await input.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
         var relevant = SymbolicCliDiagnosticSelector.SelectRelevant(
             diagnostics,
             context.SyntaxTree,
