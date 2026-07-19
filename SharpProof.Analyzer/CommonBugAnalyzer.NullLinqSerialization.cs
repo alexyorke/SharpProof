@@ -62,7 +62,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.MaybeNullResultDereferenceRule,
+            AnalyzerDiagnosticCatalog.Get("MaybeNullResultDereferenceRule"),
             invocation.Syntax.GetLocation(),
             "maybe_null_result_dereference",
             invocation.TargetMethod.Name);
@@ -102,7 +102,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.PrematureQueryMaterializationRule,
+            AnalyzerDiagnosticCatalog.Get("PrematureQueryMaterializationRule"),
             materialized.Syntax.GetLocation(),
             "premature_query_materialization",
             materialized.TargetMethod.Name,
@@ -129,7 +129,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.DeferredQuerySideEffectRule,
+                        AnalyzerDiagnosticCatalog.Get("DeferredQuerySideEffectRule"),
                         mutation.Syntax.GetLocation(),
                         "deferred_query_side_effect",
                         invocation.TargetMethod.Name,
@@ -145,7 +145,7 @@ internal static partial class CommonBugAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.QueryTranslationRiskRule,
+                    AnalyzerDiagnosticCatalog.Get("QueryTranslationRiskRule"),
                     sourceCall.Syntax.GetLocation(),
                     "query_translation_risk",
                     invocation.TargetMethod.Name,
@@ -181,7 +181,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SerializationCycleRiskRule,
+            AnalyzerDiagnosticCatalog.Get("SerializationCycleRiskRule"),
             invocation.Syntax.GetLocation(),
             "serialization_cycle_risk",
             sourceRoot.ToDisplayString());
@@ -209,7 +209,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.SerializerAttributeMismatchRule,
+                AnalyzerDiagnosticCatalog.Get("SerializerAttributeMismatchRule"),
                 location,
                 "serializer_attribute_mismatch",
                 serializer == SerializerKind.SystemTextJson ? "System.Text.Json" : "Newtonsoft.Json",
@@ -338,7 +338,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.UncheckedAllocationArithmeticRule,
+                AnalyzerDiagnosticCatalog.Get("UncheckedAllocationArithmeticRule"),
                 binary.GetLocation(),
                 "unchecked_allocation_arithmetic",
                 binary.ToString());

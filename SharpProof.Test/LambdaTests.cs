@@ -52,7 +52,7 @@ public class TestClass
 }";
 
 
-        var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected1 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 17, 11, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected1);
@@ -82,7 +82,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(13, 18, 13, 28)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

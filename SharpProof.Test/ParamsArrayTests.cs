@@ -173,10 +173,10 @@ public class TestClass
     }
 }";
 
-        var expectedFM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedFM = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 19, 8, 32)
             .WithArguments("FormatMessage");
-        var expectedTM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedTM = VerifyCS.Diagnostic("SP0002")
             .WithSpan(19, 19, 19, 29)
             .WithArguments("TestMethod");
 
@@ -262,23 +262,23 @@ public class TestClass
 ";
 
 
-        var expectedDiagSP0002_Process = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagSP0002_Process = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
 
 
-        var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic("SP0002")
             .WithSpan(21, 24, 21, 34).WithArguments("TestMethod");
 
 
-        var expectedDiagSP0002_ImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagSP0002_ImpureAction = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 24, 9, 36).WithArguments("ImpureAction");
 
 
-        var expectedImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedImpureAction = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
-        var expectedProcessNumbers = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedProcessNumbers = VerifyCS.Diagnostic("SP0002")
             .WithSpan(13, 24, 13, 38).WithArguments("ProcessNumbers");
-        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(22, 24, 22, 34)
+        var expectedTestMethod = VerifyCS.Diagnostic("SP0002").WithSpan(22, 24, 22, 34)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(testCode, expectedImpureAction, expectedProcessNumbers, expectedTestMethod);
     }

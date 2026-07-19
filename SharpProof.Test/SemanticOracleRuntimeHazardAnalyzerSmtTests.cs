@@ -27,7 +27,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -111,7 +111,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -131,7 +131,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -175,7 +175,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -215,7 +215,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -503,7 +503,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -583,7 +583,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -592,7 +592,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.RelationalPatternBoundNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -601,7 +601,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.PropertyPatternBoundNonZeroLength);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -610,7 +610,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.SwitchStatementPatternBoundNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -619,7 +619,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.SwitchStatementPriorSectionExcludesZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -628,7 +628,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.SwitchExpressionPatternBoundNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -637,7 +637,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.SwitchExpressionFallbackExcludesZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -659,7 +659,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -688,7 +688,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -709,7 +709,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -730,7 +730,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -770,7 +770,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -780,7 +780,7 @@ public class TestClass
             SemanticOracleTestSources.CompoundAssignedNonZeroDivisor);
 
         Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"),
             Is.False,
             string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())));
     }
@@ -791,7 +791,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.IncrementedNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -800,7 +800,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.TupleAssignedNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -809,7 +809,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.TupleDeconstructionDeclaredNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -818,7 +818,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.InlineFiniteArrayElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -827,7 +827,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.PriorFiniteArrayElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -836,7 +836,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.InlineFiniteArrayFromEndElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -845,7 +845,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.PriorFiniteArrayFromEndElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -854,7 +854,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.ConditionalFiniteArrayElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -863,7 +863,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.TupleElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -872,7 +872,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.NamedTupleElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -881,7 +881,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.TupleLocalDeconstructionAssignedNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -890,7 +890,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.TupleLocalDeconstructionDeclaredNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -965,7 +965,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -985,7 +985,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1005,7 +1005,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1025,7 +1025,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1034,7 +1034,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.ListPatternFirstElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1043,7 +1043,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.ListPatternTrailingElementNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1052,7 +1052,7 @@ public class TestClass
         var diagnostics = await GetExceptionDiagnosticsAsync(
             SemanticOracleTestSources.ArrayElementReadFromListPatternNonZeroDivisor);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1228,7 +1228,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1285,7 +1285,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1352,7 +1352,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1372,7 +1372,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1392,7 +1392,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1412,7 +1412,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1475,7 +1475,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1510,7 +1510,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1557,7 +1557,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1577,7 +1577,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1600,7 +1600,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1661,15 +1661,15 @@ public class TestClass
         string? expectedSource = null)
     {
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
+            diagnostics.Where(candidate => candidate.Id == "SP0010").ToImmutableArray(),
+            "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(expectedType));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo(expectedType));
         if (expectedCategory != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
                 Is.EqualTo(expectedCategory));
         if (expectedSource != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
                 Is.EqualTo(expectedSource));
     }
 }

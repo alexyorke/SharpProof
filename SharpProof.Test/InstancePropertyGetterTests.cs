@@ -113,7 +113,7 @@ namespace TestNamespace
     }
 }";
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 20, 9, 25)
             .WithArguments("get_Value");
 

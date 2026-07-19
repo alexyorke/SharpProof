@@ -51,9 +51,9 @@ public class TestClass
 }";
 
 
-        var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35)
+        var expectedX = VerifyCS.Diagnostic("SP0004").WithSpan(5, 34, 5, 35)
             .WithArguments("get_X");
-        var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57)
+        var expectedY = VerifyCS.Diagnostic("SP0004").WithSpan(5, 56, 5, 57)
             .WithArguments("get_Y");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
     }
@@ -81,9 +81,9 @@ public class TestClass
 }";
 
 
-        var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35)
+        var expectedX = VerifyCS.Diagnostic("SP0004").WithSpan(5, 34, 5, 35)
             .WithArguments("get_X");
-        var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57)
+        var expectedY = VerifyCS.Diagnostic("SP0004").WithSpan(5, 56, 5, 57)
             .WithArguments("get_Y");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
     }

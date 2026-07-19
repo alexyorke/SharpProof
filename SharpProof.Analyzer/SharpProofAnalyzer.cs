@@ -3,9 +3,6 @@ namespace SharpProof.Analyzer;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class SharpProofAnalyzer : DiagnosticAnalyzer
 {
-    public const string SP0002 = SharpProofDiagnostics.PurityNotVerifiedId;
-    public const string SP0004 = SharpProofDiagnostics.MissingEnforcePureAttributeId;
-
     public SharpProofAnalyzer()
         : this(AnalyzerFeatures.All)
     {
@@ -149,9 +146,9 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
         var path = syntaxTree?.FilePath ?? "<global>";
         var properties = BaselineDiagnosticProperties.Add(
             ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ConfigurationKeyProperty, invalidConfigurationValue.Key)
-                .Add(SharpProofDiagnostics.ConfigurationValueProperty, invalidConfigurationValue.Value)
-                .Add(SharpProofDiagnostics.ConfigurationInvalidReasonProperty, invalidConfigurationValue.Reason),
+                .Add("sharpproof.config.key", invalidConfigurationValue.Key)
+                .Add("sharpproof.config.value", invalidConfigurationValue.Value)
+                .Add("sharpproof.config.invalid_reason", invalidConfigurationValue.Reason),
             "<configuration>",
             path,
             "AnalyzerConfiguration",
@@ -166,7 +163,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             invalidConfigurationValue.Reason);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
+            AnalyzerDiagnosticCatalog.Get("InvalidAnalyzerConfigurationRule"),
             location ?? Location.None,
             null,
             properties,
@@ -183,12 +180,12 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
     {
         var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.AdditionalFilePathProperty, path)
-            .Add(SharpProofDiagnostics.AdditionalFileReasonProperty, issue.Reason)
-            .Add(SharpProofDiagnostics.AdditionalFileReasonCodeProperty, issue.ReasonCode);
+            .Add("sharpproof.additional_file.path", path)
+            .Add("sharpproof.additional_file.reason", issue.Reason)
+            .Add("sharpproof.additional_file.reason_code", issue.ReasonCode);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidAdditionalFileRule,
+            AnalyzerDiagnosticCatalog.Get("InvalidAdditionalFileRule"),
             Location.None,
             null,
             properties,

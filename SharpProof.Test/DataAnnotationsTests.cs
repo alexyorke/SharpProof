@@ -81,13 +81,13 @@ public class TestClass
         var expectedCS8618 = DiagnosticResult.CompilerError("CS8618")
             .WithSpan(9, 65, 9, 82).WithSpan(9, 120, 9, 132)
             .WithArguments("property", "ErrorMessage");
-        var expectedSP0004GetterErr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004GetterErr = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 120, 9, 132)
             .WithArguments("get_ErrorMessage");
-        var expectedSP0004GetterMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004GetterMin = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 153, 9, 166)
             .WithArguments("get_MinimumLength");
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedSP0002 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 34, 14, 44)
             .WithArguments("TestMethod");
 
@@ -140,13 +140,13 @@ public class TestRunner
 }
 ";
 
-        var expectedGetMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetMin = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 16, 9, 19).WithArguments("get_Min");
-        var expectedGetMax = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetMax = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 16, 10, 19).WithArguments("get_Max");
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetValue = VerifyCS.Diagnostic("SP0004")
             .WithSpan(24, 16, 24, 21).WithArguments("get_Value");
-        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(30, 17, 30, 27)
+        var expectedTestMethod = VerifyCS.Diagnostic("SP0002").WithSpan(30, 17, 30, 27)
             .WithArguments("TestMethod");
 
 
@@ -181,10 +181,10 @@ public class MyValidatableObject : IValidatableObject // Line 7
 ";
 
 
-        var expectedGetStart = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetStart = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 21, 10, 30).WithArguments("get_StartDate");
 
-        var expectedGetEnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetEnd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 21, 11, 28).WithArguments("get_EndDate");
 
 
@@ -214,9 +214,9 @@ public class TestClass
     }
 }
 ";
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(13, 17, 13, 27)
+        var expectedSP0002 = VerifyCS.Diagnostic("SP0002").WithSpan(13, 17, 13, 27)
             .WithArguments("TestMethod");
-        var expectedGetDisplay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetDisplay = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 39, 8, 50).WithArguments("get_DisplayName");
         var compilerError = DiagnosticResult.CompilerError("CS8618").WithSpan(8, 39, 8, 50).WithSpan(8, 39, 8, 50)
             .WithArguments("property", "DisplayName");

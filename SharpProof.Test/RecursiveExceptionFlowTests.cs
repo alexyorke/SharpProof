@@ -60,11 +60,11 @@ public class RecursiveExceptionFlowTests
                                                                      """);
 
         var summaryDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .Single(d => d.GetMessage().Contains("'Render'", StringComparison.Ordinal));
 
-        var summarySources = summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var summarySources = summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(summarySources, Does.Contain("VoucherService.LoadAcceptedDocument(Voucher)"));
         Assert.That(summarySources, Does.Contain("VoucherService.RequireAcceptedDocument(Voucher)"));
@@ -72,15 +72,15 @@ public class RecursiveExceptionFlowTests
         Assert.That(summarySources, Does.Contain("direct_throw:throw"));
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .Single(d => d.GetMessage().Contains("LoadAcceptedDocument(voucher)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("LoadAcceptedDocument"));
         Assert.That(siteSources, Does.Contain("VoucherService.LoadAcceptedDocument(Voucher)"));
         Assert.That(siteSources, Does.Contain("VoucherService.RequireAcceptedDocument(Voucher)"));
@@ -141,16 +141,16 @@ public class RecursiveExceptionFlowTests
                                                                      """,
             reportExceptions: null);
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .Single(d => d.GetMessage().Contains("LoadAcceptedDocument(voucher)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
         Assert.That(siteSources, Does.Contain("VoucherService.LoadAcceptedDocument(Voucher)"));
         Assert.That(siteSources, Does.Contain("VoucherService.RequireAcceptedDocument(Voucher)"));
@@ -189,25 +189,25 @@ public class RecursiveExceptionFlowTests
                                                                      """);
 
         var summaryDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .Single(d => d.GetMessage().Contains("'Render'", StringComparison.Ordinal));
 
-        var summarySources = summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var summarySources = summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(summarySources, Does.Contain("CycleService.StepA(int)"));
         Assert.That(summarySources, Does.Contain("direct_throw:throw"));
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .First(d => d.GetMessage().Contains("StepA(depth)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty], Does.Contain("StepA"));
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"], Does.Contain("StepA"));
         Assert.That(siteSources, Does.Contain("CycleService.StepA(int)"));
         Assert.That(siteSources, Does.Contain("direct_throw:throw"));
     }
@@ -243,16 +243,16 @@ public class RecursiveExceptionFlowTests
                                                                      """,
             reportExceptions: null);
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .First(d => d.GetMessage().Contains("StepA(depth)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
         Assert.That(siteSources, Does.Contain("CycleService.StepA(int)"));
         Assert.That(siteSources, Does.Contain("direct_throw:throw"));
@@ -311,11 +311,11 @@ public class RecursiveExceptionFlowTests
                                                                      """);
 
         var summaryDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .Single(d => d.GetMessage().Contains("'Render'", StringComparison.Ordinal));
 
-        var summarySources = summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var summarySources = summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(summarySources, Does.Contain("WorkflowService.Stage1(Voucher)"));
         Assert.That(summarySources, Does.Contain("WorkflowService.Stage2(Voucher)"));
@@ -326,15 +326,15 @@ public class RecursiveExceptionFlowTests
         Assert.That(summarySources, Does.Contain("direct_throw:throw"));
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .Single(d => d.GetMessage().Contains("Stage1(voucher)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty], Does.Contain("Stage1"));
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"], Does.Contain("Stage1"));
         Assert.That(siteSources, Does.Contain("WorkflowService.Stage1(Voucher)"));
         Assert.That(siteSources, Does.Contain("WorkflowService.Stage2(Voucher)"));
         Assert.That(siteSources, Does.Contain("WorkflowService.Stage3(Voucher)"));
@@ -397,16 +397,16 @@ public class RecursiveExceptionFlowTests
                                                                      """,
             reportExceptions: null);
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
 
         var siteDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .Single(d => d.GetMessage().Contains("Stage1(voucher)", StringComparison.Ordinal));
 
-        var siteSources = siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var siteSources = siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
         Assert.That(siteSources, Does.Contain("WorkflowService.Stage1(Voucher)"));
         Assert.That(siteSources, Does.Contain("WorkflowService.Stage2(Voucher)"));

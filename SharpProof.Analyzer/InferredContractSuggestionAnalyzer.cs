@@ -48,7 +48,7 @@ internal static class InferredContractSuggestionAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.SuggestNullableContractRule,
+                    AnalyzerDiagnosticCatalog.Get("SuggestNullableContractRule"),
                     "nullable-return",
                     "global::System.Diagnostics.CodeAnalysis.NotNull",
                     "[return: NotNull]",
@@ -66,7 +66,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestNullableContractRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestNullableContractRule"),
             "nullable-parameter:" + parameter.Name,
             "global::System.Diagnostics.CodeAnalysis.NotNull",
             "[NotNull] on parameter '" + parameter.Name + "'",
@@ -107,7 +107,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestZeroAllocationsRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestZeroAllocationsRule"),
             kind,
             AttributeNamespace + "ZeroAllocations",
             "[ZeroAllocations]",
@@ -163,7 +163,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestAllowedCapabilitiesRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestAllowedCapabilitiesRule"),
             kind,
             AttributeNamespace + "AllowedCapabilities(" + argument + ")",
             "[AllowedCapabilities(" + displayArgument + ")]",
@@ -200,7 +200,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestExpectedComplexityRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestExpectedComplexityRule"),
             kind,
             AttributeNamespace + "ExpectedComplexity(" + AttributeNamespace + "ComplexityKind." +
             complexityKind + ")",
@@ -244,7 +244,7 @@ internal static class InferredContractSuggestionAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.SuggestExceptionContractRule,
+                AnalyzerDiagnosticCatalog.Get("SuggestExceptionContractRule"),
                 kind,
                 AttributeNamespace + "DoesNotThrow",
                 "[DoesNotThrow]",
@@ -262,7 +262,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestExceptionContractRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestExceptionContractRule"),
             kind,
             AttributeNamespace + "AllowedExceptions(" + arguments + ")",
             "[AllowedExceptions(" + string.Join(", ", displayTypes.Select(type => "typeof(" + type + ")")) + ")]",
@@ -305,7 +305,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestEnsuresRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestEnsuresRule"),
             kind,
             AttributeNamespace + "Ensures(" + QuoteString(condition) + ")",
             "[Ensures(" + QuoteString(condition) + ")]",
@@ -341,7 +341,7 @@ internal static class InferredContractSuggestionAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuggestRequiresRule,
+            AnalyzerDiagnosticCatalog.Get("SuggestRequiresRule"),
             kind,
             AttributeNamespace + "Requires(" + QuoteString(condition) + ")",
             "[Requires(" + QuoteString(condition) + ")]",
@@ -364,10 +364,10 @@ internal static class InferredContractSuggestionAnalyzer
             : AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
         var confidenceText = confidence.ToString().ToLowerInvariant();
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.SuggestedContractKindProperty, kind)
-            .Add(SharpProofDiagnostics.SuggestedContractAttributeProperty, attributeExpression)
-            .Add(SharpProofDiagnostics.SuggestedContractConfidenceProperty, confidenceText)
-            .Add(SharpProofDiagnostics.SuggestedContractEvidenceProperty, evidence);
+            .Add(DiagnosticPropertyNames.SuggestedContractKindProperty, kind)
+            .Add(DiagnosticPropertyNames.SuggestedContractAttributeProperty, attributeExpression)
+            .Add("sharpproof.suggestion.confidence", confidenceText)
+            .Add("sharpproof.suggestion.evidence", evidence);
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             context.MethodSymbol,
@@ -387,7 +387,7 @@ internal static class InferredContractSuggestionAnalyzer
             new object[]
             {
                 context.MethodSymbol.Name,
-                descriptor.Id == SharpProofDiagnostics.SuggestNullableContractId ? displayAttribute : evidence,
+                descriptor.Id == "SP0046" ? displayAttribute : evidence,
                 displayAttribute,
                 confidenceText
             });

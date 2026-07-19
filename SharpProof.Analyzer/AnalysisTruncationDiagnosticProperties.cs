@@ -16,12 +16,12 @@ internal static class AnalysisTruncationDiagnosticProperties
             .OrderBy(static item => item, SymbolicAnalysisTruncationEventOrdering.Canonical)
             .ToArray();
         return properties
-            .SetItem(SharpProofDiagnostics.AnalysisTruncatedProperty, bool.TrueString)
+            .SetItem("sharpproof.analysis.truncated", bool.TrueString)
             .SetItem(
-                SharpProofDiagnostics.AnalysisLimitCodesProperty,
+                "sharpproof.analysis.limit_codes",
                 string.Join(",", orderedEvents.Select(static item => item.Code).Distinct(StringComparer.Ordinal)))
             .SetItem(
-                SharpProofDiagnostics.AnalysisLimitEventsProperty,
+                "sharpproof.analysis.limit_events",
                 string.Join(";", orderedEvents.Select(FormatEvent)));
     }
 

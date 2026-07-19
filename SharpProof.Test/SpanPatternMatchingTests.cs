@@ -172,7 +172,7 @@ public class CommandParser
     }
 }
 ";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(12, 24, 12, 38)
             .WithArguments("ExecuteCommand");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

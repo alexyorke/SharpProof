@@ -104,7 +104,7 @@ public class TestClass
 }";
 
 
-        var expectedAnalyzer = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedAnalyzer = VerifyCS.Diagnostic("SP0002")
             .WithSpan(7, 17, 7, 26)
             .WithArguments("Increment");
         var expectedCompiler = DiagnosticResult.CompilerError("CS8331")
@@ -134,7 +134,7 @@ public class TestClass
     }
 }";
 
-        var expectedTestModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedTestModify = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 17, 11, 27)
             .WithArguments("TestModify");
 
@@ -211,11 +211,11 @@ public class TestClass
 }";
 
 
-        var expectedProcess = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedProcess = VerifyCS.Diagnostic("SP0002")
             .WithSpan(13, 17, 13, 24)
             .WithArguments("Process");
 
-        var expectedModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedModify = VerifyCS.Diagnostic("SP0002")
             .WithSpan(22, 18, 22, 35)
             .WithArguments("ModifyGlobalState");
         var expectedCompiler = DiagnosticResult.CompilerError("CS8329")

@@ -89,11 +89,11 @@ public static class GeometryUtils
 }
 ";
 
-        var expectedGetCenter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetCenter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 18, 14, 24).WithArguments("get_Center");
-        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetRadius = VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 19, 15, 25).WithArguments("get_Radius");
-        var expectedCircleCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCircleCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 12, 17, 18).WithArguments(".ctor");
 
         await VerifyCS.VerifyAnalyzerAsync(test,

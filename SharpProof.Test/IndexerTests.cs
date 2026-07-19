@@ -74,7 +74,7 @@ public class TestClass
 }";
 
 
-        var expectedSetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(25, 17, 25, 25)
+        var expectedSetValue = VerifyCS.Diagnostic("SP0002").WithSpan(25, 17, 25, 25)
             .WithArguments("SetValue");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSetValue);
     }
@@ -162,7 +162,7 @@ public class TestClass
 }";
 
 
-        var expectedCallUpdate = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(39, 17, 39, 37)
+        var expectedCallUpdate = VerifyCS.Diagnostic("SP0002").WithSpan(39, 17, 39, 37)
             .WithArguments("CallUpdateItemImpure");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCallUpdate);
     }

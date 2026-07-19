@@ -6,43 +6,43 @@ internal static class AttributePlacementAnalyzer
         ImmutableArray.Create(
             new AttributePlacementRule(
                 "EnforcePureAttribute", "EnforcePure",
-                SharpProofDiagnostics.MisplacedAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "PureAttribute", "Pure",
-                SharpProofDiagnostics.MisplacedAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "AllowSynchronizationAttribute", "AllowSynchronization",
-                SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedAllowSynchronizationAttributeRule"),
                 AttributeTargetPolicy.PurityOnly),
             new AttributePlacementRule(
                 "ZeroAllocationsAttribute", "ZeroAllocations",
-                SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedZeroAllocationsAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "AllowedCapabilitiesAttribute", "AllowedCapabilities",
-                SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedAllowedCapabilitiesAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "EnsuresAttribute", "Ensures",
-                SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedEnsuresAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "RequiresAttribute", "Requires",
-                SharpProofDiagnostics.MisplacedRequiresAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedRequiresAttributeRule"),
                 AttributeTargetPolicy.PurityOnly),
             new AttributePlacementRule(
                 "DoesNotThrowAttribute", "DoesNotThrow",
-                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedExceptionContractAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "AllowedExceptionsAttribute", "AllowedExceptions",
-                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedExceptionContractAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
                 "ExpectedComplexityAttribute", "ExpectedComplexity",
-                SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("MisplacedExpectedComplexityAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias));
 
     internal static void AnalyzeNonMethodDeclaration(
@@ -174,10 +174,10 @@ internal static class AttributePlacementAnalyzer
         var evidenceKey = "unrecognized_attribute_identity:" + displayName;
         var properties = BaselineDiagnosticProperties.Add(
             ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.AttributeIdentityNameProperty, attributeName)
-                .Add(SharpProofDiagnostics.AttributeIdentityNamespaceProperty,
+                .Add("sharpproof.attribute_identity.name", attributeName)
+                .Add("sharpproof.attribute_identity.namespace",
                     namespaceName.Length == 0 ? SharpProofAttributeIdentityPolicy.GlobalNamespaceToken : namespaceName)
-                .Add(SharpProofDiagnostics.AttributeIdentityAcceptedNamespacesProperty,
+                .Add("sharpproof.attribute_identity.accepted_namespaces",
                     attributePolicy.AcceptedNamespacesDisplay),
             displayName,
             context.Node.SyntaxTree.FilePath ?? string.Empty,
@@ -192,7 +192,7 @@ internal static class AttributePlacementAnalyzer
             "unrecognized_attribute_identity");
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.UnrecognizedAttributeIdentityRule,
+            AnalyzerDiagnosticCatalog.Get("UnrecognizedAttributeIdentityRule"),
             location,
             null,
             properties,

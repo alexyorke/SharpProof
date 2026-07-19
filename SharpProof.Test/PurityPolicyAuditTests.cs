@@ -98,7 +98,7 @@ public sealed class PurityPolicyAuditTests
                     ConfiguredMemberKeyTestFactory.Method("Boundary", "Value", "named:System.Int32"))
                 .Add("sharpproof_suggest_missing_enforce_pure", "false"));
 
-        Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 
@@ -130,7 +130,7 @@ public sealed class PurityPolicyAuditTests
                     ConfiguredMemberKeyTestFactory.Method("Boundary.Api", "Value", "named:System.Int32"))
                 .Add("sharpproof_suggest_missing_enforce_pure", "false"));
 
-        Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 

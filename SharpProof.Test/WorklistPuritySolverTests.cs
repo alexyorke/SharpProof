@@ -31,7 +31,7 @@ public class CompilationPurityServiceTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.PurityNotVerifiedId));
+            Does.Not.Contain("SP0002"));
     }
 
     [Test]

@@ -63,7 +63,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(10, 16, 10, 26)
             .WithArguments("TestMethod");
 
@@ -95,7 +95,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(8, 16, 8, 26)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -123,7 +123,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(8, 16, 8, 26)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -151,7 +151,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(8, 16, 8, 26)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

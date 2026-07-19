@@ -75,10 +75,10 @@ public class TestClass
     public int Read(ICounter counter) => counter.Count;
 }";
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(17, 16, 17, 21)
             .WithArguments("get_Count");
-        var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedRead = VerifyCS.Diagnostic("SP0002")
             .WithSpan(30, 16, 30, 20)
             .WithArguments("Read");
 
@@ -388,10 +388,10 @@ public class TestClass
     public int Read(BaseCounter counter) => counter.Count;
 }";
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(17, 25, 17, 30)
             .WithArguments("get_Count");
-        var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedRead = VerifyCS.Diagnostic("SP0002")
             .WithSpan(30, 16, 30, 20)
             .WithArguments("Read");
 

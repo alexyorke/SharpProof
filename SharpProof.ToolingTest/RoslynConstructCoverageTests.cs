@@ -160,9 +160,9 @@ public class RoslynConstructCoverageTests
                                                             """);
 
         var unsupportedDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(diagnostic => diagnostic.Id == "SP0002")
             .Where(diagnostic =>
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityCategoryProperty, out var category) &&
+                diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ImpurityCategoryProperty, out var category) &&
                 string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
             .ToArray();
 
@@ -186,13 +186,13 @@ public class RoslynConstructCoverageTests
                                                             }
                                                             """);
 
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.Not.Null.And.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.Not.Null.And.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.Not.Null.And.Not.Empty);
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty], Is.Not.Null.And.Not.Empty);
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
             Is.Not.Null.And.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Is.Not.Null.And.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Is.Not.Null.And.Not.Empty);
     }
 
     [TestCaseSource(nameof(SyntaxShadowCorpusSnippets))]

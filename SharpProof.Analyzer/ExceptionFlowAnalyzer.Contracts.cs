@@ -85,9 +85,9 @@ internal static partial class ExceptionFlowAnalyzer
             var operationDisplay = GetExceptionSiteDisplay(firstEntry.Site, firstEntry.Method);
             var exceptionList = string.Join(", ", disallowedEvidence.Types);
             var properties = CreateExceptionProperties(disallowedEvidence)
-                .Add(SharpProofDiagnostics.ExceptionContractAttributeProperty, contract.AttributeDisplay)
-                .Add(SharpProofDiagnostics.ExceptionContractAllowedTypesProperty, FormatAllowedTypes(contract))
-                .Add(SharpProofDiagnostics.ExceptionContractDisallowedTypesProperty, exceptionList);
+                .Add("sharpproof.exception_contract.attribute", contract.AttributeDisplay)
+                .Add("sharpproof.exception_contract.allowed_types", FormatAllowedTypes(contract))
+                .Add("sharpproof.exception_contract.disallowed_types", exceptionList);
             properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
                 methodSymbol,
@@ -103,7 +103,7 @@ internal static partial class ExceptionFlowAnalyzer
                 exceptionList);
 
             var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.ExceptionContractViolationRule,
+                AnalyzerDiagnosticCatalog.Get("ExceptionContractViolationRule"),
                 siteLocation,
                 AdditionalLocations(contract.Location),
                 properties,

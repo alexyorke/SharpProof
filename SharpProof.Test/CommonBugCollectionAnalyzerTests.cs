@@ -22,7 +22,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.CollectionMutationDuringEnumerationId);
+        AssertHas(await AnalyzeAsync(source), "SP0056");
     }
 
     [Test]
@@ -40,7 +40,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.CollectionMutationDuringEnumerationId);
+        AssertMissing(await AnalyzeAsync(source), "SP0056");
     }
 
     [Test]
@@ -61,7 +61,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.CapturedLoopVariableId);
+        AssertHas(await AnalyzeAsync(source), "SP0057");
     }
 
     [Test]
@@ -85,7 +85,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.CapturedLoopVariableId);
+        AssertMissing(await AnalyzeAsync(source), "SP0057");
     }
 
     [Test]
@@ -98,7 +98,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.MutableStructId);
+        AssertHas(await AnalyzeAsync(source), "SP0058");
     }
 
     [Test]
@@ -112,7 +112,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.MutableStructId);
+        AssertMissing(await AnalyzeAsync(source), "SP0058");
     }
 
     [Test]
@@ -126,7 +126,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.OwnedDisposableFieldId);
+        AssertHas(await AnalyzeAsync(source), "SP0059");
     }
 
     [Test]
@@ -142,7 +142,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.OwnedDisposableFieldId);
+        AssertMissing(await AnalyzeAsync(source), "SP0059");
     }
 
     [Test]
@@ -162,7 +162,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.HttpClientInLoopId);
+        AssertHas(await AnalyzeAsync(source), "SP0060");
     }
 
     [Test]
@@ -181,7 +181,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.HttpClientInLoopId);
+        AssertMissing(await AnalyzeAsync(source), "SP0060");
     }
 
     [Test]
@@ -200,7 +200,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.UnsynchronizedSharedMutationId);
+        AssertHas(await AnalyzeAsync(source), "SP0061");
     }
 
     [Test]
@@ -220,7 +220,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.UnsynchronizedSharedMutationId);
+        AssertMissing(await AnalyzeAsync(source), "SP0061");
     }
 
     [Test]
@@ -236,7 +236,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.ConcurrentCollectionEnumerationId);
+        AssertHas(await AnalyzeAsync(source), "SP0062");
     }
 
     [Test]
@@ -255,7 +255,7 @@ public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.BoxingInLoopId);
+        AssertHas(await AnalyzeAsync(source), "SP0063");
     }
 
 }

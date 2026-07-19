@@ -65,7 +65,7 @@ public class Calculator(int initialValue)
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            var expected = VerifyCS.Diagnostic("SP0002")
                 .WithSpan(13, 16, 13, 27)
                 .WithArguments("AddAndStore");
 
@@ -140,10 +140,10 @@ public readonly struct Vector2D(double x, double y)
 
 
             verifierTest.ExpectedDiagnostics.Add(VerifyCS
-                .Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 19, 11, 20)
+                .Diagnostic("SP0004").WithSpan(11, 19, 11, 20)
                 .WithArguments("get_X"));
             verifierTest.ExpectedDiagnostics.Add(VerifyCS
-                .Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(12, 19, 12, 20)
+                .Diagnostic("SP0004").WithSpan(12, 19, 12, 20)
                 .WithArguments("get_Y"));
             await verifierTest.RunAsync();
         }
@@ -196,7 +196,7 @@ public class LoggingCalculator(int initialValue)
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            var expected = VerifyCS.Diagnostic("SP0002")
                 .WithSpan(13, 16, 13, 19)
                 .WithArguments("Add");
 

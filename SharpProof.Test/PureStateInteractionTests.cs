@@ -67,11 +67,11 @@ public class TestClass
 }
 ";
 
-        var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetId = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 18).WithArguments("get_Id");
-        var expectedShapeCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedShapeCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 15, 8, 20).WithArguments(".ctor");
-        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetRadius = VerifyCS.Diagnostic("SP0004")
             .WithSpan(19, 19, 19, 25).WithArguments("get_Radius");
 
         await VerifyCS.VerifyAnalyzerAsync(test,

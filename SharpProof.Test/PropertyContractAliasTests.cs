@@ -97,12 +97,12 @@ public sealed class PropertyContractAliasTests
 
         var expectedIds = new[]
         {
-            SharpProofDiagnostics.PurityNotVerifiedId,
-            SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
-            SharpProofDiagnostics.CapabilityViolationId,
-            SharpProofDiagnostics.EnsuresNotProvenId,
-            SharpProofDiagnostics.ComplexityExceededId,
-            SharpProofDiagnostics.ExceptionContractViolationId
+            "SP0002",
+            "SP0013",
+            "SP0015",
+            "SP0018",
+            "SP0021",
+            "SP0030"
         };
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Is.EquivalentTo(expectedIds));
         foreach (var diagnosticId in expectedIds)
@@ -135,11 +135,11 @@ public sealed class PropertyContractAliasTests
             }
             """);
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0002"),
             Is.Zero);
         Assert.That(
             diagnostics.Count(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.AllocationInZeroAllocationMethodId),
+                diagnostic.Id == "SP0013"),
             Is.EqualTo(1));
     }
 
@@ -165,8 +165,8 @@ public sealed class PropertyContractAliasTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(new[]
             {
-                SharpProofDiagnostics.MisplacedAttributeId,
-                SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId
+                "SP0003",
+                "SP0014"
             }));
     }
 
@@ -192,7 +192,7 @@ public sealed class PropertyContractAliasTests
             """);
 
         var diagnostic = diagnostics.Single();
-        Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.EnsuresUnsupportedId));
+        Assert.That(diagnostic.Id, Is.EqualTo("SP0019"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("auto-property getter result is not source-visible"));
     }
 

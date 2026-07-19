@@ -52,7 +52,7 @@ public class TestClass
 ";
 
 
-        var expectedDiagnostic = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 27)
+        var expectedDiagnostic = VerifyCS.Diagnostic("SP0002").WithSpan(10, 17, 10, 27)
             .WithArguments("TestMethod");
 
         await VerifyCS.VerifyAnalyzerAsync(testCode, expectedDiagnostic);
@@ -88,9 +88,9 @@ public class TestClass : EventSource
 }";
 
 
-        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(15, 17, 15, 27)
+        var expectedTestMethod = VerifyCS.Diagnostic("SP0002").WithSpan(15, 17, 15, 27)
             .WithArguments("TestMethod");
-        var expectedOnTestEventOverride = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedOnTestEventOverride = VerifyCS.Diagnostic("SP0002")
             .WithSpan(21, 29, 21, 40).WithArguments("OnTestEvent");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedTestMethod, expectedOnTestEventOverride);

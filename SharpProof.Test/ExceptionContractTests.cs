@@ -42,11 +42,11 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ExceptionContractViolationId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0030");
         Assert.That(diagnostic.GetMessage(), Does.Contain("[DoesNotThrow]"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("System.InvalidOperationException"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionContractDisallowedTypesProperty],
+            diagnostic.Properties["sharpproof.exception_contract.disallowed_types"],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -87,13 +87,13 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ExceptionContractViolationId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0030");
         Assert.That(diagnostic.GetMessage(), Does.Contain("[AllowedExceptions]"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionContractAllowedTypesProperty],
+            diagnostic.Properties["sharpproof.exception_contract.allowed_types"],
             Is.EqualTo("System.ArgumentException"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionContractDisallowedTypesProperty],
+            diagnostic.Properties["sharpproof.exception_contract.disallowed_types"],
             Is.EqualTo("System.InvalidOperationException"));
     }
 

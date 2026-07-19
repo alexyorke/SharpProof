@@ -31,11 +31,11 @@ public class ConfigData
 }");
 
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            diagnostics.Where(candidate => candidate.Id == "SP0002")
                 .ToImmutableArray(),
-            SharpProofDiagnostics.PurityNotVerifiedId);
+            "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -61,12 +61,12 @@ public class ConfigData
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
+            diagnostics.Where(candidate => candidate.Id == "SP0010").ToImmutableArray(),
+            "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
     }
 
@@ -92,13 +92,13 @@ public class ConfigData
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true"));
 
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            diagnostics.Where(candidate => candidate.Id == "SP0011")
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
     }
 }

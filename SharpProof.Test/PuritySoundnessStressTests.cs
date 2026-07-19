@@ -14,7 +14,7 @@ public class PuritySoundnessStressTests
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, allowUnsafe);
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.True,
             name);
     }
@@ -25,7 +25,7 @@ public class PuritySoundnessStressTests
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, false);
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             name);
     }

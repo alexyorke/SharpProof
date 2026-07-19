@@ -32,7 +32,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -55,7 +55,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -78,7 +78,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -170,7 +170,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -197,7 +197,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 
@@ -224,7 +224,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -247,7 +247,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -272,7 +272,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -297,7 +297,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -328,7 +328,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -357,7 +357,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -381,7 +381,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -405,7 +405,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -428,7 +428,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -470,7 +470,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -493,7 +493,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -516,7 +516,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -545,7 +545,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -573,7 +573,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -596,7 +596,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -619,7 +619,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -644,7 +644,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -667,7 +667,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -691,7 +691,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -714,7 +714,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -912,7 +912,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -936,7 +936,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -960,7 +960,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -984,7 +984,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1008,7 +1008,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1032,7 +1032,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1057,7 +1057,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1083,7 +1083,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1108,7 +1108,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1132,7 +1132,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1155,7 +1155,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1179,7 +1179,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1203,7 +1203,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1227,7 +1227,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1251,7 +1251,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1275,7 +1275,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1301,7 +1301,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1329,7 +1329,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1359,7 +1359,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1390,7 +1390,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1416,7 +1416,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1443,7 +1443,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1466,7 +1466,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1489,7 +1489,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1511,7 +1511,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1534,7 +1534,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1558,7 +1558,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1597,7 +1597,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1621,7 +1621,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1646,7 +1646,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1671,7 +1671,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -1695,7 +1695,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1720,7 +1720,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1745,7 +1745,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1770,7 +1770,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1795,7 +1795,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1820,7 +1820,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1845,7 +1845,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1871,7 +1871,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1896,7 +1896,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1922,7 +1922,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1947,7 +1947,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1972,7 +1972,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -1995,7 +1995,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2144,7 +2144,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2171,7 +2171,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2194,7 +2194,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2224,7 +2224,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2247,7 +2247,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2271,7 +2271,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2296,7 +2296,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2320,7 +2320,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2349,7 +2349,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2381,7 +2381,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2404,7 +2404,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2428,7 +2428,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2453,7 +2453,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -2750,7 +2750,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -2869,7 +2869,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -3032,17 +3032,17 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.AnyOf("catalog_hit", "impure_callee", "unknown_external_call"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
             Is.AnyOf("Invocation", "InvocationExpression"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -3053,8 +3053,8 @@ public class TestClass
     {
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                diagnostic.Id == "SP0002" &&
+                diagnostic.Properties.TryGetValue("sharpproof.impurity.symbol", out var symbol) &&
                 symbol?.Contains(symbolFragment, StringComparison.Ordinal) == true),
             Is.EqualTo(expected));
     }

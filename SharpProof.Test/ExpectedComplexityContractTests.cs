@@ -84,7 +84,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityExceededId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0021");
         Assert.That(diagnostic.GetMessage(), Does.Contain("O(n^2)"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("O(n)"));
     }
@@ -114,15 +114,15 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0022");
         Assert.Multiple(() =>
         {
             Assert.That(diagnostic.GetMessage(), Does.Contain("UnsupportedWhileLoop"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
                 Is.EqualTo("complexity.unsupported_while_loop"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.category"],
                 Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedSyntax.ToString()));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.source"],
                 Is.EqualTo(SymbolicUnknownReasonSource.Complexity.ToString()));
         });
     }
@@ -153,7 +153,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0022");
         Assert.That(diagnostic.GetMessage(), Does.Contain("not directly comparable"));
     }
 
@@ -224,7 +224,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityExceededId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0021");
         Assert.That(diagnostic.GetMessage(), Does.Contain("O(n)"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("O(log n)"));
     }
@@ -314,7 +314,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0022");
         Assert.That(diagnostic.GetMessage(), Does.Contain("not directly comparable"));
     }
 
@@ -337,7 +337,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0022");
         Assert.That(
             diagnostic.GetMessage(),
             Does.Contain("ExternalCallee").Or.Contain("UnknownCallee"));
@@ -377,7 +377,7 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0022");
         Assert.That(diagnostic.GetMessage(), Does.Contain("DynamicDispatch"));
     }
 
@@ -398,11 +398,11 @@ public static class C
 }";
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.InvalidContractArgumentId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0024");
         Assert.That(diagnostic.GetMessage(), Does.Contain("undefined ComplexityKind value").And.Contain("99"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ContractAttributeProperty],
+        Assert.That(diagnostic.Properties["sharpproof.contract.attribute"],
             Is.EqualTo("[ExpectedComplexity]"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ContractArgumentProperty], Is.EqualTo("99"));
+        Assert.That(diagnostic.Properties["sharpproof.contract.argument"], Is.EqualTo("99"));
     }
 
     [Test]

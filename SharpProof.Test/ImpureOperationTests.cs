@@ -206,7 +206,7 @@ public class TestForm
 }";
 
 
-        var expectedSetup = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(16, 17, 16, 26)
+        var expectedSetup = VerifyCS.Diagnostic("SP0002").WithSpan(16, 17, 16, 26)
             .WithArguments("SetupForm");
 
 
@@ -241,9 +241,9 @@ public class TestClass
     }
 }";
 
-        var expectedCctor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(10, 12, 10, 18)
+        var expectedCctor = VerifyCS.Diagnostic("SP0002").WithSpan(10, 12, 10, 18)
             .WithArguments(".cctor");
-        var expectedTrigger = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(20, 17, 20, 41)
+        var expectedTrigger = VerifyCS.Diagnostic("SP0002").WithSpan(20, 17, 20, 41)
             .WithArguments("TriggerStaticConstructor");
         var compilerError = DiagnosticResult.CompilerError("CS0122").WithSpan(22, 31, 22, 38)
             .WithArguments("Config.Setting");
@@ -274,7 +274,7 @@ public class TestClass
     }
 }";
 
-        var expectedDispose = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(8, 17, 8, 24)
+        var expectedDispose = VerifyCS.Diagnostic("SP0002").WithSpan(8, 17, 8, 24)
             .WithArguments("Dispose");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedDispose);
@@ -309,21 +309,21 @@ public class TestClass
     }
 }";
         var diagGetValue = ExpectedDiagnostic(
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            "SP0004",
             7,
             16,
             7,
             21,
             "get_Value");
         var diagCtor = ExpectedDiagnostic(
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            "SP0004",
             8,
             12,
             8,
             27,
             ".ctor");
         var diagConvertIt = ExpectedDiagnostic(
-            SharpProofDiagnostics.PurityNotVerifiedId,
+            "SP0002",
             20,
             16,
             20,
@@ -355,7 +355,7 @@ public class TestClass
     }}
 }
 ";
-        var expectedCallImpure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedCallImpure = VerifyCS.Diagnostic("SP0002")
             .WithSpan(12, 17, 12, 43)
             .WithArguments("CallImpureDelegateViaParam");
 
@@ -386,7 +386,7 @@ public class TestClass
     }}
 }
 ";
-        var expectedCallImpureReturn = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedCallImpureReturn = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(13, 17, 13, 44)
             .WithArguments("CallImpureDelegateViaReturn");
 
@@ -423,28 +423,28 @@ public class TestClass
     }
 }";
         var diagGetValue = ExpectedDiagnostic(
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            "SP0004",
             7,
             16,
             7,
             21,
             "get_Value");
         var diagCtor = ExpectedDiagnostic(
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            "SP0004",
             8,
             12,
             8,
             30,
             ".ctor");
         var diagTakesInt = ExpectedDiagnostic(
-            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            "SP0004",
             19,
             18,
             19,
             26,
             "TakesInt");
         var diagConvertItViaArg = ExpectedDiagnostic(
-            SharpProofDiagnostics.PurityNotVerifiedId,
+            "SP0002",
             22,
             17,
             22,
@@ -487,10 +487,10 @@ public class AnotherClass
 }
 ";
 
-        var expectedCctor = ExpectedDiagnostic(SharpProofAnalyzer.SP0002, 9, 12, 9, 18, ".cctor");
-        var expectedGetValue = ExpectedDiagnostic(SharpProofAnalyzer.SP0002, 16, 26, 16, 34, "GetValue");
+        var expectedCctor = ExpectedDiagnostic("SP0002", 9, 12, 9, 18, ".cctor");
+        var expectedGetValue = ExpectedDiagnostic("SP0002", 16, 26, 16, 34, "GetValue");
         var expectedTrigger = ExpectedDiagnostic(
-            SharpProofAnalyzer.SP0002,
+            "SP0002",
             23,
             19,
             23,

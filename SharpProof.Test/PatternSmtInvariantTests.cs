@@ -940,7 +940,7 @@ public sealed class TestClass
     {
         var (_, diagnostic) = await AnalyzerTestHost.AssertOptionalSingleSp0002Async(markedSource);
         if (diagnostic != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
                 Does.Contain("System.Console.WriteLine"));
     }
 }

@@ -150,10 +150,10 @@ public sealed class TestClass
 }
 """);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.AllocationInZeroAllocationMethodId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationKindProperty], Is.EqualTo("object_creation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationOperationKindProperty],
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0013");
+        Assert.That(diagnostic.Properties["sharpproof.allocation.kind"], Is.EqualTo("object_creation"));
+        Assert.That(diagnostic.Properties["sharpproof.allocation.operation_kind"],
             Is.EqualTo("ObjectCreation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationSymbolProperty], Does.Contain("Object"));
+        Assert.That(diagnostic.Properties["sharpproof.allocation.symbol"], Does.Contain("Object"));
     }
 }

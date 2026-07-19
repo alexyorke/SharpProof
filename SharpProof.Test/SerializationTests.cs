@@ -35,13 +35,13 @@ public class TestClass
 }";
 
 
-        var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterId = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 16, 9, 18)
             .WithArguments("get_Id");
-        var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterName = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 20, 10, 24)
             .WithArguments("get_Name");
-        var expectedSerialize = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedSerialize = VerifyCS.Diagnostic("SP0002")
             .WithSpan(17, 19, 17, 29)
             .WithArguments("TestMethod");
 
@@ -63,15 +63,15 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(17, 24, 17, 34)
             .WithArguments("TestMethod");
 
 
-        var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterId = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 16, 9, 18)
             .WithArguments("get_Id");
-        var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterName = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 20, 10, 24)
             .WithArguments("get_Name");
 

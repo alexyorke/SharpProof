@@ -26,7 +26,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(12, 16, 12, 26)
             .WithArguments("GetCounter");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -52,7 +52,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(12, 17, 12, 33)
             .WithArguments("IncrementCounter");
 
@@ -81,7 +81,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(13, 16, 13, 29)
             .WithArguments("CombineFields");
 
@@ -108,7 +108,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(12, 16, 12, 39)
             .WithArguments("ReadStaticVolatileField");
 
@@ -137,7 +137,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(13, 16, 13, 31)
             .WithArguments("IncrementAndGet");
 
@@ -179,7 +179,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(17, 19, 17, 39)
             .WithArguments("GetSingletonInstance");
 
@@ -219,12 +219,12 @@ public class TestClass
 }";
 
 
-        var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected1 = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(13, 17, 13, 27)
             .WithArguments("Initialize");
 
 
-        var expected2 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected2 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(20, 16, 20, 37)
             .WithArguments("GetValueIfInitialized");
 

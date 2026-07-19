@@ -81,7 +81,7 @@ public class TestClass
 
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            VerifyCS.Diagnostic("SP0002")
                 .WithSpan(8, 32, 8, 40)
                 .WithArguments("PopValue"));
     }
@@ -105,7 +105,7 @@ public class TestClass
 
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            VerifyCS.Diagnostic("SP0002")
                 .WithSpan(8, 33, 8, 41)
                 .WithArguments("PopValue"));
     }

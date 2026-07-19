@@ -11,7 +11,7 @@ public class UsingStatementTests
     {
         var test = DisposableTestSources.ImpureFileOpenUsing;
 
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedSP0002 = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(9, 17, 9, 27)
             .WithArguments("TestMethod");
 
@@ -247,7 +247,7 @@ public class TestClass
     }
 }";
 
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedSP0002 = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(9, 17, 9, 27)
             .WithArguments("TestMethod");
 

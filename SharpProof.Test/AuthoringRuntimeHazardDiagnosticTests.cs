@@ -17,13 +17,13 @@ public sealed class AuthoringRuntimeHazardDiagnosticTests
     {
         var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
         var diagnostic = SingleRuntimeHazardDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.UncaughtExceptionSiteId));
+        Assert.That(diagnostic.Id, Is.EqualTo("SP0011"));
         Assert.That(diagnostic.GetMessage(), Does.Contain(operationText));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(category));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty], Is.EqualTo(category));
     }
 
     [TestCaseSource(nameof(GuardedSafeOrUnknownRuntimeHazardCases))]
@@ -32,7 +32,7 @@ public sealed class AuthoringRuntimeHazardDiagnosticTests
         var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+            diagnostics.Any(d => d.Id == "SP0011"),
             Is.False,
             FormatDiagnostics(diagnostics));
     }
@@ -51,7 +51,7 @@ public class TestClass
 }", "no");
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+            diagnostics.Any(d => d.Id == "SP0011"),
             Is.False,
             FormatDiagnostics(diagnostics));
     }
@@ -590,7 +590,7 @@ public class TestClass
     private static Diagnostic SingleRuntimeHazardDiagnostic(ImmutableArray<Diagnostic> diagnostics)
     {
         var siteDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .ToImmutableArray();
 
         Assert.That(siteDiagnostics, Has.Length.EqualTo(1), FormatDiagnostics(diagnostics));

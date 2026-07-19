@@ -39,7 +39,7 @@ public class TestClass
     }
 }";
 
-        var expectedGetName = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 24)
+        var expectedGetName = VerifyCS.Diagnostic("SP0004").WithSpan(11, 20, 11, 24)
             .WithArguments("get_Name");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetName);
     }
@@ -111,7 +111,7 @@ public class TestClass
     }
 }";
 
-        var expectedGetInfo = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(7, 27, 7, 34)
+        var expectedGetInfo = VerifyCS.Diagnostic("SP0004").WithSpan(7, 27, 7, 34)
             .WithArguments("GetInfo");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetInfo);
     }
@@ -167,7 +167,7 @@ namespace TestNamespace
 }";
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(12, 29, 12, 50)
+            VerifyCS.Diagnostic("SP0002").WithSpan(12, 29, 12, 50)
                 .WithArguments("GetRangeVariableNames"));
     }
 
@@ -228,6 +228,6 @@ namespace TestNamespace
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(13, 21, 13, 37).WithArguments("LogParameterName"));
+            VerifyCS.Diagnostic("SP0002").WithSpan(13, 21, 13, 37).WithArguments("LogParameterName"));
     }
 }

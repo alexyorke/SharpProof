@@ -48,7 +48,7 @@ class Program
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 28, 11, 45)
             .WithArguments("ImpureAsyncMethod");
 
@@ -80,7 +80,7 @@ class TestClass
 }
 ";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(15, 23, 15, 33)
             .WithArguments("TestMethod");
 
@@ -112,7 +112,7 @@ class TestClass
 }
 ";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(15, 23, 15, 33)
             .WithArguments("TestMethod");
 
@@ -150,10 +150,10 @@ class TestClass
 }
 ";
 
-        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedOuter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(15, 23, 15, 34)
             .WithArguments("OuterMethod");
-        var expectedLocal = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedLocal = VerifyCS.Diagnostic("SP0002")
             .WithSpan(20, 20, 20, 36)
             .WithArguments("ImpureLocalAsync");
 

@@ -77,7 +77,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -109,7 +109,7 @@ public class TestClass
 }
 ", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -141,9 +141,9 @@ public class TestClass
             reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             !d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -172,7 +172,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -255,7 +255,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -320,7 +320,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -371,7 +371,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -402,9 +402,9 @@ public class TestClass
             reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("using (resource)", StringComparison.Ordinal));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -436,7 +436,7 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.Id == "SP0011" &&
                 d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
             Is.False);
     }
@@ -474,7 +474,7 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.Id == "SP0011" &&
                 d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
             Is.False);
     }
@@ -529,7 +529,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -585,9 +585,9 @@ public class TestClass
             reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("new ThrowingEnumerable()", StringComparison.Ordinal));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -655,7 +655,7 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.Id == "SP0011" &&
                 d.GetMessage().Contains("new SafeEnumerable()", StringComparison.Ordinal)),
             Is.False);
     }
@@ -682,7 +682,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -709,7 +709,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -728,9 +728,9 @@ public readonly struct Token
 }");
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.ExceptionSummaryId &&
+            d.Id == "SP0010" &&
             ContainsMethodName(d, "op_Implicit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -749,9 +749,9 @@ public readonly struct Token
 }");
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -775,7 +775,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -802,7 +802,7 @@ public class TestClass
     private static void Second() => throw new InvalidOperationException();
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentException;System.InvalidOperationException"));
     }
 
@@ -833,7 +833,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -865,10 +865,10 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("((IService)new ThrowingService()).Work()", StringComparison.Ordinal));
         Assert.That(diagnostic.GetMessage(), Does.Contain("((IService)new ThrowingService()).Work()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -901,7 +901,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -935,10 +935,10 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal));
         Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -969,7 +969,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -1002,7 +1002,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -1035,8 +1035,8 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("dynamic_dispatch"));
     }
 
@@ -1070,12 +1070,12 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("worker.Work()", StringComparison.Ordinal));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("unknown=dynamic_dispatch:Worker.Work()"));
     }
 
@@ -1106,8 +1106,8 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("dynamic_dispatch"));
     }
 
@@ -1141,7 +1141,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -1180,7 +1180,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -1197,7 +1197,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.NullReferenceException"));
     }
 
@@ -1214,7 +1214,7 @@ public class TestClass
     }
 }", "TestMethod");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
     }
 
@@ -1244,13 +1244,13 @@ public class TestClass
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         return diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
+            d.Id == "SP0010" && ContainsMethodName(d, methodName));
     }
 
     private static bool HasExceptionDiagnosticForMethod(ImmutableArray<Diagnostic> diagnostics, string methodName)
     {
         return diagnostics.Any(d =>
-            d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
+            d.Id == "SP0010" && ContainsMethodName(d, methodName));
     }
 
     private static bool ContainsMethodName(Diagnostic diagnostic, string methodName)

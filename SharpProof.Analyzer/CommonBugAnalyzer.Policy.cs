@@ -18,7 +18,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.SuppressionWithoutJustificationRule,
+                        AnalyzerDiagnosticCatalog.Get("SuppressionWithoutJustificationRule"),
                         pragma.GetLocation(),
                         "broad_pragma_suppression",
                         pragma.ToString());
@@ -28,7 +28,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.NullableAnalysisDisabledRule,
+                        AnalyzerDiagnosticCatalog.Get("NullableAnalysisDisabledRule"),
                         nullable.SettingToken.GetLocation(),
                         "nullable_analysis_disabled");
                     break;
@@ -58,7 +58,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.SuppressionWithoutJustificationRule,
+            AnalyzerDiagnosticCatalog.Get("SuppressionWithoutJustificationRule"),
             attribute.GetLocation(),
             "attribute_suppression_without_justification",
             attribute.Name.ToString());

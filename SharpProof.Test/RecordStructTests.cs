@@ -53,9 +53,9 @@ public record struct Point
         };
 
 
-        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 19, 10, 20).WithArguments("get_X"));
-        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 19, 11, 20).WithArguments("get_Y"));
         await verifierTest.RunAsync();
     }
@@ -137,10 +137,10 @@ public record struct Counter
 }";
 
 
-        var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected1 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(17, 23, 17, 39)
             .WithArguments("GetInstanceCount");
-        var expected2 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected2 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(23, 20, 23, 29)
             .WithArguments("Increment");
 
@@ -158,7 +158,7 @@ public record struct Counter
         };
 
 
-        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 16, 11, 21).WithArguments("get_Value"));
         verifierTest.ExpectedDiagnostics.Add(expected1);
         verifierTest.ExpectedDiagnostics.Add(expected2);
@@ -206,7 +206,7 @@ public record struct CacheEntry(int Id, ImmutableList<string> Tags)
     }
 }";
 
-        var expectedAddTag = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedAddTag = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 23, 9, 29).WithArguments("AddTag");
 
         await VerifyCS.VerifyAnalyzerAsync(code, expectedAddTag);
@@ -255,11 +255,11 @@ public record struct CacheEntry(int Id, ImmutableList<string> Tags)
                    }
                    """;
 
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedSP0002 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 17, 9, 26)
             .WithArguments("Increment");
 
-        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 16, 15, 24)
             .WithArguments("GetCount");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0002, expectedSP0004);
@@ -283,11 +283,11 @@ public record struct Counter
     }
 }";
 
-        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedIncrement = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 20, 9, 29)
             .WithArguments("Increment");
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(6, 16, 6, 21)
             .WithArguments("get_Value");
 
@@ -341,9 +341,9 @@ public class Usage
         };
 
 
-        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 16, 15, 17).WithArguments("get_X"));
-        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 16, 16, 17).WithArguments("get_Y"));
         await verifierTest.RunAsync();
     }

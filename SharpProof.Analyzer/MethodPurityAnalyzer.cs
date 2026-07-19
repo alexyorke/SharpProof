@@ -76,7 +76,7 @@ internal static class MethodPurityAnalyzer
                     "invalid",
                     "conflicting_purity_attributes");
                 var conflicting = Diagnostic.Create(
-                    SharpProofDiagnostics.ConflictingPurityAttributesRule,
+                    AnalyzerDiagnosticCatalog.Get("ConflictingPurityAttributesRule"),
                     conflictingDiagnosticLocation,
                     null,
                     properties, methodSymbol.Name);
@@ -109,7 +109,7 @@ internal static class MethodPurityAnalyzer
                     "invalid",
                     "missing_purity_attribute");
                 var diag = Diagnostic.Create(
-                    SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeRule,
+                    AnalyzerDiagnosticCatalog.Get("AllowSynchronizationWithoutPurityAttributeRule"),
                     allowSyncLocation,
                     null,
                     properties, methodSymbol.Name);
@@ -137,7 +137,7 @@ internal static class MethodPurityAnalyzer
                         "[AllowSynchronization]",
                         "redundant");
                     var redundant = Diagnostic.Create(
-                        SharpProofDiagnostics.RedundantAllowSynchronizationRule,
+                        AnalyzerDiagnosticCatalog.Get("RedundantAllowSynchronizationRule"),
                         redundantLoc,
                         null,
                         properties, methodSymbol.Name);
@@ -204,7 +204,7 @@ internal static class MethodPurityAnalyzer
                     "not_proven",
                     GetPurityUnknownReason(purityResult.Evidence));
                 var diagnostic = Diagnostic.Create(
-                    SharpProofDiagnostics.PurityNotVerifiedRule,
+                    AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"),
                     diagnosticLocation,
                     null,
                     properties, methodSymbol.Name);
@@ -214,7 +214,7 @@ internal static class MethodPurityAnalyzer
                 if (effectiveEmitExplanations)
                 {
                     var explanation = Diagnostic.Create(
-                        SharpProofDiagnostics.PurityExplanationRule,
+                        AnalyzerDiagnosticCatalog.Get("PurityExplanationRule"),
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.ToSummary());
@@ -225,7 +225,7 @@ internal static class MethodPurityAnalyzer
                     !string.IsNullOrEmpty(purityResult.Evidence.BclFallbackGuess))
                 {
                     var fallbackDiagnostic = Diagnostic.Create(
-                        SharpProofDiagnostics.BclFallbackGuessRule,
+                        AnalyzerDiagnosticCatalog.Get("BclFallbackGuessRule"),
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.BclFallbackGuess,
@@ -266,7 +266,7 @@ internal static class MethodPurityAnalyzer
                         "[EnforcePure]",
                         "suggested");
                     var diagnostic = Diagnostic.Create(
-                        SharpProofDiagnostics.MissingEnforcePureAttributeRule,
+                        AnalyzerDiagnosticCatalog.Get("MissingEnforcePureAttributeRule"),
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name);

@@ -73,7 +73,7 @@ public class TestClass
         return LocalFunc();
     }
 }";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 16, 9, 28)
             .WithArguments("ImpureMethod");
         await VerifyCS.VerifyAnalyzerAsync(code, expected);

@@ -45,17 +45,17 @@ public sealed class TestClass
 
         Assert.That(
             fullDiagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.AllocationInZeroAllocationMethodId));
+            Does.Contain("SP0013"));
         var fullEnsures = AnalyzerTestHost.SingleDiagnostic(
             fullDiagnostics,
-            SharpProofDiagnostics.EnsuresNotProvenId);
+            "SP0018");
         var scopedEnsures = AnalyzerTestHost.SingleDiagnostic(
             ensuresDiagnostics,
-            SharpProofDiagnostics.EnsuresNotProvenId);
+            "SP0018");
 
         Assert.That(
             ensuresDiagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(new[] { SharpProofDiagnostics.EnsuresNotProvenId }));
+            Is.EqualTo(new[] { "SP0018" }));
         AssertEquivalent(fullEnsures, scopedEnsures);
     }
 

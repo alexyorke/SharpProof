@@ -50,10 +50,10 @@ public class TestClass
                 "sometimes"));
 
         var diagnostic = diagnostics.Single(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty],
+            diagnostic.Id == "SP0025");
+        Assert.That(diagnostic.Properties["sharpproof.config.key"],
             Is.EqualTo("sharpproof_suggest_missing_enforce_pure_scope"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationValueProperty], Is.EqualTo("sometimes"));
+        Assert.That(diagnostic.Properties["sharpproof.config.value"], Is.EqualTo("sometimes"));
         Assert.That(diagnostic.Location.GetLineSpan().StartLinePosition.Line, Is.EqualTo(0));
     }
 
@@ -68,12 +68,12 @@ public class TestClass
             treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "deep"));
 
         var diagnostic = diagnostics.Single(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty],
+            diagnostic.Id == "SP0025");
+        Assert.That(diagnostic.Properties["sharpproof.config.key"],
             Is.EqualTo("sharpproof_smt_mode"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationValueProperty], Is.EqualTo("deep"));
+        Assert.That(diagnostic.Properties["sharpproof.config.value"], Is.EqualTo("deep"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            diagnostic.Properties["sharpproof.config.invalid_reason"],
             Does.Contain("compilation-global"));
     }
 
@@ -90,7 +90,7 @@ public class TestClass
 
         Assert.That(
             diagnostics.Select(diagnostic => diagnostic.Id),
-            Has.None.EqualTo(SharpProofDiagnostics.InvalidAnalyzerConfigurationId));
+            Has.None.EqualTo("SP0025"));
     }
 
     [Test]
@@ -208,7 +208,7 @@ public class TestClass
 }", ImmutableDictionary<string, string>.Empty);
 
         Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
-            Has.None.EqualTo(SharpProofDiagnostics.PurityNotVerifiedId));
+            Has.None.EqualTo("SP0002"));
     }
 
     [Test]
@@ -226,7 +226,7 @@ public class TestClass
 }", ImmutableDictionary<string, string>.Empty.Add("sharpproof_purity_profile", "strict"));
 
         Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.PurityNotVerifiedId));
+            Does.Contain("SP0002"));
     }
 
     [Test]
@@ -245,7 +245,7 @@ public class TestClass
             treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"));
 
         Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.PurityExplanationId));
+            Does.Contain("SP0009"));
     }
 
     [Test]
@@ -264,7 +264,7 @@ public class TestClass
             treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "false"));
 
         Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
-            Has.None.EqualTo(SharpProofDiagnostics.PurityExplanationId));
+            Has.None.EqualTo("SP0009"));
     }
 
     [Test]
@@ -413,7 +413,7 @@ public class TestClass
         for (var index = 0; index < results.Length; index++)
         {
             var sp0002Count = results[index]
-                .Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+                .Count(diagnostic => diagnostic.Id == "SP0002");
             if (index % 2 == 0)
                 Assert.That(sp0002Count, Is.EqualTo(methodCount),
                     $"Configured compilation {index} should see its impure override.");
@@ -426,7 +426,7 @@ public class TestClass
     private static ImmutableArray<string> DiagnosticMessages(ImmutableArray<Diagnostic> diagnostics)
     {
         return diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .Where(diagnostic => diagnostic.Id == "SP0004")
             .Select(diagnostic => diagnostic.GetMessage())
             .ToImmutableArray();
     }

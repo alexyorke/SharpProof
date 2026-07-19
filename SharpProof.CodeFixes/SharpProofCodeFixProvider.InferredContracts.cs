@@ -9,7 +9,7 @@ namespace SharpProof;
             Diagnostic diagnostic)
         {
             if (!diagnostic.Properties.TryGetValue(
-                    SharpProofDiagnostics.SuggestedContractAttributeProperty,
+                    DiagnosticPropertyNames.SuggestedContractAttributeProperty,
                 out var attributeExpression) ||
                 attributeExpression == null ||
                 string.IsNullOrWhiteSpace(attributeExpression) ||
@@ -22,7 +22,7 @@ namespace SharpProof;
                 return;
 
             diagnostic.Properties.TryGetValue(
-                SharpProofDiagnostics.SuggestedContractKindProperty,
+                DiagnosticPropertyNames.SuggestedContractKindProperty,
                 out var contractKind);
             var title = "Add inferred " +
                         (string.IsNullOrWhiteSpace(contractKind) ? "SharpProof" : contractKind) +

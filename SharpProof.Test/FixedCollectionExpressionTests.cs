@@ -25,7 +25,7 @@ public class CollectionExpressionExample
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 18, 10, 28)
             .WithArguments("GetNumbers");
 

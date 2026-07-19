@@ -119,11 +119,11 @@ public class NullPropagationTests
         string methodName)
     {
         var sp0004Messages = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .Where(diagnostic => diagnostic.Id == "SP0004")
             .Select(diagnostic => diagnostic.GetMessage())
             .ToArray();
         var sp0002Messages = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(diagnostic => diagnostic.Id == "SP0002")
             .Select(diagnostic => diagnostic.GetMessage())
             .ToArray();
 

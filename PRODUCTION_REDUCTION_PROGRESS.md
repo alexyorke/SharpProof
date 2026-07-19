@@ -529,12 +529,19 @@ Tests are excluded from the metric and must not be deleted.
   Symbolic proof-session interface/forwarder, result factory, and source-file
   facade are deleted; immutable source and SMT option carriers use native
   record copies. Architecture coverage prevents the retired seams from returning.
+- [x] Removed the unreleased public `SharpProofDiagnostics` descriptor and ID
+  facade. The diagnostic catalog is now the sole descriptor owner, tests assert
+  literal external IDs and property bytes, and only 17 genuinely shared
+  evidence keys remain internal. The canonical descriptor metadata hash,
+  supported-diagnostic ordering, code fixes, fuzz projections, and SARIF
+  evidence remain unchanged; architecture coverage prevents the facade from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 92,395 lines (88,476 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,231 lines; remaining reduction: 4,769.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 92,159 lines (88,240 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,467 lines; remaining reduction: 4,533.
+  This tranche removed 236 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,212 passing tests and two documented Main skips.
 

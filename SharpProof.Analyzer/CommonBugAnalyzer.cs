@@ -132,8 +132,8 @@ internal static partial class CommonBugAnalyzer
     private static ImmutableDictionary<string, string?> CreateCommonBugProperties(string kind, string symbol)
     {
         return ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
-            .Add(SharpProofDiagnostics.CommonBugSymbolProperty, symbol);
+            .Add("sharpproof.common_bug.kind", kind)
+            .Add("sharpproof.common_bug.symbol", symbol);
     }
 
     private static string CreateBaselineDiscriminator(DiagnosticDescriptor descriptor, Location location)

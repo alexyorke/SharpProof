@@ -102,10 +102,10 @@ public sealed class PurityDirectThrowVisibilityTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
                 Is.EqualTo("ThrowOperationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Throw"));
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty], Is.EqualTo("Throw"));
         });
     }
 

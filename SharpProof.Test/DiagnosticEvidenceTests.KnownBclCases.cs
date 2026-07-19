@@ -183,7 +183,7 @@ public partial class DiagnosticEvidenceTests
             ? ImmutableArray<AdditionalText>.Empty
             : (ImmutableArray<AdditionalText>?)null;
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         if (!catalogSource.EndsWith("_semantic_rule", StringComparison.Ordinal))
         {
@@ -191,10 +191,10 @@ public partial class DiagnosticEvidenceTests
             return;
         }
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(symbol));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain(symbol));
         Assert.That(
-            diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityRuleProperty, out var inferredRule) &&
+            diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ImpurityRuleProperty, out var inferredRule) &&
             !string.IsNullOrWhiteSpace(inferredRule),
             Is.True);
     }

@@ -43,7 +43,7 @@ using SharpProof.Attributes;
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 17, 8, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -66,7 +66,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 17, 8, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

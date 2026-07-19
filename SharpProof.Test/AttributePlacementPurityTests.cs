@@ -106,33 +106,33 @@ public sealed class TestClass
 
         var placementIds = new[]
         {
-            SharpProofDiagnostics.MisplacedAttributeId,
-            SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
-            SharpProofDiagnostics.MisplacedEnsuresAttributeId,
-            SharpProofDiagnostics.MisplacedRequiresAttributeId,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId,
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId
+            "SP0003",
+            "SP0007",
+            "SP0014",
+            "SP0017",
+            "SP0020",
+            "SP0029",
+            "SP0031",
+            "SP0023"
         };
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: false);
         var misplaced = diagnostics.Where(diagnostic => placementIds.Contains(diagnostic.Id)).ToArray();
 
         Assert.That(misplaced.Select(diagnostic => diagnostic.Id), Is.EquivalentTo(new[]
         {
-            SharpProofDiagnostics.MisplacedAttributeId,
-            SharpProofDiagnostics.MisplacedAttributeId,
-            SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
-            SharpProofDiagnostics.MisplacedEnsuresAttributeId,
-            SharpProofDiagnostics.MisplacedEnsuresAttributeId,
-            SharpProofDiagnostics.MisplacedRequiresAttributeId,
-            SharpProofDiagnostics.MisplacedRequiresAttributeId,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId,
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId
+            "SP0003",
+            "SP0003",
+            "SP0007",
+            "SP0014",
+            "SP0017",
+            "SP0020",
+            "SP0020",
+            "SP0029",
+            "SP0029",
+            "SP0031",
+            "SP0031",
+            "SP0031",
+            "SP0023"
         }));
         Assert.That(
             misplaced.Select(diagnostic => diagnostic.Location.SourceTree!

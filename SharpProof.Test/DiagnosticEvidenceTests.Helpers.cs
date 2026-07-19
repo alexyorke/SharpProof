@@ -49,7 +49,7 @@ public partial class DiagnosticEvidenceTests
     private static void AssertExceptionEdgesPropertyContains(Diagnostic diagnostic, params string[] expectedFragments)
     {
         Assert.That(
-            diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var serializedEdges) &&
+            diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var serializedEdges) &&
             !string.IsNullOrWhiteSpace(serializedEdges),
             Is.True,
             "Expected sharpproof.exceptions.edges on diagnostic.");
@@ -61,7 +61,7 @@ public partial class DiagnosticEvidenceTests
     private static void AssertExceptionEdgesPropertyContainsIfPresent(Diagnostic diagnostic,
         params string[] expectedFragments)
     {
-        if (!diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var serializedEdges) ||
+        if (!diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var serializedEdges) ||
             string.IsNullOrWhiteSpace(serializedEdges))
             return;
 
@@ -76,24 +76,24 @@ public partial class DiagnosticEvidenceTests
         string source)
     {
         var summaryDiagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            diagnostics.Where(diagnostic => diagnostic.Id == "SP0010")
                 .ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
+            "SP0010");
         var siteDiagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            diagnostics.Where(diagnostic => diagnostic.Id == "SP0011")
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
         foreach (var diagnostic in new[] { summaryDiagnostic, siteDiagnostic })
         {
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
                 Is.EqualTo(exceptionType));
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
                 Is.EqualTo(category));
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
                 Is.EqualTo(source));
         }
     }
@@ -107,21 +107,21 @@ public partial class DiagnosticEvidenceTests
         string? operationKind = null)
     {
         if (category != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo(category));
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo(category));
 
         if (rule != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo(rule));
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty], Is.EqualTo(rule));
 
         if (operationKind != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
                 Is.EqualTo(operationKind));
 
         if (catalogSource != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
                 Is.EqualTo(catalogSource));
 
         if (symbolContains != null)
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
                 Does.Contain(symbolContains));
     }
 

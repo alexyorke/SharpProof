@@ -257,16 +257,6 @@
     "maxInventoryFixtureDependencies":  40,
     "highFanoutFiles":  [
                             {
-                                "path":  "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
-                                "reason":  "broad generated fixture dependency",
-                                "module":  "Analyzer",
-                                "fixtureCount":  133,
-                                "tokens":  [
-                                               "AnalyzerDiagnosticCatalog",
-                                               "SharpProofDiagnostics"
-                                           ]
-                            },
-                            {
                                 "path":  "SharpProof.Analyzer/Engine/CompilationPurityService.cs",
                                 "reason":  "high-fanout analyzer core"
                             },
@@ -277,15 +267,6 @@
                             {
                                 "path":  "SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs",
                                 "reason":  "high-fanout analyzer core"
-                            },
-                            {
-                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
-                                "reason":  "broad generated fixture dependency",
-                                "module":  "Analyzer",
-                                "fixtureCount":  132,
-                                "tokens":  [
-                                               "SharpProofDiagnostics"
-                                           ]
                             },
                             {
                                 "path":  "SharpProof.Testing/AnalyzerTestHost.cs",
@@ -1708,13 +1689,11 @@
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AnalyzerDiagnosticCatalog",
-                                                  "DiagnosticDefinition",
-                                                  "SharpProofDiagnostics"
+                                                  "DiagnosticDefinition"
                                               ],
-                            "referencingFixtureCount":  133,
+                            "referencingFixtureCount":  26,
                             "referencedTokens":  [
-                                                     "AnalyzerDiagnosticCatalog",
-                                                     "SharpProofDiagnostics"
+                                                     "AnalyzerDiagnosticCatalog"
                                                  ]
                         },
                         {
@@ -2022,6 +2001,17 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/DiagnosticPropertyNames.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "DiagnosticPropertyNames"
+                                              ],
+                            "referencingFixtureCount":  22,
+                            "referencedTokens":  [
+                                                     "DiagnosticPropertyNames"
                                                  ]
                         },
                         {
@@ -3554,7 +3544,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAnalyzer"
                                               ],
-                            "referencingFixtureCount":  33,
+                            "referencingFixtureCount":  21,
                             "referencedTokens":  [
                                                      "SharpProofAnalyzer"
                                                  ]
@@ -3568,17 +3558,6 @@
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SharpProofAttributeIdentityPolicy"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "SharpProofDiagnostics"
-                                              ],
-                            "referencingFixtureCount":  132,
-                            "referencedTokens":  [
-                                                     "SharpProofDiagnostics"
                                                  ]
                         },
                         {
@@ -7286,6 +7265,42 @@
                                     "fixtureCount":  12
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalyzerTestHostConfigurationTests",
+                                                                 "AsyncTests",
+                                                                 "CheckedUserDefinedOperatorsTests",
+                                                                 "CollectionExpressionTests",
+                                                                 "DelegateTypeTests",
+                                                                 "DiagnosticDescriptorMetadataTests",
+                                                                 "EnvironmentTests",
+                                                                 "GenericsInteractionTests",
+                                                                 "IfStatementTests",
+                                                                 "ImpureOperationTests",
+                                                                 "InheritanceInteractionTests",
+                                                                 "IOOperationsTests",
+                                                                 "RecordTests",
+                                                                 "RefFieldsAndScopedRefTests",
+                                                                 "RepositoryArchitectureTests",
+                                                                 "SerializationTests",
+                                                                 "StateModificationTests",
+                                                                 "StringOperationsTests",
+                                                                 "SwitchTests",
+                                                                 "ToStringBehaviorTests",
+                                                                 "UnsignedRightShiftTests",
+                                                                 "UsingStatementTests",
+                                                                 "UsingTests",
+                                                                 "VolatileFieldTests",
+                                                                 "WhileLoopTests",
+                                                                 "YieldTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "AnalyzerDiagnosticCatalog"
+                                               ],
+                                    "fixtureCount":  26
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7367,6 +7382,38 @@
                                                    "ConfiguredMemberKey"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/DiagnosticPropertyNames.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "AnalyzerHostConcurrencyStressTests",
+                                                                 "AuthoringRuntimeHazardDiagnosticTests",
+                                                                 "BaselineSuppressionTests",
+                                                                 "DiagnosticEvidenceTests",
+                                                                 "EventAccessorRegressionTests",
+                                                                 "ExceptionFlowPathFactStressTests",
+                                                                 "ExceptionFlowPropagationRegressionTests",
+                                                                 "ExceptionReachabilitySmtTests",
+                                                                 "ExceptionSummaryCatalogValidationTests",
+                                                                 "FuzzToolTests",
+                                                                 "GlobalizationTests",
+                                                                 "InferredContractSuggestionTests",
+                                                                 "InitAccessorRegressionTests",
+                                                                 "PathSensitiveSmtInvariantTests",
+                                                                 "PurityDirectThrowVisibilityTests",
+                                                                 "RecursiveExceptionFlowTests",
+                                                                 "RepositoryArchitectureTests",
+                                                                 "RoslynConstructCoverageTests",
+                                                                 "SemanticOracleAnalyzerSmtTests",
+                                                                 "SemanticOracleMetamorphicTests",
+                                                                 "SemanticOracleRuntimeHazardAnalyzerSmtTests",
+                                                                 "UnknownRuntimeHazardDiagnosticTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "DiagnosticPropertyNames"
+                                               ],
+                                    "fixtureCount":  22
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/EffectSummaryArtifactSource.cs",
@@ -8458,25 +8505,13 @@
                                                                  "AnalyzerPackagingTests",
                                                                  "AnalyzerReleaseTrackingTests",
                                                                  "AnalyzerTestHostConfigurationTests",
-                                                                 "AutoDefaultStructsTests",
                                                                  "CalculatorTests",
-                                                                 "CheckedUserDefinedOperatorsTests",
-                                                                 "ComplexPureOperationsTests",
-                                                                 "ComprehensiveAsyncTests",
                                                                  "ConfigurationProfileTests",
                                                                  "ConstantsTests",
                                                                  "DiagnosticDescriptorMetadataTests",
                                                                  "DiagnosticEvidenceTests",
                                                                  "EffectSummarySymbolKeyFactoryTests",
                                                                  "ExceptionSummaryCatalogValidationTests",
-                                                                 "ExtendedNameofScopeTests",
-                                                                 "FrameworkCommonOperationsTests",
-                                                                 "GenericAttributesTests",
-                                                                 "ImpureOperationTests",
-                                                                 "IndexerTests",
-                                                                 "InterfaceInteractionTests",
-                                                                 "MethodCallTests",
-                                                                 "ObjectInitializerTests",
                                                                  "ProjectAnalysisContextTests",
                                                                  "ReadmeGeneratedExamplesTests",
                                                                  "ReferenceReachabilitySmtTests",
@@ -8490,7 +8525,7 @@
                                     "tokens":  [
                                                    "SharpProofAnalyzer"
                                                ],
-                                    "fixtureCount":  33
+                                    "fixtureCount":  21
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",

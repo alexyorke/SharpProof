@@ -27,9 +27,9 @@ public class NullConditionalTests
                    """;
 
 
-        var expectedGet = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGet = VerifyCS.Diagnostic("SP0004")
             .WithSpan(6, 19, 6, 24).WithArguments("get_Value");
-        var expectedMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(9, 17, 9, 27)
+        var expectedMethod = VerifyCS.Diagnostic("SP0002").WithSpan(9, 17, 9, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGet, expectedMethod);
     }

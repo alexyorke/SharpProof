@@ -42,7 +42,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.IdenticalOperandsRule,
+                AnalyzerDiagnosticCatalog.Get("IdenticalOperandsRule"),
                 binary.Syntax.GetLocation(),
                 "identical_operands",
                 binary.OperatorKind.ToString(),
@@ -86,7 +86,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.ContainerOwnedServiceDisposedRule,
+                        AnalyzerDiagnosticCatalog.Get("ContainerOwnedServiceDisposedRule"),
                         disposal.Syntax.GetLocation(),
                         "container_owned_service_disposed",
                         resolver.TargetMethod.Name);
@@ -104,7 +104,7 @@ internal static partial class CommonBugAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.ContainerOwnedServiceDisposedRule,
+                    AnalyzerDiagnosticCatalog.Get("ContainerOwnedServiceDisposedRule"),
                     resolver.Syntax.GetLocation(),
                     "container_owned_service_disposed",
                     resolver.TargetMethod.Name);
@@ -130,7 +130,7 @@ internal static partial class CommonBugAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.UnconsumedDeferredQueryRule,
+                    AnalyzerDiagnosticCatalog.Get("UnconsumedDeferredQueryRule"),
                     invocation.Syntax.GetLocation(),
                     "unconsumed_deferred_query",
                     invocation.TargetMethod.Name);
@@ -149,7 +149,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.UnconsumedDeferredQueryRule,
+                AnalyzerDiagnosticCatalog.Get("UnconsumedDeferredQueryRule"),
                 initializer.Syntax.GetLocation(),
                 "unconsumed_deferred_query",
                 invocation.TargetMethod.Name);

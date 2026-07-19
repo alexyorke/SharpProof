@@ -58,7 +58,7 @@ namespace TestNamespace
 
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(12, 21, 12, 32)
                 .WithArguments("ModifyValue")
         };
 
@@ -121,7 +121,7 @@ namespace TestNamespace
 
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(12, 21, 12, 32)
                 .WithArguments("ModifyArray")
         };
 
@@ -155,7 +155,7 @@ namespace TestNamespace
 
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 33)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(12, 21, 12, 33)
                 .WithArguments("AssignValues")
         };
 

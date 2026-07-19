@@ -213,7 +213,7 @@ namespace TestNamespace
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(13, 21, 13, 41)
             .WithArguments("WriteRawStringToFile");
 

@@ -53,19 +53,19 @@ public class TestClass
 }
 ";
 
-        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedIncrement = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 23, 9, 32)
             .WithArguments("Increment");
-        var expectedGetCount = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetCount = VerifyCS.Diagnostic("SP0002")
             .WithSpan(16, 23, 16, 31)
             .WithArguments("GetCount");
-        var expectedReset = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedReset = VerifyCS.Diagnostic("SP0002")
             .WithSpan(22, 24, 22, 29)
             .WithArguments("Reset");
-        var expectedUseCounter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedUseCounter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(31, 16, 31, 26)
             .WithArguments("UseCounter");
-        var expectedGetCurrentCountPurely = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetCurrentCountPurely = VerifyCS.Diagnostic("SP0002")
             .WithSpan(38, 16, 38, 37)
             .WithArguments("GetCurrentCountPurely");
 
@@ -120,13 +120,13 @@ public class Calculator
 ";
 
 
-        var expectedLogCalculation = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedLogCalculation = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 24, 11, 38)
             .WithArguments("LogCalculation");
-        var expectedCalculatePure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedCalculatePure = VerifyCS.Diagnostic("SP0002")
             .WithSpan(22, 16, 22, 29)
             .WithArguments("CalculatePure");
-        var expectedCalculateAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedCalculateAndLog = VerifyCS.Diagnostic("SP0002")
             .WithSpan(30, 16, 30, 31)
             .WithArguments("CalculateAndLog");
 

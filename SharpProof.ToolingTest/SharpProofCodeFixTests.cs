@@ -32,7 +32,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0004")
             .WithSpan(6, 27, 6, 30)
             .WithArguments("Add");
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
@@ -56,7 +56,7 @@ namespace N
                                        public static int Add(int value) => value + 1;
                                    }
                                    """;
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0004")
             .WithSpan(4, 23, 4, 26)
             .WithArguments("Add");
 
@@ -83,7 +83,7 @@ public static class C
     public static int Add(int a, int b) => a + b;
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0004")
             .WithSpan(6, 23, 6, 26)
             .WithArguments("Add");
 
@@ -116,7 +116,7 @@ public static class C
                                        }
                                    }
                                    """;
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0004")
             .WithSpan(7, 27, 7, 30)
             .WithArguments("Add");
 
@@ -155,7 +155,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0004")
             .WithSpan(11, 27, 11, 30)
             .WithArguments("Add");
 
@@ -192,7 +192,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
+        var expected = VerifyCF.Diagnostic("SP0005")
             .WithSpan(11, 27, 11, 29)
             .WithArguments("Id");
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
@@ -234,7 +234,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(10, 27, 10, 30)
             .WithArguments("Bad");
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
@@ -283,7 +283,7 @@ public readonly struct Temperature
     }
 }
 ";
-        var expectedImpure = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedImpure = VerifyCF.Diagnostic("SP0002")
             .WithSpan(15, 19, 15, 27)
             .WithArguments("op_Explicit");
         await VerifyCF.VerifyCodeFixAsync(
@@ -316,7 +316,7 @@ public sealed class TestClass
     public int Value => _counter++;
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(9, 16, 9, 21)
             .WithArguments("get_Value");
         await VerifyCF.VerifyCodeFixAsync(
@@ -360,7 +360,7 @@ public sealed class TestClass
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(6, 16, 6, 21)
             .WithArguments("get_Value");
 
@@ -408,7 +408,7 @@ public sealed class TestClass
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(8, 16, 8, 21)
             .WithArguments("get_Value");
 
@@ -451,7 +451,7 @@ public sealed class TestClass
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(11, 9, 11, 12)
             .WithArguments("add_E");
 
@@ -502,7 +502,7 @@ public static class TestClass
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCF.Diagnostic("SP0002")
             .WithSpan(13, 23, 13, 26)
             .WithArguments("Bad");
 
@@ -530,7 +530,7 @@ public class C
 {
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0003")
             .WithSpan(4, 2, 4, 13);
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
     }
@@ -581,7 +581,7 @@ public sealed class C
     public event Action E;
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0003")
             .WithSpan(7, 6, 7, 17);
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
     }
@@ -614,7 +614,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
+        var expected = VerifyCF.Diagnostic("SP0006")
             .WithSpan(10, 21, 10, 22)
             .WithArguments("M");
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource, "RemoveAttributesMatchingAsyncSP0006b");
@@ -648,7 +648,7 @@ namespace N
     }
 }
 ";
-        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
+        var expected = VerifyCF.Diagnostic("SP0008")
             .WithSpan(10, 20, 10, 21)
             .WithArguments("M");
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);

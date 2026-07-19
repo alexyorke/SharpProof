@@ -97,7 +97,7 @@ internal static class MethodCapabilityAnalyzer
         SymbolicUnknownReasonInfo unknownReasonInfo, string operationKind, string evidenceKey)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, reason);
+            .Add(DiagnosticPropertyNames.CapabilityUnknownReasonProperty, reason);
         properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
@@ -111,7 +111,7 @@ internal static class MethodCapabilityAnalyzer
             "unknown",
             unknownReasonInfo.Code);
         return Diagnostic.Create(
-            SharpProofDiagnostics.CapabilityUnknownRule,
+            AnalyzerDiagnosticCatalog.Get("CapabilityUnknownRule"),
             location,
             null,
             properties,
@@ -126,7 +126,7 @@ internal static class MethodCapabilityAnalyzer
     {
         var formattedCapabilities = SymbolicCapabilityFacts.FormatMask(disallowedCapabilities);
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityProperty, formattedCapabilities);
+            .Add("sharpproof.capability.flags", formattedCapabilities);
         properties = AddCapabilitySiteDiagnosticProperties(
             properties,
             methodSymbol,
@@ -138,7 +138,7 @@ internal static class MethodCapabilityAnalyzer
             out var location);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.CapabilityViolationRule,
+            AnalyzerDiagnosticCatalog.Get("CapabilityViolationRule"),
             location,
             null,
             properties, site.OperationText, methodSymbol.Name, formattedCapabilities);
@@ -150,7 +150,7 @@ internal static class MethodCapabilityAnalyzer
         SyntaxTree syntaxTree)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString());
+            .Add(DiagnosticPropertyNames.CapabilityUnknownReasonProperty, site.UnknownReason.ToString());
         properties = UnknownReasonDiagnosticProperties.Add(properties, site.UnknownReasonInfo);
         properties = AddCapabilitySiteDiagnosticProperties(
             properties,
@@ -163,7 +163,7 @@ internal static class MethodCapabilityAnalyzer
             out var location);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.CapabilityUnknownRule,
+            AnalyzerDiagnosticCatalog.Get("CapabilityUnknownRule"),
             location,
             null,
             properties, site.OperationText, methodSymbol.Name, site.UnknownReason.ToString());
@@ -180,7 +180,7 @@ internal static class MethodCapabilityAnalyzer
         out Location location)
     {
         properties = properties.Add(
-            SharpProofDiagnostics.CapabilityOperationKindProperty,
+            "sharpproof.capability.operation_kind",
             site.OperationKind);
         location = Location.Create(
             syntaxTree,
@@ -188,7 +188,7 @@ internal static class MethodCapabilityAnalyzer
 
         if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
             properties = properties.Add(
-                SharpProofDiagnostics.CapabilitySymbolProperty,
+                "sharpproof.capability.symbol",
                 site.SymbolDisplayName);
 
         return AnalyzerDiagnosticProperties.AddBaselineAndExplain(

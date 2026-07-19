@@ -2,9 +2,9 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using System.Globalization;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace SharpProof.Test;
 
@@ -40,8 +40,8 @@ public sealed class DiagnosticDescriptorMetadataTests
                 Assert.That(descriptor.Category, Is.EqualTo(expected.Category), descriptor.Id);
                 Assert.That(descriptor.DefaultSeverity, Is.EqualTo(expected.Severity), descriptor.Id);
                 var isProfileEnabledCommonBugRule =
-                    string.CompareOrdinal(descriptor.Id, SharpProofDiagnostics.AwaitNullConditionalId) >= 0 &&
-                    string.CompareOrdinal(descriptor.Id, SharpProofDiagnostics.UnconsumedDeferredQueryId) <= 0;
+                    string.CompareOrdinal(descriptor.Id, "SP0048") >= 0 &&
+                    string.CompareOrdinal(descriptor.Id, "SP0076") <= 0;
                 Assert.That(descriptor.IsEnabledByDefault, Is.EqualTo(!isProfileEnabledCommonBugRule), descriptor.Id);
                 Assert.That(
                     descriptor.HelpLinkUri,
@@ -74,14 +74,17 @@ public sealed class DiagnosticDescriptorMetadataTests
     [Test]
     public void DiagnosticCatalog_PreservesCanonicalDescriptorMetadata()
     {
-        var canonical = string.Join("\n", typeof(SharpProofDiagnostics)
-            .GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(static field => field.FieldType == typeof(DiagnosticDescriptor))
-            .Select(static field => (Field: field, Descriptor: (DiagnosticDescriptor)field.GetValue(null)!))
+        var catalogPath = Path.Combine(
+            FindRepositoryRoot(), "SharpProof.Analyzer", "AnalyzerDiagnosticCatalog.json");
+        using var catalog = JsonDocument.Parse(File.ReadAllText(catalogPath));
+        var canonical = string.Join("\n", catalog.RootElement
+            .EnumerateArray()
+            .Select(static definition => definition.GetProperty("FieldName").GetString()!)
+            .Select(static fieldName => (FieldName: fieldName, Descriptor: AnalyzerDiagnosticCatalog.Get(fieldName)))
             .OrderBy(static entry => entry.Descriptor.Id, StringComparer.Ordinal)
             .Select(static entry => string.Join(
                 "\u001f",
-                entry.Field.Name,
+                entry.FieldName,
                 entry.Descriptor.Id,
                 entry.Descriptor.Title.ToString(CultureInfo.InvariantCulture),
                 entry.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
@@ -111,12 +114,10 @@ public sealed class DiagnosticDescriptorMetadataTests
         Assert.Multiple(() =>
         {
             Assert.That(splitDeclarationFiles, Is.Empty);
-            Assert.That(
-                catalogSource.Split("public static readonly DiagnosticDescriptor ", StringSplitOptions.None),
-                Has.Length.EqualTo(AnalyzerDiagnosticCatalog.SupportedDiagnostics.Length + 1));
+            Assert.That(catalogSource, Does.Not.Contain("public static readonly DiagnosticDescriptor "));
             Assert.That(catalogSource, Does.Not.Contain("CreateDescriptor("));
             Assert.That(catalogSource, Does.Not.Contain("CreateCommonBugDescriptor("));
-            Assert.That(catalogSource, Does.Contain("AnalyzerDiagnosticCatalog.Get(nameof("));
+            Assert.That(catalogSource, Does.Not.Contain("SharpProofDiagnostics"));
             Assert.That(catalogSource, Does.Not.Contain("GetFields("));
             Assert.That(catalogData.Split("\"FieldName\"", StringSplitOptions.None),
                 Has.Length.EqualTo(AnalyzerDiagnosticCatalog.SupportedDiagnostics.Length + 1));

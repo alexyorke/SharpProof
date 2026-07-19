@@ -24,32 +24,32 @@ public class TestClass
         var diagnostics = await GetDiagnosticsAsync(UnknownDivisionSource, "unknowns");
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
             diagnostics,
-            SharpProofDiagnostics.UnknownRuntimeHazardId);
+            "SP0033");
 
         Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Info));
         Assert.That(diagnostic.GetMessage(), Does.Contain("DivideByZero"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("10 / divisor"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardKindProperty],
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.kind"],
             Is.EqualTo("DivideByZero"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardStatusProperty],
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.status"],
             Is.EqualTo("Unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardStatusReasonProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardTriggerProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardProofBackendProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.status_reason"], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.trigger"], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.proof_backend"], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.unknown_reason"], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
             Is.EqualTo("runtime_hazard.unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.category"],
             Is.EqualTo(SymbolicUnknownReasonCategory.Unknown.ToString()));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.source"],
             Is.EqualTo(SymbolicUnknownReasonSource.RuntimeHazard.ToString()));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselineSymbolProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselinePathProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselineOperationKindProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.BaselineSymbolProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.BaselinePathProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.BaselineOperationKindProperty],
             Is.EqualTo("DivideExpression"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselineEvidenceKeyProperty], Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainProofStatusProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.BaselineEvidenceKeyProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.explain.proof_status"], Is.EqualTo("unknown"));
+        Assert.That(diagnostics.Any(candidate => candidate.Id == "SP0011"),
             Is.False);
     }
 
@@ -62,7 +62,7 @@ public class TestClass
         var diagnostics = await GetDiagnosticsAsync(UnknownDivisionSource, mode);
 
         Assert.That(diagnostics.Any(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId), Is.False);
+            diagnostic.Id == "SP0033"), Is.False);
     }
 
     [Test]
@@ -86,10 +86,10 @@ public class TestClass
         var diagnostics = await GetDiagnosticsAsync(source, "sites-and-unknowns");
 
         Assert.That(diagnostics.Count(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.EqualTo(1));
+            diagnostic.Id == "SP0011"), Is.EqualTo(1));
         Assert.That(diagnostics.Count(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId), Is.EqualTo(1));
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            diagnostic.Id == "SP0033"), Is.EqualTo(1));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"),
             Is.False);
     }
 
@@ -113,11 +113,11 @@ public class TestClass
 
         var diagnostics = await GetDiagnosticsAsync(source, "all-and-unknowns");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"),
             Is.True);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0011"),
             Is.True);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0033"),
             Is.True);
     }
 
@@ -138,7 +138,7 @@ public class TestClass
         var diagnostics = await GetDiagnosticsAsync(source, "unknowns");
 
         Assert.That(diagnostics.Any(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId), Is.False);
+            diagnostic.Id == "SP0033"), Is.False);
     }
 
     private static Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source, string mode)

@@ -74,7 +74,7 @@ public sealed class TestClass
 
         await AssertSingleDiagnosticAsync(
             test,
-            SharpProofDiagnostics.EnsuresNotProvenId,
+            "SP0018",
             EnsuresFrameworkReferences,
             analyzerFeatures: AnalyzerFeatures.Ensures);
     }
@@ -870,15 +870,15 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.EnsuresUnsupportedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0019");
         Assert.Multiple(() =>
         {
             Assert.That(diagnostic.GetMessage(), Does.Contain("result is not available"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
                 Is.EqualTo("ensures.unsupported_condition"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.category"],
                 Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedSyntax.ToString()));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.source"],
                 Is.EqualTo(SymbolicUnknownReasonSource.Ensures.ToString()));
         });
     }
@@ -916,7 +916,7 @@ public sealed class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "disabled"));
 
         var ensuresDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.EnsuresUnsupportedId)
+            .Where(diagnostic => diagnostic.Id == "SP0019")
             .ToArray();
         Assert.That(ensuresDiagnostics, Has.Length.EqualTo(2));
         Assert.That(ensuresDiagnostics.All(diagnostic => diagnostic.GetMessage().Contains("SMT")), Is.True);

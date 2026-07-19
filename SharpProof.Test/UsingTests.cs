@@ -34,7 +34,7 @@ public class TestClass
         var test = DisposableTestSources.ImpureFileOpenUsing;
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(9, 17, 9, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -66,7 +66,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(14, 17, 14, 27)
             .WithArguments("TestMethod");
 

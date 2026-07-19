@@ -90,19 +90,19 @@ public class TestClass
 }
 ";
 
-        var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetId = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 18).WithArguments("get_Id");
-        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetRadius = VerifyCS.Diagnostic("SP0004")
             .WithSpan(28, 19, 28, 25).WithArguments("get_Radius");
-        var expectedCtorCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(32, 12, 32, 18)
+        var expectedCtorCircle = VerifyCS.Diagnostic("SP0002").WithSpan(32, 12, 32, 18)
             .WithArguments(".ctor");
-        var expectedScaleCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedScaleCircle = VerifyCS.Diagnostic("SP0002")
             .WithSpan(41, 26, 41, 31).WithArguments("Scale");
-        var expectedSetRadiusCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedSetRadiusCircle = VerifyCS.Diagnostic("SP0002")
             .WithSpan(47, 17, 47, 26).WithArguments("SetRadius");
-        var expectedProcessShape = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedProcessShape = VerifyCS.Diagnostic("SP0002")
             .WithSpan(61, 17, 61, 29).WithArguments("ProcessShape");
-        var expectedCalculateAndScale = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedCalculateAndScale = VerifyCS.Diagnostic("SP0002")
             .WithSpan(67, 19, 67, 36).WithArguments("CalculateAndScale");
 
         await VerifyCS.VerifyAnalyzerAsync(test,
@@ -144,13 +144,13 @@ public class TestClass
 }
 ";
 
-        var expectedSetName = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(7, 19, 7, 23)
+        var expectedSetName = VerifyCS.Diagnostic("SP0002").WithSpan(7, 19, 7, 23)
             .WithArguments("set_Name");
-        var expectedGetName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetName = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 19, 7, 23).WithArguments("get_Name");
-        var expectedConfigure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 26)
+        var expectedConfigure = VerifyCS.Diagnostic("SP0002").WithSpan(10, 17, 10, 26)
             .WithArguments("Configure");
-        var expectedImpureMethodCall = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedImpureMethodCall = VerifyCS.Diagnostic("SP0002")
             .WithSpan(19, 17, 19, 33).WithArguments("ImpureMethodCall");
 
         await VerifyCS.VerifyAnalyzerAsync(test,

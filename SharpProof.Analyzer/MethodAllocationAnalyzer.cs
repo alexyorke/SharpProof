@@ -28,7 +28,7 @@ internal static class MethodAllocationAnalyzer
             var location = allocationSite.Syntax.GetLocation();
             var properties = CreateAllocationProperties(allocationSite, methodSymbol, context.Node.SyntaxTree);
             var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.AllocationInZeroAllocationMethodRule,
+                AnalyzerDiagnosticCatalog.Get("AllocationInZeroAllocationMethodRule"),
                 location,
                 null,
                 properties,
@@ -52,12 +52,12 @@ internal static class MethodAllocationAnalyzer
         SyntaxTree syntaxTree)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.AllocationKindProperty, allocationSite.AllocationKind)
-            .Add(SharpProofDiagnostics.AllocationOperationKindProperty, allocationSite.Operation.Kind.ToString());
+            .Add("sharpproof.allocation.kind", allocationSite.AllocationKind)
+            .Add("sharpproof.allocation.operation_kind", allocationSite.Operation.Kind.ToString());
 
         if (allocationSite.Symbol != null)
             properties = properties.Add(
-                SharpProofDiagnostics.AllocationSymbolProperty,
+                "sharpproof.allocation.symbol",
                 allocationSite.Symbol.ToDisplayString(AllocationSymbolDisplayFormat));
 
         return AnalyzerDiagnosticProperties.AddBaselineAndExplain(

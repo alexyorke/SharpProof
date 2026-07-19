@@ -60,7 +60,7 @@ public class TestClass
 }";
 
 
-        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(16, 17, 16, 27)
+        var expectedTestMethod = VerifyCS.Diagnostic("SP0002").WithSpan(16, 17, 16, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedTestMethod);
     }

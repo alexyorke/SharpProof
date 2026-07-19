@@ -117,12 +117,12 @@ public class RecordTests
                 .WithSpan(9, 19, 9, 23)
                 .WithArguments("property", "Name"),
 
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(16, 17, 16, 29)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(16, 17, 16, 29)
                 .WithArguments("UpdatePerson"),
 
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 19, 9, 23)
+            VerifyCS.Diagnostic("SP0004").WithSpan(9, 19, 9, 23)
                 .WithArguments("get_Name"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(10, 16, 10, 19)
+            VerifyCS.Diagnostic("SP0004").WithSpan(10, 16, 10, 19)
                 .WithArguments("get_Age")
         };
 

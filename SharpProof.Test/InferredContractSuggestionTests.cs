@@ -11,13 +11,13 @@ public sealed class InferredContractSuggestionTests
 {
     private static readonly ImmutableHashSet<string> SuggestionIds =
         ImmutableHashSet.Create(
-            SharpProofDiagnostics.SuggestZeroAllocationsId,
-            SharpProofDiagnostics.SuggestAllowedCapabilitiesId,
-            SharpProofDiagnostics.SuggestExpectedComplexityId,
-            SharpProofDiagnostics.SuggestExceptionContractId,
-            SharpProofDiagnostics.SuggestEnsuresId,
-            SharpProofDiagnostics.SuggestRequiresId,
-            SharpProofDiagnostics.SuggestNullableContractId);
+            "SP0034",
+            "SP0035",
+            "SP0036",
+            "SP0037",
+            "SP0038",
+            "SP0039",
+            "SP0046");
 
     [Test]
     public async Task Suggestions_AreSilentByDefault()
@@ -37,7 +37,7 @@ public sealed class InferredContractSuggestionTests
             await GetSuggestionsAsync(
                 "public static class C { public static int Identity(int value) => value; }",
                 "zero-allocations"),
-            SharpProofDiagnostics.SuggestZeroAllocationsId);
+            "SP0034");
         AssertSuggestion(
             zeroAllocation,
             "zero-allocations",
@@ -48,7 +48,7 @@ public sealed class InferredContractSuggestionTests
             await GetSuggestionsAsync(
                 "using System; public static class C { public static void Write() => Console.WriteLine(1); }",
                 "capabilities"),
-            SharpProofDiagnostics.SuggestAllowedCapabilitiesId);
+            "SP0035");
         AssertSuggestion(
             capabilities,
             "capabilities",
@@ -73,7 +73,7 @@ public sealed class InferredContractSuggestionTests
                 }
                 """,
                 "complexity"),
-            SharpProofDiagnostics.SuggestExpectedComplexityId);
+            "SP0036");
         AssertSuggestion(
             complexity,
             "complexity",
@@ -85,7 +85,7 @@ public sealed class InferredContractSuggestionTests
             await GetSuggestionsAsync(
                 "public static class C { public static int Identity(int value) => value; }",
                 "exceptions"),
-            SharpProofDiagnostics.SuggestExceptionContractId);
+            "SP0037");
         AssertSuggestion(
             exceptionContract,
             "exceptions",
@@ -96,7 +96,7 @@ public sealed class InferredContractSuggestionTests
             await GetSuggestionsAsync(
                 "public static class C { public static int Identity(int value) => value; }",
                 "ensures"),
-            SharpProofDiagnostics.SuggestEnsuresId);
+            "SP0038");
         AssertSuggestion(
             ensures,
             "ensures",
@@ -117,7 +117,7 @@ public sealed class InferredContractSuggestionTests
                 }
                 """,
                 "requires"),
-            SharpProofDiagnostics.SuggestRequiresId);
+            "SP0039");
         AssertSuggestion(
             requires,
             "requires",
@@ -144,7 +144,7 @@ public sealed class InferredContractSuggestionTests
 
         var medium = SingleSuggestion(
             await GetSuggestionsAsync(source, "exceptions", "medium"),
-            SharpProofDiagnostics.SuggestExceptionContractId);
+            "SP0037");
         Assert.That(medium.DefaultSeverity, Is.EqualTo(DiagnosticSeverity.Info));
         AssertSuggestion(
             medium,
@@ -217,7 +217,7 @@ public sealed class InferredContractSuggestionTests
             await GetSuggestionsAsync(
                 "#nullable enable\npublic static class C { public static string? Name() => \"name\"; }",
                 "nullability"),
-            SharpProofDiagnostics.SuggestNullableContractId);
+            "SP0046");
         AssertSuggestion(
             returnSuggestion,
             "nullable-return",
@@ -238,7 +238,7 @@ public sealed class InferredContractSuggestionTests
                 }
                 """,
                 "nullability"),
-            SharpProofDiagnostics.SuggestNullableContractId);
+            "SP0046");
         AssertSuggestion(
             guardSuggestion,
             "nullable-parameter:value",
@@ -263,7 +263,7 @@ public sealed class InferredContractSuggestionTests
 
         var nullableSuggestion = SingleSuggestion(
             await GetSuggestionsAsync(source, "nullability"),
-            SharpProofDiagnostics.SuggestNullableContractId);
+            "SP0046");
         AssertSuggestion(
             nullableSuggestion,
             "nullable-parameter:value",
@@ -272,7 +272,7 @@ public sealed class InferredContractSuggestionTests
 
         var requiresSuggestion = SingleSuggestion(
             await GetSuggestionsAsync(source, "requires"),
-            SharpProofDiagnostics.SuggestRequiresId);
+            "SP0039");
         AssertSuggestion(
             requiresSuggestion,
             "requires",
@@ -317,16 +317,16 @@ public sealed class InferredContractSuggestionTests
         Assert.Multiple(() =>
         {
             Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Info));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.SuggestedContractKindProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.SuggestedContractKindProperty],
                 Is.EqualTo(kind));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.SuggestedContractAttributeProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.SuggestedContractAttributeProperty],
                 Is.EqualTo(attribute));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.SuggestedContractConfidenceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.suggestion.confidence"],
                 Is.EqualTo(confidence));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.SuggestedContractEvidenceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.suggestion.evidence"],
                 Is.Not.Empty);
-            Assert.That(diagnostic.Properties, Does.ContainKey(SharpProofDiagnostics.BaselineEvidenceKeyProperty));
-            Assert.That(diagnostic.Properties, Does.ContainKey(SharpProofDiagnostics.ExplainQueryProperty));
+            Assert.That(diagnostic.Properties, Does.ContainKey(DiagnosticPropertyNames.BaselineEvidenceKeyProperty));
+            Assert.That(diagnostic.Properties, Does.ContainKey("sharpproof.explain.query"));
         });
     }
 

@@ -65,7 +65,7 @@ internal static partial class CommonBugAnalyzer
                         Report(
                             context,
                             session,
-                            SharpProofDiagnostics.HttpClientInLoopRule,
+                            AnalyzerDiagnosticCatalog.Get("HttpClientInLoopRule"),
                             creation.Syntax.GetLocation(),
                             "http_client_in_loop",
                             clientLoop.Syntax.Kind().ToString());
@@ -78,7 +78,7 @@ internal static partial class CommonBugAnalyzer
                         Report(
                             context,
                             session,
-                            SharpProofDiagnostics.BoxingInLoopRule,
+                            AnalyzerDiagnosticCatalog.Get("BoxingInLoopRule"),
                             conversion.Syntax.GetLocation(),
                             "boxing_in_loop",
                             conversion.Operand.Type?.ToDisplayString() ?? "value",
@@ -111,7 +111,7 @@ internal static partial class CommonBugAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.CollectionMutationDuringEnumerationRule,
+                    AnalyzerDiagnosticCatalog.Get("CollectionMutationDuringEnumerationRule"),
                     operation.Syntax.GetLocation(),
                     "collection_mutation_during_enumeration",
                     collectionSymbol.Name,
@@ -186,7 +186,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.CapturedLoopVariableRule,
+                        AnalyzerDiagnosticCatalog.Get("CapturedLoopVariableRule"),
                         identifier.GetLocation(),
                         "captured_for_loop_variable",
                         captured.Name);
@@ -240,7 +240,7 @@ internal static partial class CommonBugAnalyzer
                 Report(
                     context,
                     session,
-                    SharpProofDiagnostics.UnsynchronizedSharedMutationRule,
+                    AnalyzerDiagnosticCatalog.Get("UnsynchronizedSharedMutationRule"),
                     mutation.Syntax.GetLocation(),
                     "unsynchronized_shared_mutation",
                     stateName,
@@ -372,7 +372,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.ConcurrentCollectionEnumerationRule,
+            AnalyzerDiagnosticCatalog.Get("ConcurrentCollectionEnumerationRule"),
             invocation.Syntax.GetLocation(),
             "concurrent_collection_enumeration",
             invocation.TargetMethod.Name,

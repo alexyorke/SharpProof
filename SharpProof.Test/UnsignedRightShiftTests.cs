@@ -168,7 +168,7 @@ namespace TestNamespace
     }
 }";
 
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedSP0002 = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(11, 21, 11, 53)
             .WithArguments("UnsignedRightShiftWithSideEffect");
 

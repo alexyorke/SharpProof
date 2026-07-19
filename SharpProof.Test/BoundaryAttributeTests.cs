@@ -89,10 +89,10 @@ public class TestClass
     public int Contradiction() => 1;
 }";
 
-        var expectedConflict = VerifyCS.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
+        var expectedConflict = VerifyCS.Diagnostic("SP0005")
             .WithSpan(8, 16, 8, 29)
             .WithArguments("Contradiction");
-        var expectedImpurity = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedImpurity = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 16, 8, 29)
             .WithArguments("Contradiction");
 

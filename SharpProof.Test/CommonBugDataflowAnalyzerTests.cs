@@ -20,7 +20,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.MaybeNullResultDereferenceId);
+        AssertHas(await AnalyzeAsync(source), "SP0064");
     }
 
     [Test]
@@ -37,7 +37,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.MaybeNullResultDereferenceId);
+        AssertMissing(await AnalyzeAsync(source), "SP0064");
     }
 
     [Test]
@@ -53,7 +53,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.PrematureQueryMaterializationId);
+        AssertHas(await AnalyzeAsync(source), "SP0065");
     }
 
     [Test]
@@ -69,7 +69,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.PrematureQueryMaterializationId);
+        AssertMissing(await AnalyzeAsync(source), "SP0065");
     }
 
     [Test]
@@ -92,7 +92,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.DeferredQuerySideEffectId);
+        AssertHas(await AnalyzeAsync(source), "SP0066");
     }
 
     [Test]
@@ -108,7 +108,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.DeferredQuerySideEffectId);
+        AssertMissing(await AnalyzeAsync(source), "SP0066");
     }
 
     [Test]
@@ -124,7 +124,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.QueryTranslationRiskId);
+        AssertHas(await AnalyzeAsync(source), "SP0067");
     }
 
     [Test]
@@ -143,7 +143,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.SerializationCycleRiskId);
+        AssertHas(await AnalyzeAsync(source), "SP0068");
     }
 
     [Test]
@@ -163,7 +163,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.SerializationCycleRiskId);
+        AssertMissing(await AnalyzeAsync(source), "SP0068");
     }
 
     [Test]
@@ -188,7 +188,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.SerializerAttributeMismatchId);
+        AssertHas(await AnalyzeAsync(source), "SP0069");
     }
 
     [Test]
@@ -203,7 +203,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.IneffectiveRequiredAttributeId);
+        AssertHas(await AnalyzeAsync(source), "SP0070");
     }
 
     [Test]
@@ -218,7 +218,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.IneffectiveRequiredAttributeId);
+        AssertMissing(await AnalyzeAsync(source), "SP0070");
     }
 
     [Test]
@@ -231,7 +231,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.UncheckedAllocationArithmeticId);
+        AssertHas(await AnalyzeAsync(source), "SP0071");
     }
 
     [Test]
@@ -244,7 +244,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.UncheckedAllocationArithmeticId);
+        AssertMissing(await AnalyzeAsync(source), "SP0071");
     }
 
     [Test]
@@ -256,7 +256,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               public sealed class Sample { }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.SuppressionWithoutJustificationId);
+        AssertHas(await AnalyzeAsync(source), "SP0072");
     }
 
     [Test]
@@ -268,7 +268,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               public sealed class Sample { }
                               """;
 
-        AssertMissing(await AnalyzeAsync(source), SharpProofDiagnostics.SuppressionWithoutJustificationId);
+        AssertMissing(await AnalyzeAsync(source), "SP0072");
     }
 
     [Test]
@@ -279,7 +279,7 @@ public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
                               public sealed class Sample { }
                               """;
 
-        AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.NullableAnalysisDisabledId);
+        AssertHas(await AnalyzeAsync(source), "SP0073");
     }
 
 }

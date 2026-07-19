@@ -456,7 +456,7 @@ public sealed class ImpactedTestSelectionScriptTests
     [Test]
     public async Task ListOnlyJson_InventoryBroadDependencyTriggersFullSuiteFallback()
     {
-        const string changedFile = "SharpProof.Analyzer/SharpProofDiagnostics.cs";
+        const string changedFile = "SharpProof.Analyzer/Engine/CompilationPurityService.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
 
@@ -464,7 +464,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
         Assert.That(
             GetStringArray(root, "fullSuiteFallbackReasons"),
-            Does.Contain(changedFile + " is broad generated fixture dependency"));
+            Does.Contain(changedFile + " is high-fanout analyzer core"));
     }
 
     [Test]

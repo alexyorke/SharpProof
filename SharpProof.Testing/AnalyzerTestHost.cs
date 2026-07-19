@@ -290,14 +290,14 @@ internal static class AnalyzerTestHost
 
     public static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
     {
-        return StripDiagnosticMarkup(markedSource, SharpProofDiagnostics.PurityNotVerifiedId, false);
+        return StripDiagnosticMarkup(markedSource, "SP0002", false);
     }
 
     public static (string Source, string ExpectedSpanText) StripRequiredSp0002Markup(string markedSource)
     {
         var (source, expectedSpanText) = StripDiagnosticMarkup(
             markedSource,
-            SharpProofDiagnostics.PurityNotVerifiedId,
+            "SP0002",
             true);
         return (source, expectedSpanText!);
     }
@@ -315,7 +315,7 @@ internal static class AnalyzerTestHost
             concurrentAnalysis: concurrentAnalysis,
             analyzerFeatures: analyzerFeatures);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(diagnostic => diagnostic.Id == "SP0002")
             .ToArray();
 
         if (expectedSpanText == null)
@@ -345,7 +345,7 @@ internal static class AnalyzerTestHost
             frameworkReferences: frameworkReferences,
             concurrentAnalysis: concurrentAnalysis,
             analyzerFeatures: analyzerFeatures);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         Assert.That(diagnostics, Has.Length.EqualTo(1));
         AssertDiagnosticSpan(source, diagnostic, expectedSpanText);

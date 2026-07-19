@@ -73,7 +73,7 @@ public class TestClass
 }
 ";
 
-        var expectedMain = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMain = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 24, 11, 28)
             .WithArguments("Main");
 
@@ -103,7 +103,7 @@ public class TestClass
 }
 ";
 
-        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAdd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 16, 13, 19).WithArguments("Add");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd);
     }

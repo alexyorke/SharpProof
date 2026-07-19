@@ -76,13 +76,13 @@ public class Service
 }
 ";
 
-        var expectedLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
+        var expectedLog = VerifyCS.Diagnostic("SP0002")
             .WithSpan(12, 17, 12, 20)
             .WithArguments("Log");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(21, 12, 21, 19)
             .WithArguments(".ctor");
-        var expectedDoWork = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
+        var expectedDoWork = VerifyCS.Diagnostic("SP0002")
             .WithSpan(27, 17, 27, 23)
             .WithArguments("DoWork");
 

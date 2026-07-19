@@ -172,14 +172,14 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.CapabilityUnknownId);
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0016");
         Assert.Multiple(() =>
         {
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
                 Is.EqualTo("capability.dynamic_dispatch"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.category"],
                 Is.EqualTo(SymbolicUnknownReasonCategory.DynamicDispatch.ToString()));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.unknown.source"],
                 Is.EqualTo(SymbolicUnknownReasonSource.Capability.ToString()));
         });
     }
@@ -307,12 +307,12 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.CapabilityViolationId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0015");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.CapabilityProperty], Is.EqualTo("IO, Console"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.CapabilityOperationKindProperty],
+        Assert.That(diagnostic.Properties["sharpproof.capability.flags"], Is.EqualTo("IO, Console"));
+        Assert.That(diagnostic.Properties["sharpproof.capability.operation_kind"],
             Is.EqualTo("Invocation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.CapabilitySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.capability.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 

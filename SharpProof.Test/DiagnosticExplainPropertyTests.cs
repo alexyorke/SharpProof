@@ -29,11 +29,11 @@ public sealed class TestClass
 }",
             sourcePath: sourcePath);
 
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "SP0002");
         AssertExplainTarget(diagnostic, sourcePath);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainContractProperty], Is.EqualTo("[EnforcePure]"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainProofStatusProperty], Is.EqualTo("not_proven"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainUnknownReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.explain.contract"], Is.EqualTo("[EnforcePure]"));
+        Assert.That(diagnostic.Properties["sharpproof.explain.proof_status"], Is.EqualTo("not_proven"));
+        Assert.That(diagnostic.Properties["sharpproof.explain.unknown_reason"],
             Is.Not.Null.And.Not.Empty);
     }
 
@@ -56,19 +56,19 @@ public sealed class TestClass
 }",
             sourcePath: sourcePath);
 
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.EnsuresNotProvenId);
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "SP0018");
         AssertExplainTarget(diagnostic, sourcePath, "result > 0");
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainContractProperty], Is.EqualTo("result > 0"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainProofStatusProperty],
+        Assert.That(diagnostic.Properties["sharpproof.explain.contract"], Is.EqualTo("result > 0"));
+        Assert.That(diagnostic.Properties["sharpproof.explain.proof_status"],
             Is.EqualTo("proven_false"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainUnknownReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.explain.unknown_reason"],
             Is.EqualTo("ir_condition_syntactic_false"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EnsuresConditionProperty], Is.EqualTo("result > 0"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EnsuresProofStatusProperty],
+        Assert.That(diagnostic.Properties["sharpproof.ensures.condition"], Is.EqualTo("result > 0"));
+        Assert.That(diagnostic.Properties["sharpproof.ensures.proof_status"],
             Is.EqualTo("ProvenFalse"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EnsuresFailureReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.ensures.failure_reason"],
             Is.EqualTo("ir_condition_syntactic_false"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.EnsuresUnknownReasonProperty), Is.False);
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.ensures.unknown_reason"), Is.False);
     }
 
     [Test]
@@ -89,16 +89,16 @@ public static class TestClass
 }",
             sourcePath: sourcePath);
 
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.RequiresNotProvenId);
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "SP0027");
         AssertExplainTarget(diagnostic, sourcePath, "value > 0");
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RequiresConditionProperty], Is.EqualTo("value > 0"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RequiresProofStatusProperty],
+        Assert.That(diagnostic.Properties["sharpproof.requires.condition"], Is.EqualTo("value > 0"));
+        Assert.That(diagnostic.Properties["sharpproof.requires.proof_status"],
             Is.EqualTo("ProvenFalse"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RequiresFailureReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.requires.failure_reason"],
             Is.EqualTo("ir_condition_syntactic_false"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.RequiresCalleeProperty],
+        Assert.That(diagnostic.Properties["sharpproof.requires.callee"],
             Does.Contain("TestClass.Callee(int)"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.RequiresUnknownReasonProperty), Is.False);
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.requires.unknown_reason"), Is.False);
     }
 
     [TestCase(true, TestName = "RequiresUnsupported_PreservesFamilyUnknownEvidence")]
@@ -118,21 +118,21 @@ public static class TestClass
             sourcePath: sourcePath);
 
         var expectedId = requires
-            ? SharpProofDiagnostics.RequiresUnsupportedId
-            : SharpProofDiagnostics.EnsuresUnsupportedId;
+            ? "SP0028"
+            : "SP0019";
         var diagnostic = diagnostics.Single(candidate => candidate.Id == expectedId);
         var conditionProperty = requires
-            ? SharpProofDiagnostics.RequiresConditionProperty
-            : SharpProofDiagnostics.EnsuresConditionProperty;
+            ? "sharpproof.requires.condition"
+            : "sharpproof.ensures.condition";
         var proofStatusProperty = requires
-            ? SharpProofDiagnostics.RequiresProofStatusProperty
-            : SharpProofDiagnostics.EnsuresProofStatusProperty;
+            ? "sharpproof.requires.proof_status"
+            : "sharpproof.ensures.proof_status";
         var failureReasonProperty = requires
-            ? SharpProofDiagnostics.RequiresFailureReasonProperty
-            : SharpProofDiagnostics.EnsuresFailureReasonProperty;
+            ? "sharpproof.requires.failure_reason"
+            : "sharpproof.ensures.failure_reason";
         var unknownReasonProperty = requires
-            ? SharpProofDiagnostics.RequiresUnknownReasonProperty
-            : SharpProofDiagnostics.EnsuresUnknownReasonProperty;
+            ? "sharpproof.requires.unknown_reason"
+            : "sharpproof.ensures.unknown_reason";
 
         Assert.That(diagnostic.Properties[conditionProperty], Is.EqualTo("value >"));
         Assert.That(diagnostic.Properties[proofStatusProperty], Is.EqualTo("Unknown"));
@@ -146,9 +146,9 @@ public static class TestClass
         string sourcePath,
         string? expectedImpliedCondition = null)
     {
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EvidenceSchemaVersionProperty],
+        Assert.That(diagnostic.Properties[SharpProofEvidenceSchema.DiagnosticVersionProperty],
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion.ToString(CultureInfo.InvariantCulture)));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EvidenceSchemaCompatibilityProperty],
+        Assert.That(diagnostic.Properties[SharpProofEvidenceSchema.DiagnosticCompatibilityProperty],
             Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
 
         var lineSpan = diagnostic.Location.GetLineSpan();
@@ -163,11 +163,11 @@ public static class TestClass
         if (!string.IsNullOrWhiteSpace(expectedImpliedCondition))
             expectedQuery += " --implies \"" + expectedImpliedCondition + "\"";
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainFileProperty], Is.EqualTo(sourcePath));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainLineProperty],
+        Assert.That(diagnostic.Properties["sharpproof.explain.file"], Is.EqualTo(sourcePath));
+        Assert.That(diagnostic.Properties["sharpproof.explain.line"],
             Is.EqualTo(line.ToString(CultureInfo.InvariantCulture)));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainColumnProperty],
+        Assert.That(diagnostic.Properties["sharpproof.explain.column"],
             Is.EqualTo(column.ToString(CultureInfo.InvariantCulture)));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainQueryProperty], Is.EqualTo(expectedQuery));
+        Assert.That(diagnostic.Properties["sharpproof.explain.query"], Is.EqualTo(expectedQuery));
     }
 }

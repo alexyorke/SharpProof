@@ -234,11 +234,11 @@ internal sealed class SymbolicUnknownReasonTaxonomyTests
         Assert.Multiple(() =>
         {
             Assert.That(evidence.UnknownReasonInfo.Code, Is.EqualTo("purity.unsupported_operation"));
-            Assert.That(properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Assert.That(properties["sharpproof.unknown.code"],
                 Is.EqualTo("purity.unsupported_operation"));
-            Assert.That(properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Assert.That(properties["sharpproof.unknown.category"],
                 Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedOperation.ToString()));
-            Assert.That(properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Assert.That(properties["sharpproof.unknown.source"],
                 Is.EqualTo(SymbolicUnknownReasonSource.Purity.ToString()));
         });
     }

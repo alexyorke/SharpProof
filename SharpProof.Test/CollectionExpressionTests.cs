@@ -169,7 +169,7 @@ public class CollectionExpressionExample
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(10, 18, 10, 28)
             .WithArguments("GetNumbers");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -196,7 +196,7 @@ public class CollectionExpressionExample
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(11, 25, 11, 33)
             .WithArguments("GetNames");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -222,7 +222,7 @@ public class CollectionExpressionExample
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 18, 10, 26)
             .WithArguments("GetArray");
         await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
@@ -249,7 +249,7 @@ public class CollectionExpressionExample
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 22, 11, 29)
             .WithArguments("GetList");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -382,7 +382,7 @@ public class CollectionExpressionExample
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 32, 9, 49)
             .WithArguments("GetImmutableArray");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

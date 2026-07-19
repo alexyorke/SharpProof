@@ -32,7 +32,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 17, 14, 29)
             .WithArguments("ImpureMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -55,7 +55,7 @@ public class C
     public void M() { }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
+        var expected = VerifyCS.Diagnostic("SP0006")
             .WithSpan(11, 17, 11, 18)
             .WithArguments("M");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -94,7 +94,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(18, 16, 18, 34)
             .WithArguments("PureMethodWithLock");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -129,7 +129,7 @@ class Program
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(16, 16, 16, 34)
             .WithArguments("PureMethodWithLock");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -163,7 +163,7 @@ class Program
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(16, 17, 16, 37)
             .WithArguments("ImpureMethodWithLock");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -198,7 +198,7 @@ class Program
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(16, 17, 16, 48)
             .WithArguments("ImpureMethodWithNonReadonlyLock");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -221,7 +221,7 @@ public class C
     public int M() => 42;
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
+        var expected = VerifyCS.Diagnostic("SP0008")
             .WithSpan(12, 16, 12, 17)
             .WithArguments("M");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -249,7 +249,7 @@ public class C
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 16, 14, 17)
             .WithArguments("M");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

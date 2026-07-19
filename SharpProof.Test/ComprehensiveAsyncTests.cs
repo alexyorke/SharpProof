@@ -87,7 +87,7 @@ class Program
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 40).WithArguments("ImpureAsyncMethod"));
+            VerifyCS.Diagnostic("SP0002").WithSpan(9, 23, 9, 40).WithArguments("ImpureAsyncMethod"));
     }
 
     [Test]
@@ -112,7 +112,7 @@ class Program
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(11, 28, 11, 45).WithArguments("ImpureAsyncMethod"));
+            VerifyCS.Diagnostic("SP0002").WithSpan(11, 28, 11, 45).WithArguments("ImpureAsyncMethod"));
     }
 
     [Test]
@@ -165,7 +165,7 @@ class Program
 }";
 
 
-        var diag1 = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(15, 28, 15, 45)
+        var diag1 = VerifyCS.Diagnostic("SP0002").WithSpan(15, 28, 15, 45)
             .WithArguments("ImpureAsyncMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, diag1);
     }
@@ -189,7 +189,7 @@ class Program
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 42).WithArguments("ImpureTaskRunMethod"));
+            VerifyCS.Diagnostic("SP0002").WithSpan(9, 23, 9, 42).WithArguments("ImpureTaskRunMethod"));
     }
 
     [Test]

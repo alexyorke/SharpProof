@@ -37,16 +37,16 @@ public sealed class TrustedBoundaryReviewTests
             concurrentAnalysis: true);
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.symbol"],
             Is.EqualTo("Boundary.Value(int)"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.source"],
             Is.EqualTo("config_known_pure_method"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.value"],
             Is.EqualTo(BoundaryValueKey));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("applied"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty], Is.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryClassificationProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.overridden_by"], Is.Empty);
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.classification"],
             Is.EqualTo("pure"));
     }
 
@@ -77,17 +77,17 @@ public sealed class TrustedBoundaryReviewTests
         Assert.That(reviewDiagnostics, Has.Length.EqualTo(2));
 
         var direct = BySource(reviewDiagnostics, "member_pure_external_attribute");
-        Assert.That(direct.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+        Assert.That(direct.Properties["sharpproof.trusted_boundary.value"],
             Is.EqualTo("SharpProof.Attributes.PureExternalAttribute"));
-        Assert.That(direct.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(direct.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("applied"));
 
         var configured = BySource(reviewDiagnostics, "config_known_pure_method");
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("overridden"));
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.overridden_by"],
             Is.EqualTo("member_pure_external_attribute"));
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryOverrideValueProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.override_value"],
             Is.EqualTo("SharpProof.Attributes.PureExternalAttribute"));
     }
 
@@ -115,7 +115,7 @@ public sealed class TrustedBoundaryReviewTests
             Options("used", BoundaryValueKey));
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.source"],
             Is.EqualTo("member_pure_external_attribute"));
     }
 
@@ -152,15 +152,15 @@ public sealed class TrustedBoundaryReviewTests
             ImmutableDictionary<string, string>.Empty.Add(ReviewMode, "all"));
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.source"],
             Is.EqualTo("recognized_external_pure_attribute"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.value"],
             Is.EqualTo("JetBrains.Annotations.PureAttribute"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("overridden"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.overridden_by"],
             Is.EqualTo("assembly_impure_attribute"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryOverrideValueProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.override_value"],
             Is.EqualTo("SharpProof.Attributes.ImpureAttribute"));
     }
 
@@ -189,11 +189,11 @@ public sealed class TrustedBoundaryReviewTests
             ImmutableDictionary<string, string>.Empty.Add(ReviewMode, "used"));
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.source"],
             Is.EqualTo("assembly_pure_external_attribute"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.value"],
             Is.EqualTo("SharpProof.Attributes.PureExternalAttribute"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("applied"));
     }
 
@@ -221,11 +221,11 @@ public sealed class TrustedBoundaryReviewTests
                 new AnalyzerTestHost.InMemoryAdditionalText(summaryPath, summary)));
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.source"],
             Is.EqualTo("additional_generated_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.value"],
             Is.EqualTo(summaryPath));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(diagnostic.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("applied"));
     }
 
@@ -253,11 +253,11 @@ public sealed class TrustedBoundaryReviewTests
                 new AnalyzerTestHost.InMemoryAdditionalText(summaryPath, summary)));
 
         var configured = BySource(ReviewDiagnostics(diagnostics), "config_known_pure_method");
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.disposition"],
             Is.EqualTo("overridden"));
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.overridden_by"],
             Is.EqualTo("additional_generated_summary"));
-        Assert.That(configured.Properties[SharpProofDiagnostics.TrustedBoundaryOverrideValueProperty],
+        Assert.That(configured.Properties["sharpproof.trusted_boundary.override_value"],
             Is.EqualTo(summaryPath));
     }
 
@@ -269,11 +269,11 @@ public sealed class TrustedBoundaryReviewTests
             ImmutableDictionary<string, string>.Empty.Add(ReviewMode, "sometimes"));
 
         var diagnostic = diagnostics.Single(item =>
-            item.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId &&
-            item.Properties[SharpProofDiagnostics.ConfigurationKeyProperty] == ReviewMode);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationValueProperty],
+            item.Id == "SP0025" &&
+            item.Properties["sharpproof.config.key"] == ReviewMode);
+        Assert.That(diagnostic.Properties["sharpproof.config.value"],
             Is.EqualTo("sometimes"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.config.invalid_reason"],
             Does.Contain("off, used, all"));
     }
 
@@ -303,13 +303,13 @@ public sealed class TrustedBoundaryReviewTests
     private static Diagnostic[] ReviewDiagnostics(ImmutableArray<Diagnostic> diagnostics)
     {
         return diagnostics
-            .Where(static diagnostic => diagnostic.Id == SharpProofDiagnostics.TrustedBoundaryReviewId)
+            .Where(static diagnostic => diagnostic.Id == "SP0040")
             .ToArray();
     }
 
     private static Diagnostic BySource(IEnumerable<Diagnostic> diagnostics, string source)
     {
         return diagnostics.Single(diagnostic =>
-            diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty] == source);
+            diagnostic.Properties["sharpproof.trusted_boundary.source"] == source);
     }
 }

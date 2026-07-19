@@ -94,11 +94,11 @@ public class TestClass
             .WithArguments("TestClass.Process(TestClass.MyDelegate, int)", "TestClass.MyDelegate");
 
 
-        var expectedDiagSP0002_Process = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagSP0002_Process = VerifyCS.Diagnostic("SP0002")
             .WithSpan(12, 24, 12, 31).WithArguments("Process");
 
 
-        var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic("SP0002")
             .WithSpan(18, 24, 18, 34).WithArguments("TestMethod");
 
 
@@ -194,11 +194,11 @@ public class TestClass
 }
 ";
 
-        var expectedDiagApplyAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagApplyAction = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 17, 9, 28).WithArguments("ApplyAction");
 
 
-        var expectedDiagTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedDiagTestMethod = VerifyCS.Diagnostic("SP0002")
             .WithSpan(16, 17, 16, 27).WithArguments("TestMethod");
 
         await VerifyCS.VerifyAnalyzerAsync(testCode, expectedDiagApplyAction, expectedDiagTestMethod);
@@ -227,7 +227,7 @@ public class TestClass
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(10, 27, 10, 47)
             .WithArguments("CreateImpureDelegate");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -331,7 +331,7 @@ public class TestClass
     }
 }";
 
-        var expectedUseCombined = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedUseCombined = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(25, 17, 25, 37).WithArguments("UseCombinedDelegates");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedUseCombined);
     }

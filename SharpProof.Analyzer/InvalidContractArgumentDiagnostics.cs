@@ -11,9 +11,9 @@ internal static class InvalidContractArgumentDiagnostics
         SyntaxTree? syntaxTree = null)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.ContractAttributeProperty, attributeName)
-            .Add(SharpProofDiagnostics.ContractArgumentProperty, argument)
-            .Add(SharpProofDiagnostics.ContractInvalidReasonProperty, reason);
+            .Add("sharpproof.contract.attribute", attributeName)
+            .Add("sharpproof.contract.argument", argument)
+            .Add("sharpproof.contract.invalid_reason", reason);
 
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
@@ -28,7 +28,7 @@ internal static class InvalidContractArgumentDiagnostics
             reason);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidContractArgumentRule,
+            AnalyzerDiagnosticCatalog.Get("InvalidContractArgumentRule"),
             location,
             null,
             properties,

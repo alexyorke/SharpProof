@@ -39,12 +39,12 @@ namespace SharpProof.Test // Add namespace to match outer scope
 }";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(16, 23, 16, 42)
             .WithArguments("CallDefaultToString");
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 20, 10, 25)
             .WithArguments("get_Value");
 

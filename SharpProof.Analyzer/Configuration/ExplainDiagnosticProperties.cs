@@ -27,24 +27,24 @@ internal static class ExplainDiagnosticProperties
                 var line = lineSpan.StartLinePosition.Line + 1;
                 var column = lineSpan.StartLinePosition.Character + 1;
                 properties = properties
-                    .SetItem(SharpProofDiagnostics.ExplainFileProperty, explainPath)
-                    .SetItem(SharpProofDiagnostics.ExplainLineProperty, line.ToString(CultureInfo.InvariantCulture))
-                    .SetItem(SharpProofDiagnostics.ExplainColumnProperty, column.ToString(CultureInfo.InvariantCulture))
-                    .SetItem(SharpProofDiagnostics.ExplainQueryProperty,
+                    .SetItem("sharpproof.explain.file", explainPath)
+                    .SetItem("sharpproof.explain.line", line.ToString(CultureInfo.InvariantCulture))
+                    .SetItem("sharpproof.explain.column", column.ToString(CultureInfo.InvariantCulture))
+                    .SetItem("sharpproof.explain.query",
                         CreateExplainQuery(explainPath, line, column, impliedConditionText));
             }
         }
 
         if (!string.IsNullOrWhiteSpace(contractText))
-            properties = properties.SetItem(SharpProofDiagnostics.ExplainContractProperty, contractText!.Trim());
+            properties = properties.SetItem("sharpproof.explain.contract", contractText!.Trim());
 
         var normalizedProofStatus = NormalizeToken(proofStatus);
         if (!string.IsNullOrWhiteSpace(normalizedProofStatus))
-            properties = properties.SetItem(SharpProofDiagnostics.ExplainProofStatusProperty, normalizedProofStatus);
+            properties = properties.SetItem("sharpproof.explain.proof_status", normalizedProofStatus);
 
         var normalizedUnknownReason = NormalizeToken(unknownReason);
         if (!string.IsNullOrWhiteSpace(normalizedUnknownReason))
-            properties = properties.SetItem(SharpProofDiagnostics.ExplainUnknownReasonProperty,
+            properties = properties.SetItem("sharpproof.explain.unknown_reason",
                 normalizedUnknownReason);
 
         return properties;

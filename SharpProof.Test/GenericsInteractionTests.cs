@@ -53,19 +53,19 @@ public class GenericTestManager
 }
 ";
 
-        var expectedGetAll = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedGetAll = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(19, 27, 19, 33)
             .WithArguments("GetAll");
-        var expectedHasBanana = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedHasBanana = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(37, 17, 37, 26)
             .WithArguments("HasBanana");
-        var expectedFindItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedFindItem = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(13, 14, 13, 22)
             .WithArguments("FindItem");
-        var expectedFindStringStartingWithB = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedFindStringStartingWithB = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(31, 19, 31, 42)
             .WithArguments("FindStringStartingWithB");
-        var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expectedContainsItem = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(22, 17, 22, 29)
             .WithArguments("ContainsItem");
 
@@ -106,10 +106,10 @@ public class Repository<T>
 ";
 
 
-        var expectedAddAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedAddAndLog = VerifyCS.Diagnostic("SP0002")
             .WithSpan(17, 17, 17, 26)
             .WithArguments("AddAndLog");
-        var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedContainsItem = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 17, 14, 29)
             .WithArguments("ContainsItem");
 

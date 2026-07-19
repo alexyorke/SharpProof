@@ -42,10 +42,10 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(9, 23, 9, 24).WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 23, 10, 24)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004").WithSpan(9, 23, 9, 24).WithArguments("get_X");
+        var expectedGetY = VerifyCS.Diagnostic("SP0004").WithSpan(10, 23, 10, 24)
             .WithArguments("get_Y");
-        var expectedProcessPoint = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(24, 28, 24, 40)
+        var expectedProcessPoint = VerifyCS.Diagnostic("SP0002").WithSpan(24, 28, 24, 40)
             .WithArguments("ProcessPoint");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY, expectedProcessPoint);
@@ -92,9 +92,9 @@ namespace TestNamespace
 }";
 
 
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(14, 16, 14, 24)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004").WithSpan(14, 16, 14, 24)
             .WithArguments(".ctor");
-        var expectedTestVector = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(30, 30, 30, 40)
+        var expectedTestVector = VerifyCS.Diagnostic("SP0004").WithSpan(30, 30, 30, 40)
             .WithArguments("TestVector");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCtor, expectedTestVector);
@@ -170,9 +170,9 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetWidth = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 20, 10, 25)
+        var expectedGetWidth = VerifyCS.Diagnostic("SP0004").WithSpan(10, 20, 10, 25)
             .WithArguments("get_Width");
-        var expectedGetHeight = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 26)
+        var expectedGetHeight = VerifyCS.Diagnostic("SP0004").WithSpan(11, 20, 11, 26)
             .WithArguments("get_Height");
 
 
@@ -214,9 +214,9 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetLogPath = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 23, 11, 30)
+        var expectedGetLogPath = VerifyCS.Diagnostic("SP0004").WithSpan(11, 23, 11, 30)
             .WithArguments("get_LogPath");
-        var expectedWriteLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(14, 21, 14, 29)
+        var expectedWriteLog = VerifyCS.Diagnostic("SP0002").WithSpan(14, 21, 14, 29)
             .WithArguments("WriteLog");
 
 
@@ -262,7 +262,7 @@ namespace TestNamespace
 }";
 
 
-        var expectedIsOrigin = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(19, 21, 19, 29)
+        var expectedIsOrigin = VerifyCS.Diagnostic("SP0002").WithSpan(19, 21, 19, 29)
             .WithArguments("IsOrigin");
 
 

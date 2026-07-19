@@ -264,7 +264,7 @@ public class FuzzToolTests
             FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.Ignore)));
 
         Assert.That(analysis.CompilationErrors, Is.Empty);
-        Assert.That(analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
         Assert.That(analysis.Findings.Any(finding => finding.Category == "impure_missing_sp0002"), Is.False);
         Assert.That(analysis.OperationKinds.ContainsKey("Invocation"), Is.True);
@@ -493,10 +493,10 @@ public class FuzzToolTests
         Assert.That(analysis.CompilationErrors, Is.Empty);
         Assert.That(analysis.Findings, Is.Empty);
         Assert.That(
-            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
         Assert.That(
-            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"),
             Is.False);
     }
 
@@ -512,7 +512,7 @@ public class FuzzToolTests
             Assert.That(analysis.CompilationErrors, Is.Empty, family);
             Assert.That(analysis.Findings, Is.Empty, family);
             Assert.That(
-                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
                 Is.False,
                 family);
         }
@@ -526,7 +526,7 @@ public class FuzzToolTests
         Assert.That(analysis.CompilationErrors, Is.Empty);
         Assert.That(analysis.Findings, Is.Empty);
         Assert.That(
-            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 
@@ -542,7 +542,7 @@ public class FuzzToolTests
             Assert.That(analysis.CompilationErrors, Is.Empty, family);
             Assert.That(analysis.Findings, Is.Empty, family);
             Assert.That(
-                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
                 Is.True,
                 family);
         }
@@ -558,10 +558,10 @@ public class FuzzToolTests
             var registryEntry = RegistryEntriesById[family];
             var analysis = analyses[family];
             var purityDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .Where(diagnostic => diagnostic.Id == "SP0002")
                 .ToArray();
             var exceptionDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+                .Where(diagnostic => diagnostic.Id == "SP0010")
                 .ToArray();
 
             Assert.That(analysis.CompilationErrors, Is.Empty, family);
@@ -583,9 +583,9 @@ public class FuzzToolTests
                 AssertRequiredProperties(
                     purityDiagnostics,
                     family,
-                    SharpProofDiagnostics.ImpurityCategoryProperty,
-                    SharpProofDiagnostics.ImpurityRuleProperty,
-                    SharpProofDiagnostics.ImpurityOperationKindProperty);
+                    DiagnosticPropertyNames.ImpurityCategoryProperty,
+                    DiagnosticPropertyNames.ImpurityRuleProperty,
+                    DiagnosticPropertyNames.ImpurityOperationKindProperty);
 
             AssertRequiredProperties(
                 exceptionDiagnostics,
@@ -611,10 +611,10 @@ public class FuzzToolTests
         {
             var analysis = analyses[expectation.Family];
             var purityDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .Where(diagnostic => diagnostic.Id == "SP0002")
                 .ToArray();
             var exceptionDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+                .Where(diagnostic => diagnostic.Id == "SP0010")
                 .ToArray();
 
             Assert.That(analysis.CompilationErrors, Is.Empty, expectation.Family);
@@ -640,10 +640,10 @@ public class FuzzToolTests
             var registryEntry = RegistryEntriesById[family];
             var analysis = analyses[family];
             var purityDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .Where(diagnostic => diagnostic.Id == "SP0002")
                 .ToArray();
             var exceptionDiagnostics = analysis.Diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+                .Where(diagnostic => diagnostic.Id == "SP0010")
                 .ToArray();
 
             Assert.That(analysis.CompilationErrors, Is.Empty, family);
@@ -675,28 +675,28 @@ public class FuzzToolTests
     {
         var analysis = (await AnalyzeCachedRegistryFamiliesAsync())["ExceptionInvokedLocalFunctionThrow"];
         var exceptionDiagnostics = analysis.Diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(diagnostic => diagnostic.Id == "SP0010")
             .ToArray();
         var exceptionDiagnostic = exceptionDiagnostics
             .First(diagnostic =>
-                diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ExceptionTypesProperty) &&
-                diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ExceptionCategoriesProperty) &&
-                diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ExceptionSourcesProperty));
+                diagnostic.Properties.ContainsKey(DiagnosticPropertyNames.ExceptionTypesProperty) &&
+                diagnostic.Properties.ContainsKey(DiagnosticPropertyNames.ExceptionCategoriesProperty) &&
+                diagnostic.Properties.ContainsKey(DiagnosticPropertyNames.ExceptionSourcesProperty));
 
         Assert.That(analysis.CompilationErrors, Is.Empty);
         AssertRequiredProperties(
             exceptionDiagnostics,
             "ExceptionInvokedLocalFunctionThrow",
-            SharpProofDiagnostics.ExceptionTypesProperty,
-            SharpProofDiagnostics.ExceptionCategoriesProperty,
-            SharpProofDiagnostics.ExceptionSourcesProperty);
+            DiagnosticPropertyNames.ExceptionTypesProperty,
+            DiagnosticPropertyNames.ExceptionCategoriesProperty,
+            DiagnosticPropertyNames.ExceptionSourcesProperty);
 
-        if (exceptionDiagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var edges))
+        if (exceptionDiagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var edges))
         {
             Assert.That(string.IsNullOrWhiteSpace(edges), Is.False);
             Assert.That(
                 analysis.DiagnosticSignatures.Any(signature => signature.Contains(
-                    SharpProofDiagnostics.ExceptionEdgesProperty + "=" + edges,
+                    DiagnosticPropertyNames.ExceptionEdgesProperty + "=" + edges,
                     StringComparison.Ordinal)),
                 Is.True,
                 "Diagnostic signature should preserve sharpproof.exceptions.edges when the analyzer emits it.");
@@ -733,18 +733,18 @@ public class FuzzToolTests
                     Sp0002ExpectationKind.MayEmitConservatively,
                     Sp0010ExpectationKind.MustNotEmit,
                     ImmutableArray.Create(
-                        SharpProofDiagnostics.ImpurityCategoryProperty,
-                        SharpProofDiagnostics.ImpurityRuleProperty,
-                        SharpProofDiagnostics.ImpurityOperationKindProperty),
+                        DiagnosticPropertyNames.ImpurityCategoryProperty,
+                        DiagnosticPropertyNames.ImpurityRuleProperty,
+                        DiagnosticPropertyNames.ImpurityOperationKindProperty),
                     ImmutableArray.Create(
-                        SharpProofDiagnostics.ExceptionTypesProperty,
-                        SharpProofDiagnostics.ExceptionCategoriesProperty,
-                        SharpProofDiagnostics.ExceptionSourcesProperty),
+                        DiagnosticPropertyNames.ExceptionTypesProperty,
+                        DiagnosticPropertyNames.ExceptionCategoriesProperty,
+                        DiagnosticPropertyNames.ExceptionSourcesProperty),
                     ImmutableArray<string>.Empty));
 
             var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
             var exceptionDiagnostic =
-                analysis.Diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId);
+                analysis.Diagnostics.Single(diagnostic => diagnostic.Id == "SP0010");
             var summary = await ToolingFuzzTestRunner.RunCasesAsync(
                 ImmutableArray.Create(fuzzCase),
                 new FuzzOptions
@@ -761,9 +761,9 @@ public class FuzzToolTests
             AssertRequiredProperties(
                 new[] { exceptionDiagnostic },
                 fuzzCase.Family,
-                SharpProofDiagnostics.ExceptionTypesProperty,
-                SharpProofDiagnostics.ExceptionCategoriesProperty,
-                SharpProofDiagnostics.ExceptionSourcesProperty);
+                DiagnosticPropertyNames.ExceptionTypesProperty,
+                DiagnosticPropertyNames.ExceptionCategoriesProperty,
+                DiagnosticPropertyNames.ExceptionSourcesProperty);
             Assert.That(summary.FindingCount, Is.GreaterThan(0));
 
             var summaryPath = Path.Combine(outputDirectory, "summary.json");
@@ -780,12 +780,12 @@ public class FuzzToolTests
                     signature.Contains("SP0010", StringComparison.Ordinal));
             Assert.That(unexpectedSp0010Finding.Details, Does.Contain(expectedSignature));
 
-            if (exceptionDiagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var edges))
+            if (exceptionDiagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var edges))
             {
                 Assert.That(string.IsNullOrWhiteSpace(edges), Is.False);
                 Assert.That(
                     unexpectedSp0010Finding.Details.Any(detail => detail.Contains(
-                        SharpProofDiagnostics.ExceptionEdgesProperty + "=" + edges,
+                        DiagnosticPropertyNames.ExceptionEdgesProperty + "=" + edges,
                         StringComparison.Ordinal)),
                     Is.True,
                     "summary.json findings should preserve sharpproof.exceptions.edges when the analyzer emits it.");

@@ -108,7 +108,7 @@ return value.Value;
     {
         var test = ExactConcreteDispatchTestSources.CreateSource(hierarchy, signature, body);
         var (_, diagnostic) = await AnalyzerTestHost.AssertSingleSp0002Async(test);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 }

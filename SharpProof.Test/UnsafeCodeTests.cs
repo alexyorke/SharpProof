@@ -31,7 +31,7 @@ public class TestClass
 
         await VerifyUnsafeAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            VerifyCS.Diagnostic("SP0002")
                 .WithSpan("/0/Test1.cs", 8, 24, 8, 34)
                 .WithArguments("TestMethod"));
     }
@@ -60,7 +60,7 @@ public class TestClass
 
         await VerifyUnsafeAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            VerifyCS.Diagnostic("SP0002")
                 .WithSpan("/0/Test1.cs", 8, 31, 8, 41)
                 .WithArguments("TestMethod"));
     }

@@ -34,8 +34,8 @@ internal sealed class DiagnosticBaseline
     {
         if (_entries.IsDefaultOrEmpty) return false;
 
-        if (!TryGetProperty(diagnostic.Properties, SharpProofDiagnostics.BaselineSymbolProperty, out var symbolId) ||
-            !TryGetProperty(diagnostic.Properties, SharpProofDiagnostics.BaselinePathProperty, out var sourcePath))
+        if (!TryGetProperty(diagnostic.Properties, DiagnosticPropertyNames.BaselineSymbolProperty, out var symbolId) ||
+            !TryGetProperty(diagnostic.Properties, DiagnosticPropertyNames.BaselinePathProperty, out var sourcePath))
             return false;
 
         var symbolIds = GetDiagnosticSymbolIds(diagnostic.Properties, symbolId);
@@ -139,7 +139,7 @@ internal sealed class DiagnosticBaseline
     {
         var builder = ImmutableArray.CreateBuilder<string>();
         builder.Add(primarySymbolId);
-        if (TryGetProperty(properties, SharpProofDiagnostics.BaselineSymbolAliasesProperty, out var aliases))
+        if (TryGetProperty(properties, DiagnosticPropertyNames.BaselineSymbolAliasesProperty, out var aliases))
             foreach (var alias in aliases.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var trimmed = alias.Trim();
@@ -176,9 +176,9 @@ internal sealed class DiagnosticBaseline
                 normalizedSourcePath,
                 Line: line,
                 Column: column,
-                Contract: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineContractProperty),
-                OperationKind: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineOperationKindProperty),
-                EvidenceKey: GetOptionalProperty(diagnostic, SharpProofDiagnostics.BaselineEvidenceKeyProperty)),
+                Contract: GetOptionalProperty(diagnostic, DiagnosticPropertyNames.BaselineContractProperty),
+                OperationKind: GetOptionalProperty(diagnostic, DiagnosticPropertyNames.BaselineOperationKindProperty),
+                EvidenceKey: GetOptionalProperty(diagnostic, DiagnosticPropertyNames.BaselineEvidenceKeyProperty)),
             resolved.AbsolutePath);
     }
 

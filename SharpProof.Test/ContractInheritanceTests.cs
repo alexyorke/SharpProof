@@ -70,11 +70,11 @@ public sealed class ContractInheritanceTests
         var ids = diagnostics.Select(static diagnostic => diagnostic.Id).ToArray();
         Assert.Multiple(() =>
         {
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.AllocationInZeroAllocationMethodId));
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.CapabilityViolationId));
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.ComplexityExceededId));
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.EnsuresNotProvenId));
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.RequiresNotProvenId));
+            Assert.That(ids, Does.Contain("SP0013"));
+            Assert.That(ids, Does.Contain("SP0015"));
+            Assert.That(ids, Does.Contain("SP0021"));
+            Assert.That(ids, Does.Contain("SP0018"));
+            Assert.That(ids, Does.Contain("SP0027"));
         });
     }
 
@@ -117,7 +117,7 @@ public sealed class ContractInheritanceTests
             compilationName: "InheritedPurityOverload");
 
         var purityDiagnostic = diagnostics.Single(
-            static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+            static diagnostic => diagnostic.Id == "SP0002");
         var implementationStart = source.LastIndexOf("Read()", StringComparison.Ordinal);
 
         Assert.That(purityDiagnostic.Location.SourceSpan.Start, Is.EqualTo(implementationStart));
@@ -148,7 +148,7 @@ public sealed class ContractInheritanceTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.EnsuresNotProvenId));
+            Does.Contain("SP0018"));
     }
 
     [Test]
@@ -177,6 +177,6 @@ public sealed class ContractInheritanceTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.ConflictingPurityAttributesId));
+            Does.Contain("SP0005"));
     }
 }

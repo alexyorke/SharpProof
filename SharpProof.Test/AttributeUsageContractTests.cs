@@ -10,19 +10,19 @@ public sealed class AttributeUsageContractTests
     private static readonly BroadUsageAttributePolicy[] BroadUsagePolicies =
     {
         new(typeof(AllowedCapabilitiesAttribute), "[AllowedCapabilities(...)]",
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId),
+            "SP0017"),
         new(typeof(AllowedExceptionsAttribute), "[AllowedExceptions(...)]",
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId),
-        new(typeof(EnforcePureAttribute), "[EnforcePure]", SharpProofDiagnostics.MisplacedAttributeId),
-        new(typeof(EnsuresAttribute), "[Ensures(\"condition\")]", SharpProofDiagnostics.MisplacedEnsuresAttributeId),
+            "SP0031"),
+        new(typeof(EnforcePureAttribute), "[EnforcePure]", "SP0003"),
+        new(typeof(EnsuresAttribute), "[Ensures(\"condition\")]", "SP0020"),
         new(typeof(ExpectedComplexityAttribute), "[ExpectedComplexity(...)]",
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId),
+            "SP0023"),
         new(typeof(DoesNotThrowAttribute), "[DoesNotThrow]",
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeId),
-        new(typeof(PureAttribute), "[Pure]", SharpProofDiagnostics.MisplacedAttributeId),
-        new(typeof(RequiresAttribute), "[Requires(\"condition\")]", SharpProofDiagnostics.MisplacedRequiresAttributeId),
+            "SP0031"),
+        new(typeof(PureAttribute), "[Pure]", "SP0003"),
+        new(typeof(RequiresAttribute), "[Requires(\"condition\")]", "SP0029"),
         new(typeof(ZeroAllocationsAttribute), "[ZeroAllocations]",
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId)
+            "SP0014")
     };
 
     [Test]

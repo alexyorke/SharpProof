@@ -466,7 +466,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -496,7 +496,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -527,7 +527,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -555,7 +555,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -641,7 +641,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -799,8 +799,8 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                diagnostic.Id == "SP0002" &&
+                diagnostic.Properties.TryGetValue("sharpproof.impurity.symbol", out var symbol) &&
                 symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
             Is.False);
     }
@@ -830,7 +830,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -853,7 +853,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -878,8 +878,8 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionTypesProperty,
+                diagnostic.Id == "SP0010" &&
+                diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionTypesProperty,
                     out var exceptionTypes) &&
                 exceptionTypes?.Contains("System.DivideByZeroException", StringComparison.Ordinal) == true),
             Is.False);

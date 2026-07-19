@@ -106,7 +106,7 @@ namespace TestNamespace
 
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
                 .WithSpan(12, 21, 12, 31)
                 .WithArguments("TestMethod")
         };

@@ -62,13 +62,13 @@ internal static class TrustedBoundaryReviewAnalyzer
         foreach (var finding in session.GetTrustedBoundaryFindings())
         {
             var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.TrustedBoundarySymbolProperty, finding.SymbolDisplay)
-                .Add(SharpProofDiagnostics.TrustedBoundarySourceProperty, finding.Source)
-                .Add(SharpProofDiagnostics.TrustedBoundaryValueProperty, finding.Value)
-                .Add(SharpProofDiagnostics.TrustedBoundaryDispositionProperty, finding.Disposition)
-                .Add(SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty, finding.OverriddenBy)
-                .Add(SharpProofDiagnostics.TrustedBoundaryOverrideValueProperty, finding.OverrideValue)
-                .Add(SharpProofDiagnostics.TrustedBoundaryClassificationProperty, finding.Classification);
+                .Add("sharpproof.trusted_boundary.symbol", finding.SymbolDisplay)
+                .Add("sharpproof.trusted_boundary.source", finding.Source)
+                .Add("sharpproof.trusted_boundary.value", finding.Value)
+                .Add("sharpproof.trusted_boundary.disposition", finding.Disposition)
+                .Add("sharpproof.trusted_boundary.overridden_by", finding.OverriddenBy)
+                .Add("sharpproof.trusted_boundary.override_value", finding.OverrideValue)
+                .Add("sharpproof.trusted_boundary.classification", finding.Classification);
             if (finding.Location.SourceTree != null)
                 properties = BaselineDiagnosticProperties.Add(
                     properties,
@@ -81,7 +81,7 @@ internal static class TrustedBoundaryReviewAnalyzer
                 ? string.Empty
                 : $" by '{finding.OverriddenBy}'";
             var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.TrustedBoundaryReviewRule,
+                AnalyzerDiagnosticCatalog.Get("TrustedBoundaryReviewRule"),
                 finding.Location,
                 null,
                 properties,

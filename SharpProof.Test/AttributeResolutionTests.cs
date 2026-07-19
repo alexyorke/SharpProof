@@ -30,12 +30,12 @@ public class TestClass
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
         var identityDiagnostic = diagnostics.Single(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnrecognizedAttributeIdentityId);
-        Assert.That(identityDiagnostic.Properties[SharpProofDiagnostics.AttributeIdentityNameProperty],
+            diagnostic.Id == "SP0026");
+        Assert.That(identityDiagnostic.Properties["sharpproof.attribute_identity.name"],
             Is.EqualTo("EnforcePureAttribute"));
-        Assert.That(identityDiagnostic.Properties[SharpProofDiagnostics.AttributeIdentityNamespaceProperty],
+        Assert.That(identityDiagnostic.Properties["sharpproof.attribute_identity.namespace"],
             Is.EqualTo("<global>"));
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -70,9 +70,9 @@ public class TestClass
                 "Contracts"));
 
         Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UnrecognizedAttributeIdentityId),
+            diagnostics.Any(diagnostic => diagnostic.Id == "SP0026"),
             Is.False);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -102,12 +102,12 @@ public static class TestClass
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
         var identityDiagnostic = diagnostics.Single(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnrecognizedAttributeIdentityId);
-        Assert.That(identityDiagnostic.Properties[SharpProofDiagnostics.AttributeIdentityNameProperty],
+            diagnostic.Id == "SP0026");
+        Assert.That(identityDiagnostic.Properties["sharpproof.attribute_identity.name"],
             Is.EqualTo("PureAttribute"));
-        Assert.That(identityDiagnostic.Properties[SharpProofDiagnostics.AttributeIdentityNamespaceProperty],
+        Assert.That(identityDiagnostic.Properties["sharpproof.attribute_identity.namespace"],
             Is.EqualTo("External"));
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 }

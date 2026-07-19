@@ -100,7 +100,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(
             diagnostic,
@@ -138,7 +138,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_double_dispose", "MethodInvocationPurityRule",
             "symbolic_resource_lifetime", "PureDisposable.Dispose");
@@ -178,7 +178,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule",
             "symbolic_resource_lifetime", "PureDisposable.Use");
@@ -219,7 +219,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule",
             "symbolic_resource_lifetime", "PureDisposable.Use");
@@ -258,7 +258,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule",
             "symbolic_resource_lifetime", "PureDisposable.Use");
@@ -300,7 +300,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule",
             "symbolic_resource_lifetime", "PureDisposable.Use");
@@ -331,7 +331,7 @@ public sealed class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         AssertSp0002Evidence(diagnostic, "resource_missing_dispose", "ResourceLifetimeAnalysis",
             "symbolic_resource_lifetime", "resource");
@@ -363,7 +363,7 @@ public sealed class TestClass
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
         Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId));
+            diagnostic.Id == "SP0002"));
     }
 
     [Test]
@@ -393,16 +393,16 @@ public class TestClass
                     "named:System.Int32")));
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("config_known_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.CustomApi"));
     }
 
@@ -428,14 +428,14 @@ public class TestClass
                     "named:System.Int32")));
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("KnownImpureMethod"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty], Is.EqualTo("KnownImpureMethod"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("config_known_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.TestMethod"));
     }
 
@@ -463,15 +463,15 @@ public class TestClass
                 "Boundary"));
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("known_impure_namespace_or_type"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("Boundary.Value"));
     }
 
@@ -495,15 +495,15 @@ public class TestClass
                 "System.Math"));
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("known_impure_namespace_or_type"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Math.Abs"));
     }
 
@@ -533,7 +533,7 @@ public class TestClass
                         parameters: new[] { ("none", "named:System.Int32") })));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Configured pure member should override a configured impure type for the same member.");
     }
@@ -563,7 +563,7 @@ public class TestClass
                         "named:System.Net.IPAddress")));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Configured pure property should override a configured impure namespace for the same member.");
     }
@@ -596,7 +596,7 @@ public class TestClass
         var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should keep SHA256.HashData(ReadOnlySpan<byte>) out of the impure cryptography namespace fallback.");
         Assert.That(resolution.Matched, Is.True,
@@ -630,7 +630,7 @@ public class TestClass
         var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Uri.IsWellFormedUriString even when the symbol resolves through a facade assembly.");
         Assert.That(resolution.Matched, Is.True,
@@ -666,7 +666,7 @@ public class TestClass
         var matched = invocations.Select(symbol => ResolveGeneratedPurity(symbol, compilation).Matched).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Uri.EscapeDataString and Uri.UnescapeDataString when the symbol resolves through a facade assembly.");
         Assert.That(matched, Is.EqualTo(new[] { true, true }),
@@ -690,7 +690,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -707,7 +707,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve System.Uri.ToString().");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -731,7 +731,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -747,9 +747,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("InterpolatedStringPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve System.Uri.ToString() for interpolation too.");
@@ -790,7 +790,7 @@ public class TestClass
         var matched = resolution.Matched;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow OperatingSystem.IsWindows.");
         Assert.That(matched, Is.True,
@@ -831,21 +831,21 @@ public class TestClass
         var getter = propertySymbol.GetMethod!;
         var resolution = ResolveGeneratedPurity(getter, compilation);
         var matched = resolution.Matched;
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Generated runtime evidence should treat AppContext.TargetFrameworkName as an impure ambient read.");
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve AppContext.TargetFrameworkName.get to its runtime implementation assembly.");
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.AppContext.TargetFrameworkName"));
     }
 
@@ -892,7 +892,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Environment.Is64BitProcess, Environment.Is64BitOperatingSystem, and Environment.NewLine.");
         Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
@@ -958,7 +958,7 @@ public class TestClass
                 return (matched, classification);
             });
 
-        Assert.That(diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(candidate => candidate.Id == "SP0002"), Is.False);
         Assert.That(classifications["Comparer<int>.Default"].matched, Is.True);
         Assert.That(classifications["Comparer<int>.Default"].classification, Is.EqualTo("pure"));
         Assert.That(classifications["EqualityComparer<int>.Default"].matched, Is.True);
@@ -1011,7 +1011,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow CancellationToken.None even under the System.Threading namespace fallback.");
         Assert.That(matched, Is.True);
@@ -1034,15 +1034,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.Tasks.Task.Delay"));
     }
 
@@ -1062,15 +1062,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("caller_visible_memory_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.Tasks.Task.Run"));
     }
 
@@ -1090,13 +1090,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.CancellationToken.IsCancellationRequested.get"));
     }
 
@@ -1116,13 +1116,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.Tasks.Task.IsCompleted.get"));
     }
 
@@ -1161,7 +1161,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow IPAddress.IsLoopback(System.Net.IPAddress).");
         Assert.That(matched, Is.True,
@@ -1187,7 +1187,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1205,7 +1205,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve System.Net.IPEndPoint..ctor(System.Net.IPAddress, int).");
@@ -1239,7 +1239,7 @@ public class TestClass
                 FormatJsonArray("object_state_write", "throw")));
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1258,7 +1258,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve System.Runtime.Versioning.FrameworkName..ctor(string).");
@@ -1328,8 +1328,8 @@ public class TestClass
                 });
 
         Assert.That(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-                .Select(candidate => candidate.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+            diagnostics.Where(candidate => candidate.Id == "SP0002")
+                .Select(candidate => candidate.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }),
             "AggregateException constructor and Flatten should now diagnose via reviewed generated runtime evidence.");
@@ -1443,7 +1443,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Nullable<T>.GetValueOrDefault overloads.");
         Assert.That(classifications["value.GetValueOrDefault()"].matched, Is.True);
@@ -1562,7 +1562,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the argument guard helpers backed by runtime summaries.");
         Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
@@ -1586,7 +1586,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1604,9 +1604,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.get.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -1630,7 +1630,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1647,13 +1647,13 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Directory.GetCurrentDirectory"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Directory.GetCurrentDirectory().");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -1677,7 +1677,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1696,11 +1696,11 @@ public class TestClass
         var classification = resolution.Classification;
         var primaryCategory = resolution.PrimaryCategory;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Environment.CurrentDirectory.set"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.set.");
         Assert.That(classification, Is.EqualTo("impure"));
@@ -1724,7 +1724,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1742,11 +1742,11 @@ public class TestClass
         var classification = resolution.Classification;
         var primaryCategory = resolution.PrimaryCategory;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Directory.SetCurrentDirectory"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Directory.SetCurrentDirectory(string).");
         Assert.That(classification, Is.EqualTo("impure"));
@@ -1770,7 +1770,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1787,11 +1787,11 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Directory.Exists"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Directory.Exists(string).");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -1815,7 +1815,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1832,11 +1832,11 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.File.Exists"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve File.Exists(string).");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -1860,7 +1860,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1877,11 +1877,11 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Directory.CreateDirectory"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Directory.CreateDirectory(string).");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -1905,7 +1905,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -1922,11 +1922,11 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Directory.CreateTempSubdirectory"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Directory.CreateTempSubdirectory(string).");
@@ -1978,7 +1978,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -2012,7 +2012,7 @@ public class TestClass
         Assert.That(
             purityDiagnostics.All(diagnostic =>
                 string.Equals(
-                    diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+                    diagnostic.Properties["sharpproof.impurity.catalog_source"],
                     "generated_purity_summary",
                     StringComparison.Ordinal)),
             Is.True);
@@ -2046,7 +2046,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2063,7 +2063,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.GetFolderPath.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -2088,7 +2088,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2105,7 +2105,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Environment.GetEnvironmentVariable(string).");
@@ -2131,7 +2131,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2148,7 +2148,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.GetEnvironmentVariables().");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -2173,7 +2173,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2190,7 +2190,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Environment.GetEnvironmentVariables(EnvironmentVariableTarget).");
@@ -2215,7 +2215,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2232,7 +2232,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Environment.SetEnvironmentVariable(string, string).");
@@ -2257,7 +2257,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2274,7 +2274,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Environment.SetEnvironmentVariable(string, string, EnvironmentVariableTarget).");
@@ -2299,7 +2299,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2316,9 +2316,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Environment.ExpandEnvironmentVariables(string).");
@@ -2386,7 +2386,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -2476,7 +2476,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(8));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -2505,7 +2505,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -2524,7 +2524,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.PurityNotVerifiedId));
+        Assert.That(diagnostic.Id, Is.EqualTo("SP0002"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve System.Globalization.CultureInfo.Name.get.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -2617,7 +2617,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -2739,7 +2739,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(12));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -2871,7 +2871,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -3005,7 +3005,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(18));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -3078,7 +3078,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -3152,7 +3152,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(8));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -3225,7 +3225,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -3299,7 +3299,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(8));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -3328,7 +3328,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3346,7 +3346,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CommandLine.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3370,7 +3370,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3388,7 +3388,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.Version.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3412,7 +3412,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3429,9 +3429,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Globalization.CultureInfo.GetCultureInfo(string)"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve CultureInfo.GetCultureInfo(string).");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3455,7 +3455,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3473,7 +3473,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.ProcessId.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3497,7 +3497,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3514,9 +3514,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Convert.ChangeType"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Convert.ChangeType(object, System.Type).");
@@ -3542,7 +3542,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CreateGeneratedPurityProbeCompilation(syntaxTree);
         var invocation = syntaxTree.GetRoot()
@@ -3552,7 +3552,7 @@ public class TestClass
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
         var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Runtime.InteropServices.Marshal.PtrToStructure"));
         Assert.That(resolution.Matched, Is.True,
             "Generated purity catalog should resolve Marshal.PtrToStructure<T>(IntPtr).");
@@ -3577,11 +3577,11 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var probe = CreateGeneratedPurityProbeContext(source);
         var resolution = ResolveGeneratedPurityByExpressionText(probe, "principal.IsInRole(\"admin\")");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Security.Claims.ClaimsPrincipal.IsInRole"));
         Assert.That(resolution.Matched, Is.True,
             "Generated purity catalog should resolve ClaimsPrincipal.IsInRole(string).");
@@ -3637,7 +3637,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -3699,7 +3699,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -3728,7 +3728,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3746,7 +3746,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.SystemDirectory.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3770,7 +3770,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3788,7 +3788,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.UserInteractive.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3812,7 +3812,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -3830,7 +3830,7 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.UserName.");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -3870,7 +3870,7 @@ public class TestClass
             .ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Version constructors, comparisons, and getters.");
         Assert.That(matched, Is.EqualTo(new[] { true, true, true, true }),
@@ -3912,7 +3912,7 @@ public class TestClass
         var freshnessClassification = resolution.FreshnessClassification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow BitConverter.GetBytes(int) without the manual pure catalog.");
         Assert.That(matched, Is.True,
@@ -3958,7 +3958,7 @@ public class TestClass
         var effectVisibilityClassification = resolution.EffectVisibilityClassification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow standalone Array.Empty<int>() invocations without the manual pure catalog.");
         Assert.That(matched, Is.True,
@@ -4001,7 +4001,7 @@ public class TestClass
         var matched = resolution.Matched;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Type.GetTypeFromHandle(RuntimeTypeHandle).");
         Assert.That(matched, Is.True,
@@ -4045,7 +4045,7 @@ public class TestClass
             .ToDictionary(entry => entry.Expression, entry => entry.Resolution);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Type.Equals(Type), Type.Equals(object), and Type.GetHashCode().");
         Assert.That(classifications["left.Equals(right)"].Matched, Is.True);
@@ -4095,7 +4095,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow object.GetType() as metadata-only read.");
         Assert.That(matched, Is.EqualTo(new[] { true }),
@@ -4219,7 +4219,7 @@ public class TestClass
             StringComparer.Ordinal);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the reviewed System.Type metadata getters.");
         Assert.That(resolutions["type.DeclaringMethod"], Is.EqualTo((true, "pure")));
@@ -4294,7 +4294,7 @@ public class TestClass
         var matched = resolution.Matched;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Path.Combine(string, string).");
         Assert.That(matched, Is.True,
@@ -4334,7 +4334,7 @@ public class TestClass
         var matched = resolution.Matched;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Path.GetFileName(string).");
         Assert.That(matched, Is.True,
@@ -4405,7 +4405,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow object.ReferenceEquals, ArraySegment constructors, Tuple.Create, and ValueTuple.Create.");
         Assert.That(matched, Is.EqualTo(new[] { true, true, true, true, true }),
@@ -4495,7 +4495,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the probed core constructors and value-type constructors.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
@@ -4553,7 +4553,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the tracked exception constructors.");
         Assert.That(matched, Is.EqualTo(new[] { true, true }),
@@ -4629,7 +4629,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the tracked DateTime stable getters.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
@@ -4684,7 +4684,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -4758,7 +4758,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         foreach (var label in classifications.Keys)
@@ -4829,7 +4829,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow StringBuilder.Length and HttpResponseMessage.IsSuccessStatusCode.");
         Assert.That(resolutions.Select(result => result.matched).ToArray(), Is.EqualTo(new[] { true, true }),
@@ -4870,7 +4870,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -4923,11 +4923,11 @@ public class TestClass
             .Where(expressionText => expressionText != "char.ConvertToUtf32(value, other)")
             .ToArray();
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("char.ConvertToUtf32(char, char)"));
         foreach (var expressionText in pureTrackedExpressions)
         {
@@ -4960,7 +4960,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -4977,11 +4977,11 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("char.ConvertFromUtf32(int)"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve char.ConvertFromUtf32(int).");
         Assert.That(classification, Is.EqualTo("impure"),
@@ -5061,7 +5061,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the implicit HashCode constructor, HashCode.ToHashCode, and Index getters.");
         Assert.That(matched, Is.EqualTo(new[] { true, true, true, true, true }),
@@ -5104,7 +5104,7 @@ public class TestClass
             .ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the tracked span and MemoryMarshal helpers.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, matched.Length).ToArray()),
@@ -5178,7 +5178,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow the tracked ReadOnlySequence helpers and Slice(long).");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -5225,7 +5225,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow List<T>.Capacity.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -5262,7 +5262,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -5295,17 +5295,17 @@ public class TestClass
                 return (matched, classification, primaryCategory, categories, freshnessClassification);
             });
         var impuritySymbols = purityDiagnostics
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "ObjectCreationPurityRule" }));
         Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.List<int>.List()"));
@@ -5363,7 +5363,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -5382,9 +5382,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("Capacity.set"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("Capacity.set"));
         Assert.That(matched, Is.True, "Generated purity catalog should resolve List<T>.Capacity.set.");
         Assert.That(classification, Is.EqualTo("impure"),
             "List<T>.Capacity.set mutates list state and should remain generated impure.");
@@ -5426,7 +5426,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow List<T>.FindIndex.");
         Assert.That(matched, Is.True,
@@ -5485,7 +5485,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -5518,17 +5518,17 @@ public class TestClass
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(trackedExpressions.Length));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "MethodInvocationPurityRule" }));
         Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.List<T>.Add(T)"));
@@ -5613,7 +5613,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -5644,17 +5644,17 @@ public class TestClass
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "MethodInvocationPurityRule" }));
         Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.Queue<T>.Enqueue(T)"));
@@ -5693,7 +5693,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -5726,7 +5726,7 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
 
@@ -5977,7 +5977,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -6017,15 +6017,15 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain(
                 "System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()"));
         Assert.That(
             classifications[
@@ -6059,7 +6059,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -6098,14 +6098,14 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue"));
         Assert.That(classifications["System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)"],
             Is.EqualTo((true, "impure")));
@@ -6155,7 +6155,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -6216,23 +6216,23 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(5));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.BlockingCollection<T>.Add(T)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.BlockingCollection<T>.Take()"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.ConcurrentBag<T>.Add(T)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)"));
         Assert.That(
             classifications["System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)"],
@@ -6263,15 +6263,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ObjectCreationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.DiagnosticListener.DiagnosticListener(string)"));
     }
 
@@ -6397,7 +6397,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -6444,17 +6444,17 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Generic.SortedSet<T>.Add(T)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.BitArray.Set(int, bool)"));
         Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)"],
             Is.EqualTo((true, "impure")));
@@ -6493,7 +6493,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -6541,14 +6541,14 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Array.ConvertAll"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Array.Sort"));
         Assert.That(
             classifications["System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)"],
@@ -6619,7 +6619,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CreateGeneratedPurityProbeCompilation(syntaxTree);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -6668,7 +6668,7 @@ public class TestClass
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
                 .OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
             Is.EqualTo(new[]
             {
@@ -6728,7 +6728,7 @@ public class TestClass
         }).ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow EmailAddressAttribute..ctor().");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -6762,7 +6762,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -6788,17 +6788,17 @@ public class TestClass
             return (matched, classification);
         }).ToArray();
         var impuritySymbols = purityDiagnostics
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "MethodInvocationPurityRule" }));
         Assert.That(impuritySymbols, Has.Some.Contain("System.DateTime.ToFileTime()"));
@@ -6843,7 +6843,7 @@ public class TestClass
             .ToArray();
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow these component-model attribute constructors.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, matched.Length).ToArray()),
@@ -6868,18 +6868,18 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var probe = CreateGeneratedPurityProbeContext(source);
         var resolution = ResolveGeneratedPurityByExpressionText(
             probe,
             "new RegularExpressionAttribute(\"^[a-z]+$\")");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ObjectCreationPurityRule"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain(
                 "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)"));
         Assert.That(resolution.Matched, Is.True,
@@ -6919,7 +6919,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -6949,17 +6949,17 @@ public class TestClass
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "ObjectCreationPurityRule" }));
         Assert.That(impuritySymbols,
@@ -7024,7 +7024,7 @@ public class TestClass
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
             "Generated purity catalog should resolve decimal.Negate.");
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow decimal.Negate.");
     }
@@ -7058,7 +7058,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -7093,10 +7093,10 @@ public class TestClass
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
         Assert.That(
-            purityDiagnostics[0].Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            purityDiagnostics[0].Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(
-            purityDiagnostics[0].Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            purityDiagnostics[0].Properties["sharpproof.impurity.symbol"],
             Does.Contain("decimal.ToInt32(decimal)"));
 
         Assert.That(resolutions["decimal.Compare(left, right)"].matched, Is.True);
@@ -7157,7 +7157,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Count(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Count(candidate => candidate.Id == "SP0002"),
             Is.EqualTo(1),
             "Runtime-derived array summaries should keep Array.Find impure while allowing Array.FindIndex through generated purity evidence.");
         Assert.That(classifications["Array.Find(values, static value => value > 0)"].matched, Is.True,
@@ -7222,7 +7222,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Generated array predicate summaries should allow Exists and TrueForAll without the manual pure catalog.");
         Assert.That(classifications["Array.Exists(values, static value => value > 0)"].matched, Is.True,
@@ -7286,7 +7286,7 @@ public class TestClass
 
         Assert.That(trackedMethods, Has.Length.EqualTo(2));
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Array.IndexOf and Array.Length.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -7329,7 +7329,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Generated runtime summary should report Array.GetLength as potentially throwing.");
         Assert.That(matched, Is.True,
@@ -7375,7 +7375,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Array.GetEnumerator.");
         Assert.That(matched, Is.True,
@@ -7404,7 +7404,7 @@ public class TestClass
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Array receivers cast to IEnumerable should narrow back to the trusted Array.GetEnumerator runtime helper.");
     }
@@ -7429,7 +7429,7 @@ public class TestClass
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Array receivers cast to IEnumerable<T> should narrow back to the trusted Array.GetEnumerator runtime helper.");
     }
@@ -7476,7 +7476,7 @@ public class TestClass
 
         Assert.That(trackedMethods, Has.Length.EqualTo(2));
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow Contract.Requires and Contract.Ensures.");
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -7520,7 +7520,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Runtime-derived array binary search summary should no longer allow Array.BinarySearch as a hard-coded pure helper.");
         Assert.That(matched, Is.True,
@@ -7566,7 +7566,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Runtime-derived SortedSet summary should no longer allow GetViewBetween as a hard-coded pure helper.");
         Assert.That(matched, Is.True,
@@ -7630,7 +7630,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow SortedList<TKey, TValue>.IndexOfKey and LinkedListNode<T>.Value.");
         Assert.That(classifications["System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)"].matched,
@@ -7671,7 +7671,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId).ToArray();
+            .Where(diagnostic => diagnostic.Id == "SP0002").ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -7710,14 +7710,14 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty])
+                .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.catalog_source"])
                 .Distinct().ToArray(),
             Is.EqualTo(new[] { "generated_purity_summary" }));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Generic.LinkedList<T>.AddFirst(T)"));
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty]),
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"]),
             Has.Some.Contain("System.Collections.Generic.LinkedListNode<T>.Value.set"));
 
         Assert.That(classifications["System.Collections.Generic.LinkedList<T>.AddFirst(T)"].matched, Is.True,
@@ -7803,7 +7803,7 @@ public class TestClass<TKey, TValue>
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow KeyValuePair<TKey, TValue> ctor and accessors.");
         foreach (var label in classifications.Keys)
@@ -7881,7 +7881,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "SortedDictionary lookup helpers should stay semantically pure for builtin keys and values after removing the static pure catalog entries.");
         Assert.That(
@@ -7993,7 +7993,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Count(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Count(candidate => candidate.Id == "SP0002"),
             Is.EqualTo(4),
             "Concrete Dictionary/SortedDictionary view getters should still report diagnostics after moving off the static impure catalog.");
         foreach (var label in classifications.Keys)
@@ -8091,7 +8091,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Unknown ICollection<T> contract dispatch should become conservative once the static pure fallback is removed.");
         Assert.That(classifications["System.Collections.Generic.ICollection<T>.Contains(T)"].matched, Is.True,
@@ -8228,7 +8228,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Unknown ICollection<T>/IList<T> mutator dispatch should remain conservative once the static impure fallback is removed.");
         foreach (var label in classifications.Keys)
@@ -8312,7 +8312,7 @@ public class TestClass
             });
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "Unknown IEnumerable<T>/IEnumerator<T> contract dispatch should become conservative once the static pure fallback is removed.");
         Assert.That(classifications["System.Collections.Generic.IEnumerable<T>.GetEnumerator()"].matched, Is.True,
@@ -8358,7 +8358,7 @@ public class TestClass
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
         var purityDiagnostics = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(candidate => candidate.Id == "SP0002")
             .ToArray();
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
@@ -8408,12 +8408,12 @@ public class TestClass
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
             purityDiagnostics
-                .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty]).Distinct()
+                .Select(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty]).Distinct()
                 .ToArray(),
             Is.EqualTo(new[] { "unknown_external_call" }),
             "Open virtual dispatch on overridable Hashtable/SortedList members should remain conservative even though the base methods have reviewed generated summaries.");
         Assert.That(
-            purityDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            purityDiagnostics.Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
                 .OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
             Is.EqualTo(new[]
             {
@@ -8422,7 +8422,7 @@ public class TestClass
             }));
         Assert.That(
             purityDiagnostics.All(diagnostic =>
-                !diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty)),
+                !diagnostic.Properties.ContainsKey("sharpproof.impurity.catalog_source")),
             Is.True,
             "These diagnostics should come from conservative open virtual dispatch, not from directly trusting the base-method runtime summary at the call site.");
 
@@ -8476,7 +8476,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.True,
             "KeyedCollection<TKey, TItem>.Contains should no longer be globally trusted as pure when it dispatches through runtime hooks.");
         Assert.That(matched, Is.True,
@@ -8521,7 +8521,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow SortedDictionary<TKey, TValue>.Count.");
         Assert.That(matched, Is.True,
@@ -8561,9 +8561,9 @@ public class TestClass
                         "[\"dynamic_dispatch\"]",
                         displaySymbol))));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCategoryProperty), Is.True);
+        Assert.That(diagnostic.Properties.ContainsKey(DiagnosticPropertyNames.ImpurityCategoryProperty), Is.True);
     }
 
     [Test]
@@ -8582,15 +8582,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.AppContext.SetSwitch"));
     }
 
@@ -8610,15 +8610,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("caller_visible_memory_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)"));
     }
 
@@ -8638,15 +8638,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("caller_visible_memory_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.Queue<T>.TryPeek(out T)"));
     }
 
@@ -8665,13 +8665,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.Dictionary<TKey, TValue>.Clear()"));
     }
 
@@ -8691,13 +8691,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.Dictionary<TKey, TValue>.Add(TKey, TValue)"));
     }
 
@@ -8717,13 +8717,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)"));
     }
 
@@ -8743,13 +8743,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.Dictionary<TKey, TValue>.TryAdd(TKey, TValue)"));
     }
 
@@ -8769,15 +8769,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("caller_visible_memory_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Find"));
     }
 
@@ -8798,13 +8798,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.BinarySearch"));
     }
 
@@ -8824,13 +8824,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Copy(System.Array, int, System.Array, int, int)"));
     }
 
@@ -8849,13 +8849,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.CopyTo(System.Array, int)"));
     }
 
@@ -8875,13 +8875,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Copy(System.Array, System.Array, int)"));
     }
 
@@ -8901,13 +8901,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)"));
     }
 
@@ -8927,13 +8927,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Clear(System.Array)"));
     }
 
@@ -8953,13 +8953,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Clear(System.Array, int, int)"));
     }
 
@@ -8979,13 +8979,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Fill"));
     }
 
@@ -9006,15 +9006,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("caller_visible_memory_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Array.Resize"));
     }
 
@@ -9034,13 +9034,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"));
     }
 
@@ -9061,9 +9061,9 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.SortedSet<int>.GetViewBetween"));
     }
 
@@ -9084,7 +9084,7 @@ public class TestClass
 }");
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "AppDomain.CurrentDomain now resolves as pure from runtime-generated summaries and should not raise SP0002.");
     }
@@ -9105,15 +9105,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.AppDomain.BaseDirectory.get"));
     }
 
@@ -9133,15 +9133,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.AppDomain.FriendlyName.get"));
     }
 
@@ -9161,14 +9161,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.Stopwatch.GetTimestamp"));
     }
 
@@ -9197,15 +9197,15 @@ public class TestClass
     }
 }", additionalFiles: additionalFiles);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("object_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ObjectCreationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Runtime.Versioning.FrameworkName"));
     }
 
@@ -9244,7 +9244,7 @@ public class TestClass
         var classification = resolution.Classification;
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should allow new Stopwatch() when the constructor only initializes fresh-owned state.");
         Assert.That(matched, Is.True, "Generated purity catalog should resolve Stopwatch..ctor().");
@@ -9267,14 +9267,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.Stopwatch.ElapsedTicks.get"));
     }
 
@@ -9294,14 +9294,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.Stopwatch.Start"));
     }
 
@@ -9322,7 +9322,7 @@ public class TestClass
 }";
 
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityProbe",
@@ -9339,9 +9339,9 @@ public class TestClass
         var matched = resolution.Matched;
         var classification = resolution.Classification;
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Stopwatch static fields from the runtime static constructor.");
@@ -9365,13 +9365,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.Stopwatch"));
     }
 
@@ -9391,13 +9391,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Diagnostics.Stopwatch"));
     }
 
@@ -9418,7 +9418,7 @@ public class TestClass
 }");
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "TimeProvider.System now resolves as pure from runtime-generated summaries and should not raise SP0002.");
     }
@@ -9439,14 +9439,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.impurity.catalog_source"), Is.False);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.TimeProvider.LocalTimeZone.get"));
     }
 
@@ -9466,14 +9466,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.TimeZoneInfo.FindSystemTimeZoneById"));
     }
 
@@ -9493,15 +9493,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)"));
     }
 
@@ -9521,14 +9521,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Guid.NewGuid"));
     }
 
@@ -9548,14 +9548,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Path.GetFullPath"));
     }
 
@@ -9575,15 +9575,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.IO.Path.GetTempPath"));
     }
 
@@ -9606,15 +9606,15 @@ public class TestClass
             additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(
                 MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Configuration.ConfigurationManager.AppSettings"));
     }
 
@@ -9637,15 +9637,15 @@ public class TestClass
             additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(
                 MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Configuration.ConfigurationManager.ConnectionStrings"));
     }
 
@@ -9665,15 +9665,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Timers.Timer.Start"));
     }
 
@@ -9693,15 +9693,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Timers.Timer.Stop"));
     }
 
@@ -9736,13 +9736,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Runtime.InteropServices.SafeHandle.Dispose"));
     }
 
@@ -9763,15 +9763,15 @@ public class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Reflection.AssemblyName.GetAssemblyName"));
     }
 
@@ -9790,15 +9790,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Immutable.ImmutableQueue"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("Dequeue"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("Dequeue"));
     }
 
     [Test]
@@ -9818,7 +9818,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -9838,7 +9838,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -9858,7 +9858,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -9878,7 +9878,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -9928,7 +9928,7 @@ public class TestClass
             "object.Equals(left, right)");
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Generated purity summary evidence should allow AddingNewEventArgs() and object.Equals(object, object).");
         Assert.That(resolutions.Select(result => result.Matched).ToArray(), Is.EqualTo(new[] { true, true }),
@@ -9963,7 +9963,7 @@ public class TestClass
 }",
             additionalFiles: additionalFiles);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -10026,7 +10026,7 @@ public class TestClass
 }",
             additionalFiles: additionalFiles);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -10046,15 +10046,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Immutable.ImmutableStack"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("Pop"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("Pop"));
     }
 
     [Test]
@@ -10073,15 +10073,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.HashSet"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("Add"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("Add"));
     }
 
     [Test]
@@ -10142,14 +10142,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("double.Parse"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("double.Parse"));
     }
 
     public async Task Sp0002_CurrentCultureNumericFormat_UsesSemanticCatalogSource()
@@ -10167,14 +10167,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("double.ToString"));
     }
 
@@ -10194,14 +10194,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.DateOnly.ParseExact"));
     }
 
@@ -10223,14 +10223,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.DateTimeOffset.Parse"));
     }
 
@@ -10252,14 +10252,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.DateTime.TryParseExact"));
     }
 
@@ -10281,14 +10281,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.DateTimeOffset.TryParseExact"));
     }
 
@@ -10308,14 +10308,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.DateTime.ToLongDateString"));
     }
 
@@ -10345,7 +10345,7 @@ public class TestClass
                         genericArity: 1)));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Configured pure generic method should override a configured impure type for the same member.");
     }
@@ -10375,7 +10375,7 @@ public class TestClass
                         "tparam:0")));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Configured pure generic value-type property should override a configured impure type for the same member.");
     }
@@ -10403,14 +10403,14 @@ public class TestClass
 }");
 
         var callerDiagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'Caller'", StringComparison.Ordinal));
 
-        Assert.That(callerDiagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(callerDiagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("catalog_hit"));
-        Assert.That(callerDiagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(callerDiagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.Callee"));
-        Assert.That(callerDiagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(callerDiagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -10430,11 +10430,11 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unresolved_delegate_target"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Action.Invoke"));
     }
 
@@ -10453,11 +10453,11 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
             Is.EqualTo("DynamicInvocation"));
     }
 
@@ -10476,13 +10476,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("BinaryOperationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Binary"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty], Is.EqualTo("Binary"));
     }
 
     [Test]
@@ -10500,13 +10500,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("UnaryOperationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Unary"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty], Is.EqualTo("Unary"));
     }
 
     [Test]
@@ -10529,14 +10529,14 @@ public class WorkerHost
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.impurity.catalog_source"), Is.False);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("IWorker.Compute"));
     }
 
@@ -10564,16 +10564,16 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"));
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unknown_external_call"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("NativeMethods.ReadValue"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("extern"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"], Is.EqualTo("extern"));
 
-        var explanationDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityExplanationId);
+        var explanationDiagnostic = SingleDiagnostic(diagnostics, "SP0009");
         Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("unverified external call at"));
         Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("NativeMethods.ReadValue"));
         Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("unknown_external_call"));
@@ -10600,31 +10600,31 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackConfidenceProperty], Is.EqualTo("low"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("probably_pure"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.confidence"], Is.EqualTo("low"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("value_return_no_ref_or_out"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
             Is.EqualTo("purity.library_model_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.category"],
             Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedLibraryModel.ToString()));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.source"],
             Is.EqualTo(SymbolicUnknownReasonSource.Purity.ToString()));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonRawProperty],
+        Assert.That(diagnostic.Properties["sharpproof.unknown.raw_reason"],
             Is.EqualTo("value_return_no_ref_or_out"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("value-like result without ref or out parameters"));
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Not.Contain("value_return_no_ref_or_out"));
 
-        var explanationDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityExplanationId);
+        var explanationDiagnostic = SingleDiagnostic(diagnostics, "SP0009");
         Assert.That(explanationDiagnostic.GetMessage(),
             Does.Contain("non-authoritative BCL fallback guess probably_pure"));
         Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("with BCL fallback "));
@@ -10650,7 +10650,7 @@ public class TestClass
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId),
+            diagnostics.Any(candidate => candidate.Id == "SP0004"),
             Is.False);
     }
 
@@ -10675,11 +10675,11 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_bcl_fallback_guesses", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        Assert.That(diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityExplanationId), Is.False);
-        Assert.That(SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId)
-            .Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
+        Assert.That(diagnostics.Any(candidate => candidate.Id == "SP0009"), Is.False);
+        Assert.That(SingleDiagnostic(diagnostics, "SP0002")
+            .Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("probably_pure"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
     }
 
@@ -10704,18 +10704,18 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"],
             Is.EqualTo("probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("void_returning_metadata_method"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_impure"));
     }
 
@@ -10740,17 +10740,17 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("reference_returning_instance_metadata_method"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("unknown"));
     }
 
@@ -10775,17 +10775,17 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("probably_pure"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("value_type_constructor_value_like_parameters"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
     }
 
@@ -10810,17 +10810,17 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("probably_pure"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("metadata_getter_value_like_return"));
 
-        var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
+        var fallbackDiagnostic = SingleDiagnostic(diagnostics, "SP0012");
         Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
     }
 
@@ -10845,15 +10845,15 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"],
             Is.EqualTo("probably_impure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("mutable_metadata_field"));
     }
 
@@ -10878,14 +10878,14 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("bcl_heuristic_fallback"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.guess"], Is.EqualTo("probably_pure"));
+        Assert.That(diagnostic.Properties["sharpproof.bcl_fallback.reason"],
             Is.EqualTo("readonly_metadata_field_value_like"));
     }
 
@@ -10918,14 +10918,14 @@ public class TestClass
                         "[\"metadata_only_or_external\"]"))),
             additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("metadata_only_or_external"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.BclFallbackGuessProperty), Is.False);
-        Assert.That(diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.BclFallbackGuessId), Is.False);
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.bcl_fallback.guess"), Is.False);
+        Assert.That(diagnostics.Any(candidate => candidate.Id == "SP0012"), Is.False);
     }
 
     [Test]
@@ -10945,15 +10945,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("AssignmentPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("analyzer.mutation.caller-visible"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass._value"));
     }
 
@@ -10974,15 +10974,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_escape"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ReturnStatementPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("owned_local_array_return"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("boxed"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("boxed"));
     }
 
     [Test]
@@ -11002,15 +11002,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_escape"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ReturnByRefAnalysis"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("analyzer.escape.return.byref"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.GetValue"));
     }
 
@@ -11032,12 +11032,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -11058,13 +11058,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.s_value"));
     }
 
@@ -11087,13 +11087,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.s_value"));
     }
 
@@ -11122,14 +11122,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.Value.get"));
     }
 
@@ -11160,13 +11160,13 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -11186,12 +11186,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -11213,12 +11213,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -11238,10 +11238,10 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ThrowOperationPurityRule"));
     }
 
@@ -11261,12 +11261,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.ReadLine"));
     }
 
@@ -11288,12 +11288,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ThrowOperationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Throw"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty], Is.EqualTo("Throw"));
     }
 
     [Test]
@@ -11313,11 +11313,11 @@ public class TestClass
     }
 }", allowUnsafe: true);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unsafe_pointer"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("UnsupportedOperation"));
     }
 
@@ -11351,15 +11351,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unsupported_operation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("RecursivePurityAnalysis"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("recursive_call"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.Fibonacci"));
     }
 
@@ -11393,16 +11393,16 @@ public sealed class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
             Is.EqualTo("Invocation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("Bag.Length.get"));
     }
 
@@ -11430,13 +11430,13 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(diagnostic => diagnostic.Id == "SP0002")
             .Single(diagnostic => diagnostic.GetMessage().Contains("'A'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.B"));
     }
 
@@ -11465,13 +11465,13 @@ public class TestClass
             .Replace("PROPERTY_NAME", propertyName, StringComparison.Ordinal);
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("metadata_only_or_external"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Environment." + propertyName));
     }
 
@@ -11491,13 +11491,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unknown_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Environment.Exit"));
     }
 
@@ -11527,7 +11527,7 @@ public class TestClass
                         "[]"))));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated pure summaries should override the conservative TickCount fallback.");
     }
@@ -11548,14 +11548,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Environment.StackTrace"));
     }
 
@@ -11575,15 +11575,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.Thread.CurrentThread"));
     }
 
@@ -11603,13 +11603,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("bcl_fallback_probably_pure"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Type.GetType"));
     }
 
@@ -11630,14 +11630,14 @@ public class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.impurity.catalog_source"), Is.False);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Type.FullName"));
     }
 
@@ -11658,14 +11658,14 @@ public class TestClass
 }",
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("dynamic_dispatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("PropertyReferencePurityRule"));
-        Assert.That(diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.impurity.catalog_source"), Is.False);
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Type.TypeHandle"));
     }
 
@@ -11692,15 +11692,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Runtime.Loader.AssemblyLoadContext"));
     }
 
@@ -11729,7 +11729,7 @@ public class TestClass
                         "[]"))));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated pure summaries should override the conservative reflection fallback for Type.ToString().");
     }
@@ -11766,7 +11766,7 @@ public class TestClass
                         "[]"))));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted exact-match purity selection should prefer the stronger pure summary regardless of additional-file order.");
     }
@@ -11796,7 +11796,7 @@ public class TestClass
                         "[]"))));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated pure summaries should override the manual ToString catalog inside interpolated strings.");
     }
@@ -11860,13 +11860,13 @@ public class TestClass
                 additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(
                     MetadataReference.CreateFromFile(assemblyPath)));
 
-            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+            var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
                 Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+            Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
                 Is.EqualTo("metadata_only_or_external"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
                 Does.Contain("System.SyntheticSystemFormattingBoundary.ToString"));
         }
         finally
@@ -11901,7 +11901,7 @@ public class TestClass
                         "[]"))));
 
         Assert.That(
-            diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(candidate => candidate.Id == "SP0002"),
             Is.False,
             "Trusted generated pure summaries should override the conservative reflection fallback for Type.GetTypeFromHandle(RuntimeTypeHandle).");
     }
@@ -11925,9 +11925,9 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.Not.Empty);
     }
 
@@ -11949,13 +11949,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.Not.Empty);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Threading.Monitor.Enter"));
     }
 
@@ -11975,15 +11975,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ObjectCreationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Collections.Generic.List<int>.List()"));
     }
 
@@ -12004,12 +12004,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -12036,14 +12036,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.GetValues"));
     }
 
@@ -12062,13 +12062,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ArrayCreationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("array_creation"));
     }
 
@@ -12087,17 +12087,17 @@ public class TestClass<T> where T : new()
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("unsupported_operation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("ObjectCreationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityOperationKindProperty],
             Is.EqualTo("TypeParameterObjectCreation"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generic_type_construction"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("T"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain("T"));
     }
 
     [Test]
@@ -12124,15 +12124,15 @@ public class TestClass
 }");
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+            .Where(d => d.Id == "SP0002")
             .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.GetValues"));
     }
 
@@ -12153,12 +12153,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -12179,12 +12179,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -12213,12 +12213,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -12247,12 +12247,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -12281,12 +12281,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -12316,14 +12316,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("Resource.Dispose"));
     }
 
@@ -12351,14 +12351,14 @@ public class DerivedType : BaseType
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("BaseType.BaseType"));
     }
 
@@ -12384,14 +12384,14 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"],
             Does.Contain("TestClass.ImpureTarget"));
     }
 
@@ -12417,15 +12417,15 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("EventAssignmentPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("event_subscription"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("TestClass.Changed"));
     }
 
@@ -12445,12 +12445,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -12469,13 +12469,13 @@ public class TestClass
     }
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("mutable_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("CollectionExpressionPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("collection_expression_target"));
     }
 
@@ -12500,8 +12500,8 @@ public class TestClass
             source,
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"));
 
-        Assert.That(defaultDiagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityExplanationId), Is.False);
-        Assert.That(explanationDiagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityExplanationId), Is.True);
+        Assert.That(defaultDiagnostics.Any(d => d.Id == "SP0009"), Is.False);
+        Assert.That(explanationDiagnostics.Any(d => d.Id == "SP0009"), Is.True);
     }
 
     [Test]
@@ -12529,14 +12529,14 @@ public class TestClass
             source,
             ReportAndCheckedExceptionsOptions());
 
-        Assert.That(defaultDiagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        Assert.That(defaultDiagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-        Assert.That(reportDiagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.True);
-        Assert.That(reportDiagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
-        Assert.That(checkedDiagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        Assert.That(checkedDiagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.True);
-        Assert.That(combinedDiagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.True);
-        Assert.That(combinedDiagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.True);
+        Assert.That(defaultDiagnostics.Any(d => d.Id == "SP0010"), Is.False);
+        Assert.That(defaultDiagnostics.Any(d => d.Id == "SP0011"), Is.False);
+        Assert.That(reportDiagnostics.Any(d => d.Id == "SP0010"), Is.True);
+        Assert.That(reportDiagnostics.Any(d => d.Id == "SP0011"), Is.False);
+        Assert.That(checkedDiagnostics.Any(d => d.Id == "SP0010"), Is.False);
+        Assert.That(checkedDiagnostics.Any(d => d.Id == "SP0011"), Is.True);
+        Assert.That(combinedDiagnostics.Any(d => d.Id == "SP0010"), Is.True);
+        Assert.That(combinedDiagnostics.Any(d => d.Id == "SP0011"), Is.True);
     }
 
     [Test]
@@ -12553,16 +12553,16 @@ public class TestClass
 }",
             RuntimeHazardSitesOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("value / divisor"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_divide_by_zero"));
     }
 
@@ -12581,8 +12581,8 @@ public class TestClass
 }",
             RuntimeHazardAllOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.True);
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.True);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.True);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.True);
     }
 
     [Test]
@@ -12709,7 +12709,7 @@ public class TestClass
 }",
             RuntimeHazardSitesOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -12732,11 +12732,11 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("System.ArgumentNullException"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException;System.InvalidOperationException"));
     }
 
@@ -12761,7 +12761,7 @@ public class TestClass
 }",
             CheckedExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -12779,7 +12779,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -12803,17 +12803,17 @@ public class TestClass
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(exceptionDiagnostics.Length, Is.EqualTo(2));
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'Caller'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'Callee'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -12844,14 +12844,14 @@ public class TestClass
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(exceptionDiagnostics.Any(d => d.GetMessage().Contains("'Caller'", StringComparison.Ordinal)),
             Is.False);
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'Callee'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -12879,16 +12879,16 @@ public class Widget
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'Create'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'.ctor'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -12923,14 +12923,14 @@ public class Widget
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(exceptionDiagnostics.Any(d => d.GetMessage().Contains("'Create'", StringComparison.Ordinal)),
             Is.False);
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'.ctor'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -12961,16 +12961,16 @@ public class Widget
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'Read'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'get_Value'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -13008,14 +13008,14 @@ public class Widget
             ReportExceptionsOptions());
 
         var exceptionDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .ToArray();
 
         Assert.That(exceptionDiagnostics.Any(d => d.GetMessage().Contains("'Read'", StringComparison.Ordinal)),
             Is.False);
         Assert.That(
             exceptionDiagnostics.Single(d => d.GetMessage().Contains("'get_Value'", StringComparison.Ordinal))
-                .Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                .Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -13043,15 +13043,15 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
         AssertExceptionEdgesPropertyContainsIfPresent(
             diagnostic,
@@ -13087,7 +13087,7 @@ public class TestClass
                     Array.Empty<string>(),
                     "System.ArgumentNullException"))));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -13113,17 +13113,17 @@ public class TestClass
                     "System.ArgumentNullException"))));
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("ArgumentNullException.ThrowIfNull(value)"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("System.ArgumentNullException.ThrowIfNull"));
         AssertExceptionEdgesPropertyContainsIfPresent(
             diagnostic,
@@ -13155,23 +13155,23 @@ public class TestClass
                     "System.ArgumentNullException"))));
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("ArgumentException.ThrowIfNullOrEmpty(text)"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentException;System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.ArgumentException=effect_summary:System.ArgumentException.ThrowIfNullOrEmpty"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentException.ThrowIfNullOrEmpty"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+            diagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("System.ArgumentException.ThrowIfNullOrEmpty"));
     }
 
@@ -13203,7 +13203,7 @@ public class TestClass
                     Array.Empty<string>(),
                     "System.ArgumentNullException"))));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -13234,24 +13234,24 @@ public class TestClass
                     new[] { "System.ArgumentNullException", "System.InvalidOperationException" }))));
 
         var summaryDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+            "SP0010");
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
 
         var siteDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
         Assert.That(siteDiagnostic.GetMessage(), Does.Contain("ArgumentNullException.ThrowIfNull(value)"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
     }
 
@@ -13277,15 +13277,15 @@ public class TestClass
                     new[] { "System.UriFormatException" }))));
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("new Uri(value)"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.UriFormatException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty], Does.Contain("System.Uri"));
+        Assert.That(diagnostic.Properties["sharpproof.exceptions.symbol"], Does.Contain("System.Uri"));
     }
 
     [Test]
@@ -13316,7 +13316,7 @@ public class TestClass
                     "System.Uri..ctor(string)",
                     new[] { "System.UriFormatException" }))));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -13342,33 +13342,33 @@ public class DerivedException : Exception
 
         var summaryDiagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .Where(d => d.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty] == "effect_summary")
+                .Where(d => d.Id == "SP0010")
+                .Where(d => d.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty] == "effect_summary")
                 .Where(d =>
-                    (d.Properties[SharpProofDiagnostics.ExceptionSourcesProperty] ?? string.Empty).Contains(
+                    (d.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty] ?? string.Empty).Contains(
                         "System.Exception", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            "SP0010");
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.Exception"));
 
         var siteDiagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("base(value)", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            "SP0011");
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("System.Exception"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.Exception"));
     }
 
@@ -13394,19 +13394,19 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("Callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=source_callee:"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty], Does.Contain("Callee"));
+        Assert.That(diagnostic.Properties["sharpproof.exceptions.symbol"], Does.Contain("Callee"));
     }
 
     [Test]
@@ -13432,19 +13432,19 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.NullReferenceException=source_callee:"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty], Does.Contain("Callee()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty], Does.Contain("Callee()"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("definite_await_null:await_expression"));
     }
 
@@ -13470,14 +13470,14 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("Local()", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
         AssertExceptionEdgesPropertyContains(
             diagnostic,
@@ -13504,14 +13504,14 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("thunk()", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
         AssertExceptionEdgesPropertyContains(
             diagnostic,
@@ -13547,7 +13547,7 @@ public class TestClass
             CheckedExceptionsOptions());
 
         var siteDiagnostics = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .ToImmutableArray();
 
         Assert.That(siteDiagnostics.Any(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal)), Is.False);
@@ -13581,37 +13581,37 @@ public class DerivedClass : BaseClass
 
         var summaryDiagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .Where(d => d.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty] == "source_callee")
+                .Where(d => d.Id == "SP0010")
+                .Where(d => d.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty] == "source_callee")
                 .Where(d =>
-                    (d.Properties[SharpProofDiagnostics.ExceptionSourcesProperty] ?? string.Empty).Contains("BaseClass",
+                    (d.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty] ?? string.Empty).Contains("BaseClass",
                         StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            "SP0010");
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("BaseClass"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("direct_throw:throw"));
 
         var siteDiagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("base(value)", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            "SP0011");
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("BaseClass"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("BaseClass"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("direct_throw:throw"));
     }
 
@@ -13647,19 +13647,19 @@ public class TestClass
 
         var diagnostic = SingleDiagnostic(
             diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .Where(d => d.Id == "SP0011")
                 .Where(d => d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal))
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("source_callee"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=source_callee:"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("ThrowingService.Work"));
     }
 
@@ -13679,15 +13679,15 @@ public class TestClass
             CheckedExceptionsOptions());
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("throw new InvalidOperationException()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.InvalidOperationException=direct_throw:throw"));
     }
 
@@ -13705,15 +13705,15 @@ public class TestClass
             CheckedExceptionsOptions());
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("value / 0"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_divide_by_zero"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.DivideByZeroException=definite_divide_by_zero:binary_operator"));
     }
 
@@ -13732,15 +13732,15 @@ public class TestClass
             CheckedExceptionsOptions());
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("value.Length"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_null_dereference"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
     }
 
@@ -13766,7 +13766,7 @@ public class TestClass
 }",
             CheckedExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -13792,7 +13792,7 @@ public class TestClass
 }",
             CheckedExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -13821,11 +13821,11 @@ public class TestClass
             CheckedExceptionsOptions());
 
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .Where(d => d.Id == "SP0011")
             .Single(d => d.GetMessage().Contains("Outer()", StringComparison.Ordinal));
 
-        var sources = diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty];
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var sources = diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty];
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
         Assert.That(sources, Does.Contain("Outer()"));
         Assert.That(sources, Does.Contain("Inner()"));
@@ -13860,11 +13860,11 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'Create'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.UriFormatException"));
     }
 
@@ -13891,11 +13891,11 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'Read'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -13921,17 +13921,17 @@ public class TestClass
                     new[] { "System.InvalidOperationException" }))));
 
         var diagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnostics.Where(d => d.Id == "SP0011").ToImmutableArray(),
+            "SP0011");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("Environment.CurrentDirectory"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("System.Environment.CurrentDirectory.get"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.Environment.CurrentDirectory.get"));
     }
 
@@ -13963,11 +13963,11 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -14003,7 +14003,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -14040,12 +14040,12 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("rethrow"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty], Is.EqualTo("rethrow"));
     }
 
     [Test]
@@ -14063,11 +14063,11 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
     }
 
@@ -14093,7 +14093,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -14109,7 +14109,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -14132,13 +14132,13 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_divide_by_zero"));
     }
 
@@ -14164,12 +14164,12 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_divide_by_zero"));
     }
 
@@ -14188,15 +14188,15 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_null_dereference"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
     }
 
@@ -14220,13 +14220,13 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("definite_null_dereference"));
     }
 
@@ -14249,7 +14249,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -14269,14 +14269,14 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.InvalidOperationException=direct_throw:throw"));
     }
 
@@ -14304,15 +14304,15 @@ public class TestClass
 
         var diagnostic =
             SingleDiagnostic(
-                diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-                SharpProofDiagnostics.ExceptionSummaryId);
+                diagnostics.Where(d => d.Id == "SP0010").ToImmutableArray(),
+                "SP0010");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Is.EqualTo("System.ArgumentNullException=direct_throw:throw"));
     }
 
@@ -14338,13 +14338,13 @@ public class TestClass
 }",
             CheckedExceptionsOptions());
 
-        var siteDiagnostics = diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToArray();
+        var siteDiagnostics = diagnostics.Where(d => d.Id == "SP0011").ToArray();
 
         Assert.That(siteDiagnostics.Length, Is.EqualTo(1));
         Assert.That(siteDiagnostics[0].GetMessage(), Does.Contain("throw new ArgumentNullException()"));
-        Assert.That(siteDiagnostics[0].Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(siteDiagnostics[0].Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(siteDiagnostics[0].Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostics[0].Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("direct_throw"));
     }
 
@@ -14370,7 +14370,7 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -14386,6 +14386,6 @@ public class TestClass
 }",
             ReportExceptionsOptions());
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 }

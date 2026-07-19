@@ -2484,14 +2484,14 @@ public class TestClass
             frameworkReferences: GlobalizationFrameworkReferences,
             concurrentAnalysis: false);
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Convert.ToSingle"));
     }
 
@@ -2516,14 +2516,14 @@ public class TestClass
             frameworkReferences: GlobalizationFrameworkReferences,
             concurrentAnalysis: false);
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Convert.ToDouble"));
     }
 
@@ -2553,14 +2553,14 @@ public class TestClass
             frameworkReferences: GlobalizationFrameworkReferences,
             concurrentAnalysis: false);
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Convert.ToDateTime"));
     }
 
@@ -2611,14 +2611,14 @@ public class TestClass
             frameworkReferences: GlobalizationFrameworkReferences,
             concurrentAnalysis: false);
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("current_culture_semantic_rule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(expectedSymbol));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"], Does.Contain(expectedSymbol));
     }
 
 

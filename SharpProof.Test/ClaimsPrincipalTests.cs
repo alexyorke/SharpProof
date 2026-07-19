@@ -33,7 +33,7 @@ public class TestClass
             test,
             frameworkReferences: ClaimsFrameworkReferences,
             concurrentAnalysis: true);
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
         Assert.That(diagnostic.GetMessage(), Does.Contain("TestMethod"));
     }
 }

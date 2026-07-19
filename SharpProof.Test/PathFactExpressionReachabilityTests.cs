@@ -184,7 +184,7 @@ public class TestClass
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
         Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 
@@ -210,7 +210,7 @@ public class TestClass
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
         Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 
@@ -333,7 +333,7 @@ public class TestClass
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
         Assert.That(
-            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.True);
     }
 

@@ -520,6 +520,7 @@ public sealed class RepositoryArchitectureTests
         var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
         var catalog = File.ReadAllText(Path.Combine(analyzerRoot, "AnalyzerDiagnosticCatalog.cs"));
         var catalogData = File.ReadAllText(Path.Combine(analyzerRoot, "AnalyzerDiagnosticCatalog.json"));
+        var propertyNames = File.ReadAllText(Path.Combine(analyzerRoot, "DiagnosticPropertyNames.cs"));
         var configuration = File.ReadAllText(Path.Combine(
             analyzerRoot, "Configuration", "AnalyzerConfiguration.cs"));
 
@@ -528,6 +529,10 @@ public sealed class RepositoryArchitectureTests
             Assert.That(catalog, Does.Contain("SharpProof.Analyzer.DiagnosticCatalog.json"));
             Assert.That(catalog, Does.Contain("DescriptorsByField"));
             Assert.That(catalog, Does.Not.Contain("GetFields("));
+            Assert.That(catalog, Does.Not.Contain("SharpProofDiagnostics"));
+            Assert.That(File.Exists(Path.Combine(analyzerRoot, "SharpProofDiagnostics.cs")), Is.False);
+            Assert.That(propertyNames, Does.Contain("internal static class DiagnosticPropertyNames"));
+            Assert.That(propertyNames, Does.Not.Contain("DiagnosticDescriptor"));
             Assert.That(catalogData.Split("\"FieldName\"", StringSplitOptions.None), Has.Length.EqualTo(76));
             Assert.That(configuration, Does.Not.Contain("AllSupportedDiagnosticIds"));
             Assert.That(configuration, Does.Contain("SharpProofDiagnosticSuppressor.SupportedDiagnosticIds"));

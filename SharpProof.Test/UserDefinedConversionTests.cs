@@ -36,10 +36,10 @@ public struct Celsius
 }";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 19, 9, 24)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 12, 11, 19)
             .WithArguments(".ctor");
 
@@ -79,13 +79,13 @@ public class Money
 }";
 
 
-        var expectedGetterAmount = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterAmount = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 20, 9, 26)
             .WithArguments("get_Amount");
-        var expectedGetterCurrency = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterCurrency = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 19, 10, 27)
             .WithArguments("get_Currency");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(12, 12, 12, 17)
             .WithArguments(".ctor");
 
@@ -120,10 +120,10 @@ public class Counter
 }";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 16, 11, 21)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 12, 13, 19)
             .WithArguments(".ctor");
 
@@ -169,16 +169,16 @@ public class DateOnly
 }";
 
 
-        var expectedGetterYear = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterYear = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 16, 9, 20)
             .WithArguments("get_Year");
-        var expectedGetterMonth = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterMonth = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 16, 10, 21)
             .WithArguments("get_Month");
-        var expectedGetterDay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetterDay = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 16, 11, 19)
             .WithArguments("get_Day");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 12, 13, 20)
             .WithArguments(".ctor");
 

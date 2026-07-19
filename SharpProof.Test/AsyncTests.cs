@@ -28,7 +28,7 @@ namespace TestNamespace
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(10, 32, 10, 47)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(10, 32, 10, 47)
                 .WithArguments("PureAsyncMethod"));
     }
 
@@ -55,7 +55,7 @@ namespace TestNamespace
 
 
         await VerifyCS.VerifyAnalyzerAsync(test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(11, 27, 11, 44)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(11, 27, 11, 44)
                 .WithArguments("ImpureAsyncMethod"));
     }
 
@@ -86,7 +86,7 @@ namespace TestNamespace
 }";
 
 
-        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 32, 10, 56)
+        var expectedOuter = VerifyCS.Diagnostic("SP0002").WithSpan(10, 32, 10, 56)
             .WithArguments("MethodCallingImpureAsync");
 
 

@@ -60,23 +60,23 @@ public class TestManager
 }
 ";
 
-        var expectedGetDeviceIdProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetDeviceIdProp = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 17, 7, 25).WithArguments("get_DeviceId");
-        var expectedCtorDevice = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtorDevice = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 15, 8, 21).WithArguments(".ctor");
-        var expectedGetDeviceIdMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetDeviceIdMethod = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 17, 11, 28).WithArguments("GetDeviceId");
-        var expectedGetIpAddressProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetIpAddressProp = VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 19, 16, 28).WithArguments("get_IPAddress");
-        var expectedCtorNetworked = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtorNetworked = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 15, 17, 30).WithArguments(".ctor");
-        var expectedGetIpAddressMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetIpAddressMethod = VerifyCS.Diagnostic("SP0004")
             .WithSpan(21, 19, 21, 31).WithArguments("GetIpAddress");
-        var expectedGetBrightnessProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetBrightnessProp = VerifyCS.Diagnostic("SP0004")
             .WithSpan(26, 16, 26, 26).WithArguments("get_Brightness");
-        var expectedCtorLight = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtorLight = VerifyCS.Diagnostic("SP0004")
             .WithSpan(27, 12, 27, 22).WithArguments(".ctor");
-        var expectedGetBrightnessMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetBrightnessMethod = VerifyCS.Diagnostic("SP0004")
             .WithSpan(30, 16, 30, 29).WithArguments("GetBrightness");
 
         await VerifyCS.VerifyAnalyzerAsync(test,
@@ -178,19 +178,19 @@ public class TestUsage
 
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(13, 27, 13, 33)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(13, 27, 13, 33)
                 .WithArguments("Format"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(16, 16, 16, 32)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(16, 16, 16, 32)
                 .WithArguments("ProcessAndDouble"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(23, 17, 23, 26)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(23, 17, 23, 26)
                 .WithArguments("LogStatus"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(49, 25, 49, 32)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(49, 25, 49, 32)
                 .WithArguments("Process"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(57, 28, 57, 34)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(57, 28, 57, 34)
                 .WithArguments("Format"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(67, 17, 67, 35)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(67, 17, 67, 35)
                 .WithArguments("UseProcessorPurely"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(75, 18, 75, 38)
+            VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule")).WithSpan(75, 18, 75, 38)
                 .WithArguments("UseProcessorImpurely")
         };
 

@@ -20,7 +20,7 @@ internal static class BaselineDiagnosticProperties
         var aliases = DiagnosticBaseline.GetSymbolIds(symbol);
         if (!aliases.IsDefaultOrEmpty)
             properties = properties.SetItem(
-                SharpProofDiagnostics.BaselineSymbolAliasesProperty,
+                DiagnosticPropertyNames.BaselineSymbolAliasesProperty,
                 string.Join("\n", aliases));
 
         return properties;
@@ -37,20 +37,20 @@ internal static class BaselineDiagnosticProperties
         properties = SharpProofEvidenceSchema.AddDiagnosticProperties(properties);
 
         if (!string.IsNullOrWhiteSpace(symbolId))
-            properties = properties.SetItem(SharpProofDiagnostics.BaselineSymbolProperty, symbolId.Trim());
+            properties = properties.SetItem(DiagnosticPropertyNames.BaselineSymbolProperty, symbolId.Trim());
 
         var normalizedPath = DiagnosticBaseline.NormalizePath(path);
         if (!string.IsNullOrWhiteSpace(normalizedPath))
-            properties = properties.SetItem(SharpProofDiagnostics.BaselinePathProperty, normalizedPath);
+            properties = properties.SetItem(DiagnosticPropertyNames.BaselinePathProperty, normalizedPath);
 
         if (!string.IsNullOrWhiteSpace(operationKind))
-            properties = properties.SetItem(SharpProofDiagnostics.BaselineOperationKindProperty, operationKind!.Trim());
+            properties = properties.SetItem(DiagnosticPropertyNames.BaselineOperationKindProperty, operationKind!.Trim());
 
         if (!string.IsNullOrWhiteSpace(contractText))
-            properties = properties.SetItem(SharpProofDiagnostics.BaselineContractProperty, contractText!.Trim());
+            properties = properties.SetItem(DiagnosticPropertyNames.BaselineContractProperty, contractText!.Trim());
 
         if (!string.IsNullOrWhiteSpace(evidenceKey))
-            properties = properties.SetItem(SharpProofDiagnostics.BaselineEvidenceKeyProperty, evidenceKey!.Trim());
+            properties = properties.SetItem(DiagnosticPropertyNames.BaselineEvidenceKeyProperty, evidenceKey!.Trim());
 
         return properties;
     }

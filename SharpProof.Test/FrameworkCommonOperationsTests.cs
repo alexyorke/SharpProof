@@ -37,13 +37,13 @@ public class TestClass
         }
 }";
 
-        var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48)
+        var expectedGetContent = VerifyCS.Diagnostic("SP0004").WithSpan(10, 41, 10, 48)
             .WithArguments("get_Content");
-        var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46)
+        var expectedGetText = VerifyCS.Diagnostic("SP0004").WithSpan(11, 42, 11, 46)
             .WithArguments("get_Text");
-        var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54)
+        var expectedShow = VerifyCS.Diagnostic("SP0004").WithSpan(12, 50, 12, 54)
             .WithArguments("Show");
-        var expectedUpdateUI = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(20, 21, 20, 29)
+        var expectedUpdateUI = VerifyCS.Diagnostic("SP0002").WithSpan(20, 21, 20, 29)
             .WithArguments("UpdateUI");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetContent, expectedGetText, expectedShow, expectedUpdateUI);
@@ -77,11 +77,11 @@ public class TestClass
     }
 }";
 
-        var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48)
+        var expectedGetContent = VerifyCS.Diagnostic("SP0004").WithSpan(10, 41, 10, 48)
             .WithArguments("get_Content");
-        var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46)
+        var expectedGetText = VerifyCS.Diagnostic("SP0004").WithSpan(11, 42, 11, 46)
             .WithArguments("get_Text");
-        var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54)
+        var expectedShow = VerifyCS.Diagnostic("SP0004").WithSpan(12, 50, 12, 54)
             .WithArguments("Show");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetContent, expectedGetText, expectedShow);
     }

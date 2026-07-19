@@ -130,24 +130,24 @@ public partial class ExceptionSummaryCatalogValidationTests
         var expected = expectedDiagnostics.Single(d => d.Id == diagnosticId);
         var actual = actualDiagnostics.Single(d => d.Id == diagnosticId);
 
-        Assert.That(actual.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo(expected.Properties[SharpProofDiagnostics.ExceptionTypesProperty]));
-        Assert.That(actual.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo(expected.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty]));
-        Assert.That(actual.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(expected.Properties[SharpProofDiagnostics.ExceptionSourcesProperty]));
+        Assert.That(actual.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
+            Is.EqualTo(expected.Properties[DiagnosticPropertyNames.ExceptionTypesProperty]));
+        Assert.That(actual.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
+            Is.EqualTo(expected.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty]));
+        Assert.That(actual.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
+            Is.EqualTo(expected.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty]));
 
         var expectedHasSymbol =
-            expected.Properties.TryGetValue(SharpProofDiagnostics.ExceptionSymbolProperty, out var expectedSymbol);
+            expected.Properties.TryGetValue("sharpproof.exceptions.symbol", out var expectedSymbol);
         var actualHasSymbol =
-            actual.Properties.TryGetValue(SharpProofDiagnostics.ExceptionSymbolProperty, out var actualSymbol);
+            actual.Properties.TryGetValue("sharpproof.exceptions.symbol", out var actualSymbol);
         Assert.That(actualHasSymbol, Is.EqualTo(expectedHasSymbol));
         if (expectedHasSymbol) Assert.That(actualSymbol, Is.EqualTo(expectedSymbol));
 
         var expectedHasEdges =
-            expected.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var expectedEdges);
+            expected.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var expectedEdges);
         var actualHasEdges =
-            actual.Properties.TryGetValue(SharpProofDiagnostics.ExceptionEdgesProperty, out var actualEdges);
+            actual.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionEdgesProperty, out var actualEdges);
         Assert.That(actualHasEdges, Is.EqualTo(expectedHasEdges));
         if (expectedHasEdges) Assert.That(actualEdges, Is.EqualTo(expectedEdges));
     }
@@ -574,11 +574,11 @@ public partial class ExceptionSummaryCatalogValidationTests
         string exceptionType)
     {
         var diagnostic = diagnostics
-            .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(d => d.Id == "SP0010")
             .Single(d => d.GetMessage().Contains("'" + methodName + "'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 

@@ -41,7 +41,7 @@ public static class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(26, 27, 26, 31)
             .WithArguments("Bump");
 

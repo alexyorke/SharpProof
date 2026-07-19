@@ -370,7 +370,7 @@ internal static class MethodRequiresAnalyzer
             callee: callee);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.RequiresNotProvenRule,
+            AnalyzerDiagnosticCatalog.Get("RequiresNotProvenRule"),
             location,
             AdditionalLocations(contractLocation),
             properties,
@@ -402,7 +402,7 @@ internal static class MethodRequiresAnalyzer
             callee);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.RequiresUnsupportedRule,
+            AnalyzerDiagnosticCatalog.Get("RequiresUnsupportedRule"),
             location,
             additionalLocations,
             properties,

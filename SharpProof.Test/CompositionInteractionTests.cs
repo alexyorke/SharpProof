@@ -60,13 +60,13 @@ public class Car
 ";
 
 
-        var expectedEngineStart = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedEngineStart = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 17, 11, 22)
             .WithArguments("Start");
-        var expectedCarStartCar = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedCarStartCar = VerifyCS.Diagnostic("SP0002")
             .WithSpan(35, 17, 35, 25)
             .WithArguments("StartCar");
-        var expectedGetPowerToWheelRatio = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedGetPowerToWheelRatio = VerifyCS.Diagnostic("SP0002")
             .WithSpan(41, 16, 41, 36)
             .WithArguments("GetPowerToWheelRatio");
 

@@ -67,19 +67,19 @@ public class TestClass
     }
 }
 ";
-        var expectedGetVersion = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(13, 19, 13, 26)
+        var expectedGetVersion = VerifyCS.Diagnostic("SP0002").WithSpan(13, 19, 13, 26)
             .WithArguments("get_Version");
-        var expectedConfigure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(23, 17, 23, 26)
+        var expectedConfigure = VerifyCS.Diagnostic("SP0002").WithSpan(23, 17, 23, 26)
             .WithArguments("Configure");
-        var expectedReadVersion = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedReadVersion = VerifyCS.Diagnostic("SP0002")
             .WithSpan(29, 19, 29, 30).WithArguments("ReadVersion");
-        var expectedUseImpureGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedUseImpureGetter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(41, 19, 41, 34).WithArguments("UseImpureGetter");
-        var expectedUseImpureMethodCall = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedUseImpureMethodCall = VerifyCS.Diagnostic("SP0002")
             .WithSpan(47, 17, 47, 36).WithArguments("UseImpureMethodCall");
-        var expectedGetName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetName = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 19, 8, 23).WithArguments("get_Name");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 12, 11, 22).WithArguments(".ctor");
 
         await VerifyCS.VerifyAnalyzerAsync(test,

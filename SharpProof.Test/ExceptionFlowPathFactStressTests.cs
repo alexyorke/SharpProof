@@ -361,7 +361,7 @@ public class TestClass
     {
         var isSummary = testCase.Surface == DiagnosticSurface.SummarySp0010;
         var diagnostics = await GetAnalyzerDiagnosticsAsync(testCase.Source, isSummary, !isSummary);
-        var diagnosticId = isSummary ? SharpProofDiagnostics.ExceptionSummaryId : SharpProofDiagnostics.UncaughtExceptionSiteId;
+        var diagnosticId = isSummary ? "SP0010" : "SP0011";
         var matching = diagnostics.Where(diagnostic => diagnostic.Id == diagnosticId).ToArray();
 
         switch (testCase.Mode)
@@ -370,28 +370,28 @@ public class TestClass
             {
                 var diagnostic = matching.Single();
                 if (testCase.ExceptionType is { } exceptionType)
-                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+                    Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty], Is.EqualTo(exceptionType));
                 if (testCase.ExceptionCategory is { } exceptionCategory)
-                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(exceptionCategory));
+                    Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty], Is.EqualTo(exceptionCategory));
                 if (testCase.ExceptionSource is { } exceptionSource)
-                    Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty], Is.EqualTo(exceptionSource));
+                    Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty], Is.EqualTo(exceptionSource));
                 break;
             }
             case AssertionMode.Absent:
                 Assert.That(matching, Is.Empty);
                 break;
             case AssertionMode.AnyContainsType:
-                Assert.That(matching.Any(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty]!
+                Assert.That(matching.Any(diagnostic => diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty]!
                     .Contains(testCase.ExceptionType!, StringComparison.Ordinal)), Is.True);
                 break;
             case AssertionMode.ForbidType:
                 Assert.That(matching.Any(diagnostic => diagnostic.Properties.TryGetValue(
-                    SharpProofDiagnostics.ExceptionTypesProperty, out var types) && types != null &&
+                    DiagnosticPropertyNames.ExceptionTypesProperty, out var types) && types != null &&
                     types.Contains(testCase.ExceptionType!, StringComparison.Ordinal)), Is.False);
                 break;
             case AssertionMode.ForbidCategory:
                 Assert.That(matching.Any(diagnostic => diagnostic.Properties.TryGetValue(
-                    SharpProofDiagnostics.ExceptionCategoriesProperty, out var categories) && categories != null &&
+                    DiagnosticPropertyNames.ExceptionCategoriesProperty, out var categories) && categories != null &&
                     categories.Contains(testCase.ExceptionCategory!, StringComparison.Ordinal)), Is.False);
                 break;
             default:

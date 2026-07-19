@@ -761,15 +761,15 @@ internal partial class PurityAnalysisEngine
         public ImmutableDictionary<string, string?> ToDiagnosticProperties()
         {
             var builder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpurityCategoryProperty, Category);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpurityRuleProperty, RuleName);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpurityOperationKindProperty, OperationKind);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpuritySymbolProperty, Symbol);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpurityCatalogSourceProperty, CatalogSource);
-            AddIfPresent(builder, SharpProofDiagnostics.ImpurityCalleeChainProperty, CalleeChain);
-            AddIfPresent(builder, SharpProofDiagnostics.BclFallbackGuessProperty, BclFallbackGuess);
-            AddIfPresent(builder, SharpProofDiagnostics.BclFallbackConfidenceProperty, BclFallbackConfidence);
-            AddIfPresent(builder, SharpProofDiagnostics.BclFallbackReasonProperty, BclFallbackReason);
+            AddIfPresent(builder, DiagnosticPropertyNames.ImpurityCategoryProperty, Category);
+            AddIfPresent(builder, DiagnosticPropertyNames.ImpurityRuleProperty, RuleName);
+            AddIfPresent(builder, DiagnosticPropertyNames.ImpurityOperationKindProperty, OperationKind);
+            AddIfPresent(builder, "sharpproof.impurity.symbol", Symbol);
+            AddIfPresent(builder, "sharpproof.impurity.catalog_source", CatalogSource);
+            AddIfPresent(builder, "sharpproof.impurity.callee_chain", CalleeChain);
+            AddIfPresent(builder, "sharpproof.bcl_fallback.guess", BclFallbackGuess);
+            AddIfPresent(builder, "sharpproof.bcl_fallback.confidence", BclFallbackConfidence);
+            AddIfPresent(builder, "sharpproof.bcl_fallback.reason", BclFallbackReason);
             var properties = builder.ToImmutable();
             return UnknownReasonInfo.IsUnknown
                 ? UnknownReasonDiagnosticProperties.Add(properties, UnknownReasonInfo)

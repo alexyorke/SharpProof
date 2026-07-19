@@ -22,7 +22,7 @@ public class TestClass
     }
 }";
 
-        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 16, 8, 27)
             .WithArguments("GetConstant");
         await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0004);
@@ -243,17 +243,17 @@ public class PotentialPurity
 }";
 
 
-        var expectedConst = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedConst = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 43)
             .WithArguments("GetConstantWithoutAttribute");
-        var expectedGreeting = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGreeting = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 19, 10, 46)
             .WithArguments("GetGreetingWithoutAttribute");
-        var expectedCalc = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCalc = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 16, 13, 39)
             .WithArguments("GetCalcWithoutAttribute");
 
-        var expectedNameof = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedNameof = VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 19, 16, 44)
             .WithArguments("GetNameofWithoutAttribute");
 
@@ -280,7 +280,7 @@ public class PurityChain
 }";
 
 
-        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 16, 10, 33)
             .WithArguments("CallingPureHelper");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
@@ -307,16 +307,16 @@ public class CallChain
 }";
 
 
-        var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedA = VerifyCS.Diagnostic("SP0004")
             .WithSpan(5, 16, 5, 23)
             .WithArguments("MethodA");
-        var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedB = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 16, 8, 23)
             .WithArguments("MethodB");
-        var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedC = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 16, 11, 23)
             .WithArguments("MethodC");
-        var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedD = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 16, 14, 23)
             .WithArguments("MethodD");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD);
@@ -337,17 +337,17 @@ public class LongerChain
     public int MethodF() => MethodE() + 1;
 }";
 
-        var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(4, 16, 4, 23)
+        var expectedA = VerifyCS.Diagnostic("SP0004").WithSpan(4, 16, 4, 23)
             .WithArguments("MethodA");
-        var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 16, 5, 23)
+        var expectedB = VerifyCS.Diagnostic("SP0004").WithSpan(5, 16, 5, 23)
             .WithArguments("MethodB");
-        var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(6, 16, 6, 23)
+        var expectedC = VerifyCS.Diagnostic("SP0004").WithSpan(6, 16, 6, 23)
             .WithArguments("MethodC");
-        var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 16, 7, 23)
+        var expectedD = VerifyCS.Diagnostic("SP0004").WithSpan(7, 16, 7, 23)
             .WithArguments("MethodD");
-        var expectedE = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 16, 8, 23)
+        var expectedE = VerifyCS.Diagnostic("SP0004").WithSpan(8, 16, 8, 23)
             .WithArguments("MethodE");
-        var expectedF = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 16, 9, 23)
+        var expectedF = VerifyCS.Diagnostic("SP0004").WithSpan(9, 16, 9, 23)
             .WithArguments("MethodF");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD, expectedE, expectedF);
     }
@@ -376,7 +376,7 @@ public class CombinedPurity
     }
 }";
 
-        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 16, 13, 22)
             .WithArguments("GetSum");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
@@ -832,10 +832,10 @@ public readonly record struct Zzz
 }
 ";
 
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 16, 14, 17)
             .WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY = VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 16, 15, 17)
             .WithArguments("get_Y");
 

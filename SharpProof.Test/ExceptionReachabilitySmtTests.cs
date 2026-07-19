@@ -27,7 +27,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -61,7 +61,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -100,7 +100,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -121,7 +121,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -137,7 +137,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -387,7 +387,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -459,7 +459,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -480,7 +480,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -725,7 +725,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -745,7 +745,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -772,7 +772,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -819,7 +819,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -839,7 +839,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -866,7 +866,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -913,7 +913,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0011"),
             Is.False);
     }
 
@@ -941,7 +941,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0011"),
             Is.False);
     }
 
@@ -967,7 +967,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -992,7 +992,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1012,7 +1012,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1061,7 +1061,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1125,7 +1125,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1142,8 +1142,8 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty] ==
+                diagnostic.Id == "SP0010" &&
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty] ==
                 "definite_negative_array_length"),
             Is.False);
     }
@@ -1166,7 +1166,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1186,7 +1186,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1245,7 +1245,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1273,7 +1273,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1389,7 +1389,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1406,8 +1406,8 @@ public class TestClass
 
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty] ==
+                diagnostic.Id == "SP0010" &&
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty] ==
                 "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"),
             Is.False);
     }
@@ -1434,7 +1434,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1482,7 +1482,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1531,7 +1531,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1597,7 +1597,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1648,7 +1648,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1665,7 +1665,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1691,7 +1691,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1716,7 +1716,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1755,7 +1755,7 @@ public class TestClass
 }");
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArrayTypeMismatchException"));
     }
 
@@ -1812,7 +1812,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1828,7 +1828,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1843,7 +1843,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1859,7 +1859,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1875,7 +1875,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -1901,7 +1901,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     private static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
@@ -1924,12 +1924,12 @@ public class TestClass
 
     private static Diagnostic SingleExceptionDiagnostic(ImmutableArray<Diagnostic> diagnostics)
     {
-        return SingleDiagnosticById(diagnostics, SharpProofDiagnostics.ExceptionSummaryId);
+        return SingleDiagnosticById(diagnostics, "SP0010");
     }
 
     private static Diagnostic SingleUncaughtExceptionSiteDiagnostic(ImmutableArray<Diagnostic> diagnostics)
     {
-        return SingleDiagnosticById(diagnostics, SharpProofDiagnostics.UncaughtExceptionSiteId);
+        return SingleDiagnosticById(diagnostics, "SP0011");
     }
 
     private static Diagnostic SingleDiagnosticById(
@@ -1949,15 +1949,15 @@ public class TestClass
         string? sources = null)
     {
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo(exceptionTypes));
         if (categories != null)
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
                 Is.EqualTo(categories));
         if (sources != null)
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+                diagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
                 Is.EqualTo(sources));
     }
 }

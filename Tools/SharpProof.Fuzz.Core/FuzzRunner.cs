@@ -355,7 +355,7 @@ public static class FuzzRunner
             fuzzCase,
             diagnostics,
             new DiagnosticExpectationPolicy(
-                SharpProofDiagnostics.PurityNotVerifiedId,
+                "SP0002",
                 fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit,
                 fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustEmit,
                 true,
@@ -371,7 +371,7 @@ public static class FuzzRunner
         foreach (var diagnostic in sp0002Diagnostics)
         {
             if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityCategoryProperty, out var category) &&
+                diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ImpurityCategoryProperty, out var category) &&
                 string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
@@ -386,7 +386,7 @@ public static class FuzzRunner
             fuzzCase,
             diagnostics,
             new DiagnosticExpectationPolicy(
-                SharpProofDiagnostics.ExceptionSummaryId,
+                "SP0010",
                 fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustNotEmit,
                 fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustEmit,
                 fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore,

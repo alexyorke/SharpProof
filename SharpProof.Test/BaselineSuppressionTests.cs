@@ -27,7 +27,7 @@ public class TestClass
     }
 }", Baseline("SP0002", "M:TestClass.Impure", "src/ProductionCode.cs"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -47,7 +47,7 @@ public class TestClass
     }
 }", Baseline("SP0002", "M:TestClass.Impure", "other/ProductionCode.cs"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -66,7 +66,7 @@ public class TestClass
     }
 }", Baseline("SP0002", "M:TestClass.Impure", "ProductionCode.cs"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -89,7 +89,7 @@ public class TestClass
     }
 }", Baseline("SP0002", "M:TestClass.Impure", "src/ProductionCode.cs"), sourcePath, baselinePath);
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -121,7 +121,7 @@ public class TestClass
   ]
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -153,7 +153,7 @@ public class TestClass
   ]
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -166,7 +166,7 @@ public class TestClass
     public int Pure() => 1;
 }", Baseline("SP0004", "M:TestClass.Pure", "src/ProductionCode.cs"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0004"),
             Is.False);
     }
 
@@ -186,7 +186,7 @@ public class TestClass
     }
 }", "{ invalid json");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"), Is.True);
     }
 
     [Test]
@@ -206,10 +206,10 @@ public class TestClass
 }", "{}");
         var impure = AnalyzerTestHost.SingleDiagnostic(
             impureDiagnostics,
-            SharpProofDiagnostics.PurityNotVerifiedId);
+            "SP0002");
 
-        Assert.That(impure.Properties[SharpProofDiagnostics.BaselineSymbolProperty], Is.EqualTo("M:TestClass.Impure"));
-        Assert.That(impure.Properties[SharpProofDiagnostics.BaselinePathProperty], Is.EqualTo("src/ProductionCode.cs"));
+        Assert.That(impure.Properties[DiagnosticPropertyNames.BaselineSymbolProperty], Is.EqualTo("M:TestClass.Impure"));
+        Assert.That(impure.Properties[DiagnosticPropertyNames.BaselinePathProperty], Is.EqualTo("src/ProductionCode.cs"));
 
         var missingAttributeDiagnostics = await GetAnalyzerDiagnosticsAsync(@"
 public class TestClass
@@ -218,11 +218,11 @@ public class TestClass
 }", "{}");
         var missingAttribute = AnalyzerTestHost.SingleDiagnostic(
             missingAttributeDiagnostics,
-            SharpProofDiagnostics.MissingEnforcePureAttributeId);
+            "SP0004");
 
-        Assert.That(missingAttribute.Properties[SharpProofDiagnostics.BaselineSymbolProperty],
+        Assert.That(missingAttribute.Properties[DiagnosticPropertyNames.BaselineSymbolProperty],
             Is.EqualTo("M:TestClass.Pure"));
-        Assert.That(missingAttribute.Properties[SharpProofDiagnostics.BaselinePathProperty],
+        Assert.That(missingAttribute.Properties[DiagnosticPropertyNames.BaselinePathProperty],
             Is.EqualTo("src/ProductionCode.cs"));
     }
 
@@ -244,7 +244,7 @@ public class TestClass
 }";
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}");
         var allocationDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.AllocationInZeroAllocationMethodId)
+            .Where(diagnostic => diagnostic.Id == "SP0013")
             .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
             .ToArray();
 
@@ -252,7 +252,7 @@ public class TestClass
 
         var filteredDiagnostics = await GetAnalyzerDiagnosticsAsync(source, Baseline(allocationDiagnostics[0]));
         var remainingAllocations = filteredDiagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.AllocationInZeroAllocationMethodId)
+            .Where(diagnostic => diagnostic.Id == "SP0013")
             .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
             .ToArray();
 
@@ -274,11 +274,11 @@ public class TestClass
 {
 }";
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}");
-        var misplaced = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.MisplacedAttributeId);
+        var misplaced = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0003");
 
         var filteredDiagnostics = await GetAnalyzerDiagnosticsAsync(source, Baseline(misplaced));
 
-        Assert.That(filteredDiagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.MisplacedAttributeId),
+        Assert.That(filteredDiagnostics.Any(diagnostic => diagnostic.Id == "SP0003"),
             Is.False);
     }
 
@@ -298,13 +298,13 @@ public class TestClass
         var options = ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", "sites");
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}", globalOptions: options);
         var exceptionSite =
-            AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.UncaughtExceptionSiteId);
+            AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0011");
 
         var filteredDiagnostics =
             await GetAnalyzerDiagnosticsAsync(source, Baseline(exceptionSite), globalOptions: options);
 
         Assert.That(
-            filteredDiagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+            filteredDiagnostics.Any(diagnostic => diagnostic.Id == "SP0011"),
             Is.False);
     }
 
@@ -325,7 +325,7 @@ public class TestClass
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}", globalOptions: options);
         var unknownHazard = AnalyzerTestHost.SingleDiagnostic(
             diagnostics,
-            SharpProofDiagnostics.UnknownRuntimeHazardId);
+            "SP0033");
 
         var filteredDiagnostics = await GetAnalyzerDiagnosticsAsync(
             source,
@@ -334,7 +334,7 @@ public class TestClass
 
         Assert.That(
             filteredDiagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId),
+                diagnostic.Id == "SP0033"),
             Is.False);
     }
 
@@ -354,17 +354,17 @@ public class TestClass
     }
 }";
         var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}");
-        var impure = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-        var preferredSymbol = impure.Properties[SharpProofDiagnostics.BaselineSymbolProperty];
-        var legacyAlias = impure.Properties[SharpProofDiagnostics.BaselineSymbolAliasesProperty]!
+        var impure = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
+        var preferredSymbol = impure.Properties[DiagnosticPropertyNames.BaselineSymbolProperty];
+        var legacyAlias = impure.Properties[DiagnosticPropertyNames.BaselineSymbolAliasesProperty]!
             .Split('\n')
             .First(alias => !string.Equals(alias, preferredSymbol, StringComparison.Ordinal));
 
         var filteredDiagnostics = await GetAnalyzerDiagnosticsAsync(
             source,
-            Baseline(SharpProofDiagnostics.PurityNotVerifiedId, legacyAlias, "src/ProductionCode.cs"));
+            Baseline("SP0002", legacyAlias, "src/ProductionCode.cs"));
 
-        Assert.That(filteredDiagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(filteredDiagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -390,8 +390,8 @@ public class TestClass
         var entry = new Dictionary<string, object?>
         {
             ["id"] = diagnostic.Id,
-            ["symbol"] = diagnostic.Properties[SharpProofDiagnostics.BaselineSymbolProperty],
-            ["path"] = diagnostic.Properties[SharpProofDiagnostics.BaselinePathProperty],
+            ["symbol"] = diagnostic.Properties[DiagnosticPropertyNames.BaselineSymbolProperty],
+            ["path"] = diagnostic.Properties[DiagnosticPropertyNames.BaselinePathProperty],
             ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
             ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy
         };
@@ -403,9 +403,9 @@ public class TestClass
             entry["column"] = lineSpan.StartLinePosition.Character + 1;
         }
 
-        AddOptionalEntry(entry, diagnostic, SharpProofDiagnostics.BaselineContractProperty, "contract");
-        AddOptionalEntry(entry, diagnostic, SharpProofDiagnostics.BaselineOperationKindProperty, "operationKind");
-        AddOptionalEntry(entry, diagnostic, SharpProofDiagnostics.BaselineEvidenceKeyProperty, "evidenceKey");
+        AddOptionalEntry(entry, diagnostic, DiagnosticPropertyNames.BaselineContractProperty, "contract");
+        AddOptionalEntry(entry, diagnostic, DiagnosticPropertyNames.BaselineOperationKindProperty, "operationKind");
+        AddOptionalEntry(entry, diagnostic, DiagnosticPropertyNames.BaselineEvidenceKeyProperty, "evidenceKey");
 
         return JsonSerializer.Serialize(new Dictionary<string, object?>
         {

@@ -72,7 +72,7 @@ public class TestClass
         yield return 2;
     }
 }";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule").Id)
             .WithSpan(9, 29, 9, 39)
             .WithArguments("GetNumbers");
 

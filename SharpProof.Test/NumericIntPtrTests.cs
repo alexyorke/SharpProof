@@ -47,9 +47,9 @@ using SharpProof.Attributes; // Assuming AttributeSource is prepended elsewhere 
         }
     }";
         var test = CreateTestWithAttribute(testCode);
-        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAdd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 21, 17, 24).WithArguments("Add");
-        var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMultiply = VerifyCS.Diagnostic("SP0004")
             .WithSpan(23, 21, 23, 29).WithArguments("Multiply");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
     }
@@ -76,9 +76,9 @@ using SharpProof.Attributes;
         }
     }";
         var test = CreateTestWithAttribute(testCode);
-        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAdd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 22, 17, 25).WithArguments("Add");
-        var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMultiply = VerifyCS.Diagnostic("SP0004")
             .WithSpan(23, 22, 23, 30).WithArguments("Multiply");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
     }
@@ -115,13 +115,13 @@ using SharpProof.Attributes;
             return (nuint)value;
         }
     }";
-        var expectedToInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedToInt = VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 20, 16, 32).WithArguments("ConvertToInt");
-        var expectedToNInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedToNInt = VerifyCS.Diagnostic("SP0004")
             .WithSpan(22, 21, 22, 34).WithArguments("ConvertToNInt");
-        var expectedToUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedToUInt = VerifyCS.Diagnostic("SP0004")
             .WithSpan(28, 22, 28, 35).WithArguments("ConvertToUInt");
-        var expectedToNUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedToNUInt = VerifyCS.Diagnostic("SP0004")
             .WithSpan(34, 22, 34, 36).WithArguments("ConvertToNUInt");
         await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode), expectedToInt, expectedToNInt,
             expectedToUInt, expectedToNUInt);
@@ -161,13 +161,13 @@ using SharpProof.Attributes;
         }
     }";
         var test = CreateTestWithAttribute(testCode);
-        var expectedGT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGT = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 21, 17, 34).WithArguments("IsGreaterThan");
-        var expectedLT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedLT = VerifyCS.Diagnostic("SP0004")
             .WithSpan(23, 21, 23, 31).WithArguments("IsLessThan");
-        var expectedEQ = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedEQ = VerifyCS.Diagnostic("SP0004")
             .WithSpan(29, 21, 29, 29).WithArguments("AreEqual");
-        var expectedGTU = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGTU = VerifyCS.Diagnostic("SP0004")
             .WithSpan(35, 21, 35, 34).WithArguments("IsGreaterThan");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGT, expectedLT, expectedEQ, expectedGTU);
     }
@@ -206,13 +206,13 @@ using SharpProof.Attributes;
         }
     }";
         var test = CreateTestWithAttribute(testCode);
-        var expectedPos = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedPos = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 21, 17, 42).WithArguments("GetLargePositiveValue");
-        var expectedNeg = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedNeg = VerifyCS.Diagnostic("SP0004")
             .WithSpan(23, 21, 23, 37).WithArguments("GetNegativeValue");
-        var expectedUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedUnsigned = VerifyCS.Diagnostic("SP0004")
             .WithSpan(29, 22, 29, 43).WithArguments("GetLargeUnsignedValue");
-        var expectedZero = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedZero = VerifyCS.Diagnostic("SP0004")
             .WithSpan(35, 22, 35, 34).WithArguments("GetZeroValue");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedPos, expectedNeg, expectedUnsigned, expectedZero);
     }
@@ -257,15 +257,15 @@ using SharpProof.Attributes;
         }
     }";
         var test = CreateTestWithAttribute(testCode);
-        var expectedAnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAnd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(17, 21, 17, 31).WithArguments("BitwiseAnd");
-        var expectedOr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedOr = VerifyCS.Diagnostic("SP0004")
             .WithSpan(23, 21, 23, 30).WithArguments("BitwiseOr");
-        var expectedXor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedXor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(29, 21, 29, 31).WithArguments("BitwiseXor");
-        var expectedNot = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedNot = VerifyCS.Diagnostic("SP0004")
             .WithSpan(35, 21, 35, 31).WithArguments("BitwiseNot");
-        var expectedAndUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAndUnsigned = VerifyCS.Diagnostic("SP0004")
             .WithSpan(41, 22, 41, 32).WithArguments("BitwiseAnd");
 
         await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode),

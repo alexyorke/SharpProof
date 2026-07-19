@@ -44,7 +44,7 @@ internal static class NullableContractAnalyzer
                     session,
                     completion,
                     resultText + " != null",
-                    SharpProofDiagnostics.NullableReturnContractViolationRule,
+                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     "return",
                     "non-null return",
                     method.Name,
@@ -60,7 +60,7 @@ internal static class NullableContractAnalyzer
                     session,
                     completion,
                     "old(" + escapedInput + ") == null || " + resultText + " != null",
-                    SharpProofDiagnostics.NullableReturnContractViolationRule,
+                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     "return-if-input-not-null",
                     conditionalContract,
                     new object[] { method.Name, conditionalContract },
@@ -87,7 +87,7 @@ internal static class NullableContractAnalyzer
                         session,
                         completion,
                         target + " != null",
-                        SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
+                        AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                         "parameter-not-null",
                         "[NotNull]",
                         context.MethodSymbol.Name,
@@ -104,7 +104,7 @@ internal static class NullableContractAnalyzer
                             session,
                             completion,
                             ConditionalImplication(completion.ResultExpression, notNullWhen, target + " != null"),
-                            SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
+                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                             "parameter-not-null-when",
                             contract,
                             context.MethodSymbol.Name,
@@ -123,7 +123,7 @@ internal static class NullableContractAnalyzer
                             session,
                             completion,
                             ConditionalImplication(completion.ResultExpression, !maybeNullWhen, target + " != null"),
-                            SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
+                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                             "parameter-non-null-opposite-maybe-null-when",
                             contract,
                             context.MethodSymbol.Name,
@@ -197,7 +197,7 @@ internal static class NullableContractAnalyzer
                 session,
                 completion,
                 condition,
-                SharpProofDiagnostics.NullableMemberContractViolationRule,
+                AnalyzerDiagnosticCatalog.Get("NullableMemberContractViolationRule"),
                 expectedResult.HasValue ? "member-not-null-when" : "member-not-null",
                 contract,
                 new object[] { context.MethodSymbol.Name, targetName, contract },
@@ -254,7 +254,7 @@ internal static class NullableContractAnalyzer
                     session,
                     suppression,
                     condition,
-                    SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
+                    AnalyzerDiagnosticCatalog.Get("UnnecessaryNullForgivingOperatorRule"),
                     "declared non-null input and Roslyn flow state prove the operand non-null");
                 continue;
             }
@@ -288,7 +288,7 @@ internal static class NullableContractAnalyzer
                         session,
                         suppression,
                         condition,
-                        SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
+                        AnalyzerDiagnosticCatalog.Get("UnsafeNullForgivingOperatorRule"),
                         proof.CounterexampleWitness.Reason,
                         proof);
                     continue;
@@ -306,7 +306,7 @@ internal static class NullableContractAnalyzer
                         session,
                         suppression,
                         condition,
-                        SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
+                        AnalyzerDiagnosticCatalog.Get("UnnecessaryNullForgivingOperatorRule"),
                         "roslyn flow state proves the operand non-null");
                     continue;
                 }
@@ -319,7 +319,7 @@ internal static class NullableContractAnalyzer
                         session,
                         suppression,
                         condition,
-                        SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
+                        AnalyzerDiagnosticCatalog.Get("UnsafeNullForgivingOperatorRule"),
                         "Roslyn flow state permits the operand to be null");
                     continue;
                 }
@@ -329,8 +329,8 @@ internal static class NullableContractAnalyzer
             }
 
             var descriptor = proof.TruthValue == SymbolicTruthValue.ProvenTrue
-                ? SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule
-                : SharpProofDiagnostics.UnsafeNullForgivingOperatorRule;
+                ? AnalyzerDiagnosticCatalog.Get("UnnecessaryNullForgivingOperatorRule")
+                : AnalyzerDiagnosticCatalog.Get("UnsafeNullForgivingOperatorRule");
             ReportSuppression(context, session, suppression, condition, descriptor, proof.Reason, proof);
         }
     }
@@ -577,7 +577,7 @@ internal static class NullableContractAnalyzer
 
         var properties = CreateProperties(context, location, kind, proof.Condition, contract, proof);
         var diagnostic = Diagnostic.Create(
-            SharpProofDiagnostics.NullableVerificationInconclusiveRule,
+            AnalyzerDiagnosticCatalog.Get("NullableVerificationInconclusiveRule"),
             location,
             properties,
             context.MethodSymbol.Name,
@@ -621,11 +621,11 @@ internal static class NullableContractAnalyzer
         string? unknownReason)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.NullableContractKindProperty, kind)
-            .Add(SharpProofDiagnostics.NullableContractConditionProperty, condition)
-            .Add(SharpProofDiagnostics.NullableContractTargetProperty, target)
-            .Add(SharpProofDiagnostics.NullableProofStatusProperty, proofStatus)
-            .Add(SharpProofDiagnostics.NullableProofReasonProperty, proofReason);
+            .Add("sharpproof.nullable.contract_kind", kind)
+            .Add("sharpproof.nullable.condition", condition)
+            .Add("sharpproof.nullable.target", target)
+            .Add("sharpproof.nullable.proof_status", proofStatus)
+            .Add("sharpproof.nullable.proof_reason", proofReason);
         return AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             context.MethodSymbol,

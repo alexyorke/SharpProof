@@ -24,7 +24,7 @@ public class TestClass
 }";
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(9, 12, 9, 21)
                 .WithArguments(".ctor")
         );
@@ -129,7 +129,7 @@ public class TestClass
 
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(9, 12, 9, 21)
                 .WithArguments(".ctor")
         );
@@ -228,10 +228,10 @@ public class TestClass
 }";
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(9, 12, 9, 21)
                 .WithArguments(".ctor"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(14, 17, 14, 29)
                 .WithArguments("ProcessValue")
         );
@@ -278,13 +278,13 @@ public record Person // SP0004 expected for .ctor, get_Name, get_Age
 }";
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(7, 12, 7, 18)
                 .WithArguments(".ctor"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(13, 19, 13, 23)
                 .WithArguments("get_Name"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(14, 16, 14, 19)
                 .WithArguments("get_Age")
         );
@@ -310,7 +310,7 @@ public struct Point // SP0004 expected
 }";
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(10, 12, 10, 17)
                 .WithArguments(".ctor")
         );
@@ -363,10 +363,10 @@ public class DerivedClass : BaseClass // The derived constructor is also unannot
 }";
         await VerifyCS.VerifyAnalyzerAsync(
             test,
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(9, 15, 9, 24)
                 .WithArguments(".ctor"),
-            VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            VerifyCS.Diagnostic("SP0004")
                 .WithSpan(17, 12, 17, 24)
                 .WithArguments(".ctor")
         );

@@ -360,7 +360,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
 }

@@ -96,7 +96,7 @@ public sealed class TestClass
     public static int Value(int value) => value;
 }");
 
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.RequiresUnsupportedId);
+        var diagnostic = SingleDiagnostic(diagnostics, "SP0028");
         Assert.That(diagnostic.GetMessage(), Does.Contain("result placeholder"));
     }
 
@@ -153,7 +153,7 @@ public sealed class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", "sites"));
 
-        Assert.That(diagnostics.Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+        Assert.That(diagnostics.Where(diagnostic => diagnostic.Id == "SP0011"),
             Is.Empty);
     }
 

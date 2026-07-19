@@ -149,7 +149,7 @@ public sealed class TestClass
     }
 }";
 
-        var expectedRemoveChanged = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedRemoveChanged = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 9, 13, 15)
             .WithArguments("remove_Changed");
 

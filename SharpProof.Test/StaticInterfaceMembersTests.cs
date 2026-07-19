@@ -41,13 +41,13 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 20, 16, 25)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(18, 16, 18, 23)
             .WithArguments(".ctor");
-        var expectedSP0004StructAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004StructAdd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(22, 31, 22, 34)
             .WithArguments("Add");
 
@@ -370,13 +370,13 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(18, 23, 18, 28)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(19, 16, 19, 22)
             .WithArguments(".ctor");
-        var expectedSP0004Multiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSP0004Multiply = VerifyCS.Diagnostic("SP0004")
             .WithSpan(22, 30, 22, 38)
             .WithArguments("Multiply");
         await new VerifyCS.Test

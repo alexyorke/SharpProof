@@ -70,13 +70,13 @@ public sealed class OperationBlockPipelineTests
 
         var expectedIds = new[]
         {
-            SharpProofDiagnostics.PurityNotVerifiedId,
-            SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
-            SharpProofDiagnostics.CapabilityViolationId,
-            SharpProofDiagnostics.EnsuresNotProvenId,
-            SharpProofDiagnostics.ComplexityExceededId,
-            SharpProofDiagnostics.RequiresUnsupportedId,
-            SharpProofDiagnostics.ExceptionContractViolationId
+            "SP0002",
+            "SP0013",
+            "SP0015",
+            "SP0018",
+            "SP0021",
+            "SP0028",
+            "SP0030"
         };
 
         Assert.That(diagnostics, Has.Length.EqualTo(expectedIds.Length));
@@ -113,10 +113,10 @@ public sealed class OperationBlockPipelineTests
             compilationName: "OperationBlockGuardedThrow");
 
         Assert.That(
-            diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Count(diagnostic => diagnostic.Id == "SP0002"),
             Is.EqualTo(1));
         Assert.That(
-            diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            diagnostics.Count(diagnostic => diagnostic.Id == "SP0010"),
             Is.EqualTo(1));
     }
 

@@ -63,7 +63,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 16, 8, 23)
             .WithArguments("Project");
 
@@ -108,7 +108,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 19, 8, 28)
             .WithArguments("Normalize");
 
@@ -129,7 +129,7 @@ public class C
     public int Add(int a, int b) => a + b;
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
+        var expected = VerifyCS.Diagnostic("SP0005")
             .WithSpan(9, 16, 9, 19)
             .WithArguments("Add");
 
@@ -147,7 +147,7 @@ namespace SharpProof.Attributes { [AttributeUsage(AttributeTargets.All)] public 
 public class C { }
 ";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId)
+        var expected = VerifyCS.Diagnostic("SP0007")
             .WithSpan(5, 2, 5, 44);
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
@@ -200,13 +200,13 @@ public class TestUsage
 ";
 
 
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 12, 8, 15).WithArguments(".ctor");
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 16, 14, 17).WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY = VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 16, 15, 17).WithArguments("get_Y");
-        var expectedSP0003 = VerifyCS.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId).WithSpan(4, 2, 4, 6);
+        var expectedSP0003 = VerifyCS.Diagnostic("SP0003").WithSpan(4, 2, 4, 6);
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCtor, expectedGetX, expectedGetY, expectedSP0003);
     }
@@ -248,9 +248,9 @@ public class TestUsage
 ";
 
 
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004")
             .WithSpan(6, 16, 6, 17).WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 17).WithArguments("get_Y");
 
 
@@ -286,11 +286,11 @@ public struct MyStruct
 ";
 
 
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004")
             .WithSpan(6, 16, 6, 17).WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 17).WithArguments("get_Y");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 12, 10, 20).WithArguments(".ctor");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY, expectedCtor);
@@ -374,15 +374,15 @@ public class TestUsage
 }
 ";
 
-        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX = VerifyCS.Diagnostic("SP0004")
             .WithSpan(6, 16, 6, 17).WithArguments("get_X");
-        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 16, 7, 17).WithArguments("get_Y");
 
 
-        var expectedGetX2 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetX2 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(22, 16, 22, 20).WithArguments("GetX");
-        var expectedGetY2 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetY2 = VerifyCS.Diagnostic("SP0004")
             .WithSpan(27, 16, 27, 20).WithArguments("GetY");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY, expectedGetX2, expectedGetY2);

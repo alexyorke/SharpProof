@@ -27,7 +27,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.MutableStructRule,
+            AnalyzerDiagnosticCatalog.Get("MutableStructRule"),
             type,
             location,
             "mutable_struct",
@@ -65,7 +65,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.OwnedDisposableFieldRule,
+                AnalyzerDiagnosticCatalog.Get("OwnedDisposableFieldRule"),
                 field,
                 location,
                 "owned_disposable_field",
@@ -159,7 +159,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.IneffectiveRequiredAttributeRule,
+                AnalyzerDiagnosticCatalog.Get("IneffectiveRequiredAttributeRule"),
                 member,
                 location,
                 "ineffective_required_attribute",

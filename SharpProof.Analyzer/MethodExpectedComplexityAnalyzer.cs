@@ -250,8 +250,8 @@ internal static class MethodExpectedComplexityAnalyzer
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
-                .Add(SharpProofDiagnostics.ActualComplexityProperty, result.Complexity.Text),
+                .Add(DiagnosticPropertyNames.ExpectedComplexityProperty, declaredComplexity.Text)
+                .Add("sharpproof.complexity.actual", result.Complexity.Text),
             methodSymbol,
             syntaxTree,
             "ExpectedComplexity",
@@ -262,7 +262,7 @@ internal static class MethodExpectedComplexityAnalyzer
             "exceeded");
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.ComplexityExceededRule,
+            AnalyzerDiagnosticCatalog.Get("ComplexityExceededRule"),
             location,
             attributeLocation == null ? null : new[] { attributeLocation },
             properties,
@@ -282,8 +282,8 @@ internal static class MethodExpectedComplexityAnalyzer
     {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
-            .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason);
+            .Add(DiagnosticPropertyNames.ExpectedComplexityProperty, declaredComplexity.Text)
+            .Add("sharpproof.complexity.unknown_reason", reason);
         var effectiveUnknownReason = unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason);
         properties = UnknownReasonDiagnosticProperties.Add(properties, effectiveUnknownReason);
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
@@ -299,7 +299,7 @@ internal static class MethodExpectedComplexityAnalyzer
             effectiveUnknownReason.Code);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
+            AnalyzerDiagnosticCatalog.Get("ComplexityCouldNotBeVerifiedRule"),
             location,
             attributeLocation == null ? null : new[] { attributeLocation },
             properties,

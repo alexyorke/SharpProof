@@ -26,7 +26,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Not.Contain("SP0041"));
     }
 
     [ReadmeExample("sp0041-nullable-return-contract")]
@@ -44,7 +44,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Contain("SP0041"));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Not.Contain("SP0041"));
     }
 
     [ReadmeExample("sp0042-nullable-parameter-contract")]
@@ -87,7 +87,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+            Does.Contain("SP0042"));
     }
 
     [TestCase(true)]
@@ -110,7 +110,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+            Does.Not.Contain("SP0042"));
     }
 
     [Test]
@@ -129,7 +129,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Contain("SP0041"));
     }
 
     [Test]
@@ -148,7 +148,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Not.Contain("SP0041"));
     }
 
     [ReadmeExample("sp0043-nullable-member-contract")]
@@ -172,7 +172,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Contain("SP0043"));
     }
 
     [Test]
@@ -196,7 +196,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Not.Contain("SP0043"));
     }
 
     [Test]
@@ -217,7 +217,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Contain("SP0043"));
     }
 
     [Test]
@@ -241,7 +241,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Not.Contain("SP0043"));
     }
 
     [Test]
@@ -265,7 +265,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Contain("SP0043"));
     }
 
     [ReadmeExample("sp0047-nullable-inconclusive")]
@@ -292,7 +292,7 @@ public sealed class NullableContractVerificationTests
                 "true"));
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableVerificationInconclusiveId));
+            Does.Contain("SP0047"));
     }
 
     [ReadmeExample("sp0044-unsafe-null-forgiving")]
@@ -316,17 +316,17 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
         var ids = diagnostics.Select(static diagnostic => diagnostic.Id).ToArray();
         var unnecessary = diagnostics.Single(static diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId);
+            diagnostic.Id == "SP0045");
 
         Assert.Multiple(() =>
         {
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
-            Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+            Assert.That(ids, Does.Contain("SP0044"));
+            Assert.That(ids, Does.Contain("SP0045"));
             Assert.That(
-                unnecessary.Properties[SharpProofDiagnostics.ExplainContractProperty],
+                unnecessary.Properties["sharpproof.explain.contract"],
                 Is.EqualTo("value"));
             Assert.That(
-                unnecessary.Properties[SharpProofDiagnostics.ExplainProofStatusProperty],
+                unnecessary.Properties["sharpproof.explain.proof_status"],
                 Is.EqualTo("proven"));
         });
     }
@@ -350,7 +350,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
+            Does.Contain("SP0044"));
     }
 
     [Test]
@@ -375,7 +375,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
+            Does.Not.Contain("SP0044"));
     }
 
     [Test]
@@ -408,18 +408,18 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
         var suppressions = diagnostics
             .Where(static diagnostic => diagnostic.Id is
-                SharpProofDiagnostics.UnsafeNullForgivingOperatorId or
-                SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId)
+                "SP0044" or
+                "SP0045")
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ToArray();
 
         Assert.That(
             suppressions.Count(static diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId),
+                diagnostic.Id == "SP0045"),
             Is.EqualTo(1));
         Assert.That(
             suppressions.Single(static diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId)
+                diagnostic.Id == "SP0045")
                 .Location.GetLineSpan().StartLinePosition.Line,
             Is.GreaterThan(14));
     }
@@ -448,9 +448,9 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+            Does.Contain("SP0045"));
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
+            Does.Not.Contain("SP0044"));
     }
 
     [Test]
@@ -468,7 +468,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+            Does.Contain("SP0042"));
     }
 
     [Test]
@@ -490,7 +490,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+            Does.Contain("SP0042"));
     }
 
     [Test]
@@ -511,7 +511,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+            Does.Contain("SP0043"));
     }
 
     [Test]
@@ -532,7 +532,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Count(static diagnostic =>
-            diagnostic.Id == SharpProofDiagnostics.NullableReturnContractViolationId), Is.EqualTo(1));
+            diagnostic.Id == "SP0041"), Is.EqualTo(1));
     }
 
     [Test]
@@ -549,7 +549,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Not.Contain("SP0041"));
     }
 
     [Test]
@@ -566,7 +566,7 @@ public sealed class NullableContractVerificationTests
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+            Does.Not.Contain("SP0041"));
     }
 
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(

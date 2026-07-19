@@ -64,7 +64,7 @@ public class CollectionExpressionExample
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(8, 18, 8, 28)
             .WithArguments("GetNumbers");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -89,7 +89,7 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 18, 10, 26)
             .WithArguments("GetArray");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -114,7 +114,7 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(11, 22, 11, 29)
             .WithArguments("GetList");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -159,7 +159,7 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 18, 10, 26)
             .WithArguments("GetArray");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);

@@ -1729,10 +1729,10 @@ public class TestClass
     }
 }";
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 16, 8, 21)
             .WithArguments("get_Value");
-        var expectedMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedMethod = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 20, 14, 30)
             .WithArguments("TestMethod");
 
@@ -1747,7 +1747,7 @@ public class TestClass
             false);
         if (diagnostic != null)
             Assert.That(
-                diagnostic.Properties.ContainsKey(SharpProofDiagnostics.ImpuritySymbolProperty),
+                diagnostic.Properties.ContainsKey("sharpproof.impurity.symbol"),
                 Is.True);
     }
 }

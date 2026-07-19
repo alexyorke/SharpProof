@@ -43,11 +43,11 @@ namespace TestNamespace
 }";
 
 
-        var expectedSP0004_Getter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+        var expectedSP0004_Getter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 14, 11, 19).WithArguments("get_Value");
-        var expectedSP0004_Ctor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+        var expectedSP0004_Ctor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 12, 13, 25).WithArguments(".ctor");
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
+        var expectedSP0002 = VerifyCS.Diagnostic("SP0002")
             .WithSpan(26, 23, 26, 40)
             .WithArguments("GetAttributeValue");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004_Getter, expectedSP0004_Ctor, expectedSP0002);
@@ -90,10 +90,10 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 14, 11, 26)
             .WithArguments("get_DefaultValue");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 12, 13, 26)
             .WithArguments(".ctor");
 
@@ -125,10 +125,10 @@ public class TestClass
 ";
 
 
-        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 14, 7, 18)
             .WithArguments("get_Data");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 12, 8, 23)
             .WithArguments(".ctor");
 
@@ -174,13 +174,13 @@ namespace TestNamespace
 }";
 
 
-        var expectedKeyGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedKeyGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 17, 11, 20)
             .WithArguments("get_Key");
-        var expectedValueGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedValueGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(12, 19, 12, 24)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 12, 14, 25)
             .WithArguments(".ctor");
 
@@ -225,11 +225,11 @@ namespace TestNamespace
 }";
 
 
-        var expectedSP0004_Getter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+        var expectedSP0004_Getter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(12, 14, 12, 19).WithArguments("get_Value");
-        var expectedSP0004_Ctor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+        var expectedSP0004_Ctor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 12, 14, 24).WithArguments(".ctor");
-        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(27, 21, 27, 29)
+        var expectedSP0002 = VerifyCS.Diagnostic("SP0002").WithSpan(27, 21, 27, 29)
             .WithArguments("LogValue");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004_Getter, expectedSP0004_Ctor, expectedSP0002);
     }
@@ -276,11 +276,11 @@ namespace TestNamespace
 }";
 
 
-        var expectedMinGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMinGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(12, 14, 12, 22).WithArguments("get_MinValue");
-        var expectedMaxGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMaxGetter = VerifyCS.Diagnostic("SP0004")
             .WithSpan(13, 14, 13, 22).WithArguments("get_MaxValue");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(15, 12, 15, 29).WithArguments(".ctor");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedMinGetter, expectedMaxGetter, expectedCtor);
     }

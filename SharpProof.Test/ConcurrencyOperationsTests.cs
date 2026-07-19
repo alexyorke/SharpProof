@@ -77,7 +77,7 @@ public class TestClass
 ";
 
 
-        var expectedDiagnostic = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(11, 17, 11, 27)
+        var expectedDiagnostic = VerifyCS.Diagnostic("SP0002").WithSpan(11, 17, 11, 27)
             .WithArguments("TestMethod");
 
         await VerifyCS.VerifyAnalyzerAsync(testCode, expectedDiagnostic);

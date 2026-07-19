@@ -20,7 +20,7 @@ public sealed class TestClass
     public int Bad => _counter++;
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 16, 9, 19)
             .WithArguments("get_Bad");
 
@@ -58,7 +58,7 @@ public sealed class TestClass
     public int this[int value] => _counter++;
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(9, 16, 9, 20)
             .WithArguments("get_Item");
 
@@ -84,7 +84,7 @@ public static class TestClass
     public static int Read(Counter counter) => counter.Value;
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(14, 23, 14, 27)
             .WithArguments("Read");
 

@@ -14,7 +14,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.AsyncVoidRule,
+                AnalyzerDiagnosticCatalog.Get("AsyncVoidRule"),
                 GetMethodIdentifierLocation(context),
                 "async_void",
                 method.Name);
@@ -27,7 +27,7 @@ internal static partial class CommonBugAnalyzer
                     Report(
                         context,
                         session,
-                        SharpProofDiagnostics.NullTaskReturnRule,
+                        AnalyzerDiagnosticCatalog.Get("NullTaskReturnRule"),
                         returnOperation.ReturnedValue?.Syntax.GetLocation() ?? returnOperation.Syntax.GetLocation(),
                         "null_task_return",
                         method.Name);
@@ -42,7 +42,7 @@ internal static partial class CommonBugAnalyzer
             Report(
                 context,
                 session,
-                SharpProofDiagnostics.NullTaskReturnRule,
+                AnalyzerDiagnosticCatalog.Get("NullTaskReturnRule"),
                 taskExpressionBody.GetLocation(),
                 "null_task_return",
                 method.Name);
@@ -88,7 +88,7 @@ internal static partial class CommonBugAnalyzer
                         Report(
                             context,
                             session,
-                            SharpProofDiagnostics.BlockingAsyncRule,
+                            AnalyzerDiagnosticCatalog.Get("BlockingAsyncRule"),
                             propertyReference.Syntax.GetLocation(),
                             "blocking_task_result",
                             method.Name,
@@ -99,7 +99,7 @@ internal static partial class CommonBugAnalyzer
                         Report(
                             context,
                             session,
-                            SharpProofDiagnostics.BlockingAsyncRule,
+                            AnalyzerDiagnosticCatalog.Get("BlockingAsyncRule"),
                             invocation.Syntax.GetLocation(),
                             "blocking_task_wait",
                             method.Name,
@@ -135,7 +135,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.AwaitNullConditionalRule,
+            AnalyzerDiagnosticCatalog.Get("AwaitNullConditionalRule"),
             conditionalAccess.Syntax.GetLocation(),
             "await_null_conditional",
             conditionalAccess.Syntax.ToString());
@@ -153,7 +153,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.TaskConvertedToStringRule,
+            AnalyzerDiagnosticCatalog.Get("TaskConvertedToStringRule"),
             expression.Syntax.GetLocation(),
             "task_to_string",
             expression.Syntax.ToString());
@@ -189,7 +189,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.TaskCompletionSourceContinuationsRule,
+            AnalyzerDiagnosticCatalog.Get("TaskCompletionSourceContinuationsRule"),
             creation.Syntax.GetLocation(),
             "task_completion_source_continuations",
             creation.Syntax.ToString());
@@ -211,7 +211,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.TaskUsedAsDisposableRule,
+            AnalyzerDiagnosticCatalog.Get("TaskUsedAsDisposableRule"),
             displayOperation.Syntax.GetLocation(),
             "task_used_as_disposable",
             displayOperation.Syntax.ToString());
@@ -244,7 +244,7 @@ internal static partial class CommonBugAnalyzer
         Report(
             context,
             session,
-            SharpProofDiagnostics.AsyncValidationDeferredRule,
+            AnalyzerDiagnosticCatalog.Get("AsyncValidationDeferredRule"),
             validation.Syntax.GetLocation(),
             "async_validation_deferred",
             method.Name);

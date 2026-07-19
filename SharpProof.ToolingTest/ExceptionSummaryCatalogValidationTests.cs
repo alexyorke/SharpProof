@@ -25,11 +25,11 @@ public partial class ExceptionSummaryCatalogValidationTests
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)"));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -49,7 +49,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "sharpproof_enable_effect_summary_json",
                 "false"));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -63,7 +63,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                     "SharpProof.EffectSummary.json",
                     CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"))));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -77,7 +77,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "00000000-0000-0000-0000-000000000000"));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -91,7 +91,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 string.Empty,
                 coreLib.ModuleVersionId));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -104,7 +104,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "System.ArgumentNullException.ThrowIfNull(object, string)",
                 metadataToken: "0x06000001"));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -120,7 +120,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 metadataToken: methodIdentity.MetadataToken,
                 methodBodySha256: new string('0', methodIdentity.MethodBodySha256!.Length)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -132,11 +132,11 @@ public partial class ExceptionSummaryCatalogValidationTests
             CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"),
             "runtime.SharpProof.EffectSummary.json");
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -152,10 +152,10 @@ public partial class ExceptionSummaryCatalogValidationTests
                 thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                 transitiveThrownExceptionTypesJson: """[ "System.ArgumentNullException" ]"""));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException;System.InvalidOperationException"));
     }
 
@@ -167,7 +167,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             CreateLibraryCallSource(),
             CreateMalformedEffectSummaryJson(coreLib.AssemblyName, coreLib.AssemblySha256, coreLib.ModuleVersionId));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -181,7 +181,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "System.ArgumentNullException.ThrowIfNull(object)",
                 actualMethodLookupSymbol: "System.ArgumentNullException.ThrowIfNull(object, string)"));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -203,10 +203,10 @@ public partial class ExceptionSummaryCatalogValidationTests
                     thrownExceptionTypesJson: "[]",
                     transitiveThrownExceptionTypesJson: """[ "System.ArgumentNullException" ]""")));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.ArgumentNullException;System.InvalidOperationException"));
     }
 
@@ -264,11 +264,11 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -322,11 +322,11 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -395,11 +395,11 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -544,11 +544,11 @@ public partial class ExceptionSummaryCatalogValidationTests
             summaryJson,
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0010");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -612,23 +612,23 @@ public partial class ExceptionSummaryCatalogValidationTests
         var expectedSourceChain =
             "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
 
-        var summaryDiagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var summaryDiagnostic = diagnostics.Single(d => d.Id == "SP0010");
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
 
-        var siteDiagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
+        var siteDiagnostic = diagnostics.Single(d => d.Id == "SP0011");
         Assert.That(siteDiagnostic.GetMessage(), Does.Contain("SummaryBoundary.Outer"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("SummaryBoundary.Outer"));
     }
 
@@ -695,23 +695,23 @@ public partial class ExceptionSummaryCatalogValidationTests
                 $$"""[ { "ExceptionType": "System.InvalidOperationException", "SourcePath": "{{expectedSourceChain}}", "Depth": 3 } ]"""),
             references);
 
-        var summaryDiagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId);
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        var summaryDiagnostic = diagnostics.Single(d => d.Id == "SP0010");
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(summaryDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
 
-        var siteDiagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId);
+        var siteDiagnostic = diagnostics.Single(d => d.Id == "SP0011");
         Assert.That(siteDiagnostic.GetMessage(), Does.Contain("SummaryBoundary.Outer"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionSourcesProperty],
             Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSymbolProperty],
+        Assert.That(siteDiagnostic.Properties["sharpproof.exceptions.symbol"],
             Does.Contain("SummaryBoundary.Outer"));
     }
 
@@ -792,9 +792,9 @@ public partial class ExceptionSummaryCatalogValidationTests
             references);
 
         AssertMatchingExceptionDiagnostics(legacyDiagnostics, edgeDiagnostics,
-            SharpProofDiagnostics.ExceptionSummaryId);
+            "SP0010");
         AssertMatchingExceptionDiagnostics(legacyDiagnostics, edgeDiagnostics,
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            "SP0011");
     }
 
     [Test]
@@ -859,8 +859,8 @@ public partial class ExceptionSummaryCatalogValidationTests
                 """[ { "SourcePath": "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string)", "CalleeExactSymbolKey": "SummaryBoundary.Middle(string)", "Depth": 1 } ]"""),
             references);
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -941,7 +941,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             summaryJson,
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -984,8 +984,8 @@ public partial class ExceptionSummaryCatalogValidationTests
             summaryJson,
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -1031,11 +1031,11 @@ public partial class ExceptionSummaryCatalogValidationTests
 
         AssertEffectSummaryException(diagnostics, "TestMethod", "System.FormatException");
         var siteDiagnostic = diagnostics.Single(d =>
-            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.Id == "SP0011" &&
             d.GetMessage().Contains("SummaryBoundary.ThrowFormat()", StringComparison.Ordinal));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.FormatException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+        Assert.That(siteDiagnostic.Properties[DiagnosticPropertyNames.ExceptionCategoriesProperty],
             Is.EqualTo("effect_summary"));
     }
 
@@ -1126,8 +1126,8 @@ public partial class ExceptionSummaryCatalogValidationTests
             summaryJson,
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0010"), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0011"), Is.False);
     }
 
     [Test]
@@ -1258,7 +1258,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -1306,10 +1306,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -1366,7 +1366,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Contradictory affine guards should suppress generated-summary impurity diagnostics.");
     }
@@ -1398,10 +1398,10 @@ public partial class ExceptionSummaryCatalogValidationTests
                     "impure",
                     """[ "global_state_write" ]""")));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -1432,7 +1432,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                     """[]""")));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Trusted generated purity should override the built-in known-impure member fallback for metadata methods.");
     }
@@ -1471,8 +1471,8 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "sharpproof_enable_effect_summary_json",
                 "false"));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.Not.EqualTo("generated_purity_summary"));
     }
 
@@ -1508,8 +1508,8 @@ public partial class ExceptionSummaryCatalogValidationTests
             ImmutableArray<MetadataReference>.Empty,
             ImmutableDictionary<string, string>.Empty);
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.Not.EqualTo("generated_purity_summary"));
     }
 
@@ -1559,7 +1559,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -1614,8 +1614,8 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "sharpproof_known_impure_methods",
                 methodIdentity.CanonicalKey));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("config_known_impure"));
     }
 
@@ -1665,10 +1665,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -1700,10 +1700,10 @@ public partial class ExceptionSummaryCatalogValidationTests
                     """[ "global_state_write" ]""",
                     "System.Text.StringBuilder.StringBuilder()")));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -1752,7 +1752,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -1804,10 +1804,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -1839,7 +1839,7 @@ public partial class ExceptionSummaryCatalogValidationTests
                     """[]""")));
 
         Assert.That(
-            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            diagnostics.Any(d => d.Id == "SP0002"),
             Is.False,
             "Trusted generated getter purity should override the built-in known-impure property fallback for metadata properties.");
     }
@@ -1893,8 +1893,8 @@ public partial class ExceptionSummaryCatalogValidationTests
                 "sharpproof_known_impure_methods",
                 methodIdentity.CanonicalKey));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("config_known_impure"));
     }
 
@@ -1945,7 +1945,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -1996,10 +1996,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -2053,7 +2053,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -2108,10 +2108,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 
@@ -2165,7 +2165,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        Assert.That(diagnostics.Any(d => d.Id == "SP0002"), Is.False);
     }
 
     [Test]
@@ -2220,10 +2220,10 @@ public partial class ExceptionSummaryCatalogValidationTests
             },
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
 
-        var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+        var diagnostic = diagnostics.Single(d => d.Id == "SP0002");
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.catalog_source"],
             Is.EqualTo("generated_purity_summary"));
     }
 

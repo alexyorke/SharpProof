@@ -40,17 +40,17 @@ public struct Vector2
     }
 }";
 
-        var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 18, 7, 19)
+        var expectedX = VerifyCS.Diagnostic("SP0004").WithSpan(7, 18, 7, 19)
             .WithArguments("get_X");
-        var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 18, 8, 19)
+        var expectedY = VerifyCS.Diagnostic("SP0004").WithSpan(8, 18, 8, 19)
             .WithArguments("get_Y");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(10, 12, 10, 19).WithArguments(".ctor");
-        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedAdd = VerifyCS.Diagnostic("SP0004")
             .WithSpan(16, 36, 16, 37).WithArguments("op_Addition");
-        var expectedSub = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedSub = VerifyCS.Diagnostic("SP0004")
             .WithSpan(21, 36, 21, 37).WithArguments("op_Subtraction");
-        var expectedMul = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMul = VerifyCS.Diagnostic("SP0004")
             .WithSpan(26, 36, 26, 37).WithArguments("op_Multiply");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY, expectedCtor, expectedAdd, expectedSub,
             expectedMul);
@@ -82,11 +82,11 @@ public class Counter
         return new Counter(a.Value + b.Value);
     }
 }";
-        var expectedVal = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedVal = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 16, 9, 21).WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(11, 12, 11, 19).WithArguments(".ctor");
-        var expectedOp = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(18, 36, 18, 37)
+        var expectedOp = VerifyCS.Diagnostic("SP0002").WithSpan(18, 36, 18, 37)
             .WithArguments("op_Addition");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedVal, expectedCtor, expectedOp);
     }
@@ -161,17 +161,17 @@ public struct Temperature
     }
 }";
 
-        var expectedGet = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGet = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 19, 7, 26).WithArguments("get_Celsius");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(9, 12, 9, 23).WithArguments(".ctor");
-        var expectedLess = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedLess = VerifyCS.Diagnostic("SP0004")
             .WithSpan(14, 33, 14, 34).WithArguments("op_LessThan");
-        var expectedGreater = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedGreater = VerifyCS.Diagnostic("SP0004")
             .WithSpan(19, 33, 19, 34).WithArguments("op_GreaterThan");
-        var expectedEqual = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedEqual = VerifyCS.Diagnostic("SP0004")
             .WithSpan(24, 33, 24, 35).WithArguments("op_Equality");
-        var expectedNotEqual = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedNotEqual = VerifyCS.Diagnostic("SP0004")
             .WithSpan(29, 33, 29, 35).WithArguments("op_Inequality");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGet, expectedCtor, expectedLess, expectedGreater,
             expectedEqual, expectedNotEqual);
@@ -207,13 +207,13 @@ public struct Foot
     }
 }";
 
-        var expectedMeterVal = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMeterVal = VerifyCS.Diagnostic("SP0004")
             .WithSpan(7, 19, 7, 24).WithArguments("get_Value");
-        var expectedMeterCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedMeterCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(8, 12, 8, 17).WithArguments(".ctor");
-        var expectedFootVal = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedFootVal = VerifyCS.Diagnostic("SP0004")
             .WithSpan(18, 19, 18, 24).WithArguments("get_Value");
-        var expectedFootCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+        var expectedFootCtor = VerifyCS.Diagnostic("SP0004")
             .WithSpan(19, 12, 19, 16).WithArguments(".ctor");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedMeterVal, expectedMeterCtor, expectedFootVal,
             expectedFootCtor);

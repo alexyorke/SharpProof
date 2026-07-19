@@ -58,22 +58,22 @@ internal static class ContractDiagnosticSupport
         var properties = family switch
         {
             EvidenceFamily.Requires => ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.RequiresProofStatusProperty, proofStatus)
-                .Add(SharpProofDiagnostics.RequiresFailureReasonProperty, failureReason)
-                .Add(SharpProofDiagnostics.RequiresCalleeProperty, callee),
+                .Add("sharpproof.requires.condition", condition)
+                .Add("sharpproof.requires.proof_status", proofStatus)
+                .Add("sharpproof.requires.failure_reason", failureReason)
+                .Add("sharpproof.requires.callee", callee),
             EvidenceFamily.Ensures => ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proofStatus)
-                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, failureReason),
+                .Add("sharpproof.ensures.condition", condition)
+                .Add("sharpproof.ensures.proof_status", proofStatus)
+                .Add("sharpproof.ensures.failure_reason", failureReason),
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, null)
         };
 
         if (diagnosticUnknownReason != null)
             properties = properties.Add(
                 family == EvidenceFamily.Requires
-                    ? SharpProofDiagnostics.RequiresUnknownReasonProperty
-                    : SharpProofDiagnostics.EnsuresUnknownReasonProperty,
+                    ? "sharpproof.requires.unknown_reason"
+                    : "sharpproof.ensures.unknown_reason",
                 diagnosticUnknownReason);
 
         if (structuredUnknownReason?.IsUnknown == true)

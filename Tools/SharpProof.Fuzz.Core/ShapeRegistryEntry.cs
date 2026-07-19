@@ -27,14 +27,14 @@ public sealed record FuzzExpectation(
     public const string DefinitelyPureBucket = "definitely_pure";
 
     private static readonly ImmutableArray<string> DefaultSp0002Properties = ImmutableArray.Create(
-        SharpProofDiagnostics.ImpurityCategoryProperty,
-        SharpProofDiagnostics.ImpurityRuleProperty,
-        SharpProofDiagnostics.ImpurityOperationKindProperty);
+        DiagnosticPropertyNames.ImpurityCategoryProperty,
+        DiagnosticPropertyNames.ImpurityRuleProperty,
+        DiagnosticPropertyNames.ImpurityOperationKindProperty);
 
     private static readonly ImmutableArray<string> DefaultSp0010Properties = ImmutableArray.Create(
-        SharpProofDiagnostics.ExceptionTypesProperty,
-        SharpProofDiagnostics.ExceptionCategoriesProperty,
-        SharpProofDiagnostics.ExceptionSourcesProperty);
+        DiagnosticPropertyNames.ExceptionTypesProperty,
+        DiagnosticPropertyNames.ExceptionCategoriesProperty,
+        DiagnosticPropertyNames.ExceptionSourcesProperty);
 
     public string Bucket =>
         Sp0002 == Sp0002ExpectationKind.MayEmitConservatively ||
@@ -65,7 +65,7 @@ public sealed record FuzzExpectation(
 
     public FuzzExpectation RequireExceptionEdgesOnAnySp0010() => this with
     {
-        RequiredAnySp0010Properties = ImmutableArray.Create(SharpProofDiagnostics.ExceptionEdgesProperty)
+        RequiredAnySp0010Properties = ImmutableArray.Create(DiagnosticPropertyNames.ExceptionEdgesProperty)
     };
 }
 

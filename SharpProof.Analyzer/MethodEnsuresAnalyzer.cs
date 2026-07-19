@@ -584,7 +584,7 @@ internal static class MethodEnsuresAnalyzer
             structuredUnknownReason: unknownReasonInfo);
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.EnsuresNotProvenRule,
+            AnalyzerDiagnosticCatalog.Get("EnsuresNotProvenRule"),
             completionSite.Location,
             contractLocation == null ? null : new[] { contractLocation },
             properties,
@@ -616,7 +616,7 @@ internal static class MethodEnsuresAnalyzer
             structuredUnknownReason: SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
 
         return Diagnostic.Create(
-            SharpProofDiagnostics.EnsuresUnsupportedRule,
+            AnalyzerDiagnosticCatalog.Get("EnsuresUnsupportedRule"),
             location,
             additionalLocations,
             properties,

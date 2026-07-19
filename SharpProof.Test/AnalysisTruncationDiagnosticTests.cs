@@ -41,16 +41,16 @@ public sealed class AnalysisTruncationDiagnosticTests
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_analysis_max_merged_path_conditions", "1")
                 .Add("sharpproof_analysis_max_guard_facts_per_target_per_state", "1"));
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0002");
 
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.AnalysisTruncatedProperty],
+            diagnostic.Properties["sharpproof.analysis.truncated"],
             Is.EqualTo(bool.TrueString));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.AnalysisLimitCodesProperty],
+            diagnostic.Properties["sharpproof.analysis.limit_codes"],
             Does.Contain("analysis_limit.merged_path_conditions"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.AnalysisLimitEventsProperty],
+            diagnostic.Properties["sharpproof.analysis.limit_events"],
             Does.Contain("analysis_limit.merged_path_conditions|1|2|"));
     }
 }

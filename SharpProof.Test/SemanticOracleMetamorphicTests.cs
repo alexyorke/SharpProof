@@ -28,11 +28,11 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty], Does.Contain("Log"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.callee_chain"], Does.Contain("Log"));
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -55,7 +55,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -76,12 +76,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.WriteLine"));
     }
 
@@ -101,7 +101,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -124,7 +124,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0002"),
             Is.False);
     }
 
@@ -145,12 +145,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -170,12 +170,12 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, "SP0002");
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ImpurityRuleProperty],
             Is.EqualTo("MethodInvocationPurityRule"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+        Assert.That(diagnostic.Properties["sharpproof.impurity.symbol"],
             Does.Contain("System.Console.Read"));
     }
 
@@ -196,10 +196,10 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
         var diagnostic = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(candidate => candidate.Id == "SP0010")
             .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -224,10 +224,10 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
         var diagnostic = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(candidate => candidate.Id == "SP0010")
             .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -246,7 +246,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -267,7 +267,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -291,7 +291,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -315,7 +315,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -341,10 +341,10 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
         var diagnostic = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(candidate => candidate.Id == "SP0010")
             .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 
@@ -369,7 +369,7 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "SP0010"), Is.False);
     }
 
     [Test]
@@ -394,10 +394,10 @@ public class TestClass
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
         var diagnostic = diagnostics
-            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .Where(candidate => candidate.Id == "SP0010")
             .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+        Assert.That(diagnostic.Properties[DiagnosticPropertyNames.ExceptionTypesProperty],
             Is.EqualTo("System.InvalidOperationException"));
     }
 }

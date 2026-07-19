@@ -100,25 +100,25 @@ namespace TestNamespace
 }";
 
 
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 24, 11, 30)
+        var expectedGetValue = VerifyCS.Diagnostic("SP0004").WithSpan(11, 24, 11, 30)
             .WithArguments("get_Amount");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(13, 16, 13, 21)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004").WithSpan(13, 16, 13, 21)
             .WithArguments(".ctor");
-        var expectedOpAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(19, 38, 19, 39)
+        var expectedOpAdd = VerifyCS.Diagnostic("SP0004").WithSpan(19, 38, 19, 39)
             .WithArguments("op_Addition");
-        var expectedOpCheckedAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(25, 46, 25, 47)
+        var expectedOpCheckedAdd = VerifyCS.Diagnostic("SP0004").WithSpan(25, 46, 25, 47)
             .WithArguments("op_CheckedAddition");
-        var expectedOpSub = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(31, 38, 31, 39)
+        var expectedOpSub = VerifyCS.Diagnostic("SP0004").WithSpan(31, 38, 31, 39)
             .WithArguments("op_Subtraction");
-        var expectedOpCheckedSub = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(37, 46, 37, 47)
+        var expectedOpCheckedSub = VerifyCS.Diagnostic("SP0004").WithSpan(37, 46, 37, 47)
             .WithArguments("op_CheckedSubtraction");
-        var expectedOpMul = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(43, 38, 43, 39)
+        var expectedOpMul = VerifyCS.Diagnostic("SP0004").WithSpan(43, 38, 43, 39)
             .WithArguments("op_Multiply");
-        var expectedOpCheckedMul = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(49, 46, 49, 47)
+        var expectedOpCheckedMul = VerifyCS.Diagnostic("SP0004").WithSpan(49, 46, 49, 47)
             .WithArguments("op_CheckedMultiply");
-        var expectedOpDiv = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(55, 38, 55, 39)
+        var expectedOpDiv = VerifyCS.Diagnostic("SP0004").WithSpan(55, 38, 55, 39)
             .WithArguments("op_Division");
-        var expectedOpCheckedDiv = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(61, 46, 61, 47)
+        var expectedOpCheckedDiv = VerifyCS.Diagnostic("SP0004").WithSpan(61, 46, 61, 47)
             .WithArguments("op_CheckedDivision");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedCtor, expectedOpAdd, expectedOpCheckedAdd,
             expectedOpSub, expectedOpCheckedSub, expectedOpMul, expectedOpCheckedMul, expectedOpDiv,
@@ -195,13 +195,13 @@ namespace TestNamespace
 }";
         var expected = new[]
         {
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 23, 11, 24).WithArguments("get_X"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 23, 12, 24).WithArguments("get_Y"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(14, 16, 14, 24).WithArguments(".ctor"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(21, 41, 21, 42).WithArguments("op_Addition"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(27, 49, 27, 50).WithArguments("op_CheckedAddition"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(33, 41, 33, 42).WithArguments("op_Subtraction"),
-            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(39, 49, 39, 50)
+            VerifyCS.Diagnostic("SP0004").WithSpan(11, 23, 11, 24).WithArguments("get_X"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(12, 23, 12, 24).WithArguments("get_Y"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(14, 16, 14, 24).WithArguments(".ctor"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(21, 41, 21, 42).WithArguments("op_Addition"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(27, 49, 27, 50).WithArguments("op_CheckedAddition"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(33, 41, 33, 42).WithArguments("op_Subtraction"),
+            VerifyCS.Diagnostic("SP0004").WithSpan(39, 49, 39, 50)
                 .WithArguments("op_CheckedSubtraction")
         };
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -294,27 +294,27 @@ public struct ComplexValue
             ";
 
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(65, 32, 65, 48)
             .WithArguments("FibonacciChecked");
 
 
-        var expected2 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+        var expected2 = VerifyCS.Diagnostic(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"))
             .WithSpan(56, 32, 56, 57)
             .WithArguments("ComplexCalculationChecked");
 
 
-        var expectedAddChecked = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(8, 23, 8, 33)
+        var expectedAddChecked = VerifyCS.Diagnostic("SP0004").WithSpan(8, 23, 8, 33)
             .WithArguments("AddChecked");
-        var expectedGetReal = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 16, 16, 20)
+        var expectedGetReal = VerifyCS.Diagnostic("SP0004").WithSpan(16, 16, 16, 20)
             .WithArguments("get_Real");
-        var expectedGetImaginary = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(17, 16, 17, 25)
+        var expectedGetImaginary = VerifyCS.Diagnostic("SP0004").WithSpan(17, 16, 17, 25)
             .WithArguments("get_Imaginary");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(19, 12, 19, 24)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004").WithSpan(19, 12, 19, 24)
             .WithArguments(".ctor");
-        var expectedOpSub = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(41, 41, 41, 42)
+        var expectedOpSub = VerifyCS.Diagnostic("SP0004").WithSpan(41, 41, 41, 42)
             .WithArguments("op_Subtraction");
-        var expectedOpNeg = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(49, 41, 49, 42)
+        var expectedOpNeg = VerifyCS.Diagnostic("SP0004").WithSpan(49, 41, 49, 42)
             .WithArguments("op_UnaryNegation");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expected, expected2, expectedAddChecked, expectedGetReal,
@@ -398,17 +398,17 @@ namespace TestNamespace
     }
 }";
 
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 25)
+        var expectedGetValue = VerifyCS.Diagnostic("SP0004").WithSpan(11, 20, 11, 25)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(13, 16, 13, 27)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004").WithSpan(13, 16, 13, 27)
             .WithArguments(".ctor");
-        var expectedOpAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(19, 44, 19, 45)
+        var expectedOpAdd = VerifyCS.Diagnostic("SP0004").WithSpan(19, 44, 19, 45)
             .WithArguments("op_Addition");
-        var expectedOpCheckedAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(25, 52, 25, 53)
+        var expectedOpCheckedAdd = VerifyCS.Diagnostic("SP0004").WithSpan(25, 52, 25, 53)
             .WithArguments("op_CheckedAddition");
-        var expectedOpMul = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(31, 44, 31, 45)
+        var expectedOpMul = VerifyCS.Diagnostic("SP0004").WithSpan(31, 44, 31, 45)
             .WithArguments("op_Multiply");
-        var expectedOpCheckedMul = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(37, 52, 37, 53)
+        var expectedOpCheckedMul = VerifyCS.Diagnostic("SP0004").WithSpan(37, 52, 37, 53)
             .WithArguments("op_CheckedMultiply");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedCtor, expectedOpAdd, expectedOpCheckedAdd,
             expectedOpMul, expectedOpCheckedMul);
@@ -453,7 +453,7 @@ public class Calculator
 }
 ";
 
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(8, 19, 8, 24)
+        var expectedGetValue = VerifyCS.Diagnostic("SP0004").WithSpan(8, 19, 8, 24)
             .WithArguments("get_Value");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
@@ -584,15 +584,15 @@ namespace TestNamespace
     }
 }";
 
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 25)
+        var expectedGetValue = VerifyCS.Diagnostic("SP0004").WithSpan(11, 20, 11, 25)
             .WithArguments("get_Value");
-        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(13, 16, 13, 23)
+        var expectedCtor = VerifyCS.Diagnostic("SP0004").WithSpan(13, 16, 13, 23)
             .WithArguments(".ctor");
-        var expectedOpAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(19, 40, 19, 41)
+        var expectedOpAdd = VerifyCS.Diagnostic("SP0004").WithSpan(19, 40, 19, 41)
             .WithArguments("op_Addition");
-        var expectedOpCheckedAdd = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(25, 48, 25, 49)
+        var expectedOpCheckedAdd = VerifyCS.Diagnostic("SP0004").WithSpan(25, 48, 25, 49)
             .WithArguments("op_CheckedAddition");
-        var expectedIncrementCounter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(36, 24, 36, 40)
+        var expectedIncrementCounter = VerifyCS.Diagnostic("SP0002").WithSpan(36, 24, 36, 40)
             .WithArguments("IncrementCounter");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedCtor, expectedOpAdd, expectedOpCheckedAdd,
             expectedIncrementCounter);

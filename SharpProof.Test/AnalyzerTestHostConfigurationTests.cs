@@ -65,8 +65,8 @@ public class TestClass
                     ConfiguredMemberKeyTestFactory.Method("TestClass", "Second"))));
 
         var symbols = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-            .Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty])
+            .Where(diagnostic => diagnostic.Id == "SP0002")
+            .Select(diagnostic => diagnostic.Properties["sharpproof.impurity.symbol"])
             .ToArray();
 
         Assert.That(symbols, Has.Some.Contains("TestClass.First"));
@@ -94,8 +94,8 @@ public class TestClass
                     "SharpProof.EffectSummary.json",
                     "{ invalid json")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Is.EqualTo("malformed effect-summary JSON"));
     }
 
@@ -112,28 +112,28 @@ public sealed class TestClass
                 .Add("sharpproof_suggest_missing_enforce_pure", "maybe"));
 
         var configurationDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId)
-            .OrderBy(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty],
+            .Where(diagnostic => diagnostic.Id == "SP0025")
+            .OrderBy(diagnostic => diagnostic.Properties["sharpproof.config.key"],
                 StringComparer.Ordinal)
             .ToArray();
 
         Assert.That(configurationDiagnostics, Has.Length.EqualTo(3));
         Assert.That(
             configurationDiagnostics.Select(diagnostic =>
-                diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty]),
+                diagnostic.Properties["sharpproof.config.key"]),
             Is.EqualTo(new[]
             {
                 "sharpproof_smt_mode",
                 "sharpproof_smt_timeout_ms",
                 "sharpproof_suggest_missing_enforce_pure"
             }));
-        Assert.That(configurationDiagnostics[0].Properties[SharpProofDiagnostics.ConfigurationValueProperty],
+        Assert.That(configurationDiagnostics[0].Properties["sharpproof.config.value"],
             Is.EqualTo("turbo"));
-        Assert.That(configurationDiagnostics[0].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+        Assert.That(configurationDiagnostics[0].Properties["sharpproof.config.invalid_reason"],
             Does.Contain("expected one of"));
-        Assert.That(configurationDiagnostics[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+        Assert.That(configurationDiagnostics[1].Properties["sharpproof.config.invalid_reason"],
             Is.EqualTo("expected a positive integer"));
-        Assert.That(configurationDiagnostics[2].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+        Assert.That(configurationDiagnostics[2].Properties["sharpproof.config.invalid_reason"],
             Is.EqualTo("expected a boolean value"));
     }
 
@@ -148,7 +148,7 @@ public sealed class TestClass
 
         Assert.That(
             diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId),
+                diagnostic.Id == "SP0025"),
             Is.False);
     }
 
@@ -162,20 +162,20 @@ public sealed class TestClass
                 .Add("sharpproof_runtime_hazard_mode", "true"));
 
         var invalid = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId)
-            .OrderBy(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty],
+            .Where(diagnostic => diagnostic.Id == "SP0025")
+            .OrderBy(diagnostic => diagnostic.Properties["sharpproof.config.key"],
                 StringComparer.Ordinal)
             .ToArray();
 
         Assert.That(invalid, Has.Length.EqualTo(2));
         Assert.That(
-            invalid.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty]),
+            invalid.Select(diagnostic => diagnostic.Properties["sharpproof.config.key"]),
             Is.EqualTo(new[] { "sharpproof_runtime_hazard_mode", "sharpproof_smt_mode" }));
         Assert.That(
-            invalid[0].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            invalid[0].Properties["sharpproof.config.invalid_reason"],
             Does.Contain("none, sites, summaries, all, unknowns, sites-and-unknowns, all-and-unknowns"));
         Assert.That(
-            invalid[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            invalid[1].Properties["sharpproof.config.invalid_reason"],
             Does.Contain("disabled, bounded, deep"));
     }
 
@@ -195,14 +195,14 @@ public sealed class TestClass
                 .Add("sharpproof_known_pure_methods", "TestClass.Value;" + getterWithoutSuffix));
 
         var diagnostic = diagnostics.Single(item =>
-            item.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId &&
-            item.Properties[SharpProofDiagnostics.ConfigurationKeyProperty] ==
+            item.Id == "SP0025" &&
+            item.Properties["sharpproof.config.key"] ==
             "sharpproof_known_pure_methods");
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            diagnostic.Properties["sharpproof.config.invalid_reason"],
             Does.Contain("canonical structural method keys"));
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            diagnostic.Properties["sharpproof.config.invalid_reason"],
             Does.Contain(".get or .set"));
     }
 
@@ -231,11 +231,11 @@ public sealed class TestClass
                 "CS8602, UNKNOWN0001"));
 
         var diagnostic = diagnostics.Single(item =>
-            item.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId &&
-            item.Properties[SharpProofDiagnostics.ConfigurationKeyProperty] ==
+            item.Id == "SP0025" &&
+            item.Properties["sharpproof.config.key"] ==
             "sharpproof_suppression_diagnostic_ids");
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            diagnostic.Properties["sharpproof.config.invalid_reason"],
             Does.Contain("unknown values: unknown0001"));
     }
 
@@ -249,10 +249,10 @@ public sealed class TestClass
                     "runtime.SharpProof.EffectSummary.json",
                     "{ invalid json")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFilePathProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.path"],
             Is.EqualTo("runtime.SharpProof.EffectSummary.json"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Is.EqualTo("malformed effect-summary JSON"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("malformed effect-summary JSON"));
     }
@@ -269,11 +269,11 @@ public sealed class TestClass
                     "runtime.SharpProof.EffectSummary.json",
                     json)));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
         Assert.Multiple(() =>
         {
             Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+                diagnostic.Properties["sharpproof.additional_file.reason"],
                 Is.EqualTo("unsupported effect-summary root; expected an object"));
             Assert.That(diagnostics.Select(static item => item.Id), Does.Not.Contain("AD0001"));
         });
@@ -289,8 +289,8 @@ public sealed class TestClass
                     "SharpProof.Baseline.json",
                     "  ")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Is.EqualTo("file is empty"));
     }
 
@@ -308,8 +308,8 @@ public sealed class TestClass
                     "SharpProof.EffectSummary.json",
                     "{\"SchemaVersion\":" + schemaVersion + ",\"Assemblies\":[]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("unsupported effect-summary SchemaVersion '" + schemaVersion + "'"));
     }
 
@@ -323,8 +323,8 @@ public sealed class TestClass
                     "SharpProof.EffectSummary.json",
                     "{\"SchemaVersion\":5,\"EvidenceSchemaVersion\":99,\"Assemblies\":[]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("unsupported effect-summary EvidenceSchemaVersion '99'"));
     }
 
@@ -339,8 +339,8 @@ public sealed class TestClass
                     "{\"SchemaVersion\":5,\"EvidenceSchemaVersion\":2," +
                     "\"EvidenceSchemaCompatibility\":\"breaking\",\"Assemblies\":[]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("EvidenceSchemaCompatibility must be 'exact-v2'"));
     }
 
@@ -385,11 +385,11 @@ public sealed class TestClass
                     summary)));
 
         var diagnostic = diagnostics.Single(item =>
-            item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
-            item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty] == expectedReasonCode);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFilePathProperty],
+            item.Id == "SP0032" &&
+            item.Properties["sharpproof.additional_file.reason_code"] == expectedReasonCode);
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.path"],
             Is.EqualTo("stale.SharpProof.EffectSummary.json"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("get_Length"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("was ignored because"));
     }
@@ -420,9 +420,9 @@ public sealed class TestClass
 
         Assert.That(
             diagnostics.Any(item =>
-                item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
-                item.Properties.ContainsKey(SharpProofDiagnostics.AdditionalFileReasonCodeProperty) &&
-                item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty]!.StartsWith(
+                item.Id == "SP0032" &&
+                item.Properties.ContainsKey("sharpproof.additional_file.reason_code") &&
+                item.Properties["sharpproof.additional_file.reason_code"]!.StartsWith(
                     "effect_summary_",
                     StringComparison.Ordinal)),
             Is.False);
@@ -458,8 +458,8 @@ public sealed class TestClass
 
         Assert.That(
             diagnostics.Any(item =>
-                item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
-                item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty] ==
+                item.Id == "SP0032" &&
+                item.Properties["sharpproof.additional_file.reason_code"] ==
                 "effect_summary_framework_source_mismatch"),
             Is.EqualTo(expectStaleDiagnostic));
     }
@@ -477,8 +477,8 @@ public sealed class TestClass
                     "\"path\":\"input.cs\",\"evidenceSchemaVersion\":2," +
                     "\"evidenceSchemaCompatibility\":\"exact-v2\"},{\"id\":\"SP0002\"}]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("baseline entry is missing required evidenceSchemaVersion"));
     }
 
@@ -495,8 +495,8 @@ public sealed class TestClass
                     "\"Path\":\"input.cs\",\"EvidenceSchemaVersion\":2," +
                     "\"EvidenceSchemaCompatibility\":\"exact-v2\"}]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("baseline contains no diagnostic entries"));
     }
 
@@ -513,8 +513,8 @@ public sealed class TestClass
                     "\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"," +
                     "\"evidenceSchemaVersion\":99,\"evidenceSchemaCompatibility\":\"future\"}]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("unsupported baseline entry evidenceSchemaVersion '99'"));
     }
 
@@ -531,9 +531,9 @@ public sealed class TestClass
                     "\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"," +
                     "\"evidenceSchemaVersion\":2,\"evidenceSchemaCompatibility\":\"exact-v2\"}]}]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
         Assert.That(
-            diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("baseline contains no diagnostic entries"));
     }
 
@@ -550,8 +550,8 @@ public sealed class TestClass
                     "\"id\":\"SP0002\",\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"," +
                     "\"evidenceSchemaVersion\":1,\"evidenceSchemaCompatibility\":\"additive-v1\"}]}")));
 
-        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+        var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
+        Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
             Does.Contain("unsupported baseline evidenceSchemaVersion '1'"));
     }
 
@@ -653,8 +653,7 @@ public sealed class TestClass
         {
             "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs",
             "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
-            "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
-            "SharpProof.Analyzer/SharpProofDiagnostics.cs"
+            "SharpProof.Analyzer/Configuration/ConfigKeys.cs"
         };
 
         var offenders = Directory
@@ -665,9 +664,6 @@ public sealed class TestClass
                 Source = File.ReadAllText(path)
             })
             .Where(file => !allowedFiles.Contains(file.Path) &&
-                           !file.Path.StartsWith(
-                               "SharpProof.Analyzer/SharpProofDiagnostics.",
-                               StringComparison.Ordinal) &&
                            file.Source.Contains("sharpproof_", StringComparison.Ordinal))
             .Select(file => file.Path)
             .ToArray();

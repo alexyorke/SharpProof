@@ -33,7 +33,7 @@ public class TestClass
 }";
 
 
-        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedOuter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(12, 16, 12, 26)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedOuter);
@@ -59,7 +59,7 @@ public class TestClass
     }
 }";
 
-        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expected = VerifyCS.Diagnostic("SP0002")
             .WithSpan(10, 17, 10, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
@@ -88,7 +88,7 @@ public class TestClass
     }
 }";
 
-        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+        var expectedOuter = VerifyCS.Diagnostic("SP0002")
             .WithSpan(15, 17, 15, 27)
             .WithArguments("TestMethod");
         await VerifyCS.VerifyAnalyzerAsync(test, expectedOuter);

@@ -11,13 +11,13 @@ internal static class UnknownReasonDiagnosticProperties
         if (info == null) throw new ArgumentNullException(nameof(info));
 
         return properties
-            .SetItem(SharpProofDiagnostics.UnknownReasonCodeProperty, info.Code)
-            .SetItem(SharpProofDiagnostics.UnknownReasonCategoryProperty, info.Category.ToString())
-            .SetItem(SharpProofDiagnostics.UnknownReasonSourceProperty, info.Source.ToString())
-            .SetItem(SharpProofDiagnostics.UnknownReasonRawProperty, info.RawReason)
-            .SetItem(SharpProofDiagnostics.UnknownReasonRetryableProperty, info.IsRetryable.ToString())
+            .SetItem("sharpproof.unknown.code", info.Code)
+            .SetItem("sharpproof.unknown.category", info.Category.ToString())
+            .SetItem("sharpproof.unknown.source", info.Source.ToString())
+            .SetItem("sharpproof.unknown.raw_reason", info.RawReason)
+            .SetItem("sharpproof.unknown.retryable", info.IsRetryable.ToString())
             .SetItem(
-                SharpProofDiagnostics.UnknownReasonConfigurationRelatedProperty,
+                "sharpproof.unknown.configuration_related",
                 info.IsConfigurationRelated.ToString());
     }
 }

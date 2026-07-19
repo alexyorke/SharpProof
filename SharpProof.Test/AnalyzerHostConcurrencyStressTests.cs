@@ -45,14 +45,14 @@ public class AnalyzerHostConcurrencyStressTests
         {
             AssertNoAnalyzerFailures(diagnostics);
             Assert.That(
-                diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                diagnostics.Count(diagnostic => diagnostic.Id == "SP0002"),
                 Is.EqualTo(methodCount));
             Assert.That(
                 diagnostics.Count(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.AllocationInZeroAllocationMethodId),
+                    diagnostic.Id == "SP0013"),
                 Is.EqualTo(methodCount));
             Assert.That(
-                diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.EnsuresNotProvenId),
+                diagnostics.Count(diagnostic => diagnostic.Id == "SP0018"),
                 Is.EqualTo(methodCount));
             Assert.That(GetDiagnosticFingerprint(diagnostics), Is.EqualTo(expectedFingerprint));
         }
@@ -126,17 +126,17 @@ public class AnalyzerHostConcurrencyStressTests
         {
             var diagnostics = results[index];
             var purityDiagnostics = diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .Where(diagnostic => diagnostic.Id == "SP0002")
                 .ToImmutableArray();
             var reportsTimeout = diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ExceptionTypesProperty, out var types) &&
+                diagnostic.Id == "SP0010" &&
+                diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ExceptionTypesProperty, out var types) &&
                 types != null &&
                 types.Contains("System.TimeoutException", StringComparison.Ordinal));
 
             AssertNoAnalyzerFailures(diagnostics);
             Assert.That(
-                diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAdditionalFileId),
+                diagnostics.Any(diagnostic => diagnostic.Id == "SP0032"),
                 Is.False);
             if (index % 2 == 0)
             {
@@ -301,7 +301,7 @@ public class AnalyzerHostConcurrencyStressTests
         {
             AssertNoAnalyzerFailures(diagnostics);
             Assert.That(
-                diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                diagnostics.Count(diagnostic => diagnostic.Id == "SP0002"),
                 Is.EqualTo(methodCount));
             Assert.That(GetDiagnosticFingerprint(diagnostics), Is.EqualTo(expectedFingerprint));
         }

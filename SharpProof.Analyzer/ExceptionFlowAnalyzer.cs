@@ -112,7 +112,7 @@ internal static partial class ExceptionFlowAnalyzer
             "may_throw");
 
         var diagnostic = Diagnostic.Create(
-            SharpProofDiagnostics.ExceptionSummaryRule,
+            AnalyzerDiagnosticCatalog.Get("ExceptionSummaryRule"),
             diagnosticLocation,
             null,
             properties, methodSymbol.Name, exceptionList);
@@ -135,16 +135,16 @@ internal static partial class ExceptionFlowAnalyzer
             if (string.IsNullOrWhiteSpace(displayReason)) displayReason = hazard.Proof.Reason;
 
             var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ExceptionTypesProperty, hazard.ExceptionType)
-                .Add(SharpProofDiagnostics.ExceptionCategoriesProperty, hazard.Category)
-                .Add(SharpProofDiagnostics.ExceptionSourcesProperty,
+                .Add(DiagnosticPropertyNames.ExceptionTypesProperty, hazard.ExceptionType)
+                .Add(DiagnosticPropertyNames.ExceptionCategoriesProperty, hazard.Category)
+                .Add(DiagnosticPropertyNames.ExceptionSourcesProperty,
                     ExceptionSources.UnknownRuntimeHazardCandidate)
-                .Add(SharpProofDiagnostics.RuntimeHazardKindProperty, hazard.Kind.ToString())
-                .Add(SharpProofDiagnostics.RuntimeHazardStatusProperty, hazard.Status.ToString())
-                .Add(SharpProofDiagnostics.RuntimeHazardStatusReasonProperty, hazard.StatusReason)
-                .Add(SharpProofDiagnostics.RuntimeHazardTriggerProperty, hazard.TriggerCondition)
-                .Add(SharpProofDiagnostics.RuntimeHazardProofBackendProperty, hazard.Proof.Backend.ToString())
-                .Add(SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty,
+                .Add("sharpproof.runtime_hazard.kind", hazard.Kind.ToString())
+                .Add("sharpproof.runtime_hazard.status", hazard.Status.ToString())
+                .Add("sharpproof.runtime_hazard.status_reason", hazard.StatusReason)
+                .Add("sharpproof.runtime_hazard.trigger", hazard.TriggerCondition)
+                .Add("sharpproof.runtime_hazard.proof_backend", hazard.Proof.Backend.ToString())
+                .Add("sharpproof.runtime_hazard.unknown_reason",
                     hazard.Proof.UnknownReason.ToString());
             properties = UnknownReasonDiagnosticProperties.Add(properties, hazard.UnknownReasonInfo);
             properties = AnalysisTruncationDiagnosticProperties.Add(properties, hazard.AnalysisTruncation);
@@ -161,7 +161,7 @@ internal static partial class ExceptionFlowAnalyzer
                 hazard.UnknownReasonInfo.Code);
 
             var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.UnknownRuntimeHazardRule,
+                AnalyzerDiagnosticCatalog.Get("UnknownRuntimeHazardRule"),
                 location,
                 null,
                 properties,
@@ -222,7 +222,7 @@ internal static partial class ExceptionFlowAnalyzer
             var operationDisplay = GetExceptionSiteDisplay(firstEntry.Site, firstEntry.Method);
             var properties = CreateExceptionProperties(siteEvidence);
             if (!string.IsNullOrWhiteSpace(exceptionSymbol))
-                properties = properties.Add(SharpProofDiagnostics.ExceptionSymbolProperty, exceptionSymbol);
+                properties = properties.Add("sharpproof.exceptions.symbol", exceptionSymbol);
 
             properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
@@ -237,7 +237,7 @@ internal static partial class ExceptionFlowAnalyzer
                 siteEvidence.FormatCategories());
 
             var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.UncaughtExceptionSiteRule,
+                AnalyzerDiagnosticCatalog.Get("UncaughtExceptionSiteRule"),
                 siteLocation,
                 null,
                 properties, operationDisplay, exceptionList);
@@ -249,12 +249,12 @@ internal static partial class ExceptionFlowAnalyzer
         ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.ExceptionTypesProperty, string.Join(";", exceptionEvidence.Types))
-            .Add(SharpProofDiagnostics.ExceptionCategoriesProperty, exceptionEvidence.FormatCategories())
-            .Add(SharpProofDiagnostics.ExceptionSourcesProperty, exceptionEvidence.FormatSources());
+            .Add(DiagnosticPropertyNames.ExceptionTypesProperty, string.Join(";", exceptionEvidence.Types))
+            .Add(DiagnosticPropertyNames.ExceptionCategoriesProperty, exceptionEvidence.FormatCategories())
+            .Add(DiagnosticPropertyNames.ExceptionSourcesProperty, exceptionEvidence.FormatSources());
         var formattedEdges = exceptionEvidence.FormatEdges();
         if (!string.IsNullOrWhiteSpace(formattedEdges))
-            properties = properties.Add(SharpProofDiagnostics.ExceptionEdgesProperty, formattedEdges);
+            properties = properties.Add(DiagnosticPropertyNames.ExceptionEdgesProperty, formattedEdges);
 
         return properties;
     }
