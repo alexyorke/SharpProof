@@ -858,6 +858,8 @@ public sealed class RepositoryArchitectureTests
             Assert.That(configuration, Does.Contain("AnalyzerTreeConfiguration GetTreeConfiguration"));
             Assert.That(methodContext, Does.Contain("AnalyzerTreeConfiguration Configuration"));
             Assert.That(methodContext, Does.Not.Contain("AnalyzerOptions Options"));
+            Assert.That(methodContext, Does.Not.Contain("GetSymbolicQueryExecutionCount"));
+            Assert.That(methodContext, Does.Not.Contain("_queryExecutionCounts"));
             Assert.That(configuration, Does.Not.Contain("GetEmitExplanations("));
             Assert.That(configuration, Does.Not.Contain("GetReportExceptions("));
             Assert.That(configuration, Does.Not.Contain("GetCheckedExceptions("));
@@ -871,6 +873,7 @@ public sealed class RepositoryArchitectureTests
         var carriers = new[]
         {
             ("SharpProof.Analyzer/Engine/Rules/PurityAnalysisContext.cs", "record PurityAnalysisContext("),
+            ("SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs", "record struct PurityEvidence("),
             ("SharpProof.Analyzer/MethodAnalysisSnapshot.cs", "record MethodAnalysisSnapshot("),
             ("SharpProof.Analyzer/EffectSummaryEntryTrustMetadata.cs", "class EffectSummaryEntryTrustMetadata("),
             ("SharpProof.Symbolic/SymbolicSourceInput.cs", "record SymbolicSourceInput("),
@@ -900,6 +903,10 @@ public sealed class RepositoryArchitectureTests
         var invariantService = File.ReadAllText(Path.Combine(
             root, "SharpProof.Symbolic", "SymbolicInvariantService.cs"));
         Assert.That(invariantService, Does.Not.Contain("record SymbolicSmtDiagnosticsSnapshot("));
+
+        var smtAnalysis = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "Smt", "SmtAnalysisService.cs"));
+        Assert.That(smtAnalysis, Does.Not.Contain("PathConditionsImply("));
     }
 
     [Test]

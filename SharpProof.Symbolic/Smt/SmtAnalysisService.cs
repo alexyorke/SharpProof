@@ -144,13 +144,6 @@ internal sealed class SmtAnalysisService : IDisposable
                 new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula))));
     }
 
-    internal bool PathConditionsImply(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula)
-    {
-        return ClassifyImplication(pathConditions, factFormula).Outcome == PurityProofOutcome.ProvablyPure;
-    }
-
     internal PurityProofResult Classify(PurityProofQuery query)
     {
         if (_disposed) return Unknown("smt_disposed");

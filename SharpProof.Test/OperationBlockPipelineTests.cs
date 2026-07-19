@@ -176,8 +176,6 @@ public sealed class OperationBlockPipelineTests
             Assert.That(secondComplexity, Is.SameAs(firstComplexity));
             Assert.That(firstCapability.IsSuccess, Is.True);
             Assert.That(firstComplexity.IsSuccess, Is.True);
-            Assert.That(state.GetSymbolicQueryExecutionCount("capability"), Is.EqualTo(1));
-            Assert.That(state.GetSymbolicQueryExecutionCount("complexity"), Is.EqualTo(1));
             Assert.That(state.Snapshot.OperationBlocks, Has.Length.EqualTo(1));
             Assert.That(state.Snapshot.RootOperation, Is.Not.Null);
             Assert.That(state.Snapshot.VisibleOperations, Is.Not.Empty);
@@ -227,7 +225,6 @@ public sealed class OperationBlockPipelineTests
 
         Assert.That(factoryExecutions, Is.EqualTo(1));
         Assert.That(results, Has.All.SameAs(results[0]));
-        Assert.That(state.GetSymbolicQueryExecutionCount("shared-test-query"), Is.EqualTo(1));
     }
 
     [Test]

@@ -514,12 +514,20 @@ Tests are excluded from the metric and must not be deleted.
   wrapper, and the one-method complexity service. Exception flow, contract
   proofs, capability/complexity caching, CLI error classification, and public
   session results retain their characterized behavior.
+- [x] Removed the remaining analyzer and SMT test-only execution adapters.
+  Cache identity and concurrent single-execution tests now assert observable
+  results and factory counts directly, while implication tests consume the
+  canonical typed proof outcome. `PurityEvidence` is an immutable record value
+  and purity-state updates use native `with` copies instead of a nullable
+  nine-argument copy adapter. Focused cache, SMT, purity-state, diagnostic-
+  evidence, and architecture coverage preserves semantics and prevents the
+  instrumentation paths from returning.
 
 ## Current evidence
 
-- Maintained production: 92,665 lines (88,746 C#, 3,189 scripts, and 730
-  specifications); net reduction: 14,961 lines; remaining reduction: 5,039.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 92,596 lines (88,677 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,030 lines; remaining reduction: 4,970.
+  This tranche removed 69 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,211 passing tests and two documented Main skips.
 

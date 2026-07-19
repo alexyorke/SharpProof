@@ -7,9 +7,6 @@ internal sealed record AnalyzerQueryOutcome<T>(T? Value, SharpProofError? Error)
 
 internal sealed class MethodBodyAnalysisState
 {
-    private readonly ConcurrentDictionary<string, int> _queryExecutionCounts =
-        new(StringComparer.Ordinal);
-
     private readonly ConcurrentDictionary<string, Lazy<object>> _symbolicQueryResults =
         new(StringComparer.Ordinal);
 
@@ -108,11 +105,7 @@ internal sealed class MethodBodyAnalysisState
         var lazy = _symbolicQueryResults.GetOrAdd(
             queryKey,
             _ => new Lazy<object>(
-                () =>
-                {
-                    _queryExecutionCounts.AddOrUpdate(queryKey, 1, static (_, count) => count + 1);
-                    return query();
-                },
+                () => query(),
                 LazyThreadSafetyMode.ExecutionAndPublication));
         try
         {
@@ -128,10 +121,6 @@ internal sealed class MethodBodyAnalysisState
         }
     }
 
-    internal int GetSymbolicQueryExecutionCount(string queryKey)
-    {
-        return _queryExecutionCounts.TryGetValue(queryKey, out var count) ? count : 0;
-    }
 }
 
 internal static class AnalyzerSymbolicQueryBoundary

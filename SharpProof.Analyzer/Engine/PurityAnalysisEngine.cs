@@ -187,17 +187,17 @@ internal partial class PurityAnalysisEngine
 
     internal readonly struct PurityAnalysisState : IEquatable<PurityAnalysisState>
     {
-        public bool HasPotentialImpurity { get; }
-        public SyntaxNode? FirstImpureSyntaxNode { get; }
-        public PurityEvidence FirstImpurityEvidence { get; }
+        public bool HasPotentialImpurity { get; private init; }
+        public SyntaxNode? FirstImpureSyntaxNode { get; private init; }
+        public PurityEvidence FirstImpurityEvidence { get; private init; }
 
 
-        public ImmutableDictionary<ISymbol, PotentialTargets> DelegateTargetMap { get; }
+        public ImmutableDictionary<ISymbol, PotentialTargets> DelegateTargetMap { get; private init; }
 
-        public ImmutableDictionary<CaptureId, PurityAnalysisResult> FlowCaptures { get; }
-        public ImmutableDictionary<CaptureId, PotentialTargets> FlowCaptureTargets { get; }
-        public ImmutableDictionary<CaptureId, ISymbol> FlowCaptureSymbols { get; }
-        public SymbolicState PathState { get; }
+        public ImmutableDictionary<CaptureId, PurityAnalysisResult> FlowCaptures { get; private init; }
+        public ImmutableDictionary<CaptureId, PotentialTargets> FlowCaptureTargets { get; private init; }
+        public ImmutableDictionary<CaptureId, ISymbol> FlowCaptureSymbols { get; private init; }
+        public SymbolicState PathState { get; private init; }
 
 
         internal PurityAnalysisState(
@@ -335,30 +335,6 @@ internal partial class PurityAnalysisEngine
 
 
 
-        private PurityAnalysisState Copy(
-            bool? hasPotentialImpurity = null,
-            SyntaxNode? firstImpureSyntaxNode = null,
-            bool updateFirstImpureSyntaxNode = false,
-            ImmutableDictionary<ISymbol, PotentialTargets>? delegateTargetMap = null,
-            ImmutableDictionary<CaptureId, PurityAnalysisResult>? flowCaptures = null,
-            ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
-            PurityEvidence? firstImpurityEvidence = null,
-            SymbolicState? pathState = null,
-            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
-        {
-            return new PurityAnalysisState(
-                hasPotentialImpurity ?? HasPotentialImpurity,
-                updateFirstImpureSyntaxNode ? firstImpureSyntaxNode : FirstImpureSyntaxNode,
-                delegateTargetMap ?? DelegateTargetMap,
-                flowCaptures ?? FlowCaptures,
-                flowCaptureTargets ?? FlowCaptureTargets,
-                firstImpurityEvidence ?? FirstImpurityEvidence,
-                pathState ?? PathState,
-                flowCaptureSymbols ?? FlowCaptureSymbols);
-        }
-
-
-
         public PurityAnalysisState WithImpurity(PurityAnalysisResult result, SyntaxNode fallbackNode)
         {
             if (HasPotentialImpurity) return this;
@@ -366,27 +342,28 @@ internal partial class PurityAnalysisEngine
             var evidence = result.Evidence.IsEmpty
                 ? PurityEvidence.Create("unsupported_operation", "UnsupportedOperation", syntaxNode: node)
                 : result.Evidence.WithSyntax(node);
-            return Copy(
-                true,
-                node,
-                true,
-                firstImpurityEvidence: evidence);
+            return this with
+            {
+                HasPotentialImpurity = true,
+                FirstImpureSyntaxNode = node,
+                FirstImpurityEvidence = evidence
+            };
         }
 
         public PurityAnalysisState WithDelegateTarget(ISymbol delegateSymbol, PotentialTargets targets)
         {
             var newMap = DelegateTargetMap.SetItem(delegateSymbol, targets);
-            return Copy(delegateTargetMap: newMap);
+            return this with { DelegateTargetMap = newMap };
         }
 
         public PurityAnalysisState WithFlowCaptureResult(CaptureId id, PurityAnalysisResult result)
         {
-            return Copy(flowCaptures: FlowCaptures.SetItem(id, result));
+            return this with { FlowCaptures = FlowCaptures.SetItem(id, result) };
         }
 
         public PurityAnalysisState WithFlowCaptureTarget(CaptureId id, PotentialTargets targets)
         {
-            return Copy(flowCaptureTargets: FlowCaptureTargets.SetItem(id, targets));
+            return this with { FlowCaptureTargets = FlowCaptureTargets.SetItem(id, targets) };
         }
 
         public PurityAnalysisState WithFlowCaptureConcreteType(
@@ -395,34 +372,40 @@ internal partial class PurityAnalysisEngine
             SyntaxNode source)
         {
             var term = CreateFlowCaptureReferenceTerm(id);
-            return Copy(pathState: SymbolicRuntimeTypeFacts.WithExactRuntimeType(
-                PathState,
-                term,
-                concreteType,
-                source,
-                "analyzer.flow-capture.exact-runtime-type"));
+            return this with
+            {
+                PathState = SymbolicRuntimeTypeFacts.WithExactRuntimeType(
+                    PathState,
+                    term,
+                    concreteType,
+                    source,
+                    "analyzer.flow-capture.exact-runtime-type")
+            };
         }
 
         public PurityAnalysisState WithFlowCaptureSymbol(CaptureId id, ISymbol symbol)
         {
-            return Copy(flowCaptureSymbols: FlowCaptureSymbols.SetItem(id, symbol));
+            return this with { FlowCaptureSymbols = FlowCaptureSymbols.SetItem(id, symbol) };
         }
 
         public PurityAnalysisState ResetFlowCaptureFacts(CaptureId id, SyntaxNode source)
         {
             var term = CreateFlowCaptureReferenceTerm(id);
-            return Copy(pathState: SymbolicOperationTransferKernel.Invalidate(
-                PathState,
-                ImmutableArray.Create(new SymbolicInvalidationTarget(term.Name)),
-                source.Span,
-                "analyzer.flow-capture.assignment").State);
+            return this with
+            {
+                PathState = SymbolicOperationTransferKernel.Invalidate(
+                    PathState,
+                    ImmutableArray.Create(new SymbolicInvalidationTarget(term.Name)),
+                    source.Span,
+                    "analyzer.flow-capture.assignment").State
+            };
         }
 
         public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode source)
         {
             if (IsOwnedArrayFlowCapture(id)) return this;
 
-            return Copy(pathState: AddOwnedArrayFlowCaptureFacts(PathState, id, source));
+            return this with { PathState = AddOwnedArrayFlowCaptureFacts(PathState, id, source) };
         }
 
         public bool IsOwnedArrayFlowCapture(CaptureId id)
@@ -490,18 +473,21 @@ internal partial class PurityAnalysisEngine
             SyntaxNode source)
         {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
-            return Copy(pathState: SymbolicRuntimeTypeFacts.WithExactRuntimeType(
-                PathState,
-                term,
-                concreteType,
-                source,
-                "analyzer.local.exact-runtime-type"));
+            return this with
+            {
+                PathState = SymbolicRuntimeTypeFacts.WithExactRuntimeType(
+                    PathState,
+                    term,
+                    concreteType,
+                    source,
+                    "analyzer.local.exact-runtime-type")
+            };
         }
 
         public PurityAnalysisState WithoutLocalConcreteType(ISymbol localSymbol)
         {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
-            return Copy(pathState: SymbolicRuntimeTypeFacts.WithoutExactRuntimeType(PathState, term));
+            return this with { PathState = SymbolicRuntimeTypeFacts.WithoutExactRuntimeType(PathState, term) };
         }
 
         public bool TryGetLocalConcreteType(ISymbol localSymbol, out INamedTypeSymbol concreteType)
@@ -525,7 +511,7 @@ internal partial class PurityAnalysisEngine
 
         public PurityAnalysisState WithPathState(SymbolicState pathState)
         {
-            return Copy(pathState: pathState ?? new SymbolicState());
+            return this with { PathState = pathState ?? new SymbolicState() };
         }
 
         public int GetSmtSymbolVersion(ISymbol symbol)
@@ -548,7 +534,7 @@ internal partial class PurityAnalysisEngine
                         DefinitionVersion: nextVersion)),
                     definitionSyntax.Span,
                     "analyzer.version-update").State;
-            return Copy(pathState: pathState);
+            return this with { PathState = pathState };
         }
 
         private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)
@@ -697,41 +683,19 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    public readonly struct PurityEvidence
+    public readonly record struct PurityEvidence(
+        string Category,
+        string RuleName,
+        string OperationKind,
+        string Symbol,
+        string CatalogSource,
+        string CalleeChain,
+        string BclFallbackGuess,
+        string BclFallbackConfidence,
+        string BclFallbackReason)
     {
-        public string Category { get; }
-        public string RuleName { get; }
-        public string OperationKind { get; }
-        public string Symbol { get; }
-        public string CatalogSource { get; }
-        public string CalleeChain { get; }
-        public string BclFallbackGuess { get; }
-        public string BclFallbackConfidence { get; }
-        public string BclFallbackReason { get; }
         public SymbolicUnknownReasonInfo UnknownReasonInfo =>
             SymbolicUnknownReasonTaxonomy.ForPurity(Category, BclFallbackReason);
-
-        private PurityEvidence(
-            string category,
-            string ruleName,
-            string operationKind,
-            string symbol,
-            string catalogSource,
-            string calleeChain,
-            string bclFallbackGuess,
-            string bclFallbackConfidence,
-            string bclFallbackReason)
-        {
-            Category = category;
-            RuleName = ruleName;
-            OperationKind = operationKind;
-            Symbol = symbol;
-            CatalogSource = catalogSource;
-            CalleeChain = calleeChain;
-            BclFallbackGuess = bclFallbackGuess;
-            BclFallbackConfidence = bclFallbackConfidence;
-            BclFallbackReason = bclFallbackReason;
-        }
 
         public static PurityEvidence None => default;
 
@@ -768,16 +732,7 @@ internal partial class PurityAnalysisEngine
         {
             if (!string.IsNullOrEmpty(OperationKind)) return this;
 
-            return new PurityEvidence(
-                Category,
-                RuleName,
-                syntaxNode.Kind().ToString(),
-                Symbol,
-                CatalogSource,
-                CalleeChain,
-                BclFallbackGuess,
-                BclFallbackConfidence,
-                BclFallbackReason);
+            return this with { OperationKind = syntaxNode.Kind().ToString() };
         }
 
         public PurityEvidence WithCallee(string calleeSymbol, SyntaxNode? callSite)
@@ -789,30 +744,18 @@ internal partial class PurityAnalysisEngine
                 ? OperationKind
                 : callSite?.Kind().ToString() ?? string.Empty;
 
-            return new PurityEvidence(
-                string.IsNullOrEmpty(Category) ? "impure_callee" : Category,
-                RuleName,
-                operationKind,
-                string.IsNullOrEmpty(Symbol) ? calleeSymbol : Symbol,
-                CatalogSource,
-                chain,
-                BclFallbackGuess,
-                BclFallbackConfidence,
-                BclFallbackReason);
+            return this with
+            {
+                Category = string.IsNullOrEmpty(Category) ? "impure_callee" : Category,
+                OperationKind = operationKind,
+                Symbol = string.IsNullOrEmpty(Symbol) ? calleeSymbol : Symbol,
+                CalleeChain = chain
+            };
         }
 
         public PurityEvidence WithSymbol(string symbol)
         {
-            return new PurityEvidence(
-                Category,
-                RuleName,
-                OperationKind,
-                symbol,
-                CatalogSource,
-                CalleeChain,
-                BclFallbackGuess,
-                BclFallbackConfidence,
-                BclFallbackReason);
+            return this with { Symbol = symbol };
         }
 
         public ImmutableDictionary<string, string?> ToDiagnosticProperties()
