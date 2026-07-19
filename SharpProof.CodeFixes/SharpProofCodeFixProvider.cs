@@ -28,10 +28,7 @@ namespace SharpProof
 
         public override ImmutableArray<string> FixableDiagnosticIds => AllFixableDiagnosticIds;
 
-        public override FixAllProvider? GetFixAllProvider()
-        {
-            return WellKnownFixAllProviders.BatchFixer;
-        }
+        public override FixAllProvider? GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
@@ -356,18 +353,12 @@ namespace SharpProof
         {
             declaration = null!;
             for (var node = root.FindToken(position).Parent; node != null; node = node.Parent)
-                switch (node)
+                if (node is MethodDeclarationSyntax or ConstructorDeclarationSyntax or OperatorDeclarationSyntax or
+                    ConversionOperatorDeclarationSyntax or IndexerDeclarationSyntax or PropertyDeclarationSyntax or
+                    AccessorDeclarationSyntax or LocalFunctionStatementSyntax)
                 {
-                    case MethodDeclarationSyntax:
-                    case ConstructorDeclarationSyntax:
-                    case OperatorDeclarationSyntax:
-                    case ConversionOperatorDeclarationSyntax:
-                    case IndexerDeclarationSyntax:
-                    case PropertyDeclarationSyntax:
-                    case AccessorDeclarationSyntax:
-                    case LocalFunctionStatementSyntax:
-                        declaration = node;
-                        return true;
+                    declaration = node;
+                    return true;
                 }
 
             return false;
@@ -375,23 +366,16 @@ namespace SharpProof
 
         internal static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute)
         {
-            attribute = null!;
             var node = root.FindNode(span, false, true);
             attribute = node.FirstAncestorOrSelf<AttributeSyntax>() ?? (node as AttributeSyntax)!;
             return attribute != null;
         }
 
-        private static SyntaxNode? GetHostForAttribute(AttributeSyntax attr)
-        {
-            if (attr.Parent is not AttributeListSyntax list)
-                return null;
-            return list.Parent;
-        }
+        private static SyntaxNode? GetHostForAttribute(AttributeSyntax attr) =>
+            (attr.Parent as AttributeListSyntax)?.Parent;
 
-        internal static bool CanMoveAttributeToGetter(AttributeSyntax attribute)
-        {
-            return AttributeTargetSyntaxFacts.IsGetterAliasTarget(GetHostForAttribute(attribute));
-        }
+        internal static bool CanMoveAttributeToGetter(AttributeSyntax attribute) =>
+            AttributeTargetSyntaxFacts.IsGetterAliasTarget(GetHostForAttribute(attribute));
 
         private static SyntaxNode RemoveAttributeFromHost(
             SyntaxNode host,
@@ -485,22 +469,18 @@ namespace SharpProof
             return trackedDeclaration;
         }
 
-        private static INamedTypeSymbol? GetAttributeClass(SemanticModel model, AttributeSyntax attributeSyntax)
-        {
-            var sym = model.GetSymbolInfo(attributeSyntax).Symbol;
-            if (sym is IMethodSymbol { MethodKind: MethodKind.Constructor } ctor)
-                return ctor.ContainingType;
-            if (sym is INamedTypeSymbol nt)
-                return nt;
-            return null;
-        }
+        private static INamedTypeSymbol? GetAttributeClass(SemanticModel model, AttributeSyntax attributeSyntax) =>
+            model.GetSymbolInfo(attributeSyntax).Symbol switch
+            {
+                IMethodSymbol { MethodKind: MethodKind.Constructor } constructor => constructor.ContainingType,
+                INamedTypeSymbol type => type,
+                _ => null
+            };
 
         internal static Func<INamedTypeSymbol?, bool> AcceptedAttribute(
             SharpProofAttributeIdentityPolicy policy,
-            params string[] attributeTypeNames)
-        {
-            return type => attributeTypeNames.Any(name => policy.IsAccepted(type, name));
-        }
+            params string[] attributeTypeNames) =>
+            type => attributeTypeNames.Any(name => policy.IsAccepted(type, name));
 
         internal static Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
             CancellationToken cancellationToken)
@@ -525,7 +505,6 @@ namespace SharpProof
             var host = GetHostForAttribute(attribute);
             if (host is not PropertyDeclarationSyntax && host is not IndexerDeclarationSyntax) return document;
 
-            var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
             var hostWithoutAttribute = RemoveAttributeFromHost(host, attribute, preserveLeadingTrivia: false);
             var sourceAttributeList = (AttributeListSyntax)attribute.Parent!;
             var attributeList = sourceAttributeList.Attributes.Count == 1
@@ -534,16 +513,19 @@ namespace SharpProof
             attributeList = attributeList
                 .WithTarget(null)
                 .WithAdditionalAnnotations(Formatter.Annotation);
-            var updatedHost = AddAttributeToGetter(hostWithoutAttribute, attributeList, lineEnding);
+            var updatedHost = AddAttributeToGetter(hostWithoutAttribute, attributeList);
             if (updatedHost == null) return document;
 
-            return document.WithSyntaxRoot(root.ReplaceNode(host, updatedHost));
+            return await Formatter.FormatAsync(
+                    document.WithSyntaxRoot(root.ReplaceNode(host, updatedHost)),
+                    Formatter.Annotation,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private static SyntaxNode? AddAttributeToGetter(
             SyntaxNode host,
-            AttributeListSyntax attributeList,
-            string lineEnding)
+            AttributeListSyntax attributeList)
         {
             return host switch
             {
@@ -553,7 +535,6 @@ namespace SharpProof
                     property.ExpressionBody,
                     property.SemicolonToken,
                     attributeList,
-                    lineEnding,
                     static (declaration, accessorList) => declaration.WithAccessorList(accessorList),
                     static declaration => declaration
                         .WithExpressionBody(null)
@@ -564,7 +545,6 @@ namespace SharpProof
                     indexer.ExpressionBody,
                     indexer.SemicolonToken,
                     attributeList,
-                    lineEnding,
                     static (declaration, accessorList) => declaration.WithAccessorList(accessorList),
                     static declaration => declaration
                         .WithExpressionBody(null)
@@ -579,7 +559,6 @@ namespace SharpProof
             ArrowExpressionClauseSyntax? expressionBody,
             SyntaxToken semicolonToken,
             AttributeListSyntax attributeList,
-            string lineEnding,
             Func<TDeclaration, AccessorListSyntax, TDeclaration> withAccessorList,
             Func<TDeclaration, TDeclaration> withoutExpressionBody)
             where TDeclaration : SyntaxNode
@@ -590,220 +569,32 @@ namespace SharpProof
                     accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
                 if (getter == null) return null;
 
-                attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
                 var updatedGetter = getter.WithAttributeLists(
-                    getter.AttributeLists.Insert(0, attributeList));
+                        getter.AttributeLists.Insert(0, attributeList))
+                    .WithAdditionalAnnotations(Formatter.Annotation);
                 return withAccessorList(
                     declaration,
-                    accessorList.WithAccessors(accessorList.Accessors.Replace(getter, updatedGetter)));
+                    accessorList.WithAccessors(accessorList.Accessors.Replace(getter, updatedGetter)))
+                    .WithAdditionalAnnotations(Formatter.Annotation);
             }
 
             if (expressionBody == null) return null;
 
-            var expressionGetter = CreateExpressionBodiedGetter(
-                expressionBody,
-                semicolonToken,
-                attributeList,
-                GetIndentation(declaration),
-                lineEnding);
-            var declarationWithAccessor = RemoveTrailingTriviaFromLastToken(withoutExpressionBody(declaration));
-            return withAccessorList(declarationWithAccessor, CreateAccessorList(expressionGetter));
-        }
-
-        private static AccessorDeclarationSyntax CreateExpressionBodiedGetter(
-            ArrowExpressionClauseSyntax expressionBody,
-            SyntaxToken semicolonToken,
-            AttributeListSyntax attributeList,
-            string hostIndentation,
-            string lineEnding)
-        {
-            var accessorIndentation = hostIndentation + "    ";
-            attributeList = attributeList
-                .WithLeadingTrivia(FormatMovedLeadingTrivia(
-                    attributeList.GetLeadingTrivia(),
-                    default,
-                    lineEnding))
-                .WithTrailingTrivia(FormatMovedTrailingTrivia(
-                    attributeList.GetTrailingTrivia(),
-                    accessorIndentation,
-                    lineEnding));
-            expressionBody = expressionBody.WithArrowToken(
-                expressionBody.ArrowToken.WithLeadingTrivia(SyntaxFactory.Space));
-            var semicolonTrailingTrivia = PreserveInlineTriviaBeforeLineBreak(
-                semicolonToken.TrailingTrivia,
-                lineEnding,
-                hostIndentation);
-            return SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+            var expressionGetter = SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                 .WithAttributeLists(SyntaxFactory.SingletonList(attributeList))
                 .WithExpressionBody(expressionBody)
-                .WithSemicolonToken(
-                    semicolonToken
-                        .WithLeadingTrivia(default(SyntaxTriviaList))
-                        .WithTrailingTrivia(semicolonTrailingTrivia));
-        }
-
-        private static AccessorListSyntax CreateAccessorList(AccessorDeclarationSyntax getter)
-        {
-            var semicolonToken = getter.SemicolonToken;
-            var trailingTrivia = semicolonToken.TrailingTrivia;
-            var indentation = trailingTrivia.LastOrDefault(static trivia =>
-                trivia.IsKind(SyntaxKind.WhitespaceTrivia)).ToFullString();
-            var lineEnding = trailingTrivia.FirstOrDefault(static trivia =>
-                trivia.IsKind(SyntaxKind.EndOfLineTrivia)).ToFullString();
-            if (lineEnding.Length == 0) lineEnding = "\n";
-
-            return SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(getter))
-                .WithOpenBraceToken(
-                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
-                        .WithLeadingTrivia(LineBreakAndIndent(lineEnding, indentation))
-                        .WithTrailingTrivia(LineBreakAndIndent(lineEnding, indentation + "    ")))
-                .WithCloseBraceToken(
-                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)
-                        .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding)));
-        }
-
-        private static TNode RemoveTrailingTriviaFromLastToken<TNode>(TNode node)
-            where TNode : SyntaxNode
-        {
-            var lastToken = node.GetLastToken();
-            return (TNode)node.ReplaceToken(lastToken, lastToken.WithTrailingTrivia(default(SyntaxTriviaList)));
-        }
-
-        private static AttributeListSyntax FormatAttributeBeforeExistingGetter(
-            AttributeListSyntax attributeList,
-            AccessorDeclarationSyntax getter,
-            string lineEnding)
-        {
-            var indentation = SyntaxFactory.TriviaList(
-                getter.GetLeadingTrivia()
-                    .Reverse()
-                    .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
-                    .Reverse());
-            return attributeList
-                .WithLeadingTrivia(FormatMovedLeadingTrivia(
-                    attributeList.GetLeadingTrivia(),
-                    indentation,
-                    lineEnding))
-                .WithTrailingTrivia(FormatMovedTrailingTrivia(
-                    attributeList.GetTrailingTrivia(),
-                    string.Empty,
-                    lineEnding));
-        }
-
-        private static SyntaxTriviaList FormatMovedLeadingTrivia(
-            SyntaxTriviaList source,
-            SyntaxTriviaList indentation,
-            string lineEnding)
-        {
-            if (!source.Any(static trivia =>
-                    !trivia.IsKind(SyntaxKind.WhitespaceTrivia) &&
-                    !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
-                return indentation;
-
-            var builder = new List<SyntaxTrivia>();
-            builder.AddRange(indentation);
-            var afterLineBreak = false;
-            foreach (var trivia in source)
-            {
-                if (trivia.IsKind(SyntaxKind.WhitespaceTrivia)) continue;
-                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
-                {
-                    if (!afterLineBreak) builder.Add(SyntaxFactory.EndOfLine(lineEnding));
-                    builder.AddRange(indentation);
-                    afterLineBreak = true;
-                    continue;
-                }
-
-                builder.Add(trivia);
-                afterLineBreak = false;
-            }
-
-            if (!afterLineBreak)
-            {
-                builder.Add(SyntaxFactory.EndOfLine(lineEnding));
-                builder.AddRange(indentation);
-            }
-
-            return SyntaxFactory.TriviaList(builder);
-        }
-
-        private static SyntaxTriviaList FormatMovedTrailingTrivia(
-            SyntaxTriviaList source,
-            string indentation,
-            string lineEnding)
-        {
-            if (!source.Any(static trivia =>
-                    !trivia.IsKind(SyntaxKind.WhitespaceTrivia) &&
-                    !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
-                return LineBreakAndIndent(lineEnding, indentation);
-
-            var builder = new List<SyntaxTrivia>();
-            var atLineStart = false;
-            foreach (var trivia in source)
-            {
-                if (trivia.IsKind(SyntaxKind.WhitespaceTrivia)) continue;
-                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
-                {
-                    if (!atLineStart) builder.Add(SyntaxFactory.EndOfLine(lineEnding));
-                    if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
-                    atLineStart = true;
-                    continue;
-                }
-
-                if (trivia.HasStructure && trivia.GetStructure() is DirectiveTriviaSyntax && !atLineStart)
-                {
-                    builder.Add(SyntaxFactory.EndOfLine(lineEnding));
-                    if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
-                    atLineStart = true;
-                }
-                else if (!atLineStart)
-                {
-                    builder.Add(SyntaxFactory.Space);
-                }
-
-                builder.Add(trivia);
-                atLineStart = false;
-            }
-
-            if (!atLineStart)
-            {
-                builder.Add(SyntaxFactory.EndOfLine(lineEnding));
-                if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
-            }
-
-            return SyntaxFactory.TriviaList(builder);
-        }
-
-        private static string GetIndentation(SyntaxNode node)
-        {
-            return string.Concat(
-                node.GetLeadingTrivia()
-                    .Reverse()
-                    .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
-                    .Reverse()
-                    .Select(static trivia => trivia.ToFullString()));
-        }
-
-        private static SyntaxTriviaList LineBreakAndIndent(string lineEnding, string indentation)
-        {
-            var trivia = new List<SyntaxTrivia> { SyntaxFactory.EndOfLine(lineEnding) };
-            if (indentation.Length != 0) trivia.Add(SyntaxFactory.Whitespace(indentation));
-            return SyntaxFactory.TriviaList(trivia);
-        }
-
-        private static SyntaxTriviaList PreserveInlineTriviaBeforeLineBreak(
-            SyntaxTriviaList originalTrivia,
-            string lineEnding,
-            string indentation)
-        {
-            var inlineTrivia = originalTrivia
-                .TakeWhile(static trivia => !trivia.IsKind(SyntaxKind.EndOfLineTrivia))
-                .ToList();
-            if (!inlineTrivia.Any(static trivia => !trivia.IsKind(SyntaxKind.WhitespaceTrivia)))
-                inlineTrivia.Clear();
-
-            inlineTrivia.AddRange(LineBreakAndIndent(lineEnding, indentation));
-            return SyntaxFactory.TriviaList(inlineTrivia);
+                .WithSemicolonToken(semicolonToken)
+                .WithAdditionalAnnotations(Formatter.Annotation);
+            var updatedDeclaration = withoutExpressionBody(declaration)
+                .WithAdditionalAnnotations(Formatter.Annotation);
+            return withAccessorList(
+                updatedDeclaration,
+                SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(expressionGetter))
+                    .WithOpenBraceToken(
+                        SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
+                            .WithLeadingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed)
+                            .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed))
+                    .WithAdditionalAnnotations(Formatter.Annotation));
         }
 
         private async Task<Document> RemoveContractAttributeAsync(
@@ -816,7 +607,7 @@ namespace SharpProof
         {
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
-                foreach (var location in GetDiagnosticLocations(diagnostic))
+                foreach (var location in new[] { diagnostic.Location }.Concat(diagnostic.AdditionalLocations))
                 {
                     if (!location.IsInSource) continue;
 
@@ -828,12 +619,6 @@ namespace SharpProof
 
             return await RemoveAttributesMatchingAsync(document, root, declaration, shouldRemoveType, cancellationToken)
                 .ConfigureAwait(false);
-        }
-
-        private static IEnumerable<Location> GetDiagnosticLocations(Diagnostic diagnostic)
-        {
-            yield return diagnostic.Location;
-            foreach (var location in diagnostic.AdditionalLocations) yield return location;
         }
 
         internal async Task<Document> RemoveAttributesMatchingAsync(
@@ -977,24 +762,17 @@ namespace SharpProof
                     .WithTrailingTrivia(trailingTrivia));
         }
 
-    private static bool HasUnaliasedSharpProofAttributesUsing(SyntaxNode declaration)
-    {
-        foreach (var ancestor in declaration.AncestorsAndSelf())
-        {
-            var usingDirectives = ancestor switch
-            {
-                CompilationUnitSyntax compilationUnit => compilationUnit.Usings,
-                BaseNamespaceDeclarationSyntax namespaceDeclaration => namespaceDeclaration.Usings,
-                _ => default
-            };
-            if (usingDirectives.Any(static directive =>
+        private static bool HasUnaliasedSharpProofAttributesUsing(SyntaxNode declaration) =>
+            declaration.AncestorsAndSelf()
+                .SelectMany(static ancestor => ancestor switch
+                {
+                    CompilationUnitSyntax compilationUnit => compilationUnit.Usings,
+                    BaseNamespaceDeclarationSyntax namespaceDeclaration => namespaceDeclaration.Usings,
+                    _ => default
+                })
+                .Any(static directive =>
                     directive.Alias == null &&
-                    string.Equals(directive.Name?.ToString(), "SharpProof.Attributes", StringComparison.Ordinal)))
-                return true;
-        }
-
-        return false;
-    }
+                    string.Equals(directive.Name?.ToString(), "SharpProof.Attributes", StringComparison.Ordinal));
 
         private static bool IsUnambiguousAttributeName(
             SemanticModel model,

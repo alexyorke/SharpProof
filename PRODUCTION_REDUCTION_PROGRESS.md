@@ -268,14 +268,21 @@ Tests are excluded from the metric and must not be deleted.
   disposal rule no longer recursively rechecks resources and bodies already
   visited by CFG, and architecture coverage prevents the compatibility pass
   from returning.
+- [x] Made Roslyn's formatter the single whitespace and indentation owner for
+  moving misplaced Requires attributes onto property and indexer getters.
+  Deleted the code-fix provider's manual leading/trailing trivia walkers,
+  expression-getter builder, accessor-brace formatter, indentation reconstruction,
+  and line-break preservation forest. Exact expression-bodied, existing-getter,
+  target-alias, and comment-preservation fixes remain unchanged; no test was
+  deleted, and architecture coverage prevents the manual formatter from returning.
 
 ## Current evidence
 
-- Maintained production: 99,617 lines (95,698 C#, 3,189 scripts, and 730
-  specifications); net reduction: 8,009 lines; remaining reduction: 11,991.
+- Maintained production: 99,417 lines (95,498 C#, 3,189 scripts, and 730
+  specifications); net reduction: 8,209 lines; remaining reduction: 11,791.
   This tranche removed 200 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,186 passing tests and two documented skips.
+- Six lanes: 6,185 passing tests and two documented skips.
 
 ## Milestones
 

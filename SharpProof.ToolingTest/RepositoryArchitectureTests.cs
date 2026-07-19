@@ -254,6 +254,10 @@ public sealed class RepositoryArchitectureTests
             Assert.That(File.Exists(Path.Combine(codeFixRoot, "CodeFixHandlerRegistry.cs")), Is.False);
             Assert.That(provider, Does.Contain("TryGetSimpleRemoval"));
             Assert.That(provider, Does.Contain("RegisterSynchronizationCodeFix"));
+            Assert.That(provider, Does.Contain("Formatter.FormatAsync"));
+            Assert.That(provider, Does.Not.Contain("FormatMovedLeadingTrivia"));
+            Assert.That(provider, Does.Not.Contain("FormatMovedTrailingTrivia"));
+            Assert.That(provider, Does.Not.Contain("CreateExpressionBodiedGetter"));
         });
     }
 
