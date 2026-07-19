@@ -396,20 +396,26 @@ Tests are excluded from the metric and must not be deleted.
   ownership remains a separate semantic domain. Deleted the parallel syntax
   branch/assignment evaluator; focused object, delegate, lambda, local-function,
   and resource-lifetime coverage plus an architecture guard preserve the split.
+- [x] Made one validated embedded registry the declarative owner for all 70 fuzz
+  shapes, expectations, manifests, and deterministic source templates. The C#
+  generator now retains only the five genuinely randomized builders. Exact
+  metadata and four-variant source bytes remain hash-identical, the broader
+  fuzz/shape suite stays green, and architecture coverage prevents the inline
+  registry and template block from returning.
 
 ## Current evidence
 
-- Maintained production: 95,887 lines (91,968 C#, 3,189 scripts, and 730
-  specifications); net reduction: 11,739 lines; remaining reduction: 8,261.
-  This tranche removed 133 maintained lines without deleting tests.
+- Maintained production: 95,451 lines (91,532 C#, 3,189 scripts, and 730
+  specifications); net reduction: 12,175 lines; remaining reduction: 7,825.
+  This tranche removed 436 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,200 passing tests and two documented Main skips.
+- Six lanes: 6,201 passing tests and two documented Main skips.
 
 ## Milestones
 
 - [x] 3,000 lines removed: inferred-summary foundation and first migrated rules.
 - [x] 7,000 lines removed: manual semantic catalogs substantially migrated.
-- [ ] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
+- [x] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
 - [ ] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
 - [ ] 20,000 lines removed: CLI/ProofCore cleanup and final dead-code deletion complete.
 

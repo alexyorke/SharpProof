@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="FuzzUsage.txt" LogicalName="SharpProof.Fuzz.Usage.txt" />
+    <EmbeddedResource Include="FuzzShapeRegistry.json" LogicalName="SharpProof.Fuzz.ShapeRegistry.json" />
   </ItemGroup>
 
   <ItemGroup>

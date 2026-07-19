@@ -541,6 +541,25 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void FuzzShapeRegistry_HasOneDeclarativeOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var fuzzRoot = Path.Combine(root, "Tools", "SharpProof.Fuzz.Core");
+        var generator = File.ReadAllText(Path.Combine(fuzzRoot, "FuzzCaseGenerator.cs"));
+        var registry = File.ReadAllText(Path.Combine(fuzzRoot, "FuzzShapeRegistry.json"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(generator, Does.Contain("FuzzShapeRegistry.Load"));
+            Assert.That(generator, Does.Not.Contain("MethodEntry("));
+            Assert.That(generator, Does.Not.Contain("StaticEntry("));
+            Assert.That(generator, Does.Not.Contain("ShapeRegistryEntry Entry("));
+            Assert.That(registry, Does.Contain("\"Id\": \"PureArithmetic\""));
+            Assert.That(registry, Does.Contain("\"Id\": \"ImpureUsingAwaitDelegateFlow\""));
+        });
+    }
+
+    [Test]
     public void UnknownReasons_UseOneTaxonomyInsteadOfParallelDomainRegistries()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
