@@ -1,0 +1,30 @@
+SharpProof.EffectSummary
+Summarizes IL effects from .NET assemblies for evidence-based purity catalog work.
+
+Usage:
+  dotnet run --project Tools/SharpProof.EffectSummary -- [options]
+
+Options:
+  --assembly <path>          Assembly to summarize. Can be repeated.
+  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.
+  --artifact-spec-dependencies <path> Resolve artifact inputs and outputs without generating summaries.
+  --input-manifest <path>    Write resolved dependency input paths, one per line.
+  --output-manifest <path>   Write resolved dependency output paths, one per line.
+  --dependency-output-root <path> Rebase relative artifact outputs for dependency manifests.
+  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.
+  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll
+  --all-runtime-assemblies   Inspect all System runtime assemblies for the target framework.
+  --shard-output <directory> Write one summary document per input assembly, retaining bounded per-assembly memory.
+  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.
+  --include-callees          Also emit same-assembly callees reachable from matched symbols.
+  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.
+  --max-exception-edges <count> Maximum transitive thrown-exception edges retained per method. Default: 4096.
+  --transitive-roots         Propagate root candidate labels through same-assembly calls.
+  --progress <path>          Record completed artifact-spec outputs for resumable generation.
+  --resume                   Resume completed artifact-spec outputs recorded by --progress.
+  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.
+  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.
+  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.
+  --output <path>            Write JSON to a file instead of stdout.
+  --limit <count>            Limit emitted method summaries for smoke testing.
+  --help                     Show this help.

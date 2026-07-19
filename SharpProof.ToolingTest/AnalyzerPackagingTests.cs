@@ -2414,11 +2414,14 @@ namespace TestNamespace {
     private static IReadOnlyDictionary<string, string> LoadSymbolicCliSources()
     {
         var cliDirectory = Path.Combine(FindRepositoryRoot(), "Tools", "SharpProof.SymbolicCli");
-        return Directory.EnumerateFiles(cliDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+        var sources = Directory.EnumerateFiles(cliDirectory, "*.cs", SearchOption.TopDirectoryOnly)
             .ToDictionary(
                 static path => Path.GetFileName(path),
                 File.ReadAllText,
                 StringComparer.Ordinal);
+        sources["SymbolicCliOptions.cs"] += "\n" +
+            File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliUsage.txt"));
+        return sources;
     }
 
     private static void AssertSymbolicCliSourceContains(

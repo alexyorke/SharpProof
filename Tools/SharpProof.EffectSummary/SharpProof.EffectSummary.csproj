@@ -4,6 +4,9 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="EffectSummaryUsage.txt" LogicalName="SharpProof.EffectSummary.Usage.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
     <ProjectReference Include="..\..\SharpProof.Tooling.Core\SharpProof.Tooling.Core.csproj" />
   </ItemGroup>

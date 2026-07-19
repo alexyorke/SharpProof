@@ -1,0 +1,17 @@
+Usage: SharpProof.Fuzz [options]
+
+Options:
+  --iterations <n>         Number of generated cases. Use 0 for duration-only runs. Default: 100.
+  --seconds <n>            Run duration in seconds.
+  --minutes <n>            Run duration in minutes.
+  --hours <n>              Run duration in hours.
+  --seed <n>               Deterministic random seed. Default: 12345.
+  --out <path>             Output directory. Default: artifacts/fuzz/<timestamp>.
+  --max-interesting <n>    Maximum source files saved for findings. Default: 100.
+  --max-interesting-per-family <n>
+                           Maximum saved interesting cases per family. Default: 10.
+  --checkpoint-every <n>   Write summary.partial.json and coverage.partial.json every N analyzed cases. Default: 100. Use 0 to disable.
+  --parallelism <n>        Maximum concurrent analyzer tasks. Default: 4 or processor count if lower.
+  --quiet                  Suppress progress output.
+  --fail-on-findings       Exit with code 2 when findings are found.
+  --no-repeat              Do not run repeated analyzer determinism checks.

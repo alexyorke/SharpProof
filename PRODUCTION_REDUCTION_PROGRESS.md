@@ -328,14 +328,21 @@ Tests are excluded from the metric and must not be deleted.
   unchanged. Order-sensitive CLI invariant projection retains its explicit
   constructor, and architecture coverage prevents the consolidated carrier
   forms from regressing.
+- [x] Moved Symbolic CLI, Fuzz, and EffectSummary help documents out of C#
+  option/host implementations and into explicitly named embedded resources.
+  One tooling-core loader now owns resource validation, UTF-8 decoding, and
+  terminal-newline normalization. Pre-change and post-change help text hashes
+  are identical for all three tools, packaging assertions consume the combined
+  code/resource owner, and architecture coverage locks the exact resource bytes
+  while preventing the inline help blocks from returning.
 
 ## Current evidence
 
-- Maintained production: 97,292 lines (93,373 C#, 3,189 scripts, and 730
-  specifications); net reduction: 10,334 lines; remaining reduction: 9,666.
-  This tranche removed 200 maintained lines without deleting tests.
+- Maintained production: 97,075 lines (93,156 C#, 3,189 scripts, and 730
+  specifications); net reduction: 10,551 lines; remaining reduction: 9,449.
+  This tranche removed 217 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,192 passing tests and two documented Main skips.
+- Six lanes: 6,193 passing tests and two documented Main skips.
 
 ## Milestones
 

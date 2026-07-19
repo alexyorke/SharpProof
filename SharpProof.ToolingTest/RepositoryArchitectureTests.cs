@@ -298,6 +298,43 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ToolHelpText_UsesEmbeddedByteStableResources()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var expectedHashes = new Dictionary<string, string>
+        {
+            ["Tools/SharpProof.SymbolicCli/SymbolicCliUsage.txt"] =
+                "050F0A8EE439F27EA96C0FB09D2E2475C462331D6826C772127DB7A4B25B1E82",
+            ["Tools/SharpProof.Fuzz.Core/FuzzUsage.txt"] =
+                "522AD16BD2C36DB9C619D17573A37317673AE8C56ED148F96C899BD7284A60A6",
+            ["Tools/SharpProof.EffectSummary/EffectSummaryUsage.txt"] =
+                "2386BB3BA8A78C5D654E958E33BED58970777C0AAD2CE9542B9493F1664A5126"
+        };
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (path, expectedHash) in expectedHashes)
+            {
+                var text = File.ReadAllText(Path.Combine(root, path)).TrimEnd('\r', '\n')
+                    .Replace("\r\n", "\n", StringComparison.Ordinal);
+                var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(text)));
+                Assert.That(hash, Is.EqualTo(expectedHash), path);
+            }
+
+            Assert.That(File.ReadAllText(Path.Combine(
+                root, "Tools", "SharpProof.SymbolicCli", "SymbolicCliOptions.cs")),
+                Does.Not.Contain("Usage = \"\"\""));
+            Assert.That(File.ReadAllText(Path.Combine(
+                root, "Tools", "SharpProof.Fuzz.Core", "FuzzOptions.cs")),
+                Does.Not.Contain("Usage = \"\"\""));
+            Assert.That(File.ReadAllText(Path.Combine(
+                root, "Tools", "SharpProof.EffectSummary", "EffectSummaryCli.cs")),
+                Does.Not.Contain("Console.Error.WriteLine(\"SharpProof.EffectSummary\")"));
+        });
+    }
+
+    [Test]
     public void AnalysisBudgets_UseOneCanonicalModelAndNamedRegistry()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
