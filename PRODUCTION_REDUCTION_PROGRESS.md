@@ -271,3 +271,9 @@ without new call-site ownership or generic-instantiation evidence. Removing the
 syntactic classifier caused 48 focused regressions, including proven results
 becoming unknown for formulas outside the current Z3 encoding and zero-budget
 proofs that intentionally avoid solver work.
+
+The analyzer's remaining BCL invocation overrides are also characterized as
+semantic owners, not adapters. Removing the Type, StringComparer,
+FormattableString, Enum/Boolean/IPAddress parsing, and Unsafe routes caused 17
+focused regressions; generated summaries alone do not yet preserve their
+operand, dispatch, out-argument, and compiler-lowering semantics.
