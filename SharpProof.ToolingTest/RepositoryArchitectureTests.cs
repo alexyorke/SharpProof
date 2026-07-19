@@ -168,6 +168,23 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void EffectSummary_UsesOneByRefLikeViewInferencePath()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var semanticWrappers = File.ReadAllText(Path.Combine(
+            root, "Tools", "SharpProof.EffectSummary", "EffectSummarySemanticWrapperRules.cs"));
+        var evidenceRules = File.ReadAllText(Path.Combine(
+            root, "Tools", "SharpProof.EffectSummary", "EffectSummaryClassificationEvidenceRules.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(semanticWrappers, Does.Not.Contain("HasPureArrayBackedByRefLikeViewWrapperPattern"));
+            Assert.That(semanticWrappers, Does.Not.Contain("HasPureSpanBackedByRefLikeViewWrapperPattern"));
+            Assert.That(evidenceRules, Does.Contain("HasByRefLikeViewConstructionPattern"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

@@ -169,14 +169,19 @@ Tests are excluded from the metric and must not be deleted.
   owner consumed by diagnostics; focused source/edge tests preserve direct and
   transitive evidence, and architecture coverage prevents the duplicate fact
   model and parser from returning.
+- [x] Replaced the separate array-backed and span-backed by-ref-like wrapper
+  rules with one ownership-aware construction inference path. A differential
+  snapshot preserved all 34,519 CoreLib purity classifications exactly, focused
+  runtime slices preserve Span and MemoryMarshal behavior, and architecture
+  coverage prevents the specialized manual predicates from returning.
 
 ## Current evidence
 
-- Maintained production: 103,070 lines (98,995 C#, 3,189 scripts, and 886
-  specifications); net reduction: 4,556 lines; remaining reduction: 15,444.
-  This tranche removed 220 maintained lines without deleting tests.
+- Maintained production: 103,008 lines (98,933 C#, 3,189 scripts, and 886
+  specifications); net reduction: 4,618 lines; remaining reduction: 15,382.
+  This tranche removed 62 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,158 passing tests and two documented skips.
+- Six lanes: 6,159 passing tests and two documented skips.
 
 ## Milestones
 
@@ -195,4 +200,6 @@ canonical analysis over manual catalogs when characterization proves it is
 complete; otherwise preserve the explicit owner. Require focused parity before
 deleting the old path in the same tranche, and do not revisit the independently
 required string-hash, type-identity, CFG/loop-transfer, EffectSummary
-assembly-reader, or impacted-test orchestration owners.
+assembly-reader, generated-purity override catalog, remaining semantic-wrapper
+groups, or impacted-test orchestration owners without new call-site ownership
+or generic-instantiation evidence.

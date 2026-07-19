@@ -133,9 +133,13 @@ internal static class EffectSummaryClassificationEvidenceRules
 
     internal static bool HasByRefLikeViewConstructionPattern(MethodEffectSummary? summary)
     {
-        if (summary == null ||
-            !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-            return false;
+        if (summary == null) return false;
+
+        var hasIndirectWrite = summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal);
+        var isReadOnlyProjection = !hasIndirectWrite &&
+                                   IsByRefLikeViewReturn(summary.Identity) &&
+                                   RootsAreSemanticallyPureWrapperCompatible(summary);
+        if (!hasIndirectWrite && !isReadOnlyProjection) return false;
 
         var allowsTupleOffsetReads = HasOnlyByRefLikeViewHelperFieldReads(summary);
         foreach (var effect in summary.Effects)
@@ -168,14 +172,22 @@ internal static class EffectSummaryClassificationEvidenceRules
         return sawByRefLikeConstructor;
     }
 
+    private static bool IsByRefLikeViewReturn(StructuralMethodIdentity identity) =>
+        identity.ReturnType.StartsWith("named:System.Span`1[", StringComparison.Ordinal) ||
+        identity.ReturnType.StartsWith("named:System.ReadOnlySpan`1[", StringComparison.Ordinal);
+
     internal static bool HasOnlyByRefLikeViewHelperFieldReads(MethodEffectSummary summary)
     {
         if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal)) return true;
 
         return summary.Fields.All(static field =>
-            field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
-            (field.EndsWith(".Item1", StringComparison.Ordinal) ||
-             field.EndsWith(".Item2", StringComparison.Ordinal)));
+            (field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
+             (field.EndsWith(".Item1", StringComparison.Ordinal) ||
+              field.EndsWith(".Item2", StringComparison.Ordinal))) ||
+            string.Equals(field, "System.ReadOnlySpan`1._length", StringComparison.Ordinal) ||
+            string.Equals(field, "System.ReadOnlySpan`1._reference", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Span`1._length", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Span`1._reference", StringComparison.Ordinal));
     }
 
     internal static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
@@ -689,24 +701,28 @@ internal static class EffectSummaryClassificationEvidenceRules
     internal static bool IsByRefLikeViewConstructionHelperCall(string callSymbol)
     {
         return EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
+               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Index.Equals(System.Index)", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Index.GetOffset(int)", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Index.get_Start()", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Range.GetOffsetAndLength(int)", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Range.get_End()", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Range.get_Start()", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentNullException(", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException(",
-                   StringComparison.Ordinal) ||
-               EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol);
+               EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol) ||
+               IsSemanticallyNeutralValidationThrowHelper(callSymbol);
     }
 
     internal static bool IsByRefLikeViewConstructionCall(string callSymbol)
     {
         return (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
-                callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal)) ||
+                (callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
+                 callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal))) ||
                (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
-                callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal));
+                (callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
+                 callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal)));
     }
 
     internal static bool HasParameterlessNonVoidReturn(StructuralMethodIdentity identity)

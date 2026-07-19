@@ -532,9 +532,7 @@ internal static class PurityClassificationEngine
         }
         else
         {
-            var treatsByRefLikeViewAsPure =
-                HasByRefLikeViewConstructionPattern(summary) ||
-                HasPureArrayBackedByRefLikeViewWrapperPattern(summary);
+            var treatsByRefLikeViewAsPure = HasByRefLikeViewConstructionPattern(summary);
             var freshnessClassification = GetFreshnessClassification(summary, "pure");
             if (string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
             {

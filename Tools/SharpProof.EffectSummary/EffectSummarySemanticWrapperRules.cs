@@ -3,8 +3,6 @@ internal static class EffectSummarySemanticWrapperRules
     private static readonly SemanticPureWrapperRule[] SemanticPureWrapperRules =
     [
         new(HasPureReadOnlyCharSpanSearchWrapperPattern, "none"),
-        new(HasPureArrayBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
-        new(HasPureSpanBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
         new(HasPureTypeIdentityWrapperPattern, "none"),
         new(HasPureStringHashWrapperPattern, "none"),
@@ -81,25 +79,6 @@ internal static class EffectSummarySemanticWrapperRules
                    call.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
                summary.Calls.Any(IsReadOnlyCharSpanSearchHelperCall) &&
                summary.Calls.All(IsReadOnlyCharSpanSearchHelperCall);
-    }
-
-    internal static bool HasPureArrayBackedByRefLikeViewWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "allocates_object", "calls_method", "writes_indirect_memory") &&
-               RootsAreArrayBackedByRefLikeViewWrapperCompatible(summary) &&
-               IsByRefLikeViewReturn(summary.Identity) &&
-               summary.Calls.Any(IsArrayBackedByRefLikeViewConstructionCall) &&
-               summary.Calls.All(IsArrayBackedByRefLikeViewWrapperCall);
-    }
-
-    internal static bool HasPureSpanBackedByRefLikeViewWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               IsByRefLikeViewReturn(summary.Identity) &&
-               HasOnlyByRefLikeViewProjectionFieldReads(summary) &&
-               summary.Calls.Any(IsByRefLikeViewConstructionCall) &&
-               summary.Calls.All(IsSpanBackedByRefLikeViewWrapperCall);
     }
 
     internal static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
@@ -218,14 +197,6 @@ internal static class EffectSummarySemanticWrapperRules
             string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
     }
 
-    internal static bool RootsAreArrayBackedByRefLikeViewWrapperCompatible(MethodEffectSummary summary)
-    {
-        return summary.RootCandidates.All(static root =>
-            string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) ||
-            string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
-            string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
-    }
-
     internal static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects)
     {
         return summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
@@ -237,60 +208,6 @@ internal static class EffectSummarySemanticWrapperRules
                CallsOnly(summary, "calls_method", "virtual_call") &&
                summary.RootCandidates.All(static root =>
                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal));
-    }
-
-    internal static bool IsByRefLikeViewReturn(StructuralMethodIdentity identity)
-    {
-        return identity.ReturnType.StartsWith("named:System.Span`1[", StringComparison.Ordinal) ||
-               identity.ReturnType.StartsWith("named:System.ReadOnlySpan`1[", StringComparison.Ordinal);
-    }
-
-    internal static bool IsArrayBackedByRefLikeViewConstructionCall(string callSymbol)
-    {
-        return (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
-                (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-                 callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal))) ||
-               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
-                (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-                 callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal)));
-    }
-
-    internal static bool IsArrayBackedByRefLikeViewWrapperCall(string callSymbol)
-    {
-        return IsArrayBackedByRefLikeViewConstructionCall(callSymbol) ||
-               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(ref ", StringComparison.Ordinal) ||
-               EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
-               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException()",
-                   StringComparison.Ordinal) ||
-               EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol) ||
-               callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal);
-    }
-
-    internal static bool IsSpanBackedByRefLikeViewWrapperCall(string callSymbol)
-    {
-        return IsByRefLikeViewConstructionCall(callSymbol) ||
-               IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
-               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
-                   StringComparison.Ordinal) ||
-               IsSemanticallyNeutralValidationThrowHelper(callSymbol);
-    }
-
-    internal static bool HasOnlyByRefLikeViewProjectionFieldReads(MethodEffectSummary summary)
-    {
-        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal)) return true;
-
-        return summary.Fields.All(static field =>
-            (field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
-             (field.EndsWith(".Item1", StringComparison.Ordinal) ||
-              field.EndsWith(".Item2", StringComparison.Ordinal))) ||
-            string.Equals(field, "System.ReadOnlySpan`1._length", StringComparison.Ordinal) ||
-            string.Equals(field, "System.ReadOnlySpan`1._reference", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Span`1._length", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Span`1._reference", StringComparison.Ordinal));
     }
 
     private static readonly SemanticCallRule[] SemanticCallRules =
