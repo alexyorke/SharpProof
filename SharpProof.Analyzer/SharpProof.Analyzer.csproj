@@ -6,6 +6,8 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <LangVersion>12.0</LangVersion>
+    <!-- Descriptor metadata is loaded from the validated catalog, which RS2002/RS2003 cannot inspect syntactically. -->
+    <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
     <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
     <GeneratedPurityArtifactSpecSourcePath Condition="'$(GeneratedPurityArtifactSpecSourcePath)' == ''">$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecSourcePath>
     <GeneratedPurityArtifactSpecPath Condition="'$(GeneratedPurityArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecPath>
@@ -39,6 +41,7 @@
   <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <EmbeddedResource Include="AnalyzerDiagnosticCatalog.json" LogicalName="SharpProof.Analyzer.DiagnosticCatalog.json" />
   </ItemGroup>
 
   <ItemGroup>

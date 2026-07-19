@@ -1,0 +1,1052 @@
+[
+  {
+    "FieldName": "PurityNotVerifiedRule",
+    "Id": "SP0002",
+    "Title": "Purity Not Proven",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure",
+    "Category": "Purity",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method\u0027s purity status. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the symbolic proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0002",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedAttributeRule",
+    "Id": "SP0003",
+    "Title": "Misplaced [EnforcePure] Attribute",
+    "MessageFormat": "The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[EnforcePure] and [Pure] configure purity analysis for a method-like declaration or alias the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0003",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MissingEnforcePureAttributeRule",
+    "Id": "SP0004",
+    "Title": "Missing [EnforcePure] Attribute",
+    "MessageFormat": "Method \u0027{0}\u0027 appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.",
+    "Category": "Purity",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "This method seems to only contain operations considered pure, but it lacks the [EnforcePure] attribute. Adding the attribute helps ensure its purity is maintained and communicates intent.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0004",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ConflictingPurityAttributesRule",
+    "Id": "SP0005",
+    "Title": "Conflicting purity attributes",
+    "MessageFormat": "Method \u0027{0}\u0027 has conflicting purity attributes applied",
+    "Category": "Usage",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Apply one purity contract to a method. Combining enforcing, trusted-external, and explicit-impure attributes is contradictory or confusing.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0005",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "AllowSynchronizationWithoutPurityAttributeRule",
+    "Id": "SP0006",
+    "Title": "[AllowSynchronization] requires a purity attribute",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]",
+    "Category": "Usage",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "[AllowSynchronization] only affects methods participating in purity analysis. Apply [EnforcePure] or [Pure] for it to have effect.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0006",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedAllowSynchronizationAttributeRule",
+    "Id": "SP0007",
+    "Title": "Misplaced [AllowSynchronization] Attribute",
+    "MessageFormat": "The [AllowSynchronization] attribute can only be applied to method declarations",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[AllowSynchronization] configures analyzer behavior for a method and should not be used on non-method declarations.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0007",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "RedundantAllowSynchronizationRule",
+    "Id": "SP0008",
+    "Title": "Redundant [AllowSynchronization]",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked with [AllowSynchronization] but contains no synchronization constructs",
+    "Category": "Usage",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Remove [AllowSynchronization] when the method does not use synchronization (e.g., lock).",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0008",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "PurityExplanationRule",
+    "Id": "SP0009",
+    "Title": "Purity Diagnostic Explanation",
+    "MessageFormat": "Purity analysis for \u0027{0}\u0027: {1}",
+    "Category": "Purity",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Provides structured explanation data for a purity diagnostic.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0009",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ExceptionSummaryRule",
+    "Id": "SP0010",
+    "Title": "Method May Throw Exceptions",
+    "MessageFormat": "Method \u0027{0}\u0027 can throw: {1}",
+    "Category": "ExceptionFlow",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all/all-and-unknowns. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the exception proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0010",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UncaughtExceptionSiteRule",
+    "Id": "SP0011",
+    "Title": "Operation May Throw Uncaught Exceptions",
+    "MessageFormat": "Operation \u0027{0}\u0027 may throw uncaught exceptions: {1}",
+    "Category": "ExceptionFlow",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all/sites-and-unknowns/all-and-unknowns. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the runtime hazard evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0011",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "BclFallbackGuessRule",
+    "Id": "SP0012",
+    "Title": "BCL Purity Fallback Guess",
+    "MessageFormat": "BCL purity fallback for \u0027{0}\u0027: {1} ({2})",
+    "Category": "Purity",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with sharpproof_emit_explanations or sharpproof_report_bcl_fallback_guesses.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0012",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "AllocationInZeroAllocationMethodRule",
+    "Id": "SP0013",
+    "Title": "Allocation In [ZeroAllocations] Method",
+    "MessageFormat": "Method \u0027{1}\u0027 is marked [ZeroAllocations], but operation \u0027{0}\u0027 allocates",
+    "Category": "Allocation",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports direct source-visible allocation sites inside methods annotated with [ZeroAllocations].",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0013",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedZeroAllocationsAttributeRule",
+    "Id": "SP0014",
+    "Title": "Misplaced [ZeroAllocations] Attribute",
+    "MessageFormat": "The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[ZeroAllocations] configures allocation analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0014",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "CapabilityViolationRule",
+    "Id": "SP0015",
+    "Title": "Disallowed Capability Use",
+    "MessageFormat": "Method \u0027{1}\u0027 is marked [AllowedCapabilities], but operation \u0027{0}\u0027 requires capabilities: {2}",
+    "Category": "Capabilities",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports source-visible operations or proven transitive callees that exceed the method\u0027s declared allowed capability set.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0015",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "CapabilityUnknownRule",
+    "Id": "SP0016",
+    "Title": "Capability Contract Not Proven",
+    "MessageFormat": "Method \u0027{1}\u0027 is marked [AllowedCapabilities], but operation \u0027{0}\u0027 could not be capability-verified: {2}",
+    "Category": "Capabilities",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the capability proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0016",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedAllowedCapabilitiesAttributeRule",
+    "Id": "SP0017",
+    "Title": "Misplaced [AllowedCapabilities] Attribute",
+    "MessageFormat": "The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[AllowedCapabilities] configures capability analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0017",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "EnsuresNotProvenRule",
+    "Id": "SP0018",
+    "Title": "Postcondition Not Proven",
+    "MessageFormat": "Method \u0027{1}\u0027 is marked [Ensures], but return site \u0027{0}\u0027 does not prove postcondition \u0027{2}\u0027",
+    "Category": "Contracts",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports return sites that contradict a declared [Ensures] postcondition. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the proof evidence for each return site.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0018",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "EnsuresUnsupportedRule",
+    "Id": "SP0019",
+    "Title": "Postcondition Could Not Be Verified",
+    "MessageFormat": "Method \u0027{1}\u0027 is marked [Ensures], but postcondition \u0027{0}\u0027 could not be verified: {2}",
+    "Category": "Contracts",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the unprovable contract details.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0019",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedEnsuresAttributeRule",
+    "Id": "SP0020",
+    "Title": "Misplaced [Ensures] Attribute",
+    "MessageFormat": "The [Ensures] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[Ensures] configures symbolic postcondition analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0020",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ComplexityExceededRule",
+    "Id": "SP0021",
+    "Title": "Declared Complexity Exceeded",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked [ExpectedComplexity({1})], but inferred complexity \u0027{2}\u0027 exceeds the declared bound",
+    "Category": "Complexity",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the complexity proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0021",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ComplexityCouldNotBeVerifiedRule",
+    "Id": "SP0022",
+    "Title": "Declared Complexity Could Not Be Verified",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}",
+    "Category": "Complexity",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the complexity analysis details.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0022",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedExpectedComplexityAttributeRule",
+    "Id": "SP0023",
+    "Title": "Misplaced [ExpectedComplexity] Attribute",
+    "MessageFormat": "The [ExpectedComplexity] attribute can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[ExpectedComplexity] configures complexity analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0023",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "InvalidContractArgumentRule",
+    "Id": "SP0024",
+    "Title": "Invalid SharpProof Contract Argument",
+    "MessageFormat": "SharpProof contract \u0027{0}\u0027 has invalid argument \u0027{1}\u0027: {2}",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0024",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "InvalidAnalyzerConfigurationRule",
+    "Id": "SP0025",
+    "Title": "Invalid SharpProof Analyzer Configuration",
+    "MessageFormat": "SharpProof analyzer option \u0027{0}\u0027 has invalid value \u0027{1}\u0027: {2}",
+    "Category": "Configuration",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0025",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnrecognizedAttributeIdentityRule",
+    "Id": "SP0026",
+    "Title": "Unrecognized SharpProof Attribute Identity",
+    "MessageFormat": "Attribute \u0027{0}\u0027 looks like a SharpProof contract, but type \u0027{1}\u0027 is not in an accepted SharpProof attribute namespace",
+    "Category": "Usage",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0026",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "RequiresNotProvenRule",
+    "Id": "SP0027",
+    "Title": "Precondition Not Proven",
+    "MessageFormat": "Call to \u0027{0}\u0027 does not prove precondition \u0027{1}\u0027",
+    "Category": "Contracts",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports calls whose current path facts contradict a declared [Requires] precondition. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0027",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "RequiresUnsupportedRule",
+    "Id": "SP0028",
+    "Title": "Precondition Could Not Be Verified",
+    "MessageFormat": "Precondition \u0027{1}\u0027 for \u0027{0}\u0027 could not be verified: {2}",
+    "Category": "Contracts",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the unprovable contract details.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0028",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedRequiresAttributeRule",
+    "Id": "SP0029",
+    "Title": "Misplaced [Requires] Attribute",
+    "MessageFormat": "The [Requires] attribute can only be applied to method-like declarations",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[Requires] configures symbolic call-site precondition analysis for a method-like declaration. On a property or indexer, place it on the explicit get accessor.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0029",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ExceptionContractViolationRule",
+    "Id": "SP0030",
+    "Title": "Exception Contract Violated",
+    "MessageFormat": "Method \u0027{0}\u0027 is marked {1}, but operation \u0027{2}\u0027 can throw disallowed exceptions: {3}",
+    "Category": "ExceptionFlow",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use \u0060SharpProof.SymbolicCli explain --file \u003Cpath\u003E --line \u003Cnumber\u003E\u0060 to inspect the exception proof evidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0030",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MisplacedExceptionContractAttributeRule",
+    "Id": "SP0031",
+    "Title": "Misplaced Exception Contract Attribute",
+    "MessageFormat": "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers",
+    "Category": "Usage",
+    "DefaultSeverity": "Error",
+    "IsEnabledByDefault": true,
+    "Description": "[DoesNotThrow] and [AllowedExceptions] configure exception analysis for method-like declarations or alias the getter of a getter-bearing property or indexer.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0031",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "InvalidAdditionalFileRule",
+    "Id": "SP0032",
+    "Title": "Invalid SharpProof Analyzer Additional File",
+    "MessageFormat": "SharpProof analyzer input file \u0027{0}\u0027 is invalid: {1}",
+    "Category": "Configuration",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles instead of silently dropping their data.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0032",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnknownRuntimeHazardRule",
+    "Id": "SP0033",
+    "Title": "Runtime Hazard Candidate Could Not Be Proven",
+    "MessageFormat": "Runtime hazard candidate \u0027{0}\u0027 at operation \u0027{1}\u0027 could not be proven: {2}",
+    "Category": "ExceptionFlow",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports bounded runtime-hazard candidates whose trigger could not be proven or rejected. Enable with sharpproof_runtime_hazard_mode = unknowns, sites-and-unknowns, or all-and-unknowns. The diagnostic is informational by default and carries stable proof, reason, trigger, and baseline metadata.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0033",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestZeroAllocationsRule",
+    "Id": "SP0034",
+    "Title": "Inferred [ZeroAllocations] Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0034",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestAllowedCapabilitiesRule",
+    "Id": "SP0035",
+    "Title": "Inferred [AllowedCapabilities] Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0035",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestExpectedComplexityRule",
+    "Id": "SP0036",
+    "Title": "Inferred [ExpectedComplexity] Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0036",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestExceptionContractRule",
+    "Id": "SP0037",
+    "Title": "Inferred Exception Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0037",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestEnsuresRule",
+    "Id": "SP0038",
+    "Title": "Inferred [Ensures] Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0038",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestRequiresRule",
+    "Id": "SP0039",
+    "Title": "Inferred [Requires] Contract",
+    "MessageFormat": "Method \u0027{0}\u0027 has {1}; consider adding {2} ({3} confidence)",
+    "Category": "Suggestions",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0039",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "TrustedBoundaryReviewRule",
+    "Id": "SP0040",
+    "Title": "Trusted Purity Boundary Review",
+    "MessageFormat": "Purity trust source \u0027{0}\u0027 for \u0027{1}\u0027 was {2}{3}",
+    "Category": "Review",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports structured, opt-in audit evidence for applied and overridden purity trust shortcuts.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0040",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullableReturnContractViolationRule",
+    "Id": "SP0041",
+    "Title": "Nullable return contract violated",
+    "MessageFormat": "Method \u0027{0}\u0027 can return null despite contract \u0027{1}\u0027",
+    "Category": "Nullability",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a reachable normal return that violates the declared nullable return contract.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0041",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullableParameterPostconditionViolationRule",
+    "Id": "SP0042",
+    "Title": "Nullable parameter postcondition violated",
+    "MessageFormat": "Method \u0027{0}\u0027 can complete with parameter \u0027{1}\u0027 null despite contract \u0027{2}\u0027",
+    "Category": "Nullability",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a reachable normal completion that violates a nullable parameter postcondition.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0042",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullableMemberContractViolationRule",
+    "Id": "SP0043",
+    "Title": "Nullable member contract violated",
+    "MessageFormat": "Method \u0027{0}\u0027 can complete with member \u0027{1}\u0027 null despite contract \u0027{2}\u0027",
+    "Category": "Nullability",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a reachable normal completion that violates a member-not-null contract.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0043",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnsafeNullForgivingOperatorRule",
+    "Id": "SP0044",
+    "Title": "Null-forgiving operator is unsafe",
+    "MessageFormat": "Null-forgiving operator can suppress a feasible null value for \u0027{0}\u0027",
+    "Category": "Nullability",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a null-forgiving operator reached by a proven null execution.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0044",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnnecessaryNullForgivingOperatorRule",
+    "Id": "SP0045",
+    "Title": "Null-forgiving operator is unnecessary",
+    "MessageFormat": "Null-forgiving operator is unnecessary because \u0027{0}\u0027 is proven non-null",
+    "Category": "Nullability",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports a null-forgiving operator whose operand is already proven non-null.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0045",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuggestNullableContractRule",
+    "Id": "SP0046",
+    "Title": "Nullable contract can be declared",
+    "MessageFormat": "Method \u0027{0}\u0027 satisfies nullable contract \u0027{1}\u0027",
+    "Category": "Nullability",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Suggests a nullable contract proved by every relevant completion path.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0046",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullableVerificationInconclusiveRule",
+    "Id": "SP0047",
+    "Title": "Nullable verification was inconclusive",
+    "MessageFormat": "Nullable contract \u0027{1}\u0027 on \u0027{0}\u0027 could not be verified: {2}",
+    "Category": "Nullability",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": true,
+    "Description": "Reports bounded nullable proofs that ended as unsupported or unknown.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0047",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "AwaitNullConditionalRule",
+    "Id": "SP0048",
+    "Title": "Awaiting a null-conditional expression",
+    "MessageFormat": "Awaiting null-conditional expression \u0027{0}\u0027 can dereference a null awaitable",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "A null-conditional invocation produces a null awaitable when its receiver is null. Coalesce to a non-null awaitable or guard the receiver before awaiting.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0048",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "TaskConvertedToStringRule",
+    "Id": "SP0049",
+    "Title": "Task converted to text without awaiting",
+    "MessageFormat": "Task expression \u0027{0}\u0027 is converted to text instead of awaiting its result",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "String concatenation and interpolation call ToString on Task objects; they do not use the asynchronous result.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0049",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "TaskCompletionSourceContinuationsRule",
+    "Id": "SP0050",
+    "Title": "TaskCompletionSource may run continuations synchronously",
+    "MessageFormat": "TaskCompletionSource construction \u0027{0}\u0027 does not prove RunContinuationsAsynchronously",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "TaskCompletionSource should normally include TaskCreationOptions.RunContinuationsAsynchronously to prevent completing threads from running arbitrary continuations inline.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0050",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "AsyncVoidRule",
+    "Id": "SP0051",
+    "Title": "Async void method is not an event handler",
+    "MessageFormat": "Async void method \u0027{0}\u0027 is not an event handler; return Task so callers can observe completion and exceptions",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Async void prevents callers from awaiting completion and routes exceptions through the current synchronization context. It is reserved for event-handler-shaped methods.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0051",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "BlockingAsyncRule",
+    "Id": "SP0052",
+    "Title": "Async method blocks on asynchronous work",
+    "MessageFormat": "Async method \u0027{0}\u0027 synchronously blocks on \u0027{1}\u0027",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Calling Task.Result, Task.Wait, or GetAwaiter().GetResult() inside async code can deadlock or starve worker threads. Await the operation instead.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0052",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullTaskReturnRule",
+    "Id": "SP0053",
+    "Title": "Task-returning method returns null",
+    "MessageFormat": "Task-returning method \u0027{0}\u0027 returns null; callers that await it will throw",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "A non-async method whose declared return type is Task or Task\u003CT\u003E must return a task object, not null.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0053",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "TaskUsedAsDisposableRule",
+    "Id": "SP0054",
+    "Title": "Task used as a disposable resource",
+    "MessageFormat": "Task expression \u0027{0}\u0027 is disposed by using instead of awaiting its result",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Using a Task disposes the task object; it does not await the asynchronous operation or manage the resource produced by that operation.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0054",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "AsyncValidationDeferredRule",
+    "Id": "SP0055",
+    "Title": "Public async parameter validation is deferred",
+    "MessageFormat": "Validation in async method \u0027{0}\u0027 is captured by the returned task; use a synchronous wrapper when fail-fast argument validation is required",
+    "Category": "AsyncCorrectness",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Exceptions thrown from an async Task method, including validation before its first await, are stored in the returned task. A synchronous wrapper is required when callers must observe argument errors at invocation time.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0055",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "CollectionMutationDuringEnumerationRule",
+    "Id": "SP0056",
+    "Title": "Collection mutated during enumeration",
+    "MessageFormat": "Collection \u0027{0}\u0027 is mutated by \u0027{1}\u0027 while it is being enumerated",
+    "Category": "CollectionSafety",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Mutating the same ordinary mutable collection inside its foreach body invalidates the active enumerator and commonly throws InvalidOperationException.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0056",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "CapturedLoopVariableRule",
+    "Id": "SP0057",
+    "Title": "For-loop variable captured by an escaping closure",
+    "MessageFormat": "For-loop variable \u0027{0}\u0027 is captured by a closure that can observe a later iteration value",
+    "Category": "Correctness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "For-loop iteration variables are shared across iterations. Copy the value into a local inside the loop before capturing it in a lambda that can escape the iteration.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0057",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MutableStructRule",
+    "Id": "SP0058",
+    "Title": "Struct exposes mutable instance state",
+    "MessageFormat": "Struct \u0027{0}\u0027 has mutable instance state; copies can be modified independently",
+    "Category": "Design",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Mutable value types are frequently modified through accidental copies. Prefer readonly struct, record struct with immutable members, or a class when shared mutation is intended.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0058",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "OwnedDisposableFieldRule",
+    "Id": "SP0059",
+    "Title": "Owned disposable field has no owner disposal contract",
+    "MessageFormat": "Type \u0027{0}\u0027 creates disposable field \u0027{1}\u0027 but does not implement \u0027{2}\u0027",
+    "Category": "ResourceLifetime",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "A field initialized or assigned from a local allocation is owned by its containing type. The owner must expose the matching deterministic disposal lifecycle.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0059",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "HttpClientInLoopRule",
+    "Id": "SP0060",
+    "Title": "HttpClient created repeatedly inside a loop",
+    "MessageFormat": "HttpClient is created inside loop \u0027{0}\u0027; reuse a client or use IHttpClientFactory",
+    "Category": "ResourceLifetime",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Repeated HttpClient construction creates avoidable connection pools and can exhaust sockets under sustained load.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0060",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnsynchronizedSharedMutationRule",
+    "Id": "SP0061",
+    "Title": "Shared state mutated by a parallel callback",
+    "MessageFormat": "Shared state \u0027{0}\u0027 is mutated in \u0027{1}\u0027 without visible synchronization",
+    "Category": "Concurrency",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Captured locals and fields mutated by Task, Thread, timer, or Parallel callbacks require synchronization such as Interlocked or lock, or should be replaced with isolated state.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0061",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ConcurrentCollectionEnumerationRule",
+    "Id": "SP0062",
+    "Title": "Concurrent collection enumerated through LINQ",
+    "MessageFormat": "LINQ operator \u0027{0}\u0027 enumerates concurrent collection \u0027{1}\u0027 without snapshot guarantees",
+    "Category": "Concurrency",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Concurrent collection members have documented concurrency behavior, but interface and LINQ extension methods do not necessarily provide an atomic snapshot.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0062",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "BoxingInLoopRule",
+    "Id": "SP0063",
+    "Title": "Value boxed inside a loop",
+    "MessageFormat": "Value of type \u0027{0}\u0027 is boxed inside loop \u0027{1}\u0027",
+    "Category": "Performance",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Repeated boxing allocates objects and adds GC pressure. Prefer generic APIs or strongly typed interfaces in repeated paths.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0063",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "MaybeNullResultDereferenceRule",
+    "Id": "SP0064",
+    "Title": "Maybe-null query result is dereferenced",
+    "MessageFormat": "Result of \u0027{0}\u0027 can be null or empty-default and is dereferenced immediately",
+    "Category": "Nullability",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Default-returning lookup and LINQ APIs require a guard, a non-null fallback, or a proof that a matching element exists before dereference.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0064",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "PrematureQueryMaterializationRule",
+    "Id": "SP0065",
+    "Title": "Queryable is materialized before further filtering",
+    "MessageFormat": "\u0027{0}\u0027 materializes IQueryable before subsequent \u0027{1}\u0027 processing",
+    "Category": "Performance",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Compose supported filters and projections on IQueryable before materialization so the remote provider can execute them.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0065",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "DeferredQuerySideEffectRule",
+    "Id": "SP0066",
+    "Title": "Deferred query lambda mutates state",
+    "MessageFormat": "Deferred LINQ operator \u0027{0}\u0027 contains state mutation \u0027{1}\u0027",
+    "Category": "Correctness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Side effects in deferred LINQ lambdas run on every enumeration and can therefore execute zero, one, or multiple times unexpectedly.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0066",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "QueryTranslationRiskRule",
+    "Id": "SP0067",
+    "Title": "Queryable expression calls source-only method",
+    "MessageFormat": "Queryable operator \u0027{0}\u0027 calls source method \u0027{1}\u0027 that the remote provider may not translate",
+    "Category": "Compatibility",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Remote IQueryable providers translate a bounded method set. Source-only helper calls in query predicates and selectors require provider-specific translation support.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0067",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SerializationCycleRiskRule",
+    "Id": "SP0068",
+    "Title": "Serialized source type has a reference cycle",
+    "MessageFormat": "Type \u0027{0}\u0027 contains a serializable reference cycle and is serialized without explicit cycle handling",
+    "Category": "Serialization",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "System.Text.Json rejects reachable object cycles by default. Project cyclic entities to DTOs, ignore a link, or configure deliberate reference handling.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0068",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SerializerAttributeMismatchRule",
+    "Id": "SP0069",
+    "Title": "Serializer ignores attribute from another JSON library",
+    "MessageFormat": "Serializer \u0027{0}\u0027 does not honor attribute \u0027{1}\u0027 on member \u0027{2}\u0027",
+    "Category": "Serialization",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Newtonsoft.Json and System.Text.Json define similarly named attributes that are not interchangeable.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0069",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "IneffectiveRequiredAttributeRule",
+    "Id": "SP0070",
+    "Title": "Required attribute cannot reject a non-nullable value type default",
+    "MessageFormat": "[Required] on non-nullable value member \u0027{0}\u0027 cannot distinguish omitted input from default({1})",
+    "Category": "Usage",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Use a nullable value type when model binding must distinguish missing input, then validate the resulting value range separately.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0070",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UncheckedAllocationArithmeticRule",
+    "Id": "SP0071",
+    "Title": "Allocation length uses unchecked arithmetic",
+    "MessageFormat": "Allocation length expression \u0027{0}\u0027 can wrap before bounds validation",
+    "Category": "Correctness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Compute allocation sizes in a checked context so overflow is reported instead of becoming a wrapped negative or undersized length.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0071",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "SuppressionWithoutJustificationRule",
+    "Id": "SP0072",
+    "Title": "Diagnostic suppression lacks justification",
+    "MessageFormat": "Suppression \u0027{0}\u0027 has no reviewable diagnostic scope or justification",
+    "Category": "Review",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Broad pragma suppressions and SuppressMessage attributes without justification hide warning debt and should be narrowed or documented.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0072",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "NullableAnalysisDisabledRule",
+    "Id": "SP0073",
+    "Title": "Nullable analysis explicitly disabled",
+    "MessageFormat": "Nullable analysis is disabled for this source region",
+    "Category": "Nullability",
+    "DefaultSeverity": "Info",
+    "IsEnabledByDefault": false,
+    "Description": "Explicit nullable-disable directives create blind spots in compile-time null-state analysis. Prefer scoped annotations and resolved warnings.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0073",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "IdenticalOperandsRule",
+    "Id": "SP0074",
+    "Title": "Binary operation uses the same value on both sides",
+    "MessageFormat": "Operation \u0027{0}\u0027 uses \u0027{1}\u0027 as both operands; verify that the second operand is correct",
+    "Category": "Correctness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Identical stable operands in built-in comparisons, subtraction, division, and remainder usually indicate a copied or mistyped operand. Floating-point and user-defined operators are excluded because they need not be reflexive.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0074",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "ContainerOwnedServiceDisposedRule",
+    "Id": "SP0075",
+    "Title": "Container-owned service is disposed by its consumer",
+    "MessageFormat": "Service resolved by \u0027{0}\u0027 is disposed by consuming code; the dependency-injection container owns its lifetime",
+    "Category": "ResourceLifetime",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "Services resolved from IServiceProvider are disposed by their owning service provider or scope. Consumers should not wrap the resolved service in using or call Dispose directly.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0075",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  },
+  {
+    "FieldName": "UnconsumedDeferredQueryRule",
+    "Id": "SP0076",
+    "Title": "Deferred query is never consumed",
+    "MessageFormat": "Deferred query produced by \u0027{0}\u0027 is never enumerated or materialized",
+    "Category": "Correctness",
+    "DefaultSeverity": "Warning",
+    "IsEnabledByDefault": false,
+    "Description": "LINQ query operators are deferred. Constructing a query and discarding it performs no work and does not execute its predicate or selector.",
+    "HelpLinkUri": "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#sp0076",
+    "CustomTags": [
+      "Telemetry"
+    ]
+  }
+]

@@ -335,14 +335,22 @@ Tests are excluded from the metric and must not be deleted.
   are identical for all three tools, packaging assertions consume the combined
   code/resource owner, and architecture coverage locks the exact resource bytes
   while preventing the inline help blocks from returning.
+- [x] Made one embedded JSON catalog the metadata owner for all 75 analyzer
+  diagnostics. Public descriptor fields now bind by field identity through a
+  validating immutable loader instead of repeating constructor-heavy metadata
+  in C#; supported diagnostics are derived without reflection. A canonical
+  runtime hash locks IDs, field names, titles, messages, categories,
+  severities, enabled defaults, descriptions, help links, and tags to the
+  pre-refactor assembly, while release-table and architecture tests replace
+  the syntax-only RS2002/RS2003 discovery that cannot inspect data resources.
 
 ## Current evidence
 
-- Maintained production: 97,075 lines (93,156 C#, 3,189 scripts, and 730
-  specifications); net reduction: 10,551 lines; remaining reduction: 9,449.
-  This tranche removed 217 maintained lines without deleting tests.
+- Maintained production: 96,823 lines (92,904 C#, 3,189 scripts, and 730
+  specifications); net reduction: 10,803 lines; remaining reduction: 9,197.
+  This tranche removed 252 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,193 passing tests and two documented Main skips.
+- Six lanes: 6,194 passing tests and two documented Main skips.
 
 ## Milestones
 

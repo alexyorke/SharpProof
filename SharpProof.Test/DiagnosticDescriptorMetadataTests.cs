@@ -1,12 +1,19 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using System.Globalization;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SharpProof.Test;
 
 [TestFixture]
 public sealed class DiagnosticDescriptorMetadataTests
 {
+    private const string DescriptorCatalogHash =
+        "9A736E1512758A3171208B53FA1BEC2C65F447B03FE068CFA257FA15074ABD6D";
+
     private const string HelpLinkBaseUri =
         "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#";
 
@@ -65,6 +72,32 @@ public sealed class DiagnosticDescriptorMetadataTests
     }
 
     [Test]
+    public void DiagnosticCatalog_PreservesCanonicalDescriptorMetadata()
+    {
+        var canonical = string.Join("\n", typeof(SharpProofDiagnostics)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(static field => field.FieldType == typeof(DiagnosticDescriptor))
+            .Select(static field => (Field: field, Descriptor: (DiagnosticDescriptor)field.GetValue(null)!))
+            .OrderBy(static entry => entry.Descriptor.Id, StringComparer.Ordinal)
+            .Select(static entry => string.Join(
+                "\u001f",
+                entry.Field.Name,
+                entry.Descriptor.Id,
+                entry.Descriptor.Title.ToString(CultureInfo.InvariantCulture),
+                entry.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                entry.Descriptor.Category,
+                entry.Descriptor.DefaultSeverity.ToString(),
+                entry.Descriptor.IsEnabledByDefault,
+                entry.Descriptor.Description.ToString(CultureInfo.InvariantCulture),
+                entry.Descriptor.HelpLinkUri,
+                string.Join("\u001e", entry.Descriptor.CustomTags))));
+
+        Assert.That(
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))),
+            Is.EqualTo(DescriptorCatalogHash));
+    }
+
+    [Test]
     public void DiagnosticDeclarations_HaveSingleCatalogOwner()
     {
         var analyzerDirectory = Path.Combine(FindRepositoryRoot(), "SharpProof.Analyzer");
@@ -73,6 +106,7 @@ public sealed class DiagnosticDescriptorMetadataTests
             .Select(Path.GetFileName)
             .ToArray();
         var catalogSource = File.ReadAllText(Path.Combine(analyzerDirectory, "AnalyzerDiagnosticCatalog.cs"));
+        var catalogData = File.ReadAllText(Path.Combine(analyzerDirectory, "AnalyzerDiagnosticCatalog.json"));
 
         Assert.Multiple(() =>
         {
@@ -82,6 +116,10 @@ public sealed class DiagnosticDescriptorMetadataTests
                 Has.Length.EqualTo(AnalyzerDiagnosticCatalog.SupportedDiagnostics.Length + 1));
             Assert.That(catalogSource, Does.Not.Contain("CreateDescriptor("));
             Assert.That(catalogSource, Does.Not.Contain("CreateCommonBugDescriptor("));
+            Assert.That(catalogSource, Does.Contain("AnalyzerDiagnosticCatalog.Get(nameof("));
+            Assert.That(catalogSource, Does.Not.Contain("GetFields("));
+            Assert.That(catalogData.Split("\"FieldName\"", StringSplitOptions.None),
+                Has.Length.EqualTo(AnalyzerDiagnosticCatalog.SupportedDiagnostics.Length + 1));
         });
     }
 

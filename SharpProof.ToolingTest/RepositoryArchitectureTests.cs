@@ -398,13 +398,16 @@ public sealed class RepositoryArchitectureTests
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
         var catalog = File.ReadAllText(Path.Combine(analyzerRoot, "AnalyzerDiagnosticCatalog.cs"));
+        var catalogData = File.ReadAllText(Path.Combine(analyzerRoot, "AnalyzerDiagnosticCatalog.json"));
         var configuration = File.ReadAllText(Path.Combine(
             analyzerRoot, "Configuration", "AnalyzerConfiguration.cs"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(catalog, Does.Contain("GetFields(BindingFlags.Public | BindingFlags.Static)"));
-            Assert.That(catalog, Does.Not.Contain("AnalyzerDiagnosticDefinition"));
+            Assert.That(catalog, Does.Contain("SharpProof.Analyzer.DiagnosticCatalog.json"));
+            Assert.That(catalog, Does.Contain("DescriptorsByField"));
+            Assert.That(catalog, Does.Not.Contain("GetFields("));
+            Assert.That(catalogData.Split("\"FieldName\"", StringSplitOptions.None), Has.Length.EqualTo(76));
             Assert.That(configuration, Does.Not.Contain("AllSupportedDiagnosticIds"));
             Assert.That(configuration, Does.Contain("SharpProofDiagnosticSuppressor.SupportedDiagnosticIds"));
         });
