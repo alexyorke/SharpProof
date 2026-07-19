@@ -79,8 +79,7 @@ internal sealed class SymbolicInvariantQueryView
     private SymbolicInvariantQueryView(
         SymbolicInvariantResult invariant,
         SymbolicMergedPathFacts facts,
-        SymbolicReachabilitySummary reachability,
-        SymbolicProofOutcomeSummary proofs,
+        SymbolicQueryMetrics metrics,
         SymbolicSmtDiagnostics smt,
         IReadOnlyList<SymbolicProgramPointResult> points)
     {
@@ -93,8 +92,7 @@ internal sealed class SymbolicInvariantQueryView
         CandidateProgramPointCount = facts.CandidateProgramPointCount;
         UnreachableProgramPointCount = facts.UnreachableProgramPointCount;
         IsUnreachable = facts.IsUnreachable;
-        Reachability = reachability;
-        ProofOutcomes = proofs;
+        Metrics = metrics;
         SmtDiagnostics = smt;
         TargetSummaries = BuildTargetSummaries(invariant, facts);
         TargetPathSummaries = BuildTargetPaths(points);
@@ -126,8 +124,7 @@ internal sealed class SymbolicInvariantQueryView
     internal int CandidateProgramPointCount { get; }
     internal int UnreachableProgramPointCount { get; }
     internal bool IsUnreachable { get; }
-    internal SymbolicReachabilitySummary Reachability { get; }
-    internal SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    internal SymbolicQueryMetrics Metrics { get; }
     internal SymbolicSmtDiagnostics SmtDiagnostics { get; }
     internal IReadOnlyList<SymbolicInvariantQueryDiagnostic> Diagnostics { get; }
     internal int DiagnosticCount => Diagnostics.Count;
@@ -136,14 +133,13 @@ internal sealed class SymbolicInvariantQueryView
     internal string Summary { get; }
     internal bool HasMaybeFacts => MaybeFacts.Count != 0;
     internal bool HasUnknowns => UnknownFacts.Count != 0;
-    internal bool HasUnresolvedAnalysis => HasUnknowns || Reachability.UnknownCount != 0 ||
-        Reachability.NotCheckedCount != 0 || ProofOutcomes.UnknownCount != 0;
+    internal bool HasUnresolvedAnalysis => HasUnknowns || Metrics.ReachabilityUnknownCount != 0 ||
+        Metrics.ReachabilityNotCheckedCount != 0 || Metrics.ProofUnknownCount != 0;
 
     internal static SymbolicInvariantQueryView From(SymbolicQueryResult result) => new(
         result.MergedInvariant,
         result.MergedPathFacts,
-        result.Reachability,
-        result.ProgramPointSummary.ProofOutcomes,
+        result.Metrics,
         result.SmtDiagnostics,
         result.ProgramPoints);
 
@@ -153,8 +149,7 @@ internal sealed class SymbolicInvariantQueryView
         return new SymbolicInvariantQueryView(
             point.Invariant,
             SymbolicMergedPathFacts.FromProgramPoints(points),
-            SymbolicReachabilitySummary.FromProgramPoints(points),
-            point.ProofOutcomes,
+            SymbolicQueryMetrics.FromProgramPoints(points),
             point.SmtDiagnostics,
             points);
     }
@@ -180,8 +175,8 @@ internal sealed class SymbolicInvariantQueryView
     private SymbolicInvariantQueryStatus ResolveStatus()
     {
         if (IsUnreachable) return SymbolicInvariantQueryStatus.Unreachable;
-        if (Reachability.UnknownCount != 0 || Reachability.NotCheckedCount != 0 ||
-            ProofOutcomes.UnknownCount != 0 || SmtDiagnostics.IsConfigured && !SmtDiagnostics.IsEnabled)
+        if (Metrics.ReachabilityUnknownCount != 0 || Metrics.ReachabilityNotCheckedCount != 0 ||
+            Metrics.ProofUnknownCount != 0 || SmtDiagnostics.IsConfigured && !SmtDiagnostics.IsEnabled)
             return SymbolicInvariantQueryStatus.Unresolved;
         return HasMaybeFacts || HasUnknowns
             ? SymbolicInvariantQueryStatus.Conservative
@@ -213,15 +208,19 @@ internal sealed class SymbolicInvariantQueryView
             diagnostics.Add(Diagnostic("SP-SYM-CONSERVATIVE-UNKNOWN", "Warning",
                 "The merged invariant contains conservative unknown placeholders for path-varying targets.",
                 UnknownFacts.Count, UnknownFacts));
-        if (Reachability.UnknownCount != 0 || Reachability.NotCheckedCount != 0)
+        if (Metrics.ReachabilityUnknownCount != 0 || Metrics.ReachabilityNotCheckedCount != 0)
             diagnostics.Add(Diagnostic("SP-SYM-REACHABILITY", "Warning",
                 "Some program point reachability checks are unknown or were not requested.",
-                Reachability.UnknownCount + Reachability.NotCheckedCount,
-                new[] { $"Unknown={Reachability.UnknownCount}", $"NotChecked={Reachability.NotCheckedCount}" }));
-        if (ProofOutcomes.UnknownCount != 0)
+                Metrics.ReachabilityUnknownCount + Metrics.ReachabilityNotCheckedCount,
+                new[]
+                {
+                    $"Unknown={Metrics.ReachabilityUnknownCount}",
+                    $"NotChecked={Metrics.ReachabilityNotCheckedCount}"
+                }));
+        if (Metrics.ProofUnknownCount != 0)
             diagnostics.Add(Diagnostic("SP-SYM-PROOF-UNKNOWN", "Warning",
                 "Some requested implication proofs were not resolved by bounded SMT.",
-                ProofOutcomes.UnknownCount, new[] { $"UnknownProofs={ProofOutcomes.UnknownCount}" }));
+                Metrics.ProofUnknownCount, new[] { $"UnknownProofs={Metrics.ProofUnknownCount}" }));
         if (SmtDiagnostics.IsConfigured && !SmtDiagnostics.IsEnabled)
             diagnostics.Add(Diagnostic("SP-SYM-SMT-DISABLED", "Warning",
                 "SMT is configured but disabled, so solver-backed analysis is conservative.",

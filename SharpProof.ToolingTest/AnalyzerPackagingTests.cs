@@ -1958,7 +1958,7 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("SharpProof explanation"));
         Assert.That(source, Does.Contain("PrintScopedResult(result, \"Line\", options)"));
         Assert.That(source, Does.Contain("SymbolicInvariantQueryView.From(result)"));
-        Assert.That(source, Does.Contain("SymbolicInvariantTargetFilter.ApplyToProofSummaries"));
+        Assert.That(source, Does.Contain("PrintConditionProofSummaries(result.ConditionProofs, options)"));
         Assert.That(source, Does.Contain("report.ToText()"));
         Assert.That(source, Does.Contain("Merged invariant"));
         Assert.That(source, Does.Contain("Program point kind"));

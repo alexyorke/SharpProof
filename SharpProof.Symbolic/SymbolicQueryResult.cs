@@ -12,8 +12,7 @@ internal sealed class SymbolicQueryResult
         SymbolicInvariantResult observedInvariant,
         SymbolicInvariantResult mergedInvariant,
         SymbolicMergedPathFacts mergedPathFacts,
-        SymbolicProgramPointSummary programPointSummary,
-        SymbolicReachabilitySummary reachability,
+        SymbolicQueryMetrics metrics,
         IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
         SymbolicSmtDiagnostics smtDiagnostics,
         IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
@@ -25,15 +24,31 @@ internal sealed class SymbolicQueryResult
         ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
         MergedInvariant = mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
         MergedPathFacts = mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
-        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+        Metrics = metrics;
+        Reachability = new SymbolicReachabilitySummary(
+            metrics.ReachabilityNotCheckedCount,
+            metrics.ReachabilityUnknownCount,
+            metrics.ReachableCount,
+            metrics.UnreachableCount);
+        ProgramPointSummary = new SymbolicProgramPointSummary(
+            metrics.ProgramPointCount,
+            metrics.TotalPathConditionCount,
+            metrics.MaxPathConditionCount,
+            Reachability,
+            new SymbolicProofOutcomeSummary(
+                metrics.ProofTotalCount,
+                metrics.ProofUnknownCount,
+                metrics.ProofProvenTrueCount,
+                metrics.ProofProvenFalseCount,
+                metrics.ProofUnreachableCount));
+        ConditionProofs = conditionProofs;
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         LineGroups = lineGroups ?? Array.Empty<SymbolicQueryLineGroup>();
         InvariantInfo = new SymbolicInvariantInfo(
             MergedInvariant.MergedInvariantText,
             SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
-            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
+            ProgramPoints.SelectMany(static point => point.ConditionProofs)
+                .Select(static proof => proof.Proof).ToArray(),
             MergedInvariant.MergeKind,
             MergedInvariant.ConditionCount);
         ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
@@ -77,6 +92,8 @@ internal sealed class SymbolicQueryResult
     public SymbolicReachabilitySummary Reachability { get; }
 
     public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+    internal SymbolicQueryMetrics Metrics { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
@@ -230,9 +247,8 @@ internal sealed class SymbolicQueryResult
             point.Invariant,
             point.Invariant,
             SymbolicMergedPathFacts.FromProgramPoints(new[] { point }),
-            SymbolicProgramPointSummary.FromProgramPoints(new[] { point }),
-            SymbolicReachabilitySummary.FromProgramPoints(new[] { point }),
-            SymbolicConditionProofSummary.FromProgramPoints(new[] { point }),
+            SymbolicQueryMetrics.FromProgramPoints(new[] { point }),
+            SymbolicConditionProofProjection.FromProgramPoints(new[] { point }),
             point.SmtDiagnostics);
     }
 
@@ -250,8 +266,8 @@ internal sealed class SymbolicQueryResult
             factSummary.MergedInvariantText);
         var mergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(programPoints);
         var mergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(mergedPathFacts);
-        var programPointSummary = SymbolicProgramPointSummary.FromProgramPoints(programPoints);
-        var conditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
+        var metrics = SymbolicQueryMetrics.FromProgramPoints(programPoints);
+        var conditionProofs = SymbolicConditionProofProjection.FromProgramPoints(programPoints);
         var diagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         return new SymbolicQueryResult(
             scope,
@@ -259,8 +275,7 @@ internal sealed class SymbolicQueryResult
             observedInvariant,
             mergedInvariant,
             mergedPathFacts,
-            programPointSummary,
-            programPointSummary.Reachability,
+            metrics,
             conditionProofs,
             diagnostics,
             lineGroups);

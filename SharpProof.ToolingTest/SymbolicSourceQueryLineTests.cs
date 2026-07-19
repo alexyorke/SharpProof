@@ -531,7 +531,7 @@ internal class TestClass
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery"), Is.Null);
         Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.False);
         Assert.That(typeof(SymbolicProgramPointResult).GetConstructors(), Is.Empty);
-        Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
+        Assert.That(typeof(SymbolicConditionProofResult).IsVisible, Is.False);
     }
 
     [Test]
@@ -569,16 +569,12 @@ internal class TestClass
         Assert.That(returnProof.Column, Is.EqualTo(returnPoint.Column));
         Assert.That(returnProof.NodeSpanStart, Is.EqualTo(returnPoint.NodeSpanStart));
         Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
-        var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
-        Assert.That(aggregateProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
-        Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
-        Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
-        Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
-        Assert.That(aggregateProof.Proof.DisplayKind, Is.Not.Empty);
-        Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo("value > 0"));
-        Assert.That(aggregateProof.Proof.Target, Is.EqualTo(aggregateProof.Target));
+        var aggregateProof = GetProofSummaries(result).Single(proof => proof.Condition == "value > 0");
+        Assert.That(aggregateProof.Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Unknown));
+        Assert.That(aggregateProof.Summary, Does.Contain("unresolved"));
+        Assert.That(aggregateProof.DisplayKind, Is.Not.Empty);
+        Assert.That(aggregateProof.Condition, Is.EqualTo("value > 0"));
         Assert.That(aggregateProof.Target, Is.EqualTo("value"));
-        Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
         Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
         var summary = SymbolicInvariantFactSummary.Merge(result.ProgramPoints.Select(point => point.Facts));
         Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
@@ -592,15 +588,15 @@ internal class TestClass
         Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
         Assert.That(result.MergedPathFacts.MaybeFacts, Does.Contain("value > 0"));
         Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
-        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+        Assert.That(result.Metrics.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
         Assert.That(
-            result.ProgramPointSummary.TotalPathConditionCount,
+            result.Metrics.TotalPathConditionCount,
             Is.EqualTo(result.ProgramPoints.Sum(point => point.PathConditionCount)));
         Assert.That(
-            result.ProgramPointSummary.MaxPathConditionCount,
+            result.Metrics.MaxPathConditionCount,
             Is.EqualTo(result.ProgramPoints.Max(point => point.PathConditionCount)));
         Assert.That(
-            result.ProgramPointSummary.ProofOutcomes.TotalCount,
+            result.Metrics.ProofTotalCount,
             Is.EqualTo(result.ProgramPoints.Sum(point => point.ConditionProofs.Count)));
         Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
         Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
@@ -621,8 +617,9 @@ internal class TestClass
         Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
         Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend),
             Does.Contain(SymbolicProofBackend.Smt));
-        Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
-        Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        var returnMetrics = SymbolicQueryMetrics.FromProgramPoints(new[] { returnPoint });
+        Assert.That(returnMetrics.ProofTotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
+        Assert.That(returnMetrics.ProofProvenTrueCount, Is.EqualTo(1));
         Assert.That(returnPoint.Invariant.Conditions.All(condition => condition.IsSolverBacked), Is.True);
         Assert.That(returnPoint.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
         Assert.That(
@@ -1045,13 +1042,11 @@ internal class TestClass
         Assert.That(query.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
         Assert.That(query.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
         Assert.That(query.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
-        var aggregateProof = result.ConditionProofs.Single(static proof => proof.Condition == "value > 0");
-        Assert.That(aggregateProof.Reasons, Is.Not.Empty);
-        Assert.That(
-            aggregateProof.Reasons.Sum(static reason => reason.Count),
-            Is.EqualTo(aggregateProof.TotalCount));
-        Assert.That(
-            aggregateProof.Reasons.Select(static reason => reason.TruthValue),
+        var aggregateProof = GetProofSummaries(result).Single(static proof => proof.Condition == "value > 0");
+        var aggregateInputs = result.ProgramPoints.SelectMany(static point => point.ConditionProofs)
+            .Where(static proof => proof.Condition == "value > 0").ToArray();
+        Assert.That(aggregateInputs, Has.Length.EqualTo(aggregateProof.TotalCount));
+        Assert.That(aggregateInputs.Select(static proof => proof.TruthValue),
             Does.Contain(SymbolicTruthValue.ProvenTrue));
 
         var positiveReturn = result.ProgramPoints
@@ -1064,7 +1059,7 @@ internal class TestClass
         Assert.That(positiveQuery.HasUnresolvedAnalysis, Is.False);
         Assert.That(positiveQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
         Assert.That(positiveQuery.Diagnostics, Is.Empty);
-        Assert.That(positiveQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        Assert.That(positiveQuery.Metrics.ProofProvenTrueCount, Is.EqualTo(1));
         var positiveTargetSummary = positiveQuery.TargetSummaries.Single();
         Assert.That(positiveTargetSummary.Target, Is.EqualTo("value"));
         Assert.That(positiveTargetSummary.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
@@ -1226,7 +1221,7 @@ internal class TestClass
         var impossibleReturn = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(impossibleReturn.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
         Assert.That(impossibleReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable));
-        Assert.That(result.ProgramPointSummary.Reachability.UnreachableCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(result.Metrics.UnreachableCount, Is.GreaterThanOrEqualTo(1));
 
         var unreachableOnly = result.Filter(new SymbolicSourceQueryFilter(
             reachability: new[] { SymbolicReachability.Unreachable }));
@@ -1265,10 +1260,10 @@ internal class TestClass
             Is.EquivalentTo(filtered.MergedPathFacts.MergedFacts));
         Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
         Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Is.Empty);
-        Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPoints.Count));
-        Assert.That(filtered.ProgramPointSummary.TotalPathConditionCount,
+        Assert.That(filtered.Metrics.ProgramPointCount, Is.EqualTo(filtered.ProgramPoints.Count));
+        Assert.That(filtered.Metrics.TotalPathConditionCount,
             Is.EqualTo(filtered.ProgramPoints.Single().PathConditionCount));
-        Assert.That(filtered.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
+        Assert.That(filtered.Metrics.ProofTotalCount, Is.Zero);
     }
 
     [Test]
@@ -1299,10 +1294,10 @@ internal class TestClass
         Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
         Assert.That(result.MergedInvariant.ConditionCount, Is.Zero);
         Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.Empty);
-        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.Zero);
-        Assert.That(result.ProgramPointSummary.TotalPathConditionCount, Is.Zero);
-        Assert.That(result.ProgramPointSummary.MaxPathConditionCount, Is.Zero);
-        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
+        Assert.That(result.Metrics.ProgramPointCount, Is.Zero);
+        Assert.That(result.Metrics.TotalPathConditionCount, Is.Zero);
+        Assert.That(result.Metrics.MaxPathConditionCount, Is.Zero);
+        Assert.That(result.Metrics.ProofTotalCount, Is.Zero);
     }
 
     [Test]
@@ -1353,24 +1348,22 @@ internal class TestClass
         Assert.That(result.MergedPathFacts.MaybeFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)),
             Is.True);
         Assert.That(result.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
-        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.Metrics.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
         Assert.That(
-            result.ProgramPointSummary.TotalPathConditionCount,
+            result.Metrics.TotalPathConditionCount,
             Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
         Assert.That(
-            result.ProgramPointSummary.MaxPathConditionCount,
+            result.Metrics.MaxPathConditionCount,
             Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Max(point => point.PathConditionCount)));
-        Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(result.ProgramPointSummary.Reachability.ReachableCount,
-            Is.EqualTo(result.Reachability.ReachableCount));
-        var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
+        Assert.That(result.Metrics.ReachableCount, Is.EqualTo(result.ProgramPointCount));
+        var proofSummary = GetProofSummaries(result).Single(summary => summary.Condition == "value > 0");
         Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
         Assert.That(
             proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount +
             proofSummary.UnknownCount,
             Is.EqualTo(result.ProgramPointCount));
-        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointCount));
-        Assert.That(result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount, Is.EqualTo(proofSummary.ProvenTrueCount));
+        Assert.That(result.Metrics.ProofTotalCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.Metrics.ProofProvenTrueCount, Is.EqualTo(proofSummary.ProvenTrueCount));
     }
 
     [Test]
@@ -1413,7 +1406,7 @@ internal class TestClass
             Is.True);
         Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.Facts.Count != 0),
             Is.True);
-        Assert.That(filtered.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(filtered.Metrics.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
         Assert.That(filtered.ObservedFacts,
             Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts)
                 .Distinct()));
@@ -1423,12 +1416,12 @@ internal class TestClass
         Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
         Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.MergedPathFacts.MergedInvariantText));
         Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
-        Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(filtered.Metrics.ProgramPointCount, Is.EqualTo(filtered.ProgramPointCount));
         Assert.That(
-            filtered.ProgramPointSummary.TotalPathConditionCount,
+            filtered.Metrics.TotalPathConditionCount,
             Is.EqualTo(filtered.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
-        Assert.That(filtered.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
-        Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount,
+        Assert.That(filtered.Metrics.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(GetProofSummaries(filtered).Single(summary => summary.Condition == "value > 0").ProvenTrueCount,
             Is.GreaterThan(0));
     }
 
@@ -1547,7 +1540,7 @@ internal class TestClass
         Assert.That(points[0].MethodName, Is.EqualTo("FirstValue"));
         Assert.That(points[0].Line, Is.EqualTo(firstReturnLine));
         Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
+        Assert.That(GetProofSummaries(filtered).Single().TotalCount, Is.EqualTo(1));
 
         var serializedPoint = CanonicalJson(filtered).GetProperty("programPoints").EnumerateArray().Single();
         Assert.That(serializedPoint.GetProperty("programPointKind").GetString(),
@@ -1613,12 +1606,12 @@ internal class TestClass
         Assert.That(query.Position, Is.EqualTo(position));
         Assert.That(query.ProgramPoints, Has.Count.EqualTo(1));
         Assert.That(query.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(query.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
-        Assert.That(query.ProgramPointSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
-        Assert.That(query.ProgramPointSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
-        Assert.That(query.Reachability.ReachableCount + query.Reachability.UnreachableCount +
-            query.Reachability.UnknownCount, Is.EqualTo(1));
-        Assert.That(query.Reachability.ReachableCount + query.Reachability.UnreachableCount, Is.EqualTo(1));
+        Assert.That(query.Metrics.ProofTotalCount, Is.EqualTo(result.ConditionProofs.Count));
+        Assert.That(query.Metrics.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(query.Metrics.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(query.Metrics.ReachableCount + query.Metrics.UnreachableCount +
+            query.Metrics.ReachabilityUnknownCount, Is.EqualTo(1));
+        Assert.That(query.Metrics.ReachableCount + query.Metrics.UnreachableCount, Is.EqualTo(1));
         Assert.That(invariant.StatusReason, Is.EqualTo("all_candidate_program_points_exact"));
         Assert.That(invariant.HasUnresolvedAnalysis, Is.False);
         Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("point"));
@@ -1710,7 +1703,7 @@ internal class TestClass
         Assert.That(result.LineCount, Is.EqualTo(source.Split('\n').Length));
         Assert.That(result.ProgramPoints, Is.Not.Empty);
         Assert.That(result.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(result.Metrics.ProofTotalCount, Is.GreaterThanOrEqualTo(1));
         Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
         Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
         Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
@@ -1835,7 +1828,7 @@ internal class TestClass
         Assert.That(result.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
         Assert.That(result.SpanStart, Is.EqualTo(spanStart));
         Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
-        Assert.That(result.ProgramPointSummary.MaxPathConditionCount,
+        Assert.That(result.Metrics.MaxPathConditionCount,
             Is.LessThanOrEqualTo(result.SmtDiagnostics.MaxPathConditions));
         Assert.That(query.HasUnresolvedAnalysis, Is.True);
         Assert.That(query.TargetPathSummaries.Select(static summary => summary.Target), Does.Contain("copy"));
@@ -1849,8 +1842,9 @@ internal class TestClass
         Assert.That(path.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
         Assert.That(path.ProofTotalCount, Is.GreaterThanOrEqualTo(2));
         Assert.That(path.ReasonCode, Is.Not.Empty);
-        Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
-        Assert.That(result.ConditionProofs.All(static proof => proof.Status != SymbolicConditionProofSummaryStatus.None), Is.True);
+        Assert.That(GetProofSummaries(result), Has.Count.GreaterThanOrEqualTo(2));
+        Assert.That(GetProofSummaries(result)
+            .All(static proof => proof.Status != SymbolicConditionProofSummaryStatus.None), Is.True);
         Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
     }
 
@@ -1905,7 +1899,8 @@ internal class TestClass
             query.TargetPathSummaries, filters, static summary => summary.Target);
         var targetSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetSummaries, filters, static summary => summary.Target);
-        var proofs = SymbolicInvariantTargetFilter.ApplyToProofSummaries(result.ConditionProofs, filters);
+        var proofs = SymbolicInvariantTargetFilter.ApplyToTargets(
+            GetProofSummaries(result), filters, static proof => proof.Target);
         Assert.That(query.TargetPathSummaries.Count, Is.GreaterThan(targetPaths.Count));
         Assert.That(targetPaths.Select(static summary => summary.Target), Is.EquivalentTo(new[] { "copy" }));
         Assert.That(targetSummaries.Select(static summary => summary.Target), Is.All.EqualTo("copy"));
@@ -1956,10 +1951,10 @@ internal class TestClass
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "copy > 0", "other < 10" });
         Assert.That(
-            result.ConditionProofs.Select(static proof => proof.Target),
+            GetProofSummaries(result).Select(static proof => proof.Target),
             Does.Contain("copy"));
         Assert.That(
-            result.ConditionProofs.Select(static proof => proof.Target),
+            GetProofSummaries(result).Select(static proof => proof.Target),
             Does.Contain("other"));
 
         var filters = new[] { " copy " };
@@ -1980,7 +1975,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
+    public void SymbolicConditionProofAggregate_DescribesReachableProofOutcomes()
     {
         var points = new[]
         {
@@ -1993,8 +1988,7 @@ internal class TestClass
             CreateSyntheticProofPoint("unreachable", SymbolicTruthValue.Unreachable)
         };
 
-        var summaries = SymbolicConditionProofSummary
-            .FromProgramPoints(points)
+        var summaries = GetProofSummaries(SymbolicConditionProofProjection.FromProgramPoints(points))
             .ToDictionary(static summary => summary.Condition);
 
         Assert.That(summaries["always"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysTrue));
@@ -2004,10 +1998,11 @@ internal class TestClass
         Assert.That(summaries["always"].Summary, Does.Contain("proven true"));
 
         Assert.That(summaries["never"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysFalse));
-        Assert.That(summaries["never"].RefutedOnAllReachablePoints, Is.True);
+        Assert.That(summaries["never"].ProvenFalseCount, Is.EqualTo(summaries["never"].ReachableCount));
 
         Assert.That(summaries["mixed"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Mixed));
-        Assert.That(summaries["mixed"].HasMixedReachableOutcomes, Is.True);
+        Assert.That(summaries["mixed"].ProvenTrueCount, Is.GreaterThan(0));
+        Assert.That(summaries["mixed"].ProvenFalseCount, Is.GreaterThan(0));
 
         Assert.That(summaries["unknown"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Unknown));
         Assert.That(summaries["unknown"].ResolvedCount, Is.Zero);
@@ -2049,10 +2044,10 @@ internal class TestClass
         Assert.That(result.ScopeKind, Is.EqualTo("file"));
         Assert.That(result.FilePath, Does.EndWith("CompactSummaryOnlyQuery.cs"));
         Assert.That(result.ProgramPoints, Is.Not.Empty);
-        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.Metrics.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
         Assert.That(result.MergedPathFacts.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-        Assert.That(result.Reachability.ReachableCount + result.Reachability.UnreachableCount +
-            result.Reachability.UnknownCount, Is.LessThanOrEqualTo(result.ProgramPointCount));
+        Assert.That(result.Metrics.ReachableCount + result.Metrics.UnreachableCount +
+            result.Metrics.ReachabilityUnknownCount, Is.LessThanOrEqualTo(result.ProgramPointCount));
         Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
         Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
         Assert.That(root.TryGetProperty("lines", out _), Is.False);
@@ -4141,6 +4136,42 @@ internal class TestClass
 
     private static JsonElement CanonicalJson(object value) =>
         JsonSerializer.SerializeToElement(value, value.GetType(), CanonicalJsonOptions);
+
+    private static IReadOnlyList<ProofSummary> GetProofSummaries(SymbolicQueryResult result) =>
+        GetProofSummaries(result.ConditionProofs);
+
+    private static IReadOnlyList<ProofSummary> GetProofSummaries(
+        IReadOnlyList<SymbolicConditionProofSummary> proofs) => proofs
+        .Select(static proof => new ProofSummary(
+            proof.Condition,
+            proof.Target,
+            proof.DisplayKind,
+            proof.TotalCount,
+            proof.UnknownCount,
+            proof.ProvenTrueCount,
+            proof.ProvenFalseCount,
+            proof.UnreachableCount,
+            proof.ReachableCount,
+            proof.ResolvedCount,
+            proof.Status,
+            proof.Summary,
+            proof.HoldsOnAllReachablePoints))
+        .ToArray();
+
+    private sealed record ProofSummary(
+        string Condition,
+        string Target,
+        string DisplayKind,
+        int TotalCount,
+        int UnknownCount,
+        int ProvenTrueCount,
+        int ProvenFalseCount,
+        int UnreachableCount,
+        int ReachableCount,
+        int ResolvedCount,
+        SymbolicConditionProofSummaryStatus Status,
+        string Summary,
+        bool HoldsOnAllReachablePoints);
 
     private static JsonSerializerOptions CanonicalJsonOptions { get; } = new()
     {

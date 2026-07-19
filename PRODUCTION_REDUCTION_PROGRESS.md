@@ -174,14 +174,19 @@ Tests are excluded from the metric and must not be deleted.
   snapshot preserved all 34,519 CoreLib purity classifications exactly, focused
   runtime slices preserve Span and MemoryMarshal behavior, and architecture
   coverage prevents the specialized manual predicates from returning.
+- [x] Made `SymbolicQueryMetrics` the single aggregate count owner for source
+  queries and CLI gates. Removed four independently calculated summary graphs
+  and condensed condition-proof projection/copying to immutable leaves; exact
+  compact, full-JSON, explain, text, package-consumer, and semantic aggregate
+  tests preserve output and conservative proof behavior.
 
 ## Current evidence
 
-- Maintained production: 103,008 lines (98,933 C#, 3,189 scripts, and 886
-  specifications); net reduction: 4,618 lines; remaining reduction: 15,382.
-  This tranche removed 62 maintained lines without deleting tests.
+- Maintained production: 102,806 lines (98,731 C#, 3,189 scripts, and 886
+  specifications); net reduction: 4,820 lines; remaining reduction: 15,180.
+  This tranche removed 202 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,159 passing tests and two documented skips.
+- Six lanes: 6,160 passing tests and two documented skips.
 
 ## Milestones
 

@@ -497,228 +497,88 @@ internal sealed class SymbolicSourceQueryFilter
     }
 }
 
-internal sealed class SymbolicReachabilitySummary(
-    int notCheckedCount,
-    int unknownCount,
-    int reachableCount,
-    int unreachableCount)
+internal readonly record struct SymbolicQueryMetrics(
+    int ProgramPointCount,
+    int TotalPathConditionCount,
+    int MaxPathConditionCount,
+    int ReachabilityNotCheckedCount,
+    int ReachabilityUnknownCount,
+    int ReachableCount,
+    int UnreachableCount,
+    int ProofTotalCount,
+    int ProofUnknownCount,
+    int ProofProvenTrueCount,
+    int ProofProvenFalseCount,
+    int ProofUnreachableCount)
 {
-    public int NotCheckedCount { get; } = notCheckedCount;
-    public int UnknownCount { get; } = unknownCount;
-    public int ReachableCount { get; } = reachableCount;
-    public int UnreachableCount { get; } = unreachableCount;
-
-    public static SymbolicReachabilitySummary FromProgramPoints(
-        IEnumerable<SymbolicProgramPointResult> programPoints)
-    {
-        if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
-
-        var notCheckedCount = 0;
-        var unknownCount = 0;
-        var reachableCount = 0;
-        var unreachableCount = 0;
-        foreach (var point in programPoints)
-            switch (point.Reachability)
-            {
-                case SymbolicReachability.NotChecked:
-                    notCheckedCount++;
-                    break;
-                case SymbolicReachability.Unknown:
-                    unknownCount++;
-                    break;
-                case SymbolicReachability.Reachable:
-                    reachableCount++;
-                    break;
-                case SymbolicReachability.Unreachable:
-                    unreachableCount++;
-                    break;
-            }
-
-        return new SymbolicReachabilitySummary(
-            notCheckedCount,
-            unknownCount,
-            reachableCount,
-            unreachableCount);
-    }
-}
-
-internal sealed class SymbolicProofOutcomeSummary(
-    int totalCount,
-    int unknownCount,
-    int provenTrueCount,
-    int provenFalseCount,
-    int unreachableCount)
-{
-    public int TotalCount { get; } = totalCount;
-    public int UnknownCount { get; } = unknownCount;
-    public int ProvenTrueCount { get; } = provenTrueCount;
-    public int ProvenFalseCount { get; } = provenFalseCount;
-    public int UnreachableCount { get; } = unreachableCount;
-
-    public static SymbolicProofOutcomeSummary FromProofs(
-        IEnumerable<SymbolicConditionProofResult> proofs)
-    {
-        if (proofs == null) throw new ArgumentNullException(nameof(proofs));
-
-        var totalCount = 0;
-        var unknownCount = 0;
-        var provenTrueCount = 0;
-        var provenFalseCount = 0;
-        var unreachableCount = 0;
-        foreach (var proof in proofs)
-        {
-            totalCount++;
-            switch (proof.TruthValue)
-            {
-                case SymbolicTruthValue.Unknown:
-                    unknownCount++;
-                    break;
-                case SymbolicTruthValue.ProvenTrue:
-                    provenTrueCount++;
-                    break;
-                case SymbolicTruthValue.ProvenFalse:
-                    provenFalseCount++;
-                    break;
-                case SymbolicTruthValue.Unreachable:
-                    unreachableCount++;
-                    break;
-            }
-        }
-
-        return new SymbolicProofOutcomeSummary(
-            totalCount,
-            unknownCount,
-            provenTrueCount,
-            provenFalseCount,
-            unreachableCount);
-    }
-}
-
-internal sealed class SymbolicProgramPointSummary(
-    int programPointCount,
-    int totalPathConditionCount,
-    int maxPathConditionCount,
-    SymbolicReachabilitySummary reachability,
-    SymbolicProofOutcomeSummary proofOutcomes)
-{
-    public int ProgramPointCount { get; } = programPointCount;
-    public int TotalPathConditionCount { get; } = totalPathConditionCount;
-    public int MaxPathConditionCount { get; } = maxPathConditionCount;
-    public SymbolicReachabilitySummary Reachability { get; } =
-        reachability ?? throw new ArgumentNullException(nameof(reachability));
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; } =
-        proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
-
-    public static SymbolicProgramPointSummary FromProgramPoints(
-        IEnumerable<SymbolicProgramPointResult> programPoints)
+    internal static SymbolicQueryMetrics FromProgramPoints(IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
         var points = programPoints.ToArray();
-        var totalPathConditionCount = 0;
-        var maxPathConditionCount = 0;
-        foreach (var point in points)
-        {
-            var pathConditionCount = point.PathConditionCount;
-            totalPathConditionCount += pathConditionCount;
-            if (pathConditionCount > maxPathConditionCount) maxPathConditionCount = pathConditionCount;
-        }
+        var proofs = points.SelectMany(static point => point.ConditionProofs).ToArray();
 
-        return new SymbolicProgramPointSummary(
+        return new SymbolicQueryMetrics(
             points.Length,
-            totalPathConditionCount,
-            maxPathConditionCount,
-            SymbolicReachabilitySummary.FromProgramPoints(points),
-            SymbolicProofOutcomeSummary.FromProofs(points.SelectMany(static point => point.ConditionProofs)));
+            points.Sum(static point => point.PathConditionCount),
+            points.Length == 0 ? 0 : points.Max(static point => point.PathConditionCount),
+            points.Count(static point => point.Reachability == SymbolicReachability.NotChecked),
+            points.Count(static point => point.Reachability == SymbolicReachability.Unknown),
+            points.Count(static point => point.Reachability == SymbolicReachability.Reachable),
+            points.Count(static point => point.Reachability == SymbolicReachability.Unreachable),
+            proofs.Length,
+            proofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown),
+            proofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue),
+            proofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenFalse),
+            proofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unreachable));
     }
 }
 
-internal sealed class SymbolicConditionProofSummary
+internal sealed record SymbolicReachabilitySummary(
+    int NotCheckedCount,
+    int UnknownCount,
+    int ReachableCount,
+    int UnreachableCount);
+
+internal sealed record SymbolicProofOutcomeSummary(
+    int TotalCount,
+    int UnknownCount,
+    int ProvenTrueCount,
+    int ProvenFalseCount,
+    int UnreachableCount);
+
+internal sealed record SymbolicProgramPointSummary(
+    int ProgramPointCount,
+    int TotalPathConditionCount,
+    int MaxPathConditionCount,
+    SymbolicReachabilitySummary Reachability,
+    SymbolicProofOutcomeSummary ProofOutcomes);
+
+internal sealed record SymbolicConditionProofReason(SymbolicTruthValue TruthValue, string Reason, int Count);
+
+internal sealed record SymbolicConditionProofSummary(
+    string Condition,
+    string Target,
+    string DisplayKind,
+    string ValueKind,
+    int TotalCount,
+    int UnknownCount,
+    int ProvenTrueCount,
+    int ProvenFalseCount,
+    int UnreachableCount,
+    int ReachableCount,
+    int ResolvedCount,
+    SymbolicConditionProofSummaryStatus Status,
+    string Summary,
+    SymbolicProofInfo Proof,
+    bool HoldsOnAllReachablePoints,
+    bool RefutedOnAllReachablePoints,
+    bool HasMixedReachableOutcomes,
+    IReadOnlyList<SymbolicConditionProofReason> Reasons);
+
+internal static class SymbolicConditionProofProjection
 {
-    public SymbolicConditionProofSummary(
-        string condition,
-        int unknownCount,
-        int provenTrueCount,
-        int provenFalseCount,
-        int unreachableCount,
-        int? totalCount = null,
-        IReadOnlyList<SymbolicConditionProofReasonSummary>? reasons = null,
-        string? target = null,
-        string? formulaKind = null,
-        string? valueKind = null,
-        string? formulaText = null,
-        bool isSolverBacked = false)
-    {
-        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
-        Target = target ?? string.Empty;
-        FormulaKind = formulaKind ?? "Unknown";
-        ValueKind = valueKind ?? "Unknown";
-        FormulaText = string.IsNullOrWhiteSpace(formulaText) ? Condition : formulaText!;
-        IsSolverBacked = isSolverBacked;
-        DisplayKind = FormulaKind;
-        UnknownCount = unknownCount;
-        ProvenTrueCount = provenTrueCount;
-        ProvenFalseCount = provenFalseCount;
-        UnreachableCount = unreachableCount;
-        TotalCount = totalCount ?? unknownCount + provenTrueCount + provenFalseCount + unreachableCount;
-        Reasons = reasons ?? Array.Empty<SymbolicConditionProofReasonSummary>();
-        ReachableCount = TotalCount - UnreachableCount;
-        ResolvedCount = ProvenTrueCount + ProvenFalseCount + UnreachableCount;
-        Status = ResolveStatus(TotalCount, ReachableCount, UnknownCount, ProvenTrueCount, ProvenFalseCount,
-            UnreachableCount);
-        Summary = CreateSummary(Status);
-        var unknownReason = Status == SymbolicConditionProofSummaryStatus.Unknown
-            ? Reasons.FirstOrDefault(static item => item.TruthValue == SymbolicTruthValue.Unknown)?.Reason ??
-              string.Empty
-            : null;
-        Proof = SymbolicProofProjection
-            .FromSolverBackedResult(SymbolicProofProjection.MapStatus(Status), IsSolverBacked, unknownReason)
-            .CreateInfo(Summary, false, null, Target, FormulaText, FormulaKind);
-    }
-
-    public string Condition { get; }
-
-    public string Target { get; }
-
-    public string DisplayKind { get; }
-
-    internal string FormulaKind { get; }
-
-    public string ValueKind { get; }
-
-    internal string FormulaText { get; }
-
-    internal bool IsSolverBacked { get; }
-
-    public int TotalCount { get; }
-
-    public int UnknownCount { get; }
-
-    public int ProvenTrueCount { get; }
-
-    public int ProvenFalseCount { get; }
-
-    public int UnreachableCount { get; }
-
-    public int ReachableCount { get; }
-
-    public int ResolvedCount { get; }
-
-    public SymbolicConditionProofSummaryStatus Status { get; }
-
-    public string Summary { get; }
-
-    public SymbolicProofInfo Proof { get; }
-
-    public bool HoldsOnAllReachablePoints => Status == SymbolicConditionProofSummaryStatus.AlwaysTrue;
-
-    public bool RefutedOnAllReachablePoints => Status == SymbolicConditionProofSummaryStatus.AlwaysFalse;
-
-    public bool HasMixedReachableOutcomes => Status == SymbolicConditionProofSummaryStatus.Mixed;
-
-    public IReadOnlyList<SymbolicConditionProofReasonSummary> Reasons { get; }
-
-    public static IReadOnlyList<SymbolicConditionProofSummary> FromProgramPoints(
+    internal static IReadOnlyList<SymbolicConditionProofSummary> FromProgramPoints(
         IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
@@ -736,135 +596,91 @@ internal sealed class SymbolicConditionProofSummary
         IEnumerable<SymbolicConditionProofResult> proofs)
     {
         var proofArray = proofs.ToArray();
-        var unknownCount = 0;
-        var provenTrueCount = 0;
-        var provenFalseCount = 0;
-        var unreachableCount = 0;
-        foreach (var proof in proofArray)
-            switch (proof.TruthValue)
-            {
-                case SymbolicTruthValue.Unknown:
-                    unknownCount++;
-                    break;
-                case SymbolicTruthValue.ProvenTrue:
-                    provenTrueCount++;
-                    break;
-                case SymbolicTruthValue.ProvenFalse:
-                    provenFalseCount++;
-                    break;
-                case SymbolicTruthValue.Unreachable:
-                    unreachableCount++;
-                    break;
-            }
+        var unknownCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown);
+        var provenTrueCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue);
+        var provenFalseCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenFalse);
+        var unreachableCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unreachable);
 
         var metadataProof = proofArray.FirstOrDefault(static proof => proof.IsSolverBacked) ??
                             proofArray.FirstOrDefault();
+        var reachableCount = proofArray.Length - unreachableCount;
+        var status = ResolveStatus(
+            proofArray.Length,
+            reachableCount,
+            unknownCount,
+            provenTrueCount,
+            provenFalseCount,
+            unreachableCount);
+        var reasons = proofArray.GroupBy(static proof => (proof.TruthValue, proof.Reason))
+            .OrderBy(static group => group.Key.TruthValue)
+            .ThenBy(static group => group.Key.Reason, StringComparer.Ordinal)
+            .Select(static group => new SymbolicConditionProofReason(
+                group.Key.TruthValue,
+                group.Key.Reason,
+                group.Count()))
+            .ToArray();
+        var summary = CreateSummary(status);
+        var target = metadataProof?.Target ?? string.Empty;
+        var formulaKind = metadataProof?.DisplayKind ?? "Unknown";
+        var formulaText = metadataProof?.FormulaText ?? condition;
+        var proof = SymbolicProofProjection.FromSolverBackedResult(
+                SymbolicProofProjection.MapStatus(status),
+                metadataProof?.IsSolverBacked ?? false,
+                reasons.FirstOrDefault(static reason => reason.TruthValue == SymbolicTruthValue.Unknown)?.Reason)
+            .CreateInfo(summary, false, null, target, formulaText, formulaKind);
         return new SymbolicConditionProofSummary(
             condition,
+            target,
+            formulaKind,
+            metadataProof?.ValueKind ?? "Unknown",
+            proofArray.Length,
             unknownCount,
             provenTrueCount,
             provenFalseCount,
             unreachableCount,
-            reasons: proofArray
-                .GroupBy(
-                    static proof => new ProofReasonKey(proof.TruthValue, proof.Reason),
-                    ProofReasonKeyComparer.Instance)
-                .OrderBy(static group => group.Key.TruthValue)
-                .ThenBy(static group => group.Key.Reason, StringComparer.Ordinal)
-                .Select(static group => new SymbolicConditionProofReasonSummary(
-                    group.Key.TruthValue,
-                    group.Key.Reason,
-                    group.Count()))
-                .ToArray(),
-            target: metadataProof?.Target,
-            formulaKind: metadataProof?.FormulaKind,
-            valueKind: metadataProof?.ValueKind,
-            formulaText: metadataProof?.FormulaText,
-            isSolverBacked: metadataProof?.IsSolverBacked ?? false);
+            reachableCount,
+            provenTrueCount + provenFalseCount + unreachableCount,
+            status,
+            summary,
+            proof,
+            status == SymbolicConditionProofSummaryStatus.AlwaysTrue,
+            status == SymbolicConditionProofSummaryStatus.AlwaysFalse,
+            status == SymbolicConditionProofSummaryStatus.Mixed,
+            reasons);
     }
 
-    private static SymbolicConditionProofSummaryStatus ResolveStatus(
+    internal static SymbolicConditionProofSummaryStatus ResolveStatus(
         int totalCount,
         int reachableCount,
         int unknownCount,
         int provenTrueCount,
         int provenFalseCount,
-        int unreachableCount)
+        int unreachableCount) => totalCount == 0
+        ? SymbolicConditionProofSummaryStatus.None
+        : unreachableCount == totalCount
+            ? SymbolicConditionProofSummaryStatus.UnreachableOnly
+            : unknownCount != 0
+                ? SymbolicConditionProofSummaryStatus.Unknown
+                : provenFalseCount == 0 && provenTrueCount == reachableCount
+                    ? SymbolicConditionProofSummaryStatus.AlwaysTrue
+                    : provenTrueCount == 0 && provenFalseCount == reachableCount
+                        ? SymbolicConditionProofSummaryStatus.AlwaysFalse
+                        : SymbolicConditionProofSummaryStatus.Mixed;
+
+    internal static string CreateSummary(SymbolicConditionProofSummaryStatus status) => status switch
     {
-        if (totalCount == 0) return SymbolicConditionProofSummaryStatus.None;
+        SymbolicConditionProofSummaryStatus.None => "No implication proof results were requested for this condition.",
+        SymbolicConditionProofSummaryStatus.UnreachableOnly =>
+            "Every candidate program point for this condition was unreachable.",
+        SymbolicConditionProofSummaryStatus.AlwaysTrue =>
+            "The condition is proven true at every reachable candidate program point.",
+        SymbolicConditionProofSummaryStatus.AlwaysFalse =>
+            "The condition is proven false at every reachable candidate program point.",
+        SymbolicConditionProofSummaryStatus.Mixed =>
+            "The condition has both true and false reachable proof outcomes.",
+        _ => "The condition has at least one unresolved reachable proof outcome."
+    };
 
-        if (unreachableCount == totalCount) return SymbolicConditionProofSummaryStatus.UnreachableOnly;
-
-        if (unknownCount != 0) return SymbolicConditionProofSummaryStatus.Unknown;
-
-        if (provenFalseCount == 0 && provenTrueCount == reachableCount)
-            return SymbolicConditionProofSummaryStatus.AlwaysTrue;
-
-        if (provenTrueCount == 0 && provenFalseCount == reachableCount)
-            return SymbolicConditionProofSummaryStatus.AlwaysFalse;
-
-        return SymbolicConditionProofSummaryStatus.Mixed;
-    }
-
-    private static string CreateSummary(SymbolicConditionProofSummaryStatus status)
-    {
-        switch (status)
-        {
-            case SymbolicConditionProofSummaryStatus.None:
-                return "No implication proof results were requested for this condition.";
-            case SymbolicConditionProofSummaryStatus.UnreachableOnly:
-                return "Every candidate program point for this condition was unreachable.";
-            case SymbolicConditionProofSummaryStatus.AlwaysTrue:
-                return "The condition is proven true at every reachable candidate program point.";
-            case SymbolicConditionProofSummaryStatus.AlwaysFalse:
-                return "The condition is proven false at every reachable candidate program point.";
-            case SymbolicConditionProofSummaryStatus.Mixed:
-                return "The condition has both true and false reachable proof outcomes.";
-            default:
-                return "The condition has at least one unresolved reachable proof outcome.";
-        }
-    }
-
-    private readonly struct ProofReasonKey(SymbolicTruthValue truthValue, string? reason)
-    {
-        public SymbolicTruthValue TruthValue { get; } = truthValue;
-
-        public string Reason { get; } = reason ?? string.Empty;
-    }
-
-    private sealed class ProofReasonKeyComparer : IEqualityComparer<ProofReasonKey>
-    {
-        public static readonly ProofReasonKeyComparer Instance = new();
-
-        public bool Equals(ProofReasonKey x, ProofReasonKey y)
-        {
-            return x.TruthValue == y.TruthValue &&
-                   string.Equals(x.Reason, y.Reason, StringComparison.Ordinal);
-        }
-
-        public int GetHashCode(ProofReasonKey obj)
-        {
-            unchecked
-            {
-                return ((int)obj.TruthValue * 397) ^ StringComparer.Ordinal.GetHashCode(obj.Reason);
-            }
-        }
-    }
-}
-
-internal sealed class SymbolicConditionProofReasonSummary(
-    SymbolicTruthValue truthValue,
-    string reason,
-    int count)
-{
-    public SymbolicTruthValue TruthValue { get; } = truthValue;
-    public string Reason { get; } = reason ?? string.Empty;
-    public int Count { get; } = count;
-
-    public string GetDisplayReason()
-    {
-        return SymbolicReasonDisplay.Format(Reason);
-    }
 }
 
 internal enum SymbolicConditionProofSummaryStatus

@@ -306,14 +306,18 @@ public sealed record SourceQueryPayload : SharpProofQueryPayload
 {
     internal SourceQueryPayload(SymbolicQueryResult value)
     {
+        var proofs = value.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
         Metadata = SharpProofPayloadMetadata.From(value);
         ProgramPointCount = value.ProgramPointCount;
         Invariant = value.InvariantInfo.MergedText;
-        ConditionProofCount = value.ConditionProofs.Count;
-        UnknownProofCount = value.ConditionProofs.Sum(static proof => proof.UnknownCount);
-        AllConditionsHold = value.ConditionProofs.All(static proof => proof.HoldsOnAllReachablePoints);
+        ConditionProofCount = proofs.Select(static proof => proof.Condition).Distinct(StringComparer.Ordinal).Count();
+        UnknownProofCount = value.Metrics.ProofUnknownCount;
+        AllConditionsHold = proofs.GroupBy(static proof => proof.Condition, StringComparer.Ordinal).All(static group =>
+            group.Any(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue) &&
+            group.All(static proof => proof.TruthValue is
+                SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable));
         ConservativeUnknownCount = value.MergedPathFacts.ConservativeUnknownCount;
-        ReachabilityUnknownCount = value.Reachability.UnknownCount;
+        ReachabilityUnknownCount = value.Metrics.ReachabilityUnknownCount;
         Smt = SharpProofSmtMetadata.From(value.SmtDiagnostics);
     }
 
@@ -472,11 +476,11 @@ internal sealed record SharpProofPayloadMetadata(
 
     private static IEnumerable<SymbolicUnknownReasonInfo> GetSourceUnknownReasons(SymbolicQueryResult result)
     {
-        foreach (var proof in result.ConditionProofs)
-            if (proof.Proof.Status == SymbolicProofStatus.Unknown)
+        foreach (var proof in result.ProgramPoints.SelectMany(static point => point.ConditionProofs))
+            if (proof.TruthValue == SymbolicTruthValue.Unknown)
                 yield return SymbolicUnknownReasonTaxonomy.ForProof(
                     SymbolicUnknownReason.Unknown,
-                    proof.Proof.Reason);
+                    proof.Reason);
 
         foreach (var point in result.ProgramPoints)
             if (point.Reachability == SymbolicReachability.Unknown)

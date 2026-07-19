@@ -127,13 +127,14 @@ internal static class SymbolicCliTextRenderer
                 $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
             Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
         }
+        var metrics = SymbolicQueryMetrics.FromProgramPoints(new[] { result });
         Console.WriteLine(
             "Proof outcomes: " +
-            $"Total={result.ProofOutcomes.TotalCount}, " +
-            $"ProvenTrue={result.ProofOutcomes.ProvenTrueCount}, " +
-            $"ProvenFalse={result.ProofOutcomes.ProvenFalseCount}, " +
-            $"Unreachable={result.ProofOutcomes.UnreachableCount}, " +
-            $"Unknown={result.ProofOutcomes.UnknownCount}");
+            $"Total={metrics.ProofTotalCount}, " +
+            $"ProvenTrue={metrics.ProofProvenTrueCount}, " +
+            $"ProvenFalse={metrics.ProofProvenFalseCount}, " +
+            $"Unreachable={metrics.ProofUnreachableCount}, " +
+            $"Unknown={metrics.ProofUnknownCount}");
         if (result.SmtDiagnostics.IsConfigured) PrintSmtDiagnostics(result.SmtDiagnostics);
         Console.WriteLine("Facts:");
         foreach (var fact in result.Facts) Console.WriteLine("  " + fact);
@@ -210,11 +211,15 @@ internal static class SymbolicCliTextRenderer
         IReadOnlyList<SymbolicConditionProofSummary> proofs,
         SymbolicCliOptions options)
     {
-        foreach (var proof in SymbolicInvariantTargetFilter.ApplyToProofSummaries(proofs, options.InvariantTargets))
+        foreach (var proof in proofs)
         {
+            var target = proof.Target;
+            if (options.InvariantTargets.Count != 0 &&
+                !SymbolicInvariantTargetFilter.Matches(target, options.InvariantTargets))
+                continue;
             Console.WriteLine(
-                $"Implies '{proof.Condition}' target={FormatTarget(proof.Target)} " +
-                $"kind={proof.Proof.DisplayKind} summary: Status={proof.Status}, " +
+                $"Implies '{proof.Condition}' target={FormatTarget(target)} " +
+                $"kind={proof.DisplayKind} summary: Status={proof.Status}, " +
                 $"ProvenTrue={proof.ProvenTrueCount}, ProvenFalse={proof.ProvenFalseCount}, " +
                 $"Unreachable={proof.UnreachableCount}, Unknown={proof.UnknownCount}, " +
                 $"Reachable={proof.ReachableCount}, Resolved={proof.ResolvedCount}");

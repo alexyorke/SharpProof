@@ -57,14 +57,14 @@ internal static class SymbolicCliExitGateEvaluator
             result is not SymbolicQueryResult queryResult)
             return;
 
-        var outcomes = queryResult.ProgramPointSummary.ProofOutcomes;
-        var unprovenCount = outcomes.TotalCount - outcomes.ProvenTrueCount;
-        if (outcomes.TotalCount != 0 && unprovenCount == 0) return;
+        var metrics = queryResult.Metrics;
+        var unprovenCount = metrics.ProofTotalCount - metrics.ProofProvenTrueCount;
+        if (metrics.ProofTotalCount != 0 && unprovenCount == 0) return;
 
         failures.Add(new SymbolicCliExitGateFailure(
             "unproven-implies",
-            "proofs=" + outcomes.TotalCount.ToString(CultureInfo.InvariantCulture) +
-            "; provenTrue=" + outcomes.ProvenTrueCount.ToString(CultureInfo.InvariantCulture) +
+            "proofs=" + metrics.ProofTotalCount.ToString(CultureInfo.InvariantCulture) +
+            "; provenTrue=" + metrics.ProofProvenTrueCount.ToString(CultureInfo.InvariantCulture) +
             "; unproven=" + unprovenCount.ToString(CultureInfo.InvariantCulture) + "."));
     }
 
@@ -187,8 +187,8 @@ internal static class SymbolicCliExitGateEvaluator
             {
                 "program-points" => queryResult.ProgramPointCount,
                 "conservative-unknowns" => queryResult.MergedPathFacts.ConservativeUnknownCount,
-                "proof-unknowns" => queryResult.ProgramPointSummary.ProofOutcomes.UnknownCount,
-                "reachability-unknowns" => queryResult.Reachability.UnknownCount,
+                "proof-unknowns" => queryResult.Metrics.ProofUnknownCount,
+                "reachability-unknowns" => queryResult.Metrics.ReachabilityUnknownCount,
                 _ => throw new InvalidOperationException("Unsupported invariant threshold metric: " + metric)
             };
 

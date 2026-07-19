@@ -185,6 +185,24 @@ public sealed class RepositoryArchitectureTests
         });
     }
 
+    [Test]
+    public void SymbolicQueries_UseOneAggregateMetricsOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var summaries = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicQueryFactSummaries.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summaries, Does.Contain("SymbolicQueryMetrics"));
+            Assert.That(summaries, Does.Contain("SymbolicConditionProofProjection"));
+            Assert.That(summaries, Does.Not.Contain("class SymbolicConditionProofSummary"));
+            Assert.That(summaries, Does.Not.Contain("SymbolicProgramPointSummary.FromProgramPoints"));
+            Assert.That(summaries, Does.Not.Contain("SymbolicReachabilitySummary.FromProgramPoints"));
+            Assert.That(summaries, Does.Not.Contain("SymbolicProofOutcomeSummary.FromProofs"));
+        });
+    }
+
     private static IEnumerable<string> GetExternalCompileItems(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
