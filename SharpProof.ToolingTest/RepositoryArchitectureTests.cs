@@ -608,6 +608,9 @@ public sealed class RepositoryArchitectureTests
             Path.Combine(root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptionRegistry.cs"),
             Path.Combine(root, "SharpProof.Analyzer", "Engine", "PurityKnownBclSemantics.cs"),
             Path.Combine(root, "SharpProof.ProofCore", "SmtSolver.cs"),
+            Path.Combine(root, "SharpProof.Symbolic", "Smt", "SmtAnalysisLifecycle.cs"),
+            Path.Combine(root, "SharpProof.Symbolic", "Smt", "SmtAnalysisService.cs"),
+            Path.Combine(root, "SharpProof.Symbolic", "Smt", "SmtProofSearchSessionPool.cs"),
             Path.Combine(root, "Tools", "SharpProof.EffectSummary",
                 "EffectSummaryClassificationEvidenceRules.cs")
         }.Select(File.ReadAllText));
@@ -621,6 +624,9 @@ public sealed class RepositoryArchitectureTests
             Assert.That(sources, Does.Not.Contain("public Feasibility IsSatisfiable("));
             Assert.That(sources, Does.Not.Contain("public Feasibility Implies("));
             Assert.That(sources, Does.Not.Contain("CheckPathAndImpurity("));
+            Assert.That(sources, Does.Not.Contain("RecycleSolverContext"));
+            Assert.That(sources, Does.Not.Contain("RequestGlobalRecycle"));
+            Assert.That(sources, Does.Not.Contain("SmtSolverContextRecycleScope"));
         });
     }
 

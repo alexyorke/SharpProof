@@ -676,16 +676,22 @@ Tests are excluded from the metric and must not be deleted.
   satisfiability helper, and their dead private tail are deleted; focused SMT,
   semantic-oracle, and architecture coverage preserves every result and
   prevents the parallel entry points from returning.
+- [x] Removed the test-only cross-service SMT context recycling protocol.
+  Production transient and permanent failures already recycle only the
+  service-owned current-thread solver session, so the manual recycle API,
+  scope/result DTOs, global generation, stale-session branch, and health-reset
+  tail had no product caller. Retargeted lifecycle tests preserve automatic
+  retry, local/shared cache behavior, service isolation, and disposal coverage;
+  architecture coverage prevents the unused global protocol from returning.
 
 ## Current evidence
 
-- Maintained production: 90,747 lines (86,924 C#, 3,093 scripts, and 730
-  specifications); net reduction: 16,879 lines; remaining reduction: 3,121.
-  This tranche removes 86 maintained-production lines by deleting ProofCore's
-  test-only feasibility API and its second path-and-impurity solver execution.
-  Tests use the production witness-returning boundary directly; diagnostics,
-  proof outcomes, conservative unknowns, CLI bytes, serialization, and package
-  contents are unchanged, and no test was deleted.
+- Maintained production: 90,659 lines (86,836 C#, 3,093 scripts, and 730
+  specifications); net reduction: 16,967 lines; remaining reduction: 3,033.
+  This tranche removes 88 maintained-production lines by deleting the unused
+  global SMT context recycle protocol. Real transient/permanent recovery,
+  lifecycle diagnostics, proof outcomes, conservative unknowns, CLI bytes,
+  serialization, and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,222 passing tests and two documented Main skips.
 

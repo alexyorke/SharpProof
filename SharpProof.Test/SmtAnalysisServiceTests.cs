@@ -214,8 +214,9 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void RequestGlobalSolverContextRecycle_PreservesLocalAndSharedCaches()
+    public void TransientSolverContextRecycle_PreservesLocalAndSharedCaches()
     {
+        var attempts = 0;
         var firstFactoryCalls = 0;
         var firstDisposedSessions = 0;
         var options = new SmtAnalysisOptions(
@@ -233,12 +234,13 @@ public class SmtAnalysisServiceTests
             {
                 Interlocked.Increment(ref firstFactoryCalls);
                 return new StubProofSearchSession(
-                    (_, _) => CreateImpureResult(),
+                    (_, _) => Interlocked.Increment(ref attempts) == 1
+                        ? CreateTransientFailure()
+                        : CreateImpureResult(),
                     () => Interlocked.Increment(ref firstDisposedSessions));
             });
 
         var first = firstService.Classify(query);
-        var recycle = firstService.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
         var localCached = firstService.Classify(query);
         var secondFactoryCalls = 0;
         using var secondService = new SmtAnalysisService(
@@ -253,74 +255,58 @@ public class SmtAnalysisServiceTests
         Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(localCached.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(sharedCached.Outcome, Is.EqualTo(first.Outcome));
-        Assert.That(recycle.Scope, Is.EqualTo(SmtSolverContextRecycleScope.AllThreadsOnNextUse));
-        Assert.That(recycle.DisposedCurrentThreadContext, Is.True);
-        Assert.That(recycle.LocalCacheEntryCount, Is.EqualTo(1));
-        Assert.That(recycle.SharedCacheEntryCount, Is.GreaterThanOrEqualTo(1));
-        Assert.That(firstFactoryCalls, Is.EqualTo(1));
+        Assert.That(firstFactoryCalls, Is.EqualTo(2));
         Assert.That(firstDisposedSessions, Is.EqualTo(1));
         Assert.That(secondFactoryCalls, Is.Zero);
+        Assert.That(firstService.Health.ContextRecycleCount, Is.EqualTo(1));
         Assert.That(firstService.CacheEntryCount, Is.EqualTo(1));
         Assert.That(secondService.CacheEntryCount, Is.EqualTo(1));
     }
 
     [Test]
-    public void RequestGlobalSolverContextRecycle_RecyclesOtherThreadOnNextUse()
+    public void TransientSolverContextRecycle_DoesNotRecycleAnotherServiceSession()
     {
-        var factoryCalls = 0;
-        var disposedSessions = 0;
-        Exception? workerException = null;
-        SmtAnalysisHealth? healthAfterRecycle = null;
-        using var contextReady = new ManualResetEventSlim();
-        using var recycleRequested = new ManualResetEventSlim();
-        var options = SmtAnalysisOptions.Default.WithLifecycle(
-            new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true));
-        var worker = new Thread(() =>
-        {
-            try
+        var firstAttempts = 0;
+        var firstFactoryCalls = 0;
+        var firstDisposedSessions = 0;
+        var secondFactoryCalls = 0;
+        var secondDisposedSessions = 0;
+        var options = SmtAnalysisOptions.Default.WithLifecycle(new SmtSolverLifecycleOptions(maxTransientRetries: 1));
+        using var firstService = new SmtAnalysisService(
+            options,
+            () =>
             {
-                using var service = new SmtAnalysisService(
-                    options,
-                    () =>
-                    {
-                        Interlocked.Increment(ref factoryCalls);
-                        return new StubProofSearchSession(
-                            (_, _) => CreateImpureResult(),
-                            () => Interlocked.Increment(ref disposedSessions));
-                    });
-                _ = service.Classify(CreateSolverQuery("global_recycle_first"));
-                contextReady.Set();
-                recycleRequested.Wait();
-                _ = service.Classify(CreateSolverQuery("global_recycle_second"));
-                healthAfterRecycle = service.Health;
-            }
-            catch (Exception ex)
+                Interlocked.Increment(ref firstFactoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => Interlocked.Increment(ref firstAttempts) == 1
+                        ? CreateTransientFailure()
+                        : CreateImpureResult(),
+                    () => Interlocked.Increment(ref firstDisposedSessions));
+            });
+        using var secondService = new SmtAnalysisService(
+            options,
+            () =>
             {
-                workerException = ex;
-                contextReady.Set();
-            }
-        });
-        worker.Start();
-        Assert.That(contextReady.Wait(TimeSpan.FromSeconds(10)), Is.True);
+                Interlocked.Increment(ref secondFactoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => CreateImpureResult(),
+                    () => Interlocked.Increment(ref secondDisposedSessions));
+            });
 
-        using (var controller = new SmtAnalysisService(options))
-        {
-            var recycle = controller.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
-            Assert.That(recycle.Scope, Is.EqualTo(SmtSolverContextRecycleScope.AllThreadsOnNextUse));
-        }
+        _ = secondService.Classify(CreateSolverQuery("isolated_second_before"));
+        _ = firstService.Classify(CreateSolverQuery("isolated_first"));
+        _ = secondService.Classify(CreateSolverQuery("isolated_second_after"));
 
-        recycleRequested.Set();
-        Assert.That(worker.Join(TimeSpan.FromSeconds(10)), Is.True);
-
-        Assert.That(workerException, Is.Null);
-        Assert.That(factoryCalls, Is.EqualTo(2));
-        Assert.That(disposedSessions, Is.EqualTo(2));
-        Assert.That(healthAfterRecycle, Is.Not.Null);
-        Assert.That(healthAfterRecycle!.ContextRecycleCount, Is.EqualTo(1));
+        Assert.That(firstFactoryCalls, Is.EqualTo(2));
+        Assert.That(firstDisposedSessions, Is.EqualTo(1));
+        Assert.That(firstService.Health.ContextRecycleCount, Is.EqualTo(1));
+        Assert.That(secondFactoryCalls, Is.EqualTo(1));
+        Assert.That(secondDisposedSessions, Is.Zero);
+        Assert.That(secondService.Health.ContextRecycleCount, Is.Zero);
     }
 
     [Test]
-    public void RequestGlobalSolverContextRecycle_IsolatesServiceOwnedSessions()
+    public void PermanentFailureRecycle_IsolatesServiceOwnedSessions()
     {
         var firstFactoryCalls = 0;
         var secondFactoryCalls = 0;
@@ -332,7 +318,7 @@ public class SmtAnalysisServiceTests
             {
                 Interlocked.Increment(ref firstFactoryCalls);
                 return new StubProofSearchSession(
-                    (_, _) => CreateImpureResult(),
+                    (_, _) => throw new DllNotFoundException("missing test solver"),
                     () => Interlocked.Increment(ref firstDisposedSessions));
             });
         using var secondService = new SmtAnalysisService(
@@ -345,18 +331,17 @@ public class SmtAnalysisServiceTests
                     () => Interlocked.Increment(ref secondDisposedSessions));
             });
 
-        _ = firstService.Classify(CreateSolverQuery("first_service_session"));
+        var first = firstService.Classify(CreateSolverQuery("first_service_session"));
         _ = secondService.Classify(CreateSolverQuery("second_service_session_before_recycle"));
-
-        var recycle = firstService.RecycleSolverContext(SmtSolverContextRecycleScope.AllThreadsOnNextUse);
         _ = secondService.Classify(CreateSolverQuery("second_service_session_after_recycle"));
 
-        Assert.That(recycle.DisposedCurrentThreadContext, Is.True);
+        Assert.That(first.Reason, Is.EqualTo("smt_unavailable"));
         Assert.That(firstFactoryCalls, Is.EqualTo(1));
         Assert.That(firstDisposedSessions, Is.EqualTo(1));
-        Assert.That(secondFactoryCalls, Is.EqualTo(2));
-        Assert.That(secondDisposedSessions, Is.EqualTo(1));
-        Assert.That(secondService.Health.ContextRecycleCount, Is.EqualTo(1));
+        Assert.That(firstService.Health.ContextRecycleCount, Is.EqualTo(1));
+        Assert.That(secondFactoryCalls, Is.EqualTo(1));
+        Assert.That(secondDisposedSessions, Is.Zero);
+        Assert.That(secondService.Health.ContextRecycleCount, Is.Zero);
     }
 
     [Test]

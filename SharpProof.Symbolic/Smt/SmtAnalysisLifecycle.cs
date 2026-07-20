@@ -11,12 +11,6 @@ internal enum SmtAnalysisHealthState
     Disposed
 }
 
-internal enum SmtSolverContextRecycleScope
-{
-    CurrentThread,
-    AllThreadsOnNextUse
-}
-
 internal sealed class SmtSolverLifecycleOptions(
     int maxTransientRetries = 1,
     bool recycleContextOnTransientFailure = true,
@@ -48,10 +42,3 @@ internal sealed record SmtAnalysisHealth(
     [JsonPropertyOrder(2)]
     public bool IsPermanentlyUnavailable => State == SmtAnalysisHealthState.PermanentlyUnavailable;
 }
-
-internal sealed record SmtSolverContextRecycleResult(
-    SmtSolverContextRecycleScope Scope,
-    bool DisposedCurrentThreadContext,
-    long RequestedGeneration,
-    int LocalCacheEntryCount,
-    int SharedCacheEntryCount);

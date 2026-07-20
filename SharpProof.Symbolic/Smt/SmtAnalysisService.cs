@@ -73,7 +73,7 @@ internal sealed class SmtAnalysisService : IDisposable
                     _transientRetryCount,
                     _recoveredTransientFailureCount,
                     _contextRecycleCount,
-                    SmtProofSearchSessionPool.GlobalGeneration);
+                    0);
         }
     }
 
@@ -89,36 +89,6 @@ internal sealed class SmtAnalysisService : IDisposable
                 ref _contextRecycleCount,
                 _proofSearchSessions.Dispose(
                     Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose));
-        }
-    }
-
-    public SmtSolverContextRecycleResult RecycleSolverContext(SmtSolverContextRecycleScope scope)
-    {
-        lock (_solverLock)
-        {
-            bool disposed;
-            long generation;
-            if (scope == SmtSolverContextRecycleScope.CurrentThread)
-            {
-                disposed = _proofSearchSessions.RecycleCurrentThread();
-                generation = SmtProofSearchSessionPool.GlobalGeneration;
-            }
-            else if (scope == SmtSolverContextRecycleScope.AllThreadsOnNextUse)
-            {
-                generation = _proofSearchSessions.RequestGlobalRecycle(out disposed);
-            }
-            else
-            {
-                throw new ArgumentOutOfRangeException(nameof(scope));
-            }
-
-            if (disposed) Interlocked.Increment(ref _contextRecycleCount);
-
-            ResetDegradedHealth();
-            return CreateRecycleResult(
-                scope,
-                disposed,
-                generation);
         }
     }
 
@@ -257,9 +227,7 @@ internal sealed class SmtAnalysisService : IDisposable
                     try
                     {
                         Interlocked.Increment(ref _executedQueryCount);
-                        var search = _proofSearchSessions.GetOrCreate(out var recycledStaleSession);
-                        if (recycledStaleSession)
-                            Interlocked.Increment(ref _contextRecycleCount);
+                        var search = _proofSearchSessions.GetOrCreate();
                         var resourcesBefore = search.ConsumedResourceCount;
                         try
                         {
@@ -378,19 +346,6 @@ internal sealed class SmtAnalysisService : IDisposable
         return exception is TypeInitializationException ? exception : null;
     }
 
-    private SmtSolverContextRecycleResult CreateRecycleResult(
-        SmtSolverContextRecycleScope scope,
-        bool disposedCurrentThreadContext,
-        long requestedGeneration)
-    {
-        return new SmtSolverContextRecycleResult(
-            scope,
-            disposedCurrentThreadContext,
-            requestedGeneration,
-            _proofResults.LocalEntryCount,
-            SmtProofResultCache.SharedEntryCount);
-    }
-
     private SmtAnalysisHealthState GetHealthState()
     {
         return (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
@@ -429,17 +384,6 @@ internal sealed class SmtAnalysisService : IDisposable
             if (GetHealthState() == SmtAnalysisHealthState.Degraded)
                 _recoveredTransientFailureCount++;
 
-            _consecutiveTransientFailureCount = 0;
-            if (!_disposed && Options.IsEnabled &&
-                GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
-                SetHealthState(SmtAnalysisHealthState.Ready);
-        }
-    }
-
-    private void ResetDegradedHealth()
-    {
-        lock (_healthLock)
-        {
             _consecutiveTransientFailureCount = 0;
             if (!_disposed && Options.IsEnabled &&
                 GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
